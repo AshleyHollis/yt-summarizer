@@ -119,11 +119,7 @@ yt-summarizer/
 │       └── ServiceDefaults/    # Shared Aspire defaults
 │
 ├── db/
-│   ├── migrations/             # SQL migration scripts
-│   │   ├── V001__initial_schema.sql
-│   │   ├── V002__segments_and_embeddings.sql
-│   │   └── V003__relationships.sql
-│   └── seed/                   # Test data scripts
+│   └── seed/                   # Test data scripts (migrations in services/shared/alembic/)
 │
 ├── infra/
 │   ├── bicep/                  # Azure Bicep templates

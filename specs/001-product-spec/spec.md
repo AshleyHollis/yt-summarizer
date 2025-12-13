@@ -53,7 +53,7 @@ Potential to share the library read-only with a handful of friends. Not in initi
 ### Constraints (acknowledged, not specified as implementation)
 
 - Frontend: Next.js on Azure Static Web Apps
-- Backend: Azure Container Apps with .NET Aspire orchestration; polyglot services allowed
+- Backend: Azure Container Apps with .NET Aspire orchestration; Python (API + Workers)
 - Data: Single Azure SQL Database (serverless) for operational data, vectors, and relationships
 - Blob storage for large artifacts; queue for background processing
 - Identity: Azure Entra ID with Managed Identity
