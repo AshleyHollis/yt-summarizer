@@ -1,0 +1,432 @@
+openapi: 3.0.3
+info:
+  title: YT Summarizer - Jobs API
+  description: API for monitoring and managing processing jobs
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API base path
+
+paths:
+  /jobs:
+    get:
+      operationId: listJobs
+      summary: List jobs with filters
+      tags:
+        - Jobs
+      parameters:
+        - name: videoId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by video
+        - name: batchId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by batch
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, succeeded, failed, dead_lettered]
+          description: Filter by status
+        - name: jobType
+          in: query
+          schema:
+            type: string
+            enum: [transcribe, summarize, embed, build_relationships]
+          description: Filter by job type
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter by created date (from)
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter by created date (to)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Job list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListResponse'
+
+  /jobs/{jobId}:
+    get:
+      operationId: getJob
+      summary: Get job details
+      tags:
+        - Jobs
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Job details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobDetailResponse'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /jobs/{jobId}/retry:
+    post:
+      operationId: retryJob
+      summary: Retry a failed job
+      tags:
+        - Jobs
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Job queued for retry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobRetryResponse'
+        '400':
+          description: Job cannot be retried (not in failed state)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /jobs/dead-letter:
+    get:
+      operationId: listDeadLetteredJobs
+      summary: List dead-lettered jobs
+      description: Jobs that failed after maximum retries
+      tags:
+        - Jobs
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Dead-lettered job list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListResponse'
+
+  /jobs/stats:
+    get:
+      operationId: getJobStats
+      summary: Get job processing statistics
+      tags:
+        - Jobs
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+            default: day
+          description: Time period for statistics
+      responses:
+        '200':
+          description: Job statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatsResponse'
+
+  /videos/{videoId}/timeline:
+    get:
+      operationId: getVideoTimeline
+      summary: Get processing timeline for a video
+      description: Returns all jobs and their timing for a specific video
+      tags:
+        - Jobs
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Video processing timeline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoTimelineResponse'
+        '404':
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    JobListResponse:
+      type: object
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobSummary'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalCount:
+          type: integer
+
+    JobSummary:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          format: uuid
+        videoTitle:
+          type: string
+        batchId:
+          type: string
+          format: uuid
+        jobType:
+          type: string
+          enum: [transcribe, summarize, embed, build_relationships]
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed, dead_lettered]
+        stage:
+          type: string
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        retryCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        durationSeconds:
+          type: integer
+          description: Processing duration in seconds
+
+    JobDetailResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          format: uuid
+        videoTitle:
+          type: string
+        youTubeVideoId:
+          type: string
+        batchId:
+          type: string
+          format: uuid
+        jobType:
+          type: string
+          enum: [transcribe, summarize, embed, build_relationships]
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed, dead_lettered]
+        stage:
+          type: string
+        progress:
+          type: integer
+        errorMessage:
+          type: string
+        retryCount:
+          type: integer
+        maxRetries:
+          type: integer
+        correlationId:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        durationSeconds:
+          type: integer
+        stageHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/StageHistoryEntry'
+
+    StageHistoryEntry:
+      type: object
+      properties:
+        stage:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        durationSeconds:
+          type: integer
+        message:
+          type: string
+
+    JobRetryResponse:
+      type: object
+      properties:
+        originalJobId:
+          type: string
+          format: uuid
+        newJobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        message:
+          type: string
+
+    JobStatsResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        totalJobs:
+          type: integer
+        succeededJobs:
+          type: integer
+        failedJobs:
+          type: integer
+        deadLetteredJobs:
+          type: integer
+        pendingJobs:
+          type: integer
+        runningJobs:
+          type: integer
+        averageDurationSeconds:
+          type: number
+        byType:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobTypeStats'
+
+    JobTypeStats:
+      type: object
+      properties:
+        jobType:
+          type: string
+        count:
+          type: integer
+        succeededCount:
+          type: integer
+        failedCount:
+          type: integer
+        averageDurationSeconds:
+          type: number
+
+    VideoTimelineResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        videoTitle:
+          type: string
+        youTubeVideoId:
+          type: string
+        processingStatus:
+          type: string
+        totalDurationSeconds:
+          type: integer
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineJob'
+
+    TimelineJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        jobType:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        durationSeconds:
+          type: integer
+        errorMessage:
+          type: string
+        retryCount:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string

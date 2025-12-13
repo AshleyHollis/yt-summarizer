@@ -36,7 +36,7 @@ Principles:
 |-------|-----------|-------|
 | Frontend | Next.js | Deployed to Azure Static Web Apps |
 | Backend | Azure Container Apps | .NET Aspire for orchestration (dev + deploy composition) |
-| Services | Polyglot (.NET + Python) | Python workers for ML/transcript processing |
+| Services | Python (API + Workers) | Unified Python backend for code sharing |
 | Database | Azure SQL (serverless) | Entities, relationships, and vector embeddings |
 | Storage | Azure Blob Storage | Large artifacts (transcripts, media references) |
 | Queue | Azure Storage Queue | Background job coordination |

@@ -1,0 +1,448 @@
+openapi: 3.0.3
+info:
+  title: YT Summarizer - Ingestion API
+  description: API for ingesting YouTube videos and channels
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API base path
+
+paths:
+  /videos:
+    post:
+      operationId: submitVideo
+      summary: Submit a video for processing
+      description: Queue a YouTube video URL for transcription, summarization, and embedding
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitVideoRequest'
+      responses:
+        '202':
+          description: Video queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoResponse'
+        '400':
+          description: Invalid URL or request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Video already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoExistsResponse'
+
+  /videos/{videoId}/reprocess:
+    post:
+      operationId: reprocessVideo
+      summary: Reprocess an existing video
+      description: Queue an already-ingested video for reprocessing (replaces existing artifacts)
+      tags:
+        - Ingestion
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Video queued for reprocessing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '404':
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /channels:
+    post:
+      operationId: fetchChannel
+      summary: Fetch channel videos for selection
+      description: Retrieve available videos from a YouTube channel without ingesting
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchChannelRequest'
+      responses:
+        '200':
+          description: Channel videos retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelVideosResponse'
+        '400':
+          description: Invalid channel URL or ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /batches:
+    post:
+      operationId: createBatch
+      summary: Create a batch of videos for processing
+      description: Queue multiple videos for processing as a batch
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBatchRequest'
+      responses:
+        '202':
+          description: Batch created and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      operationId: listBatches
+      summary: List all batches
+      tags:
+        - Ingestion
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Batch list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchListResponse'
+
+  /batches/{batchId}:
+    get:
+      operationId: getBatch
+      summary: Get batch details
+      tags:
+        - Ingestion
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Batch details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchDetailResponse'
+        '404':
+          description: Batch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /batches/{batchId}/retry:
+    post:
+      operationId: retryBatchFailures
+      summary: Retry all failed videos in a batch
+      tags:
+        - Ingestion
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Failed videos queued for retry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchRetryResponse'
+        '404':
+          description: Batch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    SubmitVideoRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: YouTube video URL
+          example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+        correlationId:
+          type: string
+          description: Optional correlation ID for tracing
+
+    VideoResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        youTubeVideoId:
+          type: string
+        title:
+          type: string
+        channelName:
+          type: string
+        processingStatus:
+          type: string
+          enum: [pending, processing, completed, failed]
+        jobId:
+          type: string
+          format: uuid
+
+    VideoExistsResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        processingStatus:
+          type: string
+        message:
+          type: string
+        reprocessUrl:
+          type: string
+          format: uri
+
+    FetchChannelRequest:
+      type: object
+      required:
+        - channelUrl
+      properties:
+        channelUrl:
+          type: string
+          description: YouTube channel URL or ID
+          example: https://www.youtube.com/@MarkWildman
+
+    ChannelVideosResponse:
+      type: object
+      properties:
+        channelId:
+          type: string
+          format: uuid
+        youTubeChannelId:
+          type: string
+        channelName:
+          type: string
+        videoCount:
+          type: integer
+        videos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelVideo'
+
+    ChannelVideo:
+      type: object
+      properties:
+        youTubeVideoId:
+          type: string
+        title:
+          type: string
+        duration:
+          type: integer
+          description: Duration in seconds
+        publishDate:
+          type: string
+          format: date-time
+        thumbnailUrl:
+          type: string
+          format: uri
+        alreadyIngested:
+          type: boolean
+
+    CreateBatchRequest:
+      type: object
+      required:
+        - videoIds
+      properties:
+        channelId:
+          type: string
+          format: uuid
+          description: Optional channel reference
+        name:
+          type: string
+          description: Optional batch name
+        videoIds:
+          type: array
+          items:
+            type: string
+          description: YouTube video IDs to ingest
+          example: ["dQw4w9WgXcQ", "L_jWHffIx5E"]
+
+    BatchResponse:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        totalCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    BatchListResponse:
+      type: object
+      properties:
+        batches:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchSummary'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalCount:
+          type: integer
+
+    BatchSummary:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        totalCount:
+          type: integer
+        succeededCount:
+          type: integer
+        failedCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    BatchDetailResponse:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        channelName:
+          type: string
+        totalCount:
+          type: integer
+        pendingCount:
+          type: integer
+        runningCount:
+          type: integer
+        succeededCount:
+          type: integer
+        failedCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchItem'
+
+    BatchItem:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        youTubeVideoId:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed]
+        errorMessage:
+          type: string
+
+    BatchRetryResponse:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        retriedCount:
+          type: integer
+
+    JobResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          format: uuid
+        jobType:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed]
+        createdAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string
