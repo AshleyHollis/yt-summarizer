@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import SubmitVideoForm from '@/components/SubmitVideoForm';
 
 export const metadata: Metadata = {
@@ -42,6 +43,20 @@ export default function SubmitPage() {
         {/* Submit Form */}
         <section className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 md:p-8">
           <SubmitVideoForm />
+        </section>
+
+        {/* Channel Ingestion CTA */}
+        <section className="mt-8 text-center">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Want to ingest multiple videos from a channel?
+          </p>
+          <Link
+            href="/ingest"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+          >
+            <ChannelIcon />
+            Ingest from Channel
+          </Link>
         </section>
 
         {/* Features Section */}
@@ -134,6 +149,19 @@ function RelatedIcon() {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+      />
+    </svg>
+  );
+}
+
+function ChannelIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
       />
     </svg>
   );

@@ -2,7 +2,7 @@
 ===============================================================================
 SYNC IMPACT REPORT
 ===============================================================================
-Version: 1.0.0 (Initial ratification)
+Version: 1.0.1 (Development environment clarification)
 
 Core capabilities this constitution supports:
   - Cross-video and cross-channel queries
@@ -19,6 +19,10 @@ Principles:
   V.   Security (no secrets, least-privilege)
   VI.  Engineering Quality (simplicity, testing, migrations)
   VII. Change Management (amendments, compliance, pre-merge checks)
+
+Changes in 1.0.1:
+  - Clarified VI.4 to explicitly warn against 'aspire run' in addition to 'dotnet run'
+  - Updated PowerShell example to use full project path argument
 ===============================================================================
 -->
 
@@ -159,12 +163,11 @@ Principles:
    - **.NET Aspire MUST run as a detached background process** when running tests or subsequent terminal commands. Launching Aspire as a blocking foreground process will cause it to exit when the next terminal command is entered.
    - **PowerShell pattern for background Aspire**:
      ```powershell
-     # Start Aspire in background (detached)
-     cd services/aspire/AppHost
-     Start-Process -FilePath "dotnet" -ArgumentList "run" -WindowStyle Hidden
+     # Start Aspire in background (detached) - REQUIRED for non-blocking execution
+     Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WindowStyle Hidden
      Start-Sleep -Seconds 30  # Wait for services to initialize
      ```
-   - **Never run `dotnet run` directly** when you need to execute follow-up commands in the same session—it blocks the terminal.
+   - **⚠️ NEVER use `aspire run` or `dotnet run` directly** when you need to execute follow-up commands in the same session—they block the terminal and will be killed when the next command runs.
    - **Fixed ports**: API runs on `http://localhost:8000`, Web runs on `http://localhost:3000`. These are configured with `isProxied: false` in AppHost.cs.
 
 5. **Testing**:
@@ -224,4 +227,4 @@ Principles:
 
 ---
 
-**Version**: 1.0.0 | **Ratified**: 2025-12-13 | **Last Amended**: 2025-12-13
+**Version**: 1.0.1 | **Ratified**: 2025-12-13 | **Last Amended**: 2025-12-14

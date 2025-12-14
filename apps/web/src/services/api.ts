@@ -707,4 +707,237 @@ export const libraryApi = {
     api.get('/api/v1/library/stats'),
 };
 
+// ============================================================================
+// Channel Ingestion Types (US2)
+// ============================================================================
+
+/**
+ * Request to fetch videos from a channel
+ */
+export interface FetchChannelRequest {
+  channel_url: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/**
+ * Video available from a channel for ingestion
+ */
+export interface ChannelVideo {
+  youtube_video_id: string;
+  title: string;
+  duration: number;
+  publish_date: string;
+  thumbnail_url: string | null;
+  already_ingested: boolean;
+}
+
+/**
+ * Response with channel videos
+ */
+export interface ChannelVideosResponse {
+  channel_id: string | null;
+  youtube_channel_id: string;
+  channel_name: string;
+  total_video_count: number | null;
+  returned_count: number;
+  videos: ChannelVideo[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+// ============================================================================
+// Batch Types (US2)
+// ============================================================================
+
+/**
+ * Batch status
+ */
+export type BatchStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+/**
+ * Batch item status
+ */
+export type BatchItemStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+
+/**
+ * Request to create a batch
+ */
+export interface CreateBatchRequest {
+  channel_id?: string;
+  youtube_channel_id?: string;
+  name: string;
+  video_ids: string[];
+  ingest_all?: boolean;
+}
+
+/**
+ * Batch item in a batch
+ */
+export interface BatchItem {
+  id: string;
+  video_id: string | null;
+  youtube_video_id: string;
+  title: string;
+  status: BatchItemStatus;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Batch summary for list views
+ */
+export interface BatchResponse {
+  id: string;
+  name: string;
+  channel_name: string | null;
+  status: BatchStatus;
+  total_count: number;
+  pending_count: number;
+  running_count: number;
+  succeeded_count: number;
+  failed_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Full batch details with items
+ */
+export interface BatchDetailResponse extends BatchResponse {
+  items: BatchItem[];
+}
+
+/**
+ * Batch list response
+ */
+export interface BatchListResponse {
+  batches: BatchResponse[];
+  total_count: number;
+  page: number;
+  page_size: number;
+}
+
+/**
+ * Batch retry response
+ */
+export interface BatchRetryResponse {
+  batch_id: string;
+  retried_count: number;
+  message: string;
+}
+
+// ============================================================================
+// Channel Ingestion API (US2)
+// ============================================================================
+
+export const channelApi = {
+  /**
+   * Fetch videos from a YouTube channel
+   */
+  fetchVideos: (request: FetchChannelRequest): Promise<ChannelVideosResponse> =>
+    api.post('/api/v1/channels', { body: request }),
+};
+
+// ============================================================================
+// Batch API (US2)
+// ============================================================================
+
+export const batchApi = {
+  /**
+   * Create a batch for ingestion
+   */
+  create: (request: CreateBatchRequest): Promise<BatchResponse> =>
+    api.post('/api/v1/batches', { body: request }),
+
+  /**
+   * List all batches
+   */
+  list: (page?: number, pageSize?: number): Promise<BatchListResponse> =>
+    api.get('/api/v1/batches', { params: { page, page_size: pageSize } }),
+
+  /**
+   * Get batch details
+   */
+  getById: (batchId: string): Promise<BatchDetailResponse> =>
+    api.get(`/api/v1/batches/${batchId}`),
+
+  /**
+   * Stream batch progress via Server-Sent Events
+   * Returns an EventSource that emits batch detail updates
+   */
+  streamProgress: (
+    batchId: string,
+    onUpdate: (batch: BatchDetailResponse) => void,
+    onComplete?: (batch: BatchDetailResponse) => void,
+    onError?: (error: Error) => void
+  ): (() => void) => {
+    // Build the SSE URL - use direct backend URL to avoid Next.js proxy buffering
+    // SSE connections should bypass the rewrite proxy for proper streaming
+    const directApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const sseUrl = `${directApiUrl}/api/v1/batches/${batchId}/stream`;
+
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const batch = JSON.parse(event.data) as BatchDetailResponse;
+        onUpdate(batch);
+      } catch (err) {
+        console.error('Failed to parse SSE data:', err);
+      }
+    };
+
+    eventSource.addEventListener('complete', (event) => {
+      try {
+        const batch = JSON.parse((event as MessageEvent).data) as BatchDetailResponse;
+        onComplete?.(batch);
+      } catch (err) {
+        console.error('Failed to parse SSE complete event:', err);
+      }
+      eventSource.close();
+    });
+
+    eventSource.addEventListener('error', (event) => {
+      // Check if it's a custom error event with data
+      const messageEvent = event as MessageEvent;
+      if (messageEvent.data) {
+        try {
+          const errorData = JSON.parse(messageEvent.data);
+          onError?.(new Error(errorData.error || 'SSE error'));
+        } catch {
+          onError?.(new Error('SSE connection error'));
+        }
+      }
+      // Don't close on transient errors - EventSource will reconnect
+    });
+
+    eventSource.onerror = () => {
+      // EventSource automatically reconnects on errors
+      // Only call onError if the connection is closed
+      if (eventSource.readyState === EventSource.CLOSED) {
+        onError?.(new Error('SSE connection closed'));
+      }
+    };
+
+    // Return cleanup function
+    return () => {
+      eventSource.close();
+    };
+  },
+
+  /**
+   * Retry failed items in a batch
+   */
+  retryFailed: (batchId: string): Promise<BatchRetryResponse> =>
+    api.post(`/api/v1/batches/${batchId}/retry`),
+
+  /**
+   * Retry a single failed item in a batch
+   */
+  retryItem: (batchId: string, videoId: string): Promise<BatchRetryResponse> =>
+    api.post(`/api/v1/batches/${batchId}/items/${videoId}/retry`),
+};
+
 export default api;

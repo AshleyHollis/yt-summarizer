@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Pagination } from '@/components/common/Pagination';
 import { FilterSidebar, VideoCard } from '@/components/library';
 import type { FilterState } from '@/components/library';
@@ -24,7 +25,13 @@ const PAGE_SIZE = 12;
  * Library page for browsing and filtering videos
  */
 export default function LibraryPage() {
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const searchParams = useSearchParams();
+  const statusFromUrl = searchParams.get('status');
+  
+  const [filters, setFilters] = useState<FilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    status: statusFromUrl || null,
+  }));
   const [videos, setVideos] = useState<VideoCardType[]>([]);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);

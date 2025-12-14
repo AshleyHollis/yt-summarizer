@@ -1,7 +1,24 @@
 """Pydantic model modules for the API."""
 
 from .base import ErrorDetail, ErrorResponse, PaginatedResponse, PaginationMeta
-from .channel import ChannelCard, ChannelDetailResponse, ChannelListResponse
+from .batch import (
+    BatchDetailResponse,
+    BatchItem,
+    BatchItemStatus,
+    BatchListResponse,
+    BatchResponse,
+    BatchRetryResponse,
+    BatchStatus,
+    CreateBatchRequest,
+)
+from .channel import (
+    ChannelCard,
+    ChannelDetailResponse,
+    ChannelListResponse,
+    ChannelVideo,
+    ChannelVideosResponse,
+    FetchChannelRequest,
+)
 from .facet import FacetCount, FacetListResponse, FacetType
 from .job import (
     JobListFilters,
@@ -46,11 +63,23 @@ __all__ = [
     "ErrorResponse",
     "PaginatedResponse",
     "PaginationMeta",
+    # Batch
+    "BatchDetailResponse",
+    "BatchItem",
+    "BatchItemStatus",
+    "BatchListResponse",
+    "BatchResponse",
+    "BatchRetryResponse",
+    "BatchStatus",
+    "CreateBatchRequest",
     # Channel
     "ChannelCard",
     "ChannelDetailResponse",
     "ChannelListResponse",
     "ChannelSummary",
+    "ChannelVideo",
+    "ChannelVideosResponse",
+    "FetchChannelRequest",
     # Facet
     "FacetCount",
     "FacetListResponse",

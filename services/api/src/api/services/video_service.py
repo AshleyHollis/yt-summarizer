@@ -467,13 +467,29 @@ class VideoService:
         if channel:
             return channel
 
+        # Try to create the channel, handle race condition
         channel = Channel(
             youtube_channel_id=channel_data["youtube_channel_id"],
             name=channel_data["name"],
             thumbnail_url=channel_data.get("thumbnail_url"),
         )
         self.session.add(channel)
-        await self.session.flush()
+        
+        try:
+            await self.session.flush()
+        except IntegrityError:
+            # Race condition: another request created the channel
+            # Rollback the failed insert and fetch the existing channel
+            await self.session.rollback()
+            result = await self.session.execute(
+                select(Channel).where(
+                    Channel.youtube_channel_id == channel_data["youtube_channel_id"]
+                )
+            )
+            channel = result.scalar_one_or_none()
+            if not channel:
+                # This shouldn't happen, but re-raise if it does
+                raise
 
         return channel
 

@@ -27,13 +27,18 @@ This prompt runs a complete verification of the current implementation to ensure
    - Check if Aspire backend is running at http://localhost:8000/health
    - Check if frontend is running at http://localhost:3000
    - If not running, provide these startup commands and STOP:
-     ```powershell
-     # Start Aspire (non-blocking - runs in background process)
-     Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WorkingDirectory "$PWD"
-     
-     # Start frontend (in separate terminal)
-     cd apps/web && npm run dev
-     ```
+   
+   ```powershell
+   # Start Aspire in background (NEVER use blocking 'aspire run' or 'dotnet run')
+   Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WindowStyle Hidden
+   Start-Sleep -Seconds 30  # Wait for services to initialize
+   
+   # Start frontend dev server in background
+   Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "apps\web" -WindowStyle Hidden
+   Start-Sleep -Seconds 10
+   ```
+   
+   ⚠️ **CRITICAL**: Never use `aspire run` or `dotnet run` directly - they block the terminal.
 
 2. **Run API Tests** (MUST PASS 100%):
    ```powershell

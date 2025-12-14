@@ -110,6 +110,43 @@ test.describe('User Story 3: Browse the Library', () => {
       await expect(statusDropdown).toHaveValue('completed');
     });
 
+    test('status filter via URL query parameter works', async ({ page }) => {
+      // Navigate directly to library with status=completed filter
+      // This is the URL the "View Ready Videos" button uses after batch completion
+      await page.goto('/library?status=completed');
+      
+      // Verify page loads successfully (not an error)
+      await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+      
+      // Verify the status dropdown reflects the URL parameter
+      const statusDropdown = page.getByLabel(/Status/i);
+      await expect(statusDropdown).toHaveValue('completed');
+    });
+
+    test('invalid status filter returns error from API', async ({ request }) => {
+      // Test that the API correctly rejects invalid status values
+      // This protects against bugs like using 'ready' instead of 'completed'
+      const response = await request.get('http://localhost:8000/api/v1/library/videos?status=ready', {
+        headers: { 'X-Correlation-ID': 'e2e-test' }
+      });
+      
+      // Should return 422 Unprocessable Entity for invalid enum value
+      expect(response.status()).toBe(422);
+    });
+
+    test('valid status filters return success from API', async ({ request }) => {
+      // Test all valid status values
+      const validStatuses = ['pending', 'processing', 'completed', 'failed'];
+      
+      for (const status of validStatuses) {
+        const response = await request.get(`http://localhost:8000/api/v1/library/videos?status=${status}`, {
+          headers: { 'X-Correlation-ID': 'e2e-test' }
+        });
+        
+        expect(response.ok()).toBeTruthy();
+      }
+    });
+
     test('date range filters are functional', async ({ page }) => {
       // Use specific IDs from the component
       const fromDate = page.locator('#from-date');

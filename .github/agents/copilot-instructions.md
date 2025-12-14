@@ -1,6 +1,7 @@
-﻿# yt-summarizer Development Guidelines
+﻿````chatagent
+# yt-summarizer Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-12-13
+Auto-generated from all feature plans. Last updated: 2025-12-14
 
 ## Active Technologies
 - Python 3.11, TypeScript 5.x + FastAPI, yt-dlp, Next.js 14, React 18 (001-product-spec)
@@ -11,37 +12,68 @@ Auto-generated from all feature plans. Last updated: 2025-12-13
 ## Project Structure
 
 ```text
-backend/
-frontend/
-tests/
+apps/web/           # Next.js frontend
+services/api/       # FastAPI backend
+services/workers/   # Background job workers
+services/shared/    # Shared Python package
+services/aspire/    # .NET Aspire orchestration
 ```
 
 ## Commands
 
 # Start Aspire (Windows PowerShell - runs as background process)
-Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WorkingDirectory "services\aspire\AppHost"
+Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WorkingDirectory "services\aspire\AppHost" -WindowStyle Hidden
 
 # Start Aspire (macOS/Linux - runs in foreground)
 cd services/aspire/AppHost && dotnet run
 
-# Run API tests
-cd services/api; .\.venv\Scripts\python.exe -m pytest tests/ -v -p no:asyncio
+## Test Verification Requirements
 
-# Run frontend tests
-cd apps/web; npm run test:run
+**NEVER mark a task as complete [X] without passing ALL automated tests.**
+**NO MANUAL TESTING REQUIRED** - all verification is automated.
 
-# Run E2E tests (requires Aspire + frontend running)
-cd apps/web; $env:USE_EXTERNAL_SERVER = "true"; npx playwright test
+### ALL Test Suites (Must All Pass 100%)
 
-## 🚨 CRITICAL: Test Verification Requirements
+**API Tests:**
+```powershell
+cd services/api && python -m pytest tests/ -v -p no:asyncio
+```
 
-**NEVER mark a task as complete [X] without passing tests.**
+**Worker Tests (includes Message Contracts):**
+```powershell
+cd services/workers && python -m pytest tests/ -v -p no:asyncio
+```
+
+**Shared Package Tests:**
+```powershell
+cd services/shared && python -m pytest tests/ -v -p no:asyncio
+```
+
+**Frontend Tests:**
+```powershell
+cd apps/web && npm run test:run
+```
+
+**E2E Tests (requires Aspire + frontend running):**
+```powershell
+cd apps/web && $env:USE_EXTERNAL_SERVER = "true"; npx playwright test
+```
+
+### Test Coverage Categories
+
+| Category | Location | Purpose |
+|----------|----------|---------|
+| Unit Tests | `*/tests/` | Route handlers, services, components |
+| Integration Tests | `*/tests/` | API to DB, Worker to Queue |
+| Message Contracts | `services/workers/tests/test_message_contracts.py` | Worker-to-worker data flow |
+| E2E Tests | `apps/web/e2e/` | Full user story flows |
+
+### Verification Gate
 
 Before marking ANY implementation task complete:
-1. Run API tests: Must pass 100%
-2. Run frontend tests: Must pass 100%
-3. Run E2E tests: Must pass 100%
-4. Update verification checklist in specs/*/checklists/verification.md
+1. Run ALL test suites listed above
+2. All must pass 100% (0 failures)
+3. Update verification checklist in specs/*/checklists/verification.md
 
 If tests fail, fix the issue and re-run until all pass.
 
@@ -56,3 +88,5 @@ General: Follow standard conventions
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
+````

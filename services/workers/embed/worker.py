@@ -33,6 +33,7 @@ class EmbedMessage:
     video_id: str
     youtube_video_id: str
     correlation_id: str
+    batch_id: str | None = None
     retry_count: int = 0
 
 
@@ -51,6 +52,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             video_id=raw_message["video_id"],
             youtube_video_id=raw_message["youtube_video_id"],
             correlation_id=raw_message.get("correlation_id", "unknown"),
+            batch_id=raw_message.get("batch_id"),
             retry_count=raw_message.get("retry_count", 0),
         )
 
@@ -323,6 +325,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             # Create relationships job
             job = Job(
                 video_id=UUID(message.video_id),
+                batch_id=UUID(message.batch_id) if message.batch_id else None,
                 job_type="build_relationships",
                 stage="queued",
                 status="pending",
@@ -333,15 +336,16 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
 
             # Queue the job
             queue_client = get_queue_client()
-            queue_client.send_message(
-                RELATIONSHIPS_QUEUE,
-                {
-                    "job_id": str(job.job_id),
-                    "video_id": message.video_id,
-                    "youtube_video_id": message.youtube_video_id,
-                    "correlation_id": correlation_id,
-                },
-            )
+            queue_message = {
+                "job_id": str(job.job_id),
+                "video_id": message.video_id,
+                "youtube_video_id": message.youtube_video_id,
+                "correlation_id": correlation_id,
+            }
+            if message.batch_id:
+                queue_message["batch_id"] = message.batch_id
+            
+            queue_client.send_message(RELATIONSHIPS_QUEUE, queue_message)
 
             logger.info("Queued relationships job", job_id=str(job.job_id))
 

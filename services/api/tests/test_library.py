@@ -161,6 +161,44 @@ class TestListVideos:
         )
         assert response.status_code == status.HTTP_200_OK
 
+    def test_list_videos_filter_by_all_valid_status_values(self, client, headers):
+        """Test that all valid status enum values are accepted.
+        
+        Valid values: pending, processing, completed, failed
+        """
+        valid_statuses = ["pending", "processing", "completed", "failed"]
+        for valid_status in valid_statuses:
+            response = client.get(
+                f"/api/v1/library/videos?status={valid_status}",
+                headers=headers,
+            )
+            assert response.status_code == status.HTTP_200_OK, \
+                f"Status '{valid_status}' should be valid but got {response.status_code}"
+
+    def test_list_videos_filter_by_invalid_status_ready(self, client, headers):
+        """Test that 'ready' is NOT a valid status value.
+        
+        CRITICAL: This test prevents the bug where 'ready' was used instead of 'completed'.
+        The frontend was incorrectly using '/library?status=ready' which caused errors.
+        """
+        response = client.get(
+            "/api/v1/library/videos?status=ready",
+            headers=headers,
+        )
+        # 'ready' is not a valid ProcessingStatusFilter value, so it should fail validation
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_list_videos_filter_by_other_invalid_status_values(self, client, headers):
+        """Test that other invalid status values are rejected."""
+        invalid_statuses = ["success", "done", "error", "running", "queued", "complete"]
+        for invalid_status in invalid_statuses:
+            response = client.get(
+                f"/api/v1/library/videos?status={invalid_status}",
+                headers=headers,
+            )
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY, \
+                f"Status '{invalid_status}' should be invalid but got {response.status_code}"
+
     def test_list_videos_filter_by_channel(self, client, headers):
         """Test filtering by channel ID."""
         channel_id = str(uuid4())

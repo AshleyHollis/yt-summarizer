@@ -156,7 +156,7 @@
 
 ---
 
-## Phase 5: User Story 2 — Ingest from Channel (Batch) (Priority: P2)
+## Phase 5: User Story 2 — Ingest from Channel (Batch) (Priority: P2) ✅
 
 **Goal**: User provides channel URL, browses available videos (with "Ingest All" option), starts batch; sees batch progress
 
@@ -169,34 +169,34 @@
 
 ### API Implementation for US2
 
-- [ ] T073 [P] [US2] Add ingestion channel models (FetchChannelRequest, ChannelVideosResponse, ChannelVideo) to services/api/src/api/models/channel.py
-- [ ] T074 [US2] Implement YouTube service with yt-dlp channel extraction in services/api/src/api/services/youtube_service.py
-- [ ] T075 [US2] Implement channel service for fetch/pagination in services/api/src/api/services/channel_service.py
-- [ ] T076 [US2] Implement POST /api/v1/channels endpoint (fetch channel videos) in services/api/src/api/routes/channels.py
-- [ ] T077 [P] [US2] Create batch Pydantic models (CreateBatchRequest, BatchResponse, BatchDetailResponse, BatchItem) in services/api/src/api/models/batch.py
-- [ ] T078 [US2] Implement batch service (create, get, list, retry) in services/api/src/api/services/batch_service.py
-- [ ] T079 [US2] Implement POST /api/v1/batches endpoint (create batch) in services/api/src/api/routes/batches.py
-- [ ] T080 [US2] Implement GET /api/v1/batches endpoint (list batches) in services/api/src/api/routes/batches.py
-- [ ] T081 [US2] Implement GET /api/v1/batches/{batchId} endpoint (batch detail with items) in services/api/src/api/routes/batches.py
-- [ ] T082 [US2] Implement POST /api/v1/batches/{batchId}/retry endpoint (retry all failed) in services/api/src/api/routes/batches.py
-- [ ] T083 [US2] Implement POST /api/v1/batches/{batchId}/items/{videoId}/retry endpoint (retry single) in services/api/src/api/routes/batches.py
+- [X] T073 [P] [US2] Add ingestion channel models (FetchChannelRequest, ChannelVideosResponse, ChannelVideo) to services/api/src/api/models/channel.py
+- [X] T074 [US2] Implement YouTube service with yt-dlp channel extraction in services/api/src/api/services/youtube_service.py
+- [X] T075 [US2] Implement channel service for fetch/pagination in services/api/src/api/services/channel_service.py
+- [X] T076 [US2] Implement POST /api/v1/channels endpoint (fetch channel videos) in services/api/src/api/routes/channels.py
+- [X] T077 [P] [US2] Create batch Pydantic models (CreateBatchRequest, BatchResponse, BatchDetailResponse, BatchItem) in services/api/src/api/models/batch.py
+- [X] T078 [US2] Implement batch service (create, get, list, retry) in services/api/src/api/services/batch_service.py
+- [X] T079 [US2] Implement POST /api/v1/batches endpoint (create batch) in services/api/src/api/routes/batches.py
+- [X] T080 [US2] Implement GET /api/v1/batches endpoint (list batches) in services/api/src/api/routes/batches.py
+- [X] T081 [US2] Implement GET /api/v1/batches/{batchId} endpoint (batch detail with items) in services/api/src/api/routes/batches.py
+- [X] T082 [US2] Implement POST /api/v1/batches/{batchId}/retry endpoint (retry all failed) in services/api/src/api/routes/batches.py
+- [X] T083 [US2] Implement POST /api/v1/batches/{batchId}/items/{videoId}/retry endpoint (retry single) in services/api/src/api/routes/batches.py
 
 ### Frontend for US2
 
-- [ ] T084 [US2] Create channel submission form in apps/web/src/components/ingestion/ChannelForm.tsx
-- [ ] T085 [US2] Create channel video list with multi-select + "Ingest All" button in apps/web/src/components/ingestion/ChannelVideoList.tsx
-- [ ] T086 [US2] Create "Load More" pagination for channel videos in apps/web/src/components/ingestion/ChannelVideoList.tsx
-- [ ] T087 [US2] Create batch creation page in apps/web/src/app/ingest/channel/page.tsx
-- [ ] T088 [US2] Create batch status page in apps/web/src/app/batches/[batchId]/page.tsx
-- [ ] T089 [P] [US2] Create batch progress summary component in apps/web/src/components/jobs/BatchProgress.tsx
-- [ ] T090 [P] [US2] Create per-video status row component in apps/web/src/components/jobs/BatchVideoRow.tsx
-- [ ] T091 [US2] Create batches list page in apps/web/src/app/batches/page.tsx
-- [ ] T092 [US2] Add retry failed videos button (all-at-once) on batch status page
-- [ ] T093 [US2] Add individual retry button per failed video row
-- [ ] T094 [US2] Add "already ingested" indicator for re-submitted channels (acceptance scenario 7)
-- [ ] T095 [US2] Add navigation link from completed batch to "Ready to Review" filtered library view
+- [X] T084 [US2] Create channel submission form in apps/web/src/components/ChannelForm.tsx
+- [X] T085 [US2] Create channel video list with multi-select + "Ingest All" button in apps/web/src/components/ChannelVideoList.tsx
+- [X] T086 [US2] Create "Load More" pagination for channel videos in apps/web/src/components/ChannelVideoList.tsx
+- [X] T087 [US2] Create batch creation page in apps/web/src/app/ingest/page.tsx
+- [X] T088 [US2] Create batch status page in apps/web/src/app/ingest/[batchId]/page.tsx
+- [X] T089 [P] [US2] Create batch progress summary component in apps/web/src/components/BatchProgress.tsx
+- [X] T090 [P] [US2] Create per-video status row component in apps/web/src/components/BatchProgress.tsx (integrated)
+- [X] T091 [US2] Create batches list page in apps/web/src/app/batches/page.tsx
+- [X] T092 [US2] Add retry failed videos button (all-at-once) on batch status page
+- [X] T093 [US2] Add individual retry button per failed video row
+- [X] T094 [US2] Add "already ingested" indicator for re-submitted channels (acceptance scenario 7)
+- [X] T095 [US2] Add navigation link from completed batch to "Ready to Review" filtered library view
 
-**Checkpoint**: User Story 2 complete — can batch ingest from a channel with full status tracking
+**Checkpoint**: User Story 2 complete — can batch ingest from a channel with full status tracking ✅
 
 ---
 
