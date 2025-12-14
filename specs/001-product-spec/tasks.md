@@ -13,24 +13,24 @@
 
 ---
 
-## Phase 1: Setup (Shared Infrastructure)
+## Phase 1: Setup (Shared Infrastructure) ✅
 
 **Purpose**: Project initialization, mono-repo structure, development environment
 
-- [ ] T001 Create mono-repo structure per plan.md (apps/, services/, db/, infra/, docs/)
-- [ ] T002 [P] Initialize Next.js app in apps/web/ with TypeScript, TailwindCSS, App Router
-- [ ] T003 [P] Initialize Python API project in services/api/ with FastAPI, pyproject.toml
-- [ ] T004 [P] Initialize Python workers project in services/workers/ with pyproject.toml
-- [ ] T005 [P] Initialize shared Python package in services/shared/ with pyproject.toml
-- [ ] T006 [P] Create .NET Aspire AppHost in services/aspire/AppHost/Program.cs
-- [ ] T007 [P] Configure linting: ESLint + Prettier for web, ruff for Python
-- [ ] T008 Create docker-compose.yml or Aspire emulators for local Azurite (blob + queue)
-- [ ] T009 [P] Create .env.example files for all services with required environment variables
-- [ ] T010 [P] Create README.md with development setup instructions
+- [X] T001 Create mono-repo structure per plan.md (apps/, services/, db/, infra/, docs/)
+- [X] T002 [P] Initialize Next.js app in apps/web/ with TypeScript, TailwindCSS, App Router
+- [X] T003 [P] Initialize Python API project in services/api/ with FastAPI, pyproject.toml
+- [X] T004 [P] Initialize Python workers project in services/workers/ with pyproject.toml
+- [X] T005 [P] Initialize shared Python package in services/shared/ with pyproject.toml
+- [X] T006 [P] Create .NET Aspire AppHost in services/aspire/AppHost/Program.cs
+- [X] T007 [P] Configure linting: ESLint + Prettier for web, ruff for Python
+- [X] T008 Create docker-compose.yml or Aspire emulators for local Azurite (blob + queue)
+- [X] T009 [P] Create .env.example files for all services with required environment variables
+- [X] T010 [P] Create README.md with development setup instructions
 
 ---
 
-## Phase 2: Foundational (Blocking Prerequisites)
+## Phase 2: Foundational (Blocking Prerequisites) ✅
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
@@ -38,49 +38,49 @@
 
 ### Database & Migrations
 
-- [ ] T011 Create Alembic configuration in services/shared/alembic/ with alembic.ini, env.py
-- [ ] T012 Create SQLAlchemy models for Channels, Videos in services/shared/db/models/
-- [ ] T013 Create migration 001_initial_schema.py for Channels and Videos tables
-- [ ] T014 Create SQLAlchemy models for Batches, BatchItems, Jobs in services/shared/db/models/
-- [ ] T015 Create migration 002_batches_and_jobs.py for Batches, BatchItems, Jobs tables
-- [ ] T016 Create SQLAlchemy models for Artifacts, Segments in services/shared/db/models/
-- [ ] T017 Create migration 003_artifacts_and_segments.py with VECTOR(1536) column
-- [ ] T018 Create SQLAlchemy models for Relationships, Facets, VideoFacets in services/shared/db/models/
-- [ ] T019 Create migration 004_relationships_and_facets.py
+- [X] T011 Create Alembic configuration in services/shared/alembic/ with alembic.ini, env.py
+- [X] T012 Create SQLAlchemy models for Channels, Videos in services/shared/db/models/
+- [X] T013 Create migration 001_initial_schema.py for Channels and Videos tables
+- [X] T014 Create SQLAlchemy models for Batches, BatchItems, Jobs in services/shared/db/models/
+- [X] T015 Create migration 002_batches_and_jobs.py for Batches, BatchItems, Jobs tables
+- [X] T016 Create SQLAlchemy models for Artifacts, Segments in services/shared/db/models/
+- [X] T017 Create migration 003_artifacts_and_segments.py with VECTOR(1536) column
+- [X] T018 Create SQLAlchemy models for Relationships, Facets, VideoFacets in services/shared/db/models/
+- [X] T019 Create migration 004_relationships_and_facets.py
 
 ### Shared Infrastructure
 
-- [ ] T020 [P] Implement database connection factory in services/shared/db/connection.py with retry logic
-- [ ] T021 [P] Implement Azure Blob client wrapper in services/shared/blob/client.py
-- [ ] T022 [P] Implement Azure Storage Queue client wrapper in services/shared/queue/client.py
-- [ ] T023 [P] Implement structured logging (structlog) in services/shared/logging/config.py
-- [ ] T024 [P] Implement correlation ID middleware for FastAPI in services/api/src/api/middleware/correlation.py
-- [ ] T025 [P] Create Pydantic settings for configuration in services/shared/config.py
+- [X] T020 [P] Implement database connection factory in services/shared/db/connection.py with retry logic
+- [X] T021 [P] Implement Azure Blob client wrapper in services/shared/blob/client.py
+- [X] T022 [P] Implement Azure Storage Queue client wrapper in services/shared/queue/client.py
+- [X] T023 [P] Implement structured logging (structlog) in services/shared/logging/config.py
+- [X] T024 [P] Implement correlation ID middleware for FastAPI in services/api/src/api/middleware/correlation.py
+- [X] T025 [P] Create Pydantic settings for configuration in services/shared/config.py
 
 ### API Foundation
 
-- [ ] T026 Create FastAPI app factory in services/api/src/api/main.py with CORS, error handlers
-- [ ] T027 [P] Implement health check endpoint GET /health in services/api/src/api/routes/health.py
-- [ ] T028 [P] Create base Pydantic response models (ErrorResponse, PaginatedResponse) in services/api/src/api/models/base.py
-- [ ] T029 Configure Dockerfile for API in services/api/Dockerfile
+- [X] T026 Create FastAPI app factory in services/api/src/api/main.py with CORS, error handlers
+- [X] T027 [P] Implement health check endpoint GET /health in services/api/src/api/routes/health.py
+- [X] T028 [P] Create base Pydantic response models (ErrorResponse, PaginatedResponse) in services/api/src/api/models/base.py
+- [X] T029 Configure Dockerfile for API in services/api/Dockerfile
 
 ### Worker Foundation
 
-- [ ] T030 Create worker base class with queue polling in services/workers/shared/base_worker.py
-- [ ] T031 [P] Configure Dockerfile for workers in services/workers/Dockerfile
+- [X] T030 Create worker base class with queue polling in services/workers/shared/base_worker.py
+- [X] T031 [P] Configure Dockerfile for workers in services/workers/Dockerfile
 
 ### Frontend Foundation
 
-- [ ] T032 Create API client service in apps/web/src/services/api.ts with fetch wrapper
-- [ ] T033 [P] Create base layout component in apps/web/src/app/layout.tsx
-- [ ] T034 [P] Configure environment variables in apps/web/next.config.js for API URL
-- [ ] T034a [P] Implement correlation ID generator in apps/web/src/services/correlation.ts (FR-023)
+- [X] T032 Create API client service in apps/web/src/services/api.ts with fetch wrapper
+- [X] T033 [P] Create base layout component in apps/web/src/app/layout.tsx
+- [X] T034 [P] Configure environment variables in apps/web/next.config.js for API URL
+- [X] T034a [P] Implement correlation ID generator in apps/web/src/services/correlation.ts (FR-023)
 
-**Checkpoint**: Foundation ready - user story implementation can now begin
+**Checkpoint**: Foundation ready - user story implementation can now begin ✅
 
 ---
 
-## Phase 3: User Story 1 — Ingest a Single Video (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 — Ingest a Single Video (Priority: P1) 🎯 MVP ✅
 
 **Goal**: User submits a YouTube URL, watches progress through transcription → summarization → embedding → relationship extraction, views completed summary
 
@@ -88,38 +88,38 @@
 
 ### API Implementation for US1
 
-- [ ] T035 [US1] Create video Pydantic models (SubmitVideoRequest, VideoResponse) in services/api/src/api/models/video.py
-- [ ] T036 [US1] Implement video service with submit logic in services/api/src/api/services/video_service.py
-- [ ] T037 [US1] Implement POST /api/v1/videos endpoint in services/api/src/api/routes/videos.py
-- [ ] T038 [US1] Implement GET /api/v1/videos/{videoId} endpoint in services/api/src/api/routes/videos.py
-- [ ] T039 [US1] Implement POST /api/v1/videos/{videoId}/reprocess endpoint in services/api/src/api/routes/videos.py
+- [X] T035 [US1] Create video Pydantic models (SubmitVideoRequest, VideoResponse) in services/api/src/api/models/video.py
+- [X] T036 [US1] Implement video service with submit logic in services/api/src/api/services/video_service.py
+- [X] T037 [US1] Implement POST /api/v1/videos endpoint in services/api/src/api/routes/videos.py
+- [X] T038 [US1] Implement GET /api/v1/videos/{videoId} endpoint in services/api/src/api/routes/videos.py
+- [X] T039 [US1] Implement POST /api/v1/videos/{videoId}/reprocess endpoint in services/api/src/api/routes/videos.py
 
 ### Job API for US1
 
-- [ ] T040 [P] [US1] Create job Pydantic models in services/api/src/api/models/job.py
-- [ ] T041 [US1] Implement job service in services/api/src/api/services/job_service.py
-- [ ] T042 [US1] Implement GET /api/v1/jobs/{jobId} endpoint in services/api/src/api/routes/jobs.py
-- [ ] T043 [US1] Implement GET /api/v1/jobs (list with filters) in services/api/src/api/routes/jobs.py
-- [ ] T044 [US1] Implement POST /api/v1/jobs/{jobId}/retry endpoint in services/api/src/api/routes/jobs.py
+- [X] T040 [P] [US1] Create job Pydantic models in services/api/src/api/models/job.py
+- [X] T041 [US1] Implement job service in services/api/src/api/services/job_service.py
+- [X] T042 [US1] Implement GET /api/v1/jobs/{jobId} endpoint in services/api/src/api/routes/jobs.py
+- [X] T043 [US1] Implement GET /api/v1/jobs (list with filters) in services/api/src/api/routes/jobs.py
+- [X] T044 [US1] Implement POST /api/v1/jobs/{jobId}/retry endpoint in services/api/src/api/routes/jobs.py
 
 ### Workers for US1
 
-- [ ] T045 [US1] Implement transcribe worker in services/workers/transcribe/worker.py (YouTube captions + yt-dlp fallback)
-- [ ] T046 [US1] Implement summarize worker in services/workers/summarize/worker.py (OpenAI)
-- [ ] T047 [US1] Implement embed worker in services/workers/embed/worker.py (chunking + embeddings)
-- [ ] T048 [US1] Implement relationships worker in services/workers/relationships/worker.py
+- [X] T045 [US1] Implement transcribe worker in services/workers/transcribe/worker.py (YouTube captions + yt-dlp fallback)
+- [X] T046 [US1] Implement summarize worker in services/workers/summarize/worker.py (OpenAI)
+- [X] T047 [US1] Implement embed worker in services/workers/embed/worker.py (chunking + embeddings)
+- [X] T048 [US1] Implement relationships worker in services/workers/relationships/worker.py
 
 ### Frontend for US1
 
-- [ ] T049 [US1] Create video submission form component in apps/web/src/components/ingestion/SubmitVideoForm.tsx
-- [ ] T050 [US1] Create job progress component in apps/web/src/components/jobs/JobProgress.tsx
-- [ ] T051 [US1] Create submit video page in apps/web/src/app/ingest/page.tsx
-- [ ] T052 [US1] Create video detail page in apps/web/src/app/videos/[videoId]/page.tsx
-- [ ] T053 [US1] Create transcript viewer component in apps/web/src/components/library/TranscriptViewer.tsx
-- [ ] T054 [US1] Create summary display component in apps/web/src/components/library/SummaryCard.tsx
-- [ ] T055 [US1] Add retry button with error message display in job progress component
+- [X] T049 [US1] Create video submission form component in apps/web/src/components/ingestion/SubmitVideoForm.tsx
+- [X] T050 [US1] Create job progress component in apps/web/src/components/jobs/JobProgress.tsx
+- [X] T051 [US1] Create submit video page in apps/web/src/app/ingest/page.tsx
+- [X] T052 [US1] Create video detail page in apps/web/src/app/videos/[videoId]/page.tsx
+- [X] T053 [US1] Create transcript viewer component in apps/web/src/components/library/TranscriptViewer.tsx
+- [X] T054 [US1] Create summary display component in apps/web/src/components/library/SummaryCard.tsx
+- [X] T055 [US1] Add retry button with error message display in job progress component
 
-**Checkpoint**: User Story 1 complete — can submit a video URL, track progress, view summary and transcript
+**Checkpoint**: User Story 1 complete — can submit a video URL, track progress, view summary and transcript ✅
 
 ---
 
