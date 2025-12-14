@@ -26,8 +26,19 @@ Invoke-WebRequest -Uri "http://localhost:8000/health" -Method GET -ErrorAction S
 Invoke-WebRequest -Uri "http://localhost:3000" -Method GET -ErrorAction SilentlyContinue
 ```
 
-If services are NOT running:
-- Display startup commands
+If services are NOT running, provide these startup commands:
+
+**Start Aspire Backend (non-blocking)**:
+```powershell
+# Use Start-Process to run Aspire in background (doesn't block terminal)
+Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WorkingDirectory "$PWD"
+```
+
+**Start Frontend Dev Server** (in separate terminal):
+```powershell
+cd apps/web && npm run dev
+```
+
 - **STOP** and wait for user to start services
 
 ### 2. Run Test Suites
