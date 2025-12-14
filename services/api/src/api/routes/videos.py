@@ -200,3 +200,40 @@ async def get_video_summary(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Summary not found: {str(e)}",
         )
+
+
+@router.post(
+    "/{video_id}/refresh-metadata",
+    response_model=VideoResponse,
+    summary="Refresh Video Metadata",
+    description="Refresh video metadata from YouTube (title, channel, etc.)",
+)
+async def refresh_video_metadata(
+    video_id: UUID,
+    service: VideoService = Depends(get_video_service),
+) -> VideoResponse:
+    """Refresh video metadata from YouTube.
+
+    Fetches the latest metadata from YouTube using yt-dlp
+    and updates the video and channel records.
+    """
+    try:
+        result = await service.refresh_metadata(video_id)
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Video not found",
+            )
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        import traceback
+        error_detail = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_detail,
+        )

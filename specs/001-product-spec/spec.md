@@ -86,23 +86,27 @@ User submits a YouTube URL and watches it progress through transcription, summar
 
 ### User Story 2 — Ingest from a Channel (Batch) (Priority: P2)
 
-User provides a channel URL/ID, browses available videos, selects multiple, and starts a batch. They see batch progress and per-video status.
+User provides a channel URL/ID, browses available videos, and either selects specific videos or chooses to ingest the entire channel. They see batch progress and per-video status.
 
 **Why this priority**: Enables building a library at scale, but depends on single-video ingestion working first.
 
-**Independent Test**: Submit a channel, select 5 videos, start batch, verify all 5 complete.
+**Independent Test**: Submit a channel, select 5 videos OR choose "Ingest All", start batch, verify all selected/all videos complete.
 
 **Acceptance Scenarios**:
 
-1. **Given** a channel URL/ID, **When** user submits it, **Then** the system fetches the channel's video list and displays them for selection.
+1. **Given** a channel URL/ID, **When** user submits it, **Then** the system fetches the channel's video list and displays them for selection, with an "Ingest All Videos" option.
 
-2. **Given** a list of channel videos, **When** user selects multiple and clicks "Start Batch", **Then** a batch is created and each video is queued.
+2. **Given** a list of channel videos, **When** user selects multiple and clicks "Start Batch", **Then** a batch is created and each selected video is queued.
 
-3. **Given** an active batch, **When** user views the batch status page, **Then** they see: total count, completed count, failed count, and per-video status rows.
+3. **Given** a list of channel videos, **When** user clicks "Ingest All Videos", **Then** a batch is created containing all videos from the channel.
 
-4. **Given** some videos in the batch fail, **When** user views the batch, **Then** they can retry failed videos individually or all-at-once (not via chat).
+4. **Given** an active batch, **When** user views the batch status page, **Then** they see: total count, completed count, failed count, and per-video status rows.
 
-5. **Given** a batch completes, **When** user views "Ready to Review" list, **Then** they see all newly-ingested videos with links to detail pages.
+5. **Given** some videos in the batch fail, **When** user views the batch, **Then** they can retry failed videos individually or all-at-once (not via chat).
+
+6. **Given** a batch completes, **When** user views "Ready to Review" list, **Then** they see all newly-ingested videos with links to detail pages.
+
+7. **Given** a channel previously ingested, **When** user submits it again, **Then** the system shows which videos are new, which are already ingested, and offers to ingest only new videos or reprocess all.
 
 ---
 
@@ -212,7 +216,7 @@ User asks the copilot to create a structured output (e.g., a learning path, a pr
 - **FR-002**: System MUST process videos through stages: transcript acquisition → summarization → chunking + embedding → relationship extraction.
 - **FR-003**: System MUST expose per-video job status: pending, running (with stage), succeeded, failed (with error).
 - **FR-004**: System MUST allow retry of failed jobs from the UI (not via chat).
-- **FR-005**: System MUST support batch ingestion from a channel with per-video status tracking.
+- **FR-005**: System MUST support batch ingestion from a channel with per-video status tracking. Channel video lists are fetched via yt-dlp extraction (no YouTube API key required). UI displays up to 100 videos initially with "Load More" pagination; "Ingest All" queues all videos via backend cursor.
 - **FR-006**: System MUST NOT duplicate segments or embeddings on reprocessing (upsert semantics).
 
 #### Library & Browsing
@@ -401,3 +405,12 @@ Every answer MUST include:
 - A single Azure SQL Database can handle operational data, vector storage, and relationship queries at hobby scale.
 - Users are comfortable waiting minutes for video processing (not real-time).
 - The copilot model (e.g., GPT-4) can ground responses in provided context without hallucination if properly prompted.
+
+---
+
+## Clarifications
+
+### Session 2024-12-14
+
+- Q: How should the system retrieve a YouTube channel's video list for batch ingestion? → A: yt-dlp extraction (scrapes channel page, no API key needed)
+- Q: What is the maximum number of videos to fetch for channel selection UI? → A: Fetch up to 100 videos with "Load More" pagination

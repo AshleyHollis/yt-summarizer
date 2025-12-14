@@ -428,29 +428,26 @@ class TestPipelineRegressions:
     def test_video_response_model_has_content_urls(self):
         """Regression: VideoResponse should include transcript_url and summary_url."""
         from api.models.video import VideoResponse
-        import inspect
         
-        # Get model fields
-        signature = inspect.signature(VideoResponse.__init__)
-        params = list(signature.parameters.keys())
-        
-        # Remove 'self' if present
-        params = [p for p in params if p != "self"]
+        # Get model fields from Pydantic model_fields
+        field_names = list(VideoResponse.model_fields.keys())
         
         # Check for required fields
-        assert "transcript_url" in params or hasattr(VideoResponse, "transcript_url"), \
+        assert "transcript_url" in field_names, \
             "VideoResponse missing transcript_url field"
-        assert "summary_url" in params or hasattr(VideoResponse, "summary_url"), \
+        assert "summary_url" in field_names, \
             "VideoResponse missing summary_url field"
 
     def test_completed_video_has_content_urls_populated(self):
         """Regression: Completed videos should have content URLs populated."""
         from api.models.video import VideoResponse, ProcessingStatus
+        from uuid import uuid4
         
         # Verify the service logic: completed videos should have URLs
         # This is a model-level test; service-level test is in live tests
+        video_id = uuid4()
         video = VideoResponse(
-            video_id="test-id",
+            video_id=video_id,
             youtube_video_id="dQw4w9WgXcQ",
             title="Test",
             description=None,
@@ -458,8 +455,8 @@ class TestPipelineRegressions:
             publish_date=datetime.now(),
             thumbnail_url="",
             processing_status=ProcessingStatus.COMPLETED,
-            transcript_url="/api/v1/videos/test-id/transcript",
-            summary_url="/api/v1/videos/test-id/summary",
+            transcript_url=f"/api/v1/videos/{video_id}/transcript",
+            summary_url=f"/api/v1/videos/{video_id}/summary",
             created_at=datetime.now(),
             updated_at=datetime.now(),
         )

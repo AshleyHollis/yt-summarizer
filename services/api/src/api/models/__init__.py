@@ -1,6 +1,8 @@
 """Pydantic model modules for the API."""
 
 from .base import ErrorDetail, ErrorResponse, PaginatedResponse, PaginationMeta
+from .channel import ChannelCard, ChannelDetailResponse, ChannelListResponse
+from .facet import FacetCount, FacetListResponse, FacetType
 from .job import (
     JobListFilters,
     JobListResponse,
@@ -12,6 +14,19 @@ from .job import (
     RetryJobRequest,
     RetryJobResponse,
     VideoJobsProgress,
+)
+from .library import (
+    FacetTag,
+    LibraryStatsResponse,
+    ProcessingStatusFilter,
+    Segment,
+    SegmentListResponse,
+    SortField,
+    SortOrder,
+    VideoCard,
+    VideoDetailResponse,
+    VideoFilterParams,
+    VideoListResponse as LibraryVideoListResponse,
 )
 from .video import (
     ChannelSummary,
@@ -26,9 +41,22 @@ from .video import (
 )
 
 __all__ = [
-    "ChannelSummary",
+    # Base
     "ErrorDetail",
     "ErrorResponse",
+    "PaginatedResponse",
+    "PaginationMeta",
+    # Channel
+    "ChannelCard",
+    "ChannelDetailResponse",
+    "ChannelListResponse",
+    "ChannelSummary",
+    # Facet
+    "FacetCount",
+    "FacetListResponse",
+    "FacetTag",
+    "FacetType",
+    # Job
     "JobListFilters",
     "JobListResponse",
     "JobResponse",
@@ -36,15 +64,25 @@ __all__ = [
     "JobStatus",
     "JobSummaryResponse",
     "JobType",
-    "PaginatedResponse",
-    "PaginationMeta",
-    "ProcessingStatus",
-    "ReprocessVideoRequest",
     "RetryJobRequest",
     "RetryJobResponse",
+    "VideoJobsProgress",
+    # Library
+    "LibraryStatsResponse",
+    "LibraryVideoListResponse",
+    "ProcessingStatusFilter",
+    "Segment",
+    "SegmentListResponse",
+    "SortField",
+    "SortOrder",
+    "VideoCard",
+    "VideoDetailResponse",
+    "VideoFilterParams",
+    # Video
+    "ProcessingStatus",
+    "ReprocessVideoRequest",
     "SubmitVideoRequest",
     "SubmitVideoResponse",
-    "VideoJobsProgress",
     "VideoListResponse",
     "VideoResponse",
     "VideoSummaryResponse",

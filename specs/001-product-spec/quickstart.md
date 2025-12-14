@@ -89,6 +89,12 @@ AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true
 
 Aspire orchestrates all services together:
 
+**Windows (PowerShell)** - Start as background process:
+```powershell
+Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WorkingDirectory "services\aspire\AppHost"
+```
+
+**macOS/Linux** - Start in foreground:
 ```bash
 cd services/aspire/AppHost
 dotnet run

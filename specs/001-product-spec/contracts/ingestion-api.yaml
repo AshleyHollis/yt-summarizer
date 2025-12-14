@@ -74,7 +74,7 @@ paths:
     post:
       operationId: fetchChannel
       summary: Fetch channel videos for selection
-      description: Retrieve available videos from a YouTube channel without ingesting
+      description: Retrieve available videos from a YouTube channel without ingesting. Uses yt-dlp extraction (no API key needed). Returns up to 100 videos per page with pagination cursor.
       tags:
         - Ingestion
       requestBody:
@@ -261,6 +261,14 @@ components:
           type: string
           description: YouTube channel URL or ID
           example: https://www.youtube.com/@MarkWildman
+        cursor:
+          type: string
+          description: Pagination cursor for loading more videos (returned from previous response)
+        limit:
+          type: integer
+          description: Maximum videos to return (default 100, max 100)
+          default: 100
+          maximum: 100
 
     ChannelVideosResponse:
       type: object
@@ -272,12 +280,22 @@ components:
           type: string
         channelName:
           type: string
-        videoCount:
+        totalVideoCount:
           type: integer
+          description: Total videos in channel (if known)
+        returnedCount:
+          type: integer
+          description: Number of videos in this response
         videos:
           type: array
           items:
             $ref: '#/components/schemas/ChannelVideo'
+        nextCursor:
+          type: string
+          description: Cursor for next page (null if no more videos)
+        hasMore:
+          type: boolean
+          description: Whether more videos are available
 
     ChannelVideo:
       type: object
@@ -300,13 +318,11 @@ components:
 
     CreateBatchRequest:
       type: object
-      required:
-        - videoIds
       properties:
         channelId:
           type: string
           format: uuid
-          description: Optional channel reference
+          description: Optional channel reference (required if ingestAll is true)
         name:
           type: string
           description: Optional batch name
@@ -314,8 +330,12 @@ components:
           type: array
           items:
             type: string
-          description: YouTube video IDs to ingest
+          description: YouTube video IDs to ingest (required unless ingestAll is true)
           example: ["dQw4w9WgXcQ", "L_jWHffIx5E"]
+        ingestAll:
+          type: boolean
+          description: If true, ingest all videos from the channel (requires channelId). Backend will cursor through all videos.
+          default: false
 
     BatchResponse:
       type: object

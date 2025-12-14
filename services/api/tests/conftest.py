@@ -62,10 +62,48 @@ def mock_session():
 
 @pytest.fixture
 def app(mock_session):
-    """Create a FastAPI test application with mocked dependencies."""
+    """Create a FastAPI test application with mocked dependencies.
+    
+    Creates a minimal FastAPI app without the full lifespan initialization
+    to avoid database connection attempts during testing.
+    """
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    
+    from api.middleware import CorrelationIdMiddleware
+    from api.routes import health, jobs, library, videos
     from shared.db.connection import get_session
     
-    application = create_app()
+    @asynccontextmanager
+    async def mock_lifespan(app: FastAPI):
+        """Mock lifespan that skips database initialization."""
+        yield
+    
+    # Create a minimal app for testing
+    application = FastAPI(
+        title="YT Summarizer API",
+        description="AI-powered YouTube video summarization service",
+        version="0.1.0",
+        lifespan=mock_lifespan,
+    )
+    
+    # Add middleware
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    application.add_middleware(CorrelationIdMiddleware)
+    
+    # Include routers 
+    # health router has no prefix, others have their prefixes defined in the router
+    application.include_router(health.router)
+    application.include_router(videos.router)
+    application.include_router(jobs.router)
+    application.include_router(library.router)
     
     # Override the database session dependency
     async def mock_get_session():

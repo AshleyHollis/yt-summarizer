@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .middleware import CorrelationIdMiddleware
-from .routes import health, jobs, videos
+from .routes import health, jobs, library, videos
 
 # Import shared modules (path will be configured via PYTHONPATH)
 try:
@@ -139,6 +139,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, tags=["Health"])
     app.include_router(videos.router)
     app.include_router(jobs.router)
+    app.include_router(library.router)
     
     return app
 

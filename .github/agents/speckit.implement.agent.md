@@ -125,11 +125,28 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Suggest next steps if implementation cannot proceed
    - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
 
-9. Completion validation:
+9. **🚨 MANDATORY: Test Verification Gate** (BEFORE marking any task [X]):
+   - **DO NOT mark any task as complete until tests pass**
+   - Run ALL relevant test suites after completing a phase:
+     - API tests: `cd services/api && python -m pytest tests/ -v -p no:asyncio`
+     - Frontend tests: `cd apps/web && npm run test:run`
+     - E2E tests: `cd apps/web && $env:USE_EXTERNAL_SERVER = "true"; npx playwright test`
+   - **If any test fails**: 
+     - Fix the failing test or implementation
+     - Re-run tests until all pass
+     - Only THEN mark the task as [X]
+   - **Update verification checklist** in `FEATURE_DIR/checklists/verification.md`:
+     - Record test counts and pass/fail status
+     - Mark verification items as [X] when confirmed working
+
+10. Completion validation:
    - Verify all required tasks are completed
    - Check that implemented features match the original specification
-   - Validate that tests pass and coverage meets requirements
+   - **RUN FULL TEST SUITE and confirm 100% pass rate**
    - Confirm the implementation follows the technical plan
-   - Report final status with summary of completed work
+   - Report final status with summary of completed work including:
+     - Total tests run (API + Frontend + E2E)
+     - Pass rate (must be 100%)
+     - Any manual smoke test observations
 
 Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running `/speckit.tasks` first to regenerate the task list.

@@ -265,9 +265,9 @@ export function JobProgress({
       {/* Failure message */}
       {hasFailed && (
         <div className="mt-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800">
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3">
             <svg
-              className="h-6 w-6 text-red-500"
+              className="h-6 w-6 text-red-500 flex-shrink-0 mt-0.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -283,12 +283,21 @@ export function JobProgress({
               <p className="font-medium text-red-800 dark:text-red-200">
                 Processing Failed
               </p>
-              <p className="text-sm text-red-700 dark:text-red-300">
-                {(() => {
-                  const failedJob = progress?.jobs?.find(j => j.status === 'failed');
-                  return failedJob ? `Failed at: ${STAGE_LABELS[failedJob.job_type]}` : 'An error occurred during processing.';
-                })()}
-              </p>
+              {(() => {
+                const failedJob = progress?.jobs?.find(j => j.status === 'failed');
+                return (
+                  <>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      Failed at: {failedJob ? STAGE_LABELS[failedJob.job_type] : 'Unknown stage'}
+                    </p>
+                    {failedJob?.error_message && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                        {failedJob.error_message}
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -73,10 +73,14 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             transcript = await self._fetch_transcript(message.youtube_video_id)
 
             if not transcript:
-                await mark_job_failed(message.job_id, "Could not fetch transcript from YouTube")
+                error_msg = (
+                    "No transcript available for this video. "
+                    "This video does not have captions or auto-generated subtitles on YouTube."
+                )
+                await mark_job_failed(message.job_id, error_msg)
                 return WorkerResult.failed(
                     Exception("No transcript available"),
-                    "Could not fetch transcript from YouTube",
+                    error_msg,
                 )
 
             # Store transcript in blob storage

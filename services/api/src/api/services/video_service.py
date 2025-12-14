@@ -348,7 +348,7 @@ class VideoService:
         )
 
     async def _fetch_video_metadata(self, youtube_video_id: str) -> dict:
-        """Fetch video metadata from YouTube.
+        """Fetch video metadata from YouTube using yt-dlp.
 
         Args:
             youtube_video_id: YouTube video ID.
@@ -356,20 +356,97 @@ class VideoService:
         Returns:
             Dictionary with video metadata.
         """
-        # TODO: Implement actual YouTube API call using yt-dlp
-        # For now, return placeholder data
-        return {
-            "title": f"Video {youtube_video_id}",
-            "description": None,
-            "duration": 0,
-            "publish_date": datetime.utcnow(),
-            "thumbnail_url": f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg",
-            "channel": {
-                "youtube_channel_id": "UC_placeholder",
-                "name": "Unknown Channel",
-                "thumbnail_url": None,
-            },
+        import asyncio
+        import yt_dlp
+
+        logger.info("Fetching video metadata from YouTube", youtube_video_id=youtube_video_id)
+
+        ydl_opts = {
+            "skip_download": True,
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": False,
         }
+
+        try:
+            # Run yt-dlp in a thread pool since it's synchronous
+            loop = asyncio.get_event_loop()
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = await loop.run_in_executor(
+                    None,
+                    lambda: ydl.extract_info(
+                        f"https://www.youtube.com/watch?v={youtube_video_id}",
+                        download=False,
+                    ),
+                )
+
+            # Parse upload date
+            upload_date_str = info.get("upload_date")  # Format: YYYYMMDD
+            if upload_date_str:
+                publish_date = datetime.strptime(upload_date_str, "%Y%m%d")
+            else:
+                publish_date = datetime.utcnow()
+
+            # Get best thumbnail
+            thumbnails = info.get("thumbnails", [])
+            thumbnail_url = None
+            if thumbnails:
+                # Sort by preference (higher resolution first)
+                sorted_thumbs = sorted(
+                    thumbnails,
+                    key=lambda t: (t.get("height", 0) or 0) * (t.get("width", 0) or 0),
+                    reverse=True,
+                )
+                thumbnail_url = sorted_thumbs[0].get("url") if sorted_thumbs else None
+            
+            # Fallback to standard YouTube thumbnail URL
+            if not thumbnail_url:
+                thumbnail_url = f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg"
+
+            # Get channel info
+            channel_id = info.get("channel_id") or info.get("uploader_id") or "UC_unknown"
+            channel_name = info.get("channel") or info.get("uploader") or "Unknown Channel"
+            channel_thumbnail = info.get("channel_thumbnail_url")
+
+            logger.info(
+                "Fetched video metadata successfully",
+                youtube_video_id=youtube_video_id,
+                title=info.get("title"),
+                channel=channel_name,
+            )
+
+            return {
+                "title": info.get("title") or f"Video {youtube_video_id}",
+                "description": info.get("description"),
+                "duration": info.get("duration") or 0,
+                "publish_date": publish_date,
+                "thumbnail_url": thumbnail_url,
+                "channel": {
+                    "youtube_channel_id": channel_id,
+                    "name": channel_name,
+                    "thumbnail_url": channel_thumbnail,
+                },
+            }
+
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch video metadata, using fallback",
+                youtube_video_id=youtube_video_id,
+                error=str(e),
+            )
+            # Return fallback data if yt-dlp fails
+            return {
+                "title": f"Video {youtube_video_id}",
+                "description": None,
+                "duration": 0,
+                "publish_date": datetime.utcnow(),
+                "thumbnail_url": f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg",
+                "channel": {
+                    "youtube_channel_id": "UC_unknown",
+                    "name": "Unknown Channel",
+                    "thumbnail_url": None,
+                },
+            }
 
     async def _get_or_create_channel(self, channel_data: dict) -> Channel:
         """Get or create a channel record.
@@ -409,3 +486,89 @@ class VideoService:
             JobType.BUILD_RELATIONSHIPS: "relationships-jobs",
         }
         return queue_map.get(job_type, "transcribe-jobs")
+
+    async def refresh_metadata(self, video_id: UUID) -> VideoResponse | None:
+        """Refresh video metadata from YouTube.
+
+        Args:
+            video_id: Video ID.
+
+        Returns:
+            Updated video response or None if not found.
+        """
+        # Get the video
+        result = await self.session.execute(
+            select(Video)
+            .options(selectinload(Video.channel))
+            .where(Video.video_id == video_id)
+        )
+        video = result.scalar_one_or_none()
+
+        if not video:
+            return None
+
+        # Fetch fresh metadata from YouTube
+        metadata = await self._fetch_video_metadata(video.youtube_video_id)
+
+        # Update video fields
+        video.title = metadata["title"]
+        video.description = metadata.get("description")
+        video.duration = metadata.get("duration", 0)
+        video.thumbnail_url = metadata.get("thumbnail_url")
+        if metadata.get("publish_date"):
+            video.publish_date = metadata["publish_date"]
+
+        # Get or create the channel with proper metadata
+        channel_data = metadata["channel"]
+        
+        # Check if we need to update or create a channel
+        result = await self.session.execute(
+            select(Channel).where(
+                Channel.youtube_channel_id == channel_data["youtube_channel_id"]
+            )
+        )
+        channel = result.scalar_one_or_none()
+
+        if channel:
+            # Update existing channel with new metadata
+            if channel_data["name"] and channel_data["name"] != "Unknown Channel":
+                channel.name = channel_data["name"]
+            if channel_data.get("thumbnail_url"):
+                channel.thumbnail_url = channel_data["thumbnail_url"]
+        else:
+            # Create new channel
+            channel = Channel(
+                youtube_channel_id=channel_data["youtube_channel_id"],
+                name=channel_data["name"],
+                thumbnail_url=channel_data.get("thumbnail_url"),
+            )
+            self.session.add(channel)
+            await self.session.flush()
+
+        # Update video's channel reference
+        video.channel_id = channel.channel_id
+        video.channel = channel
+
+        await self.session.commit()
+
+        logger.info(
+            "Refreshed video metadata",
+            video_id=str(video_id),
+            title=video.title,
+            channel=channel.name,
+        )
+
+        return VideoResponse(
+            video_id=video.video_id,
+            youtube_video_id=video.youtube_video_id,
+            title=video.title,
+            description=video.description,
+            duration=video.duration,
+            publish_date=video.publish_date,
+            thumbnail_url=video.thumbnail_url,
+            channel_id=channel.channel_id,
+            channel_name=channel.name,
+            processing_status=video.processing_status,
+            created_at=video.created_at,
+            updated_at=video.updated_at,
+        )

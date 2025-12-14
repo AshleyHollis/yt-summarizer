@@ -362,6 +362,7 @@ export interface JobSummaryResponse {
   job_type: JobType;
   stage: JobStage;
   status: JobStatus;
+  error_message?: string | null;
 }
 
 /**
@@ -452,6 +453,258 @@ export const jobApi = {
    */
   getVideoProgress: (videoId: string): Promise<VideoJobsProgress> =>
     api.get(`/api/v1/jobs/video/${videoId}/progress`),
+};
+
+// ============================================================================
+// Library Types
+// ============================================================================
+
+/**
+ * Processing status filter for library
+ */
+export type ProcessingStatusFilter = 'pending' | 'processing' | 'completed' | 'failed';
+
+/**
+ * Sort field options
+ */
+export type SortField = 'publishDate' | 'title' | 'createdAt';
+
+/**
+ * Sort order options
+ */
+export type SortOrder = 'asc' | 'desc';
+
+/**
+ * Facet tag attached to a video
+ */
+export interface FacetTag {
+  facet_id: string;
+  name: string;
+  type: string;
+}
+
+/**
+ * Video card for list display
+ */
+export interface VideoCard {
+  video_id: string;
+  youtube_video_id: string;
+  title: string;
+  channel_id: string;
+  channel_name: string;
+  duration: number;
+  publish_date: string;
+  thumbnail_url: string | null;
+  processing_status: string;
+  segment_count: number;
+  facets: FacetTag[];
+}
+
+/**
+ * Video list response
+ */
+export interface VideoListResponse {
+  videos: VideoCard[];
+  page: number;
+  page_size: number;
+  total_count: number;
+}
+
+/**
+ * Channel summary in video detail context
+ */
+export interface ChannelSummaryLibrary {
+  channel_id: string;
+  youtube_channel_id: string;
+  name: string;
+  thumbnail_url: string | null;
+}
+
+/**
+ * Artifact information
+ */
+export interface ArtifactInfo {
+  artifact_id: string;
+  type: string;
+  content_length: number;
+  model_name: string | null;
+  created_at: string;
+}
+
+/**
+ * Full video detail response
+ */
+export interface VideoDetailResponse {
+  video_id: string;
+  youtube_video_id: string;
+  title: string;
+  description: string | null;
+  channel: ChannelSummaryLibrary;
+  duration: number;
+  publish_date: string;
+  thumbnail_url: string | null;
+  youtube_url: string;
+  processing_status: string;
+  summary: string | null;
+  summary_artifact: ArtifactInfo | null;
+  transcript_artifact: ArtifactInfo | null;
+  segment_count: number;
+  relationship_count: number;
+  facets: FacetTag[];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Transcript segment
+ */
+export interface Segment {
+  segment_id: string;
+  sequence_number: number;
+  start_time: number;
+  end_time: number;
+  text: string;
+  youtube_url: string;
+}
+
+/**
+ * Segment list response
+ */
+export interface SegmentListResponse {
+  video_id: string;
+  segments: Segment[];
+  page: number;
+  page_size: number;
+  total_count: number;
+}
+
+/**
+ * Channel card for list display
+ */
+export interface ChannelCard {
+  channel_id: string;
+  youtube_channel_id: string;
+  name: string;
+  thumbnail_url: string | null;
+  video_count: number;
+  last_synced_at: string | null;
+}
+
+/**
+ * Channel list response
+ */
+export interface ChannelListResponse {
+  channels: ChannelCard[];
+  page: number;
+  page_size: number;
+  total_count: number;
+}
+
+/**
+ * Facet with video count
+ */
+export interface FacetCount {
+  facet_id: string;
+  name: string;
+  type: string;
+  video_count: number;
+}
+
+/**
+ * Facet list response
+ */
+export interface FacetListResponse {
+  facets: FacetCount[];
+}
+
+/**
+ * Library statistics
+ */
+export interface LibraryStatsResponse {
+  total_channels: number;
+  total_videos: number;
+  completed_videos: number;
+  total_segments: number;
+  total_relationships: number;
+  total_facets: number;
+  last_updated_at: string | null;
+}
+
+/**
+ * Video filter parameters
+ */
+export interface VideoFilterParams {
+  channel_id?: string;
+  from_date?: string;
+  to_date?: string;
+  facets?: string[];
+  status?: ProcessingStatusFilter;
+  search?: string;
+  sort_by?: SortField;
+  sort_order?: SortOrder;
+  page?: number;
+  page_size?: number;
+}
+
+// ============================================================================
+// Library API
+// ============================================================================
+
+export const libraryApi = {
+  /**
+   * List videos with filtering
+   */
+  listVideos: (params?: VideoFilterParams): Promise<VideoListResponse> =>
+    api.get('/api/v1/library/videos', {
+      params: params as Record<string, string | number | boolean | undefined>,
+    }),
+
+  /**
+   * Get video detail
+   */
+  getVideoDetail: (videoId: string): Promise<VideoDetailResponse> =>
+    api.get(`/api/v1/library/videos/${videoId}`),
+
+  /**
+   * List video segments
+   */
+  listSegments: (
+    videoId: string,
+    page?: number,
+    pageSize?: number
+  ): Promise<SegmentListResponse> =>
+    api.get(`/api/v1/library/videos/${videoId}/segments`, {
+      params: { page, page_size: pageSize },
+    }),
+
+  /**
+   * List channels
+   */
+  listChannels: (
+    page?: number,
+    pageSize?: number,
+    search?: string
+  ): Promise<ChannelListResponse> =>
+    api.get('/api/v1/library/channels', {
+      params: { page, page_size: pageSize, search },
+    }),
+
+  /**
+   * List facets
+   */
+  listFacets: (
+    facetType?: string,
+    minCount?: number
+  ): Promise<FacetListResponse> =>
+    api.get('/api/v1/library/facets', {
+      params: { facet_type: facetType, min_count: minCount },
+    }),
+
+  /**
+   * Get library statistics
+   */
+  getStats: (): Promise<LibraryStatsResponse> =>
+    api.get('/api/v1/library/stats'),
 };
 
 export default api;

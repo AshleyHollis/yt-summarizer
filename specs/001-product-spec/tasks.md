@@ -123,7 +123,7 @@
 
 ---
 
-## Phase 4: User Story 3 — Browse the Library (Priority: P2)
+## Phase 4: User Story 3 — Browse the Library (Priority: P2) ✅
 
 **Goal**: User filters the library by channel, time range, and facets; opens video detail pages
 
@@ -131,59 +131,70 @@
 
 ### API Implementation for US3
 
-- [ ] T056 [P] [US3] Create library Pydantic models (VideoListResponse, filters) in services/api/src/api/models/library.py
-- [ ] T057 [US3] Implement library service with filter logic in services/api/src/api/services/library_service.py
-- [ ] T058 [US3] Implement GET /api/v1/library/videos endpoint with filters in services/api/src/api/routes/library.py
-- [ ] T059 [US3] Implement GET /api/v1/library/videos/{videoId}/segments endpoint in services/api/src/api/routes/library.py
-- [ ] T060 [P] [US3] Create channel Pydantic models (ChannelResponse, ChannelListResponse) in services/api/src/api/models/channel.py
-- [ ] T061 [US3] Implement GET /api/v1/library/channels endpoint in services/api/src/api/routes/library.py
-- [ ] T062 [P] [US3] Create facet Pydantic models in services/api/src/api/models/facet.py
-- [ ] T063 [US3] Implement GET /api/v1/library/facets endpoint in services/api/src/api/routes/library.py
+- [X] T056 [P] [US3] Create library Pydantic models (VideoListResponse, filters) in services/api/src/api/models/library.py
+- [X] T057 [US3] Implement library service with filter logic in services/api/src/api/services/library_service.py
+- [X] T058 [US3] Implement GET /api/v1/library/videos endpoint with filters in services/api/src/api/routes/library.py
+- [X] T059 [US3] Implement GET /api/v1/library/videos/{videoId}/segments endpoint in services/api/src/api/routes/library.py
+- [X] T060 [P] [US3] Create channel Pydantic models (ChannelResponse, ChannelListResponse) in services/api/src/api/models/channel.py
+- [X] T061 [US3] Implement GET /api/v1/library/channels endpoint in services/api/src/api/routes/library.py
+- [X] T062 [P] [US3] Create facet Pydantic models in services/api/src/api/models/facet.py
+- [X] T063 [US3] Implement GET /api/v1/library/facets endpoint in services/api/src/api/routes/library.py
 
 ### Frontend for US3
 
-- [ ] T064 [US3] Create library page in apps/web/src/app/library/page.tsx
-- [ ] T065 [P] [US3] Create video card component in apps/web/src/components/library/VideoCard.tsx
-- [ ] T066 [P] [US3] Create filter sidebar component in apps/web/src/components/library/FilterSidebar.tsx
-- [ ] T067 [P] [US3] Create channel filter component in apps/web/src/components/library/ChannelFilter.tsx
-- [ ] T068 [P] [US3] Create date range picker component in apps/web/src/components/library/DateRangePicker.tsx
-- [ ] T069 [P] [US3] Create facet chips component in apps/web/src/components/library/FacetChips.tsx
-- [ ] T070 [US3] Create pagination component in apps/web/src/components/common/Pagination.tsx
-- [ ] T071 [US3] Implement segment list with timestamps on video detail page in apps/web/src/components/library/SegmentList.tsx
-- [ ] T072 [US3] Add clickable timestamps linking to YouTube in segment list
+- [X] T064 [US3] Create library page in apps/web/src/app/library/page.tsx
+- [X] T065 [P] [US3] Create video card component in apps/web/src/components/library/VideoCard.tsx
+- [X] T066 [P] [US3] Create filter sidebar component in apps/web/src/components/library/FilterSidebar.tsx
+- [X] T067 [P] [US3] Create channel filter component in apps/web/src/components/library/ChannelFilter.tsx
+- [X] T068 [P] [US3] Create date range picker component in apps/web/src/components/library/DateRangePicker.tsx
+- [X] T069 [P] [US3] Create facet chips component in apps/web/src/components/library/FacetChips.tsx
+- [X] T070 [US3] Create pagination component in apps/web/src/components/common/Pagination.tsx
+- [X] T071 [US3] Implement segment list with timestamps on video detail page in apps/web/src/components/library/SegmentList.tsx
+- [X] T072 [US3] Add clickable timestamps linking to YouTube in segment list
 
-**Checkpoint**: User Story 3 complete — can browse library with filters, view video details with segments
+**Checkpoint**: User Story 3 complete — can browse library with filters, view video details with segments ✅
 
 ---
 
 ## Phase 5: User Story 2 — Ingest from Channel (Batch) (Priority: P2)
 
-**Goal**: User provides channel URL, browses available videos, selects multiple, starts batch; sees batch progress
+**Goal**: User provides channel URL, browses available videos (with "Ingest All" option), starts batch; sees batch progress
 
-**Independent Test**: Submit a channel, select 5 videos, start batch, verify all 5 complete
+**Independent Test**: Submit a channel, select 5 videos OR click "Ingest All", start batch, verify all complete
+
+**Technical Decisions** (from clarifications):
+- Channel video lists fetched via yt-dlp extraction (no YouTube API key needed)
+- UI displays up to 100 videos with "Load More" pagination
+- "Ingest All" queues all videos via backend cursor-based fetching
 
 ### API Implementation for US2
 
-- [ ] T073 [P] [US2] Add ingestion channel models (FetchChannelRequest, ChannelVideosResponse) to services/api/src/api/models/channel.py
-- [ ] T074 [US2] Implement channel service with video fetch in services/api/src/api/services/channel_service.py
-- [ ] T075 [US2] Implement POST /api/v1/channels endpoint in services/api/src/api/routes/channels.py
-- [ ] T076 [P] [US2] Create batch Pydantic models (CreateBatchRequest, BatchResponse) in services/api/src/api/models/batch.py
-- [ ] T077 [US2] Implement batch service in services/api/src/api/services/batch_service.py
-- [ ] T078 [US2] Implement POST /api/v1/batches endpoint in services/api/src/api/routes/batches.py
-- [ ] T079 [US2] Implement GET /api/v1/batches endpoint (list) in services/api/src/api/routes/batches.py
-- [ ] T080 [US2] Implement GET /api/v1/batches/{batchId} endpoint in services/api/src/api/routes/batches.py
-- [ ] T081 [US2] Implement POST /api/v1/batches/{batchId}/retry-failed endpoint in services/api/src/api/routes/batches.py
+- [ ] T073 [P] [US2] Add ingestion channel models (FetchChannelRequest, ChannelVideosResponse, ChannelVideo) to services/api/src/api/models/channel.py
+- [ ] T074 [US2] Implement YouTube service with yt-dlp channel extraction in services/api/src/api/services/youtube_service.py
+- [ ] T075 [US2] Implement channel service for fetch/pagination in services/api/src/api/services/channel_service.py
+- [ ] T076 [US2] Implement POST /api/v1/channels endpoint (fetch channel videos) in services/api/src/api/routes/channels.py
+- [ ] T077 [P] [US2] Create batch Pydantic models (CreateBatchRequest, BatchResponse, BatchDetailResponse, BatchItem) in services/api/src/api/models/batch.py
+- [ ] T078 [US2] Implement batch service (create, get, list, retry) in services/api/src/api/services/batch_service.py
+- [ ] T079 [US2] Implement POST /api/v1/batches endpoint (create batch) in services/api/src/api/routes/batches.py
+- [ ] T080 [US2] Implement GET /api/v1/batches endpoint (list batches) in services/api/src/api/routes/batches.py
+- [ ] T081 [US2] Implement GET /api/v1/batches/{batchId} endpoint (batch detail with items) in services/api/src/api/routes/batches.py
+- [ ] T082 [US2] Implement POST /api/v1/batches/{batchId}/retry endpoint (retry all failed) in services/api/src/api/routes/batches.py
+- [ ] T083 [US2] Implement POST /api/v1/batches/{batchId}/items/{videoId}/retry endpoint (retry single) in services/api/src/api/routes/batches.py
 
 ### Frontend for US2
 
-- [ ] T082 [US2] Create channel submission form in apps/web/src/components/ingestion/ChannelForm.tsx
-- [ ] T083 [US2] Create channel video list with multi-select in apps/web/src/components/ingestion/ChannelVideoList.tsx
-- [ ] T084 [US2] Create batch creation page in apps/web/src/app/ingest/channel/page.tsx
-- [ ] T085 [US2] Create batch status page in apps/web/src/app/batches/[batchId]/page.tsx
-- [ ] T086 [P] [US2] Create batch progress component in apps/web/src/components/jobs/BatchProgress.tsx
-- [ ] T087 [P] [US2] Create per-video status row component in apps/web/src/components/jobs/BatchVideoRow.tsx
-- [ ] T088 [US2] Create batches list page in apps/web/src/app/batches/page.tsx
-- [ ] T089 [US2] Add retry failed videos button on batch status page
+- [ ] T084 [US2] Create channel submission form in apps/web/src/components/ingestion/ChannelForm.tsx
+- [ ] T085 [US2] Create channel video list with multi-select + "Ingest All" button in apps/web/src/components/ingestion/ChannelVideoList.tsx
+- [ ] T086 [US2] Create "Load More" pagination for channel videos in apps/web/src/components/ingestion/ChannelVideoList.tsx
+- [ ] T087 [US2] Create batch creation page in apps/web/src/app/ingest/channel/page.tsx
+- [ ] T088 [US2] Create batch status page in apps/web/src/app/batches/[batchId]/page.tsx
+- [ ] T089 [P] [US2] Create batch progress summary component in apps/web/src/components/jobs/BatchProgress.tsx
+- [ ] T090 [P] [US2] Create per-video status row component in apps/web/src/components/jobs/BatchVideoRow.tsx
+- [ ] T091 [US2] Create batches list page in apps/web/src/app/batches/page.tsx
+- [ ] T092 [US2] Add retry failed videos button (all-at-once) on batch status page
+- [ ] T093 [US2] Add individual retry button per failed video row
+- [ ] T094 [US2] Add "already ingested" indicator for re-submitted channels (acceptance scenario 7)
+- [ ] T095 [US2] Add navigation link from completed batch to "Ready to Review" filtered library view
 
 **Checkpoint**: User Story 2 complete — can batch ingest from a channel with full status tracking
 
@@ -197,27 +208,27 @@
 
 ### API Implementation for US4
 
-- [ ] T090 [P] [US4] Create copilot Pydantic models (CopilotQueryRequest, CopilotQueryResponse, Evidence) in services/api/src/api/models/copilot.py
-- [ ] T091 [US4] Implement vector search in services/api/src/api/services/search_service.py
-- [ ] T092 [US4] Implement POST /api/v1/copilot/search/segments endpoint in services/api/src/api/routes/copilot.py
-- [ ] T093 [US4] Implement POST /api/v1/copilot/search/videos endpoint in services/api/src/api/routes/copilot.py
-- [ ] T094 [US4] Implement POST /api/v1/copilot/topics endpoint in services/api/src/api/routes/copilot.py
-- [ ] T095 [US4] Implement GET /api/v1/copilot/coverage endpoint in services/api/src/api/routes/copilot.py
-- [ ] T096 [US4] Implement copilot query orchestrator in services/api/src/api/services/copilot_service.py
-- [ ] T097 [US4] Implement POST /api/v1/copilot/query endpoint in services/api/src/api/routes/copilot.py
+- [ ] T096 [P] [US4] Create copilot Pydantic models (CopilotQueryRequest, CopilotQueryResponse, Evidence) in services/api/src/api/models/copilot.py
+- [ ] T097 [US4] Implement vector search in services/api/src/api/services/search_service.py
+- [ ] T098 [US4] Implement POST /api/v1/copilot/search/segments endpoint in services/api/src/api/routes/copilot.py
+- [ ] T099 [US4] Implement POST /api/v1/copilot/search/videos endpoint in services/api/src/api/routes/copilot.py
+- [ ] T100 [US4] Implement POST /api/v1/copilot/topics endpoint in services/api/src/api/routes/copilot.py
+- [ ] T101 [US4] Implement GET /api/v1/copilot/coverage endpoint in services/api/src/api/routes/copilot.py
+- [ ] T102 [US4] Implement copilot query orchestrator in services/api/src/api/services/copilot_service.py
+- [ ] T103 [US4] Implement POST /api/v1/copilot/query endpoint in services/api/src/api/routes/copilot.py
 
 ### CopilotKit Integration for US4
 
-- [ ] T098 [US4] Install and configure CopilotKit in apps/web (package.json, provider setup)
-- [ ] T099 [US4] Create copilot sidebar component in apps/web/src/components/copilot/CopilotSidebar.tsx
-- [ ] T100 [P] [US4] Create scope chips component in apps/web/src/components/copilot/ScopeChips.tsx
-- [ ] T101 [P] [US4] Create citation component in apps/web/src/components/copilot/Citation.tsx
-- [ ] T102 [P] [US4] Create video card for copilot results in apps/web/src/components/copilot/CopilotVideoCard.tsx
-- [ ] T103 [US4] Create topics-in-scope panel in apps/web/src/components/copilot/TopicsPanel.tsx
-- [ ] T104 [US4] Create follow-up suggestion buttons in apps/web/src/components/copilot/FollowupButtons.tsx
-- [ ] T105 [US4] Implement scope state management with React context in apps/web/src/context/ScopeContext.tsx
-- [ ] T106 [US4] Add coverage indicator showing indexed video count in copilot UI
-- [ ] T107 [US4] Implement uncertainty messaging when content insufficient
+- [ ] T104 [US4] Install and configure CopilotKit in apps/web (package.json, provider setup)
+- [ ] T105 [US4] Create copilot sidebar component in apps/web/src/components/copilot/CopilotSidebar.tsx
+- [ ] T106 [P] [US4] Create scope chips component in apps/web/src/components/copilot/ScopeChips.tsx
+- [ ] T107 [P] [US4] Create citation component in apps/web/src/components/copilot/Citation.tsx
+- [ ] T108 [P] [US4] Create video card for copilot results in apps/web/src/components/copilot/CopilotVideoCard.tsx
+- [ ] T109 [US4] Create topics-in-scope panel in apps/web/src/components/copilot/TopicsPanel.tsx
+- [ ] T110 [US4] Create follow-up suggestion buttons in apps/web/src/components/copilot/FollowupButtons.tsx
+- [ ] T111 [US4] Implement scope state management with React context in apps/web/src/context/ScopeContext.tsx
+- [ ] T112 [US4] Add coverage indicator showing indexed video count in copilot UI
+- [ ] T113 [US4] Implement uncertainty messaging when content insufficient
 
 **Checkpoint**: User Story 4 complete — full copilot query with scope visibility, citations, follow-ups
 
@@ -231,18 +242,18 @@
 
 ### API Implementation for US5
 
-- [ ] T108 [P] [US5] Create explanation Pydantic models in services/api/src/api/models/explanation.py
-- [ ] T109 [US5] Implement explanation service in services/api/src/api/services/explanation_service.py
-- [ ] T110 [US5] Implement GET /api/v1/copilot/neighbors/{videoId} endpoint in services/api/src/api/routes/copilot.py
-- [ ] T111 [US5] Implement GET /api/v1/library/videos/{videoId}/explain endpoint in services/api/src/api/routes/library.py
+- [ ] T114 [P] [US5] Create explanation Pydantic models in services/api/src/api/models/explanation.py
+- [ ] T115 [US5] Implement explanation service in services/api/src/api/services/explanation_service.py
+- [ ] T116 [US5] Implement GET /api/v1/copilot/neighbors/{videoId} endpoint in services/api/src/api/routes/copilot.py
+- [ ] T117 [US5] Implement GET /api/v1/library/videos/{videoId}/explain endpoint in services/api/src/api/routes/library.py
 
 ### Frontend for US5
 
-- [ ] T112 [US5] Create "Why this?" button on video cards in apps/web/src/components/copilot/WhyThisButton.tsx
-- [ ] T113 [US5] Create explanation panel component in apps/web/src/components/copilot/ExplanationPanel.tsx
-- [ ] T114 [US5] Create similarity evidence display in apps/web/src/components/copilot/SimilarityEvidence.tsx
-- [ ] T115 [US5] Create relationship evidence display in apps/web/src/components/copilot/RelationshipEvidence.tsx
-- [ ] T116 [US5] Add clickable evidence segments linking to video timestamps
+- [ ] T118 [US5] Create "Why this?" button on video cards in apps/web/src/components/copilot/WhyThisButton.tsx
+- [ ] T119 [US5] Create explanation panel component in apps/web/src/components/copilot/ExplanationPanel.tsx
+- [ ] T120 [US5] Create similarity evidence display in apps/web/src/components/copilot/SimilarityEvidence.tsx
+- [ ] T121 [US5] Create relationship evidence display in apps/web/src/components/copilot/RelationshipEvidence.tsx
+- [ ] T122 [US5] Add clickable evidence segments linking to video timestamps
 
 **Checkpoint**: User Story 5 complete — transparency for all recommendations
 
@@ -256,16 +267,16 @@
 
 ### API Implementation for US6
 
-- [ ] T117 [P] [US6] Create structured output Pydantic models (LearningPath, WatchList) in services/api/src/api/models/synthesis.py
-- [ ] T118 [US6] Implement synthesis service in services/api/src/api/services/synthesis_service.py
-- [ ] T119 [US6] Add structured output tools to copilot query handler in services/api/src/api/services/copilot_service.py
+- [ ] T123 [P] [US6] Create structured output Pydantic models (LearningPath, WatchList) in services/api/src/api/models/synthesis.py
+- [ ] T124 [US6] Implement synthesis service in services/api/src/api/services/synthesis_service.py
+- [ ] T125 [US6] Add structured output tools to copilot query handler in services/api/src/api/services/copilot_service.py
 
 ### Frontend for US6
 
-- [ ] T120 [US6] Create learning path renderer in apps/web/src/components/copilot/LearningPathView.tsx
-- [ ] T121 [P] [US6] Create watch list renderer in apps/web/src/components/copilot/WatchListView.tsx
-- [ ] T122 [US6] Add rationale display for each item in structured outputs
-- [ ] T123 [US6] Add "what's missing" messaging when content insufficient for synthesis
+- [ ] T126 [US6] Create learning path renderer in apps/web/src/components/copilot/LearningPathView.tsx
+- [ ] T127 [P] [US6] Create watch list renderer in apps/web/src/components/copilot/WatchListView.tsx
+- [ ] T128 [US6] Add rationale display for each item in structured outputs
+- [ ] T129 [US6] Add "what's missing" messaging when content insufficient for synthesis
 
 **Checkpoint**: User Story 6 complete — full synthesis capabilities
 
@@ -277,33 +288,33 @@
 
 ### Error Handling & UX Polish
 
-- [ ] T124 [P] Implement serverless DB wake-up handling with "Warming up" toast in apps/web
-- [ ] T125 [P] Add dead-letter visibility page in apps/web/src/app/jobs/dead-letter/page.tsx
-- [ ] T126 [P] Create global error boundary in apps/web/src/app/error.tsx
-- [ ] T127 Add loading skeletons for all async data fetches
+- [ ] T130 [P] Implement serverless DB wake-up handling with "Warming up" toast in apps/web
+- [ ] T131 [P] Add dead-letter visibility page in apps/web/src/app/jobs/dead-letter/page.tsx
+- [ ] T132 [P] Create global error boundary in apps/web/src/app/error.tsx
+- [ ] T133 Add loading skeletons for all async data fetches
 
 ### Observability
 
-- [ ] T128 [P] Add OpenTelemetry SDK to Python API in services/api
-- [ ] T129 [P] Add OpenTelemetry to workers in services/workers
-- [ ] T130 Verify correlation ID propagation from UI → API → workers
-- [ ] T131 [P] Create Log Analytics queries for common issues in docs/runbooks/
+- [ ] T134 [P] Add OpenTelemetry SDK to Python API in services/api
+- [ ] T135 [P] Add OpenTelemetry to workers in services/workers
+- [ ] T136 Verify correlation ID propagation from UI → API → workers
+- [ ] T137 [P] Create Log Analytics queries for common issues in docs/runbooks/
 
 ### Infrastructure
 
-- [ ] T132 [P] Create Bicep module for Azure SQL in infra/bicep/modules/sql.bicep
-- [ ] T133 [P] Create Bicep module for Storage (blob + queue) in infra/bicep/modules/storage.bicep
-- [ ] T134 [P] Create Bicep module for Container Apps in infra/bicep/modules/aca.bicep
-- [ ] T135 [P] Create Bicep module for Key Vault in infra/bicep/modules/keyvault.bicep
-- [ ] T136 Create main.bicep composing all modules in infra/bicep/main.bicep
-- [ ] T137 [P] Create GitHub Actions workflow for CI in .github/workflows/ci.yml
-- [ ] T138 [P] Create GitHub Actions workflow for CD in .github/workflows/deploy.yml
+- [ ] T138 [P] Create Bicep module for Azure SQL in infra/bicep/modules/sql.bicep
+- [ ] T139 [P] Create Bicep module for Storage (blob + queue) in infra/bicep/modules/storage.bicep
+- [ ] T140 [P] Create Bicep module for Container Apps in infra/bicep/modules/aca.bicep
+- [ ] T141 [P] Create Bicep module for Key Vault in infra/bicep/modules/keyvault.bicep
+- [ ] T142 Create main.bicep composing all modules in infra/bicep/main.bicep
+- [ ] T143 [P] Create GitHub Actions workflow for CI in .github/workflows/ci.yml
+- [ ] T144 [P] Create GitHub Actions workflow for CD in .github/workflows/deploy.yml
 
 ### Documentation
 
-- [ ] T139 [P] Create architecture overview in docs/architecture.md
-- [ ] T140 [P] Create operational runbook in docs/runbooks/operations.md
-- [ ] T141 Run quickstart.md validation and update as needed
+- [ ] T145 [P] Create architecture overview in docs/architecture.md
+- [ ] T146 [P] Create operational runbook in docs/runbooks/operations.md
+- [ ] T147 Run quickstart.md validation and update as needed
 
 ---
 
@@ -439,9 +450,10 @@ This delivers:
 | Risk | Mitigation in Tasks |
 |------|-------------------|
 | YouTube caption access | T045 includes fallback to yt-dlp + Whisper |
-| Vector search latency | T091 implements exact search first; add HNSW later |
-| LLM grounding quality | T096, T107 handle uncertainty explicitly |
-| Cold start UX | T124 adds "Warming up" toast |
+| Vector search latency | T097 implements exact search first; add HNSW later |
+| LLM grounding quality | T102, T113 handle uncertainty explicitly |
+| Cold start UX | T130 adds "Warming up" toast |
+| YouTube rate limiting | T074 uses yt-dlp with backoff for channel extraction |
 
 ---
 
@@ -449,16 +461,16 @@ This delivers:
 
 | Metric | Count |
 |--------|-------|
-| **Total Tasks** | 141 |
+| **Total Tasks** | 147 |
 | **Setup Phase** | 10 |
 | **Foundational Phase** | 24 |
 | **US1 (Single Video)** | 21 |
-| **US2 (Batch Ingestion)** | 17 |
+| **US2 (Batch Ingestion)** | 23 |
 | **US3 (Browse Library)** | 17 |
 | **US4 (Copilot Query)** | 18 |
 | **US5 (Explain Why)** | 9 |
 | **US6 (Synthesis)** | 7 |
 | **Polish Phase** | 18 |
-| **Parallel Tasks** | 67 (48%) |
+| **Parallel Tasks** | ~70 (48%) |
 
 **MVP Scope**: Phases 1-3 + Phase 6 = ~73 tasks for core value delivery
