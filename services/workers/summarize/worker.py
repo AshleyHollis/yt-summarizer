@@ -1,7 +1,15 @@
 """Summarize worker for generating AI-powered video summaries."""
 
+import os
 from dataclasses import dataclass
 from typing import Any
+
+# Fix SSL certificate verification on Windows by using certifi's CA bundle
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+except ImportError:
+    pass  # certifi not installed, use system defaults
 
 from shared.blob.client import (
     SUMMARIES_CONTAINER,
@@ -107,13 +115,17 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
                 )
 
             # Generate summary
-            summary = await self._generate_summary(transcript)
+            summary, error = await self._generate_summary(transcript)
 
             if not summary:
-                await mark_job_failed(message.job_id, "OpenAI API failed to generate summary")
+                error_msg = error or "OpenAI API failed to generate summary"
+                # Truncate error message for database (max 4000 chars for SQL Server nvarchar)
+                if len(error_msg) > 4000:
+                    error_msg = error_msg[:3997] + "..."
+                await mark_job_failed(message.job_id, error_msg)
                 return WorkerResult.failed(
                     Exception("Summary generation failed"),
-                    "OpenAI API failed to generate summary",
+                    error_msg,
                 )
 
             # Store summary
@@ -167,19 +179,36 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
             logger.error("Failed to fetch transcript", error=str(e))
             return None
 
-    async def _generate_summary(self, transcript: str) -> str | None:
-        """Generate summary using OpenAI API."""
-        try:
-            from openai import AsyncOpenAI
-
-            settings = get_settings()
-            
-            # Check if API key is configured (also check for placeholder value)
-            if not settings.openai.api_key or settings.openai.api_key == "not-configured":
-                logger.warning("OpenAI API key not configured - generating mock summary for testing")
-                # Provide a mock summary for testing without API key
-                preview = transcript[:500] + "..." if len(transcript) > 500 else transcript
-                return f"""# Video Summary (Mock)
+    async def _generate_summary(self, transcript: str) -> tuple[str | None, str | None]:
+        """Generate summary using OpenAI API.
+        
+        Returns:
+            Tuple of (summary, error_message). If successful, summary is set and error is None.
+            If failed, summary is None and error_message contains the failure reason.
+        """
+        settings = get_settings()
+        
+        # DEBUG: Log the API key check
+        logger.info(
+            "DEBUG: _generate_summary API key check",
+            api_key_repr=repr(settings.openai.api_key),
+            is_azure_configured=settings.openai.is_azure_configured,
+            is_azure_ai_foundry=settings.openai.is_azure_ai_foundry,
+            azure_openai_base_url=settings.openai.azure_openai_base_url,
+            effective_api_key_set=bool(settings.openai.effective_api_key),
+        )
+        
+        # Check if any OpenAI configuration is available (Azure or standard)
+        has_valid_config = (
+            settings.openai.is_azure_configured or 
+            (settings.openai.api_key and settings.openai.api_key != "not-configured")
+        )
+        
+        if not has_valid_config:
+            logger.warning("OpenAI API key not configured - generating mock summary for testing")
+            # Provide a mock summary for testing without API key
+            preview = transcript[:500] + "..." if len(transcript) > 500 else transcript
+            return (f"""# Video Summary (Mock)
 
 **Note**: This is a mock summary generated because no OpenAI API key is configured.
 
@@ -196,9 +225,49 @@ This video discusses topics covered in the transcript.
 
 ## Summary
 This is a placeholder summary for testing purposes. Configure an OpenAI API key to generate real AI-powered summaries.
-"""
+""", None)
+        
+        try:
+            # Use Azure OpenAI if configured, otherwise use standard OpenAI
+            if settings.openai.is_azure_configured:
+                base_url = settings.openai.azure_openai_base_url
+                model = settings.openai.azure_deployment or "gpt-4o-mini"
                 
-            client = AsyncOpenAI(api_key=settings.openai.api_key)
+                # Azure AI Foundry uses OpenAI-compatible API with /models endpoint
+                if settings.openai.is_azure_ai_foundry:
+                    from openai import AsyncOpenAI
+                    
+                    client = AsyncOpenAI(
+                        api_key=settings.openai.effective_api_key,
+                        base_url=base_url,
+                        default_headers={"api-key": settings.openai.effective_api_key},
+                    )
+                    logger.info(
+                        "Using Azure AI Foundry for summarization",
+                        original_endpoint=settings.openai.azure_endpoint,
+                        base_url=base_url,
+                        model=model,
+                    )
+                else:
+                    # Standard Azure OpenAI
+                    from openai import AsyncAzureOpenAI
+                    
+                    client = AsyncAzureOpenAI(
+                        api_key=settings.openai.effective_api_key,
+                        azure_endpoint=base_url,
+                        api_version=settings.openai.azure_api_version,
+                    )
+                    logger.info(
+                        "Using Azure OpenAI for summarization",
+                        original_endpoint=settings.openai.azure_endpoint,
+                        base_url=base_url,
+                        deployment=model,
+                    )
+            else:
+                from openai import AsyncOpenAI
+                
+                client = AsyncOpenAI(api_key=settings.openai.api_key)
+                model = settings.openai.model
 
             # Truncate transcript if too long (GPT-4o-mini has 128k context)
             max_tokens = 100000  # Leave room for system prompt and response
@@ -210,9 +279,10 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
                     max_tokens=max_tokens,
                 )
 
-            response = await client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
+            # Build request parameters - newer models use max_completion_tokens instead of max_tokens
+            request_params = {
+                "model": model,
+                "messages": [
                     {
                         "role": "system",
                         "content": "You are an expert at summarizing video content.",
@@ -222,16 +292,32 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
                         "content": SUMMARIZE_PROMPT.format(transcript=transcript),
                     },
                 ],
-                max_tokens=4096,
-                temperature=0.7,
-            )
+            }
+            
+            # Azure AI Foundry models (like gpt-5) use max_completion_tokens
+            # Standard models use max_tokens
+            if settings.openai.is_azure_ai_foundry:
+                request_params["max_completion_tokens"] = 4096
+            else:
+                request_params["max_tokens"] = 4096
+                request_params["temperature"] = 0.7
+
+            response = await client.chat.completions.create(**request_params)
 
             summary = response.choices[0].message.content
-            return summary
+            return (summary, None)
 
         except Exception as e:
-            logger.error("OpenAI API call failed", error=str(e))
-            return None
+            import traceback
+            error_details = f"{type(e).__name__}: {str(e)}"
+            full_traceback = traceback.format_exc()
+            logger.error(
+                "OpenAI API call failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                traceback=full_traceback,
+            )
+            return (None, f"{error_details}\n\nTraceback:\n{full_traceback}")
 
     async def _store_summary(
         self,

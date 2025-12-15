@@ -1,7 +1,15 @@
 """Embed worker for generating vector embeddings from video content."""
 
+import os
 from dataclasses import dataclass
 from typing import Any
+
+# Fix SSL certificate verification on Windows by using certifi's CA bundle
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+except ImportError:
+    pass  # certifi not installed, use system defaults
 
 import sqlalchemy as sa
 
@@ -103,13 +111,17 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             chunks = self._chunk_content(content)
 
             # Generate embeddings
-            embeddings = await self._generate_embeddings(chunks)
+            embeddings, error = await self._generate_embeddings(chunks)
 
             if not embeddings:
-                await mark_job_failed(message.job_id, "OpenAI API failed to generate embeddings")
+                error_msg = error or "OpenAI API failed to generate embeddings"
+                # Truncate error message for database (max 4000 chars for SQL Server nvarchar)
+                if len(error_msg) > 4000:
+                    error_msg = error_msg[:3997] + "..."
+                await mark_job_failed(message.job_id, error_msg)
                 return WorkerResult.failed(
                     Exception("Embedding generation failed"),
-                    "OpenAI API failed to generate embeddings",
+                    error_msg,
                 )
 
             # Store embeddings
@@ -191,29 +203,92 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
 
         return chunks
 
-    async def _generate_embeddings(self, chunks: list[str]) -> list[list[float]] | None:
-        """Generate embeddings using OpenAI API."""
+    async def _generate_embeddings(self, chunks: list[str]) -> tuple[list[list[float]] | None, str | None]:
+        """Generate embeddings using OpenAI API.
+        
+        Returns:
+            Tuple of (embeddings, error_message). If successful, embeddings is set and error is None.
+            If failed, embeddings is None and error_message contains the failure reason.
+        """
+        import random
+        
+        settings = get_settings()
+        
+        # Log configuration for debugging
+        logger.info(
+            "DEBUG: _generate_embeddings config check",
+            is_azure_configured=settings.openai.is_azure_configured,
+            is_azure_ai_foundry=settings.openai.is_azure_ai_foundry,
+            azure_openai_base_url=settings.openai.azure_openai_base_url,
+            azure_embedding_deployment=settings.openai.azure_embedding_deployment,
+        )
+        
+        # Check if any OpenAI configuration is available (Azure or standard)
+        has_valid_config = (
+            settings.openai.is_azure_configured or 
+            (settings.openai.api_key and settings.openai.api_key != "not-configured")
+        )
+        
+        # For Azure AI Foundry, also check if embedding deployment is configured
+        embedding_deployment = settings.openai.azure_embedding_deployment
+        if settings.openai.is_azure_ai_foundry and (not embedding_deployment or embedding_deployment == "not-configured"):
+            logger.warning("Azure AI Foundry embedding deployment not configured - generating mock embeddings")
+            has_valid_config = False
+        
+        if not has_valid_config:
+            logger.warning("OpenAI API key not configured - generating mock embeddings for testing")
+            # Provide mock embeddings (1536 dimensions like text-embedding-3-small)
+            mock_embeddings = []
+            for _ in chunks:
+                # Generate a random normalized vector
+                embedding = [random.gauss(0, 1) for _ in range(1536)]
+                # Normalize to unit length
+                magnitude = sum(x**2 for x in embedding) ** 0.5
+                embedding = [x / magnitude for x in embedding]
+                mock_embeddings.append(embedding)
+            return (mock_embeddings, None)
+        
         try:
-            from openai import AsyncOpenAI
-            import random
-
-            settings = get_settings()
-            
-            # Check if API key is configured (also check for placeholder value)
-            if not settings.openai.api_key or settings.openai.api_key == "not-configured":
-                logger.warning("OpenAI API key not configured - generating mock embeddings for testing")
-                # Provide mock embeddings (1536 dimensions like text-embedding-3-small)
-                mock_embeddings = []
-                for _ in chunks:
-                    # Generate a random normalized vector
-                    embedding = [random.gauss(0, 1) for _ in range(1536)]
-                    # Normalize to unit length
-                    magnitude = sum(x**2 for x in embedding) ** 0.5
-                    embedding = [x / magnitude for x in embedding]
-                    mock_embeddings.append(embedding)
-                return mock_embeddings
+            # Use Azure OpenAI if configured, otherwise use standard OpenAI
+            if settings.openai.is_azure_configured:
+                base_url = settings.openai.azure_openai_base_url
+                embedding_model = settings.openai.azure_embedding_deployment or "text-embedding-3-small"
                 
-            client = AsyncOpenAI(api_key=settings.openai.api_key)
+                # Azure AI Foundry uses OpenAI-compatible API with /models endpoint
+                if settings.openai.is_azure_ai_foundry:
+                    from openai import AsyncOpenAI
+                    
+                    client = AsyncOpenAI(
+                        api_key=settings.openai.effective_api_key,
+                        base_url=base_url,
+                        default_headers={"api-key": settings.openai.effective_api_key},
+                    )
+                    logger.info(
+                        "Using Azure AI Foundry for embeddings",
+                        original_endpoint=settings.openai.azure_endpoint,
+                        base_url=base_url,
+                        model=embedding_model,
+                    )
+                else:
+                    # Standard Azure OpenAI
+                    from openai import AsyncAzureOpenAI
+                    
+                    client = AsyncAzureOpenAI(
+                        api_key=settings.openai.effective_api_key,
+                        azure_endpoint=base_url,
+                        api_version=settings.openai.azure_api_version,
+                    )
+                    logger.info(
+                        "Using Azure OpenAI for embeddings",
+                        original_endpoint=settings.openai.azure_endpoint,
+                        base_url=base_url,
+                        deployment=embedding_model,
+                    )
+            else:
+                from openai import AsyncOpenAI
+                
+                client = AsyncOpenAI(api_key=settings.openai.api_key)
+                embedding_model = settings.openai.embedding_model
 
             embeddings = []
 
@@ -223,7 +298,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 batch = chunks[i : i + batch_size]
 
                 response = await client.embeddings.create(
-                    model="text-embedding-3-small",
+                    model=embedding_model,
                     input=batch,
                 )
 
@@ -236,11 +311,19 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                     batch_size=len(batch),
                 )
 
-            return embeddings
+            return (embeddings, None)
 
         except Exception as e:
-            logger.error("OpenAI embeddings API call failed", error=str(e))
-            return None
+            import traceback
+            error_details = f"{type(e).__name__}: {str(e)}"
+            full_traceback = traceback.format_exc()
+            logger.error(
+                "OpenAI embeddings API call failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                traceback=full_traceback,
+            )
+            return (None, f"{error_details}\n\nTraceback:\n{full_traceback}")
 
     async def _store_embeddings(
         self,

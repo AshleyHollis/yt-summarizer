@@ -153,3 +153,6 @@ lerna-debug.log*
 # .NET Aspire Local Settings
 # -----------------------------------------------------------------------------
 .aspire/
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json

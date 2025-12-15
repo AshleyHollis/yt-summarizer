@@ -12,11 +12,15 @@ import { test, expect } from '@playwright/test';
  * Prerequisites:
  * - Run Aspire first: cd services/aspire/AppHost && dotnet run
  * - Then run tests with: USE_EXTERNAL_SERVER=true npm run test:e2e
+ * - For tests that require real AI processing: LIVE_PROCESSING=true
  *
  * Test Channel: https://www.youtube.com/@darciisabella/videos (small channel with few videos)
  */
 
 const TEST_CHANNEL_URL = 'https://www.youtube.com/@darciisabella/videos';
+
+// Check if live processing tests should run (requires real AI services)
+const LIVE_PROCESSING = process.env.LIVE_PROCESSING === 'true';
 
 test.describe('Channel Ingestion Flow', () => {
   test.describe('Navigation', () => {
@@ -145,6 +149,9 @@ test.describe('Channel Ingestion Flow', () => {
   });
 
   test.describe('Batch Creation', () => {
+    // These tests require actual video processing to complete
+    test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
+
     test.beforeEach(async ({ page }) => {
       await page.goto('/ingest');
     });

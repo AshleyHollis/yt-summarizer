@@ -97,15 +97,16 @@ $env:USE_EXTERNAL_SERVER = "true"; npx playwright test
 | Test Suite | Result | Count | Date |
 |------------|--------|-------|------|
 | API Tests | ✅ PASS | 214 | 2025-12-14 |
-| Worker Tests | ✅ PASS | 47 | 2025-12-14 |
-| Shared Tests | ✅ PASS | 12 | 2025-12-14 |
-| Frontend Tests | ✅ PASS | 125 | 2025-12-14 |
-| E2E Tests | ✅ PASS | 82 | 2025-12-14 |
+| Worker Tests | ✅ PASS | 47 | 2025-12-15 |
+| Shared Tests | ✅ PASS | 12 | 2025-12-15 |
+| Frontend Tests | ✅ PASS | 125 | 2025-12-15 |
+| E2E Tests | ✅ PASS | 83 | 2025-12-15 |
 
-**Total Automated Tests**: 480+ passing  
+**Total Automated Tests**: 586 passing (API: 319, Workers: 47, Shared: 12, Frontend: 125, E2E: 83)  
+**Skipped Tests**: 34 (E2E: 16 require LIVE_PROCESSING, API: 18 require specific setup)  
 **Manual Tests Required**: 0  
 **Verified By**: Automated CI  
-**Date**: 2025-12-14
+**Date**: 2025-12-15
 
 ---
 
@@ -116,3 +117,4 @@ $env:USE_EXTERNAL_SERVER = "true"; npx playwright test
 - Do NOT mark tasks [X] until all automated tests pass
 - Re-run verification after any code changes
 - E2E tests cover all user story acceptance criteria
+- Tests requiring live AI processing can be run with `LIVE_PROCESSING=true`

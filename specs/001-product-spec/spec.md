@@ -57,6 +57,8 @@ Potential to share the library read-only with a handful of friends. Not in initi
 - Data: Single Azure SQL Database (serverless) for operational data, vectors, and relationships
 - Blob storage for large artifacts; queue for background processing
 - Identity: Azure Entra ID with Managed Identity
+- Security: No API authentication enforced; trust network boundary only (container-to-container communication within Azure Container Apps environment)
+- LLM: Azure OpenAI — GPT-4o for chat/summarization, text-embedding-3-small for embeddings
 
 ---
 
@@ -290,6 +292,12 @@ The copilot is a query interface only. It:
 - ❌ NEVER modifies relationships or embeddings
 - ❌ NEVER searches live web or YouTube API
 
+### Conversation History
+
+- Chat history MUST persist in browser localStorage (survives page refresh)
+- History SHOULD be cleared on explicit logout or browser storage clear
+- No server-side chat history storage required
+
 ### Scope Visibility
 
 - Current scope MUST be visible as chips in the chat thread (channels, time range, content types)
@@ -414,3 +422,9 @@ Every answer MUST include:
 
 - Q: How should the system retrieve a YouTube channel's video list for batch ingestion? → A: yt-dlp extraction (scrapes channel page, no API key needed)
 - Q: What is the maximum number of videos to fetch for channel selection UI? → A: Fetch up to 100 videos with "Load More" pagination
+
+### Session 2025-12-14
+
+- Q: How should API authentication be enforced? → A: No auth (trust network boundary only)
+- Q: Which LLM provider and model should be used? → A: Azure OpenAI (GPT-4o + text-embedding-3-small)
+- Q: How should copilot conversation history be persisted? → A: Browser localStorage (survives refresh, cleared on logout)

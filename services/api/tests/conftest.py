@@ -72,12 +72,15 @@ def app(mock_session):
     from fastapi.middleware.cors import CORSMiddleware
     
     from api.middleware import CorrelationIdMiddleware
-    from api.routes import batches, channels, health, jobs, library, videos
+    from api.routes import batches, channels, copilot, health, jobs, library, videos
     from shared.db.connection import get_session
     
     @asynccontextmanager
     async def mock_lifespan(app: FastAPI):
         """Mock lifespan that skips database initialization."""
+        # Set app state to indicate database is not initialized (mocked)
+        app.state.db_initialized = False
+        app.state.db_error = "Mocked - database not initialized in tests"
         yield
     
     # Create a minimal app for testing
@@ -106,6 +109,7 @@ def app(mock_session):
     application.include_router(library.router)
     application.include_router(channels.router)
     application.include_router(batches.router)
+    application.include_router(copilot.router)
     
     # Override the database session dependency
     async def mock_get_session():
@@ -259,3 +263,67 @@ def headers(correlation_id) -> dict[str, str]:
         "X-Correlation-ID": correlation_id,
         "Content-Type": "application/json",
     }
+
+
+# ============================================================================
+# Agent Framework Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+def azure_openai_env(monkeypatch):
+    """Configure Azure OpenAI environment variables for agent tests.
+    
+    Use this fixture when testing agent creation or AG-UI endpoints
+    that require LLM configuration.
+    """
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-api-key-for-testing")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+    return {
+        "endpoint": "https://test.openai.azure.com",
+        "api_key": "test-api-key-for-testing",
+        "deployment": "gpt-4o",
+    }
+
+
+@pytest.fixture
+def openai_env(monkeypatch):
+    """Configure standard OpenAI environment variables for agent tests."""
+    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key-for-testing")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-4o")
+    return {
+        "api_key": "sk-test-key-for-testing",
+        "model": "gpt-4o",
+    }
+
+
+@pytest.fixture
+def no_llm_env(monkeypatch):
+    """Clear all LLM environment variables for testing fallback behavior."""
+    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+
+@pytest.fixture
+def agui_app(azure_openai_env):
+    """Create a FastAPI app with AG-UI endpoint configured.
+    
+    Use this fixture to test AG-UI endpoint behavior without
+    starting the full application.
+    """
+    from fastapi import FastAPI
+    from api.agents import setup_agui_endpoint
+    
+    app = FastAPI()
+    setup_agui_endpoint(app)
+    return app
+
+
+@pytest.fixture
+def agui_client(agui_app):
+    """Create a test client for the AG-UI app."""
+    return TestClient(agui_app)

@@ -206,31 +206,73 @@
 
 **Independent Test**: With 5+ ingested videos, ask a question, receive an answer with citations and video cards
 
-### API Implementation for US4
+**Technical Context**:
+- Copilot is READ-ONLY (no data modifications, no ingestion triggers)
+- Uses vector search on segment embeddings for semantic similarity
+- Uses relationship graph for related video discovery
+- CopilotKit provides the chat UI framework
+- Scope filters: channels, videoIds, dateRange, facets, contentTypes
 
-- [ ] T096 [P] [US4] Create copilot Pydantic models (CopilotQueryRequest, CopilotQueryResponse, Evidence) in services/api/src/api/models/copilot.py
-- [ ] T097 [US4] Implement vector search in services/api/src/api/services/search_service.py
-- [ ] T098 [US4] Implement POST /api/v1/copilot/search/segments endpoint in services/api/src/api/routes/copilot.py
-- [ ] T099 [US4] Implement POST /api/v1/copilot/search/videos endpoint in services/api/src/api/routes/copilot.py
-- [ ] T100 [US4] Implement POST /api/v1/copilot/topics endpoint in services/api/src/api/routes/copilot.py
-- [ ] T101 [US4] Implement GET /api/v1/copilot/coverage endpoint in services/api/src/api/routes/copilot.py
-- [ ] T102 [US4] Implement copilot query orchestrator in services/api/src/api/services/copilot_service.py
-- [ ] T103 [US4] Implement POST /api/v1/copilot/query endpoint in services/api/src/api/routes/copilot.py
+### API Models for US4
+
+- [X] T096 [P] [US4] Create QueryScope Pydantic model (channels, videoIds, dateRange, facets, contentTypes) in services/api/src/api/models/copilot.py
+- [X] T097 [P] [US4] Create CopilotQueryRequest model (query, scope, conversationId, correlationId) in services/api/src/api/models/copilot.py
+- [X] T098 [P] [US4] Create CopilotQueryResponse model (answer, videoCards, evidence, scopeEcho, followups, uncertainty) in services/api/src/api/models/copilot.py
+- [X] T099 [P] [US4] Create Evidence model (videoId, segmentId, segmentText, startTime, endTime, youTubeUrl, confidence) in services/api/src/api/models/copilot.py
+- [X] T100 [P] [US4] Create RecommendedVideo model (videoId, title, channelName, thumbnailUrl, relevanceScore, primaryReason) in services/api/src/api/models/copilot.py
+- [X] T101 [P] [US4] Create SegmentSearchRequest/Response, ScoredSegment models in services/api/src/api/models/copilot.py
+- [X] T102 [P] [US4] Create TopicsResponse, TopicCount, CoverageResponse models in services/api/src/api/models/copilot.py
+
+### API Services for US4
+
+- [X] T103 [US4] Implement vector search service with pgvector cosine similarity in services/api/src/api/services/search_service.py
+- [X] T104 [US4] Implement scope filter builder (convert QueryScope to SQL WHERE clauses) in services/api/src/api/services/search_service.py
+- [X] T105 [US4] Implement copilot orchestrator (query → search → LLM → response) in services/api/src/api/services/copilot_service.py
+- [X] T106 [US4] Add LLM client wrapper for OpenAI chat completions in services/api/src/api/services/llm_service.py
+- [X] T107 [US4] Implement follow-up suggestion generator in services/api/src/api/services/copilot_service.py
+- [X] T108 [US4] Implement uncertainty detection (insufficient content handling) in services/api/src/api/services/copilot_service.py
+
+### API Routes for US4
+
+- [X] T109 [US4] Implement POST /api/v1/copilot/query endpoint in services/api/src/api/routes/copilot.py
+- [X] T110 [US4] Implement POST /api/v1/copilot/search/segments endpoint in services/api/src/api/routes/copilot.py
+- [X] T111 [US4] Implement POST /api/v1/copilot/search/videos endpoint in services/api/src/api/routes/copilot.py
+- [X] T112 [US4] Implement POST /api/v1/copilot/topics endpoint in services/api/src/api/routes/copilot.py
+- [X] T113 [US4] Implement POST /api/v1/copilot/coverage endpoint in services/api/src/api/routes/copilot.py
+- [X] T114 [US4] Implement GET /api/v1/copilot/neighbors/{videoId} endpoint in services/api/src/api/routes/copilot.py
 
 ### CopilotKit Integration for US4
 
-- [ ] T104 [US4] Install and configure CopilotKit in apps/web (package.json, provider setup)
-- [ ] T105 [US4] Create copilot sidebar component in apps/web/src/components/copilot/CopilotSidebar.tsx
-- [ ] T106 [P] [US4] Create scope chips component in apps/web/src/components/copilot/ScopeChips.tsx
-- [ ] T107 [P] [US4] Create citation component in apps/web/src/components/copilot/Citation.tsx
-- [ ] T108 [P] [US4] Create video card for copilot results in apps/web/src/components/copilot/CopilotVideoCard.tsx
-- [ ] T109 [US4] Create topics-in-scope panel in apps/web/src/components/copilot/TopicsPanel.tsx
-- [ ] T110 [US4] Create follow-up suggestion buttons in apps/web/src/components/copilot/FollowupButtons.tsx
-- [ ] T111 [US4] Implement scope state management with React context in apps/web/src/context/ScopeContext.tsx
-- [ ] T112 [US4] Add coverage indicator showing indexed video count in copilot UI
-- [ ] T113 [US4] Implement uncertainty messaging when content insufficient
+- [X] T115 [US4] Install CopilotKit packages (@copilotkit/react-core, @copilotkit/react-ui) in apps/web/package.json
+- [X] T116 [US4] Configure CopilotKit provider with API endpoint in apps/web/src/app/providers.tsx
+- [X] T117 [US4] Create useCopilotAction hooks for search/query in apps/web/src/hooks/useCopilotActions.ts
 
-**Checkpoint**: User Story 4 complete — full copilot query with scope visibility, citations, follow-ups
+### Frontend Components for US4
+
+- [X] T118 [US4] Create CopilotSidebar component (chat panel with message history) in apps/web/src/components/copilot/CopilotSidebar.tsx
+- [X] T119 [P] [US4] Create ScopeChips component (display/edit query scope filters) in apps/web/src/components/copilot/ScopeChips.tsx
+- [X] T120 [P] [US4] Create Citation component (clickable evidence with timestamp link) in apps/web/src/components/copilot/Citation.tsx
+- [X] T121 [P] [US4] Create CopilotVideoCard component (recommended video with reason) in apps/web/src/components/copilot/CopilotVideoCard.tsx
+- [X] T122 [US4] Create TopicsPanel component (facets with counts in scope) in apps/web/src/components/copilot/TopicsPanel.tsx
+- [X] T123 [US4] Create FollowupButtons component (suggested next queries) in apps/web/src/components/copilot/FollowupButtons.tsx
+- [X] T124 [US4] Create CopilotMessage component (answer with embedded citations and video cards) in apps/web/src/components/copilot/CopilotMessage.tsx
+
+### Frontend State & Integration for US4
+
+- [X] T125 [US4] Create ScopeContext for scope state management in apps/web/src/context/ScopeContext.tsx
+- [X] T126 [US4] Add coverage indicator (indexed video count) to copilot header in apps/web/src/components/copilot/CoverageIndicator.tsx
+- [X] T127 [US4] Implement uncertainty messaging component in apps/web/src/components/copilot/UncertaintyMessage.tsx
+- [X] T128 [US4] Integrate CopilotSidebar into library and video detail pages in apps/web/src/app/layout.tsx
+- [X] T129 [US4] Add scope chip interactions (click to narrow/broaden scope) in apps/web/src/components/copilot/ScopeChips.tsx
+
+### Tests for US4
+
+- [X] T130 [P] [US4] Create API tests for copilot endpoints in services/api/tests/test_copilot.py
+- [X] T131 [P] [US4] Create integration tests for vector search in services/api/tests/test_search_service.py
+- [X] T132 [P] [US4] Create E2E tests for copilot query flow in apps/web/e2e/copilot.spec.ts
+- [X] T132a [P] [US4] Create unit tests for agent module and AG-UI endpoint registration in services/api/tests/test_agents.py
+
+**Checkpoint**: User Story 4 complete — full copilot query with scope visibility, citations, follow-ups ✅
 
 ---
 
@@ -242,18 +284,25 @@
 
 ### API Implementation for US5
 
-- [ ] T114 [P] [US5] Create explanation Pydantic models in services/api/src/api/models/explanation.py
-- [ ] T115 [US5] Implement explanation service in services/api/src/api/services/explanation_service.py
-- [ ] T116 [US5] Implement GET /api/v1/copilot/neighbors/{videoId} endpoint in services/api/src/api/routes/copilot.py
-- [ ] T117 [US5] Implement GET /api/v1/library/videos/{videoId}/explain endpoint in services/api/src/api/routes/library.py
+- [ ] T133 [P] [US5] Create ExplainRequest model (queryText, scope) in services/api/src/api/models/explanation.py
+- [ ] T134 [P] [US5] Create ExplainResponse model (similarityBasis, relationshipBasis, overallConfidence) in services/api/src/api/models/explanation.py
+- [ ] T135 [P] [US5] Create SimilarityEvidence model (segmentId, segmentText, startTime, score) in services/api/src/api/models/explanation.py
+- [ ] T136 [P] [US5] Create RelationshipEvidence model (relationshipType, relatedVideoId, confidence, rationale) in services/api/src/api/models/explanation.py
+- [ ] T137 [US5] Implement explanation service in services/api/src/api/services/explanation_service.py
+- [ ] T138 [US5] Implement POST /api/v1/copilot/explain/{videoId} endpoint in services/api/src/api/routes/copilot.py
 
 ### Frontend for US5
 
-- [ ] T118 [US5] Create "Why this?" button on video cards in apps/web/src/components/copilot/WhyThisButton.tsx
-- [ ] T119 [US5] Create explanation panel component in apps/web/src/components/copilot/ExplanationPanel.tsx
-- [ ] T120 [US5] Create similarity evidence display in apps/web/src/components/copilot/SimilarityEvidence.tsx
-- [ ] T121 [US5] Create relationship evidence display in apps/web/src/components/copilot/RelationshipEvidence.tsx
-- [ ] T122 [US5] Add clickable evidence segments linking to video timestamps
+- [ ] T139 [US5] Create "Why this?" button on video cards in apps/web/src/components/copilot/WhyThisButton.tsx
+- [ ] T140 [US5] Create explanation panel component in apps/web/src/components/copilot/ExplanationPanel.tsx
+- [ ] T141 [P] [US5] Create similarity evidence display in apps/web/src/components/copilot/SimilarityEvidence.tsx
+- [ ] T142 [P] [US5] Create relationship evidence display in apps/web/src/components/copilot/RelationshipEvidence.tsx
+- [ ] T143 [US5] Add clickable evidence segments linking to video timestamps
+
+### Tests for US5
+
+- [ ] T144 [P] [US5] Create API tests for explain endpoint in services/api/tests/test_explain.py
+- [ ] T145 [P] [US5] Create E2E tests for "Why this?" flow in apps/web/e2e/explain.spec.ts
 
 **Checkpoint**: User Story 5 complete — transparency for all recommendations
 
@@ -267,16 +316,23 @@
 
 ### API Implementation for US6
 
-- [ ] T123 [P] [US6] Create structured output Pydantic models (LearningPath, WatchList) in services/api/src/api/models/synthesis.py
-- [ ] T124 [US6] Implement synthesis service in services/api/src/api/services/synthesis_service.py
-- [ ] T125 [US6] Add structured output tools to copilot query handler in services/api/src/api/services/copilot_service.py
+- [ ] T146 [P] [US6] Create LearningPath model (items with order, rationale, videoId, evidence) in services/api/src/api/models/synthesis.py
+- [ ] T147 [P] [US6] Create WatchList model (items with videoId, reason, priority) in services/api/src/api/models/synthesis.py
+- [ ] T148 [US6] Implement synthesis service in services/api/src/api/services/synthesis_service.py
+- [ ] T149 [US6] Add structured output tools to copilot query handler in services/api/src/api/services/copilot_service.py
+- [ ] T150 [US6] Implement POST /api/v1/copilot/synthesize endpoint in services/api/src/api/routes/copilot.py
 
 ### Frontend for US6
 
-- [ ] T126 [US6] Create learning path renderer in apps/web/src/components/copilot/LearningPathView.tsx
-- [ ] T127 [P] [US6] Create watch list renderer in apps/web/src/components/copilot/WatchListView.tsx
-- [ ] T128 [US6] Add rationale display for each item in structured outputs
-- [ ] T129 [US6] Add "what's missing" messaging when content insufficient for synthesis
+- [ ] T151 [US6] Create learning path renderer in apps/web/src/components/copilot/LearningPathView.tsx
+- [ ] T152 [P] [US6] Create watch list renderer in apps/web/src/components/copilot/WatchListView.tsx
+- [ ] T153 [US6] Add rationale display for each item in structured outputs
+- [ ] T154 [US6] Add "what's missing" messaging when content insufficient for synthesis
+
+### Tests for US6
+
+- [ ] T155 [P] [US6] Create API tests for synthesis endpoint in services/api/tests/test_synthesis.py
+- [ ] T156 [P] [US6] Create E2E tests for synthesis flow in apps/web/e2e/synthesis.spec.ts
 
 **Checkpoint**: User Story 6 complete — full synthesis capabilities
 
@@ -288,33 +344,33 @@
 
 ### Error Handling & UX Polish
 
-- [ ] T130 [P] Implement serverless DB wake-up handling with "Warming up" toast in apps/web
-- [ ] T131 [P] Add dead-letter visibility page in apps/web/src/app/jobs/dead-letter/page.tsx
-- [ ] T132 [P] Create global error boundary in apps/web/src/app/error.tsx
-- [ ] T133 Add loading skeletons for all async data fetches
+- [ ] T157 [P] Implement serverless DB wake-up handling with "Warming up" toast in apps/web
+- [ ] T158 [P] Add dead-letter visibility page in apps/web/src/app/jobs/dead-letter/page.tsx
+- [ ] T159 [P] Create global error boundary in apps/web/src/app/error.tsx
+- [ ] T160 Add loading skeletons for all async data fetches
 
 ### Observability
 
-- [ ] T134 [P] Add OpenTelemetry SDK to Python API in services/api
-- [ ] T135 [P] Add OpenTelemetry to workers in services/workers
-- [ ] T136 Verify correlation ID propagation from UI → API → workers
-- [ ] T137 [P] Create Log Analytics queries for common issues in docs/runbooks/
+- [ ] T161 [P] Add OpenTelemetry SDK to Python API in services/api
+- [ ] T162 [P] Add OpenTelemetry to workers in services/workers
+- [ ] T163 Verify correlation ID propagation from UI → API → workers
+- [ ] T164 [P] Create Log Analytics queries for common issues in docs/runbooks/
 
 ### Infrastructure
 
-- [ ] T138 [P] Create Bicep module for Azure SQL in infra/bicep/modules/sql.bicep
-- [ ] T139 [P] Create Bicep module for Storage (blob + queue) in infra/bicep/modules/storage.bicep
-- [ ] T140 [P] Create Bicep module for Container Apps in infra/bicep/modules/aca.bicep
-- [ ] T141 [P] Create Bicep module for Key Vault in infra/bicep/modules/keyvault.bicep
-- [ ] T142 Create main.bicep composing all modules in infra/bicep/main.bicep
-- [ ] T143 [P] Create GitHub Actions workflow for CI in .github/workflows/ci.yml
-- [ ] T144 [P] Create GitHub Actions workflow for CD in .github/workflows/deploy.yml
+- [ ] T165 [P] Create Bicep module for Azure SQL in infra/bicep/modules/sql.bicep
+- [ ] T166 [P] Create Bicep module for Storage (blob + queue) in infra/bicep/modules/storage.bicep
+- [ ] T167 [P] Create Bicep module for Container Apps in infra/bicep/modules/aca.bicep
+- [ ] T168 [P] Create Bicep module for Key Vault in infra/bicep/modules/keyvault.bicep
+- [ ] T169 Create main.bicep composing all modules in infra/bicep/main.bicep
+- [ ] T170 [P] Create GitHub Actions workflow for CI in .github/workflows/ci.yml
+- [ ] T171 [P] Create GitHub Actions workflow for CD in .github/workflows/deploy.yml
 
 ### Documentation
 
-- [ ] T145 [P] Create architecture overview in docs/architecture.md
-- [ ] T146 [P] Create operational runbook in docs/runbooks/operations.md
-- [ ] T147 Run quickstart.md validation and update as needed
+- [ ] T172 [P] Create architecture overview in docs/architecture.md
+- [ ] T173 [P] Create operational runbook in docs/runbooks/operations.md
+- [ ] T174 Run quickstart.md validation and update as needed
 
 ---
 
@@ -450,9 +506,9 @@ This delivers:
 | Risk | Mitigation in Tasks |
 |------|-------------------|
 | YouTube caption access | T045 includes fallback to yt-dlp + Whisper |
-| Vector search latency | T097 implements exact search first; add HNSW later |
-| LLM grounding quality | T102, T113 handle uncertainty explicitly |
-| Cold start UX | T130 adds "Warming up" toast |
+| Vector search latency | T103 implements exact search first; add HNSW later |
+| LLM grounding quality | T105, T108 handle uncertainty explicitly |
+| Cold start UX | T157 adds "Warming up" toast |
 | YouTube rate limiting | T074 uses yt-dlp with backoff for channel extraction |
 
 ---
@@ -461,16 +517,16 @@ This delivers:
 
 | Metric | Count |
 |--------|-------|
-| **Total Tasks** | 147 |
+| **Total Tasks** | 174 |
 | **Setup Phase** | 10 |
 | **Foundational Phase** | 24 |
 | **US1 (Single Video)** | 21 |
 | **US2 (Batch Ingestion)** | 23 |
 | **US3 (Browse Library)** | 17 |
-| **US4 (Copilot Query)** | 18 |
-| **US5 (Explain Why)** | 9 |
-| **US6 (Synthesis)** | 7 |
+| **US4 (Copilot Query)** | 37 |
+| **US5 (Explain Why)** | 13 |
+| **US6 (Synthesis)** | 11 |
 | **Polish Phase** | 18 |
-| **Parallel Tasks** | ~70 (48%) |
+| **Parallel Tasks** | ~85 (49%) |
 
-**MVP Scope**: Phases 1-3 + Phase 6 = ~73 tasks for core value delivery
+**MVP Scope**: Phases 1-3 + Phase 6 = ~92 tasks for core value delivery

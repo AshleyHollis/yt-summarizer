@@ -139,7 +139,11 @@ class AzureStorageSettings(BaseSettings):
 
 
 class OpenAISettings(BaseSettings):
-    """OpenAI API settings."""
+    """OpenAI API settings.
+    
+    Supports both standard OpenAI and Azure OpenAI endpoints.
+    For Azure OpenAI, set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY.
+    """
     
     model_config = SettingsConfigDict(env_prefix="OPENAI_")
     
@@ -166,6 +170,86 @@ class OpenAISettings(BaseSettings):
         le=2,
         description="Temperature for completion",
     )
+    
+    @property
+    def effective_api_key(self) -> str:
+        """Get the effective API key, preferring Azure OpenAI if configured."""
+        import os
+        # Prefer Azure OpenAI API key if set
+        azure_key = os.environ.get("AZURE_OPENAI_API_KEY", "")
+        if azure_key:
+            return azure_key
+        return self.api_key
+    
+    @property
+    def azure_endpoint(self) -> str | None:
+        """Get Azure OpenAI endpoint if configured."""
+        import os
+        return os.environ.get("AZURE_OPENAI_ENDPOINT") or None
+    
+    @property  
+    def azure_api_version(self) -> str:
+        """Get Azure OpenAI API version."""
+        import os
+        return os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
+    
+    @property
+    def azure_deployment(self) -> str | None:
+        """Get Azure OpenAI deployment name if configured."""
+        import os
+        return os.environ.get("AZURE_OPENAI_DEPLOYMENT") or None
+    
+    @property
+    def azure_embedding_deployment(self) -> str | None:
+        """Get Azure OpenAI embedding deployment name if configured."""
+        import os
+        return os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT") or None
+    
+    @property
+    def is_azure_configured(self) -> bool:
+        """Check if Azure OpenAI is fully configured."""
+        return bool(
+            self.azure_endpoint 
+            and self.effective_api_key 
+            and self.effective_api_key != "not-configured"
+        )
+    
+    @property
+    def azure_openai_base_url(self) -> str | None:
+        """Build the correct base URL for Azure OpenAI or Azure AI Foundry endpoints.
+        
+        Azure AI Foundry endpoints (services.ai.azure.com):
+            Input:  https://<resource>.services.ai.azure.com/api/projects/<project>
+            Output: https://<resource>.services.ai.azure.com/models
+            
+        Standard Azure OpenAI endpoints (openai.azure.com):
+            Input:  https://<resource>.openai.azure.com
+            Output: https://<resource>.openai.azure.com (unchanged, deployment in URL handled by SDK)
+        """
+        endpoint = self.azure_endpoint
+        if not endpoint:
+            return None
+            
+        endpoint = endpoint.rstrip('/')
+        
+        # Check if this is an Azure AI Foundry endpoint
+        if "services.ai.azure.com" in endpoint:
+            # Azure AI Foundry uses the /models endpoint for OpenAI-compatible inference
+            if "/api/projects/" in endpoint:
+                # Extract base: https://<resource>.services.ai.azure.com
+                base = endpoint.split("/api/projects/")[0]
+                return f"{base}/models"
+            else:
+                return f"{endpoint}/models"
+        
+        # Standard Azure OpenAI endpoint - return as-is
+        return endpoint
+    
+    @property
+    def is_azure_ai_foundry(self) -> bool:
+        """Check if this is an Azure AI Foundry endpoint."""
+        endpoint = self.azure_endpoint
+        return bool(endpoint and "services.ai.azure.com" in endpoint)
 
 
 class QueueSettings(BaseSettings):

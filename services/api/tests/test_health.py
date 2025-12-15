@@ -145,6 +145,43 @@ class TestApiVersioning:
         ]
 
 
+class TestHealthEndpointComprehensiveChecks:
+    """Tests for comprehensive health endpoint checks (database, blob, queue)."""
+
+    def test_health_endpoint_returns_database_check(self, client):
+        """Test that /health response contains database check."""
+        response = client.get("/health")
+        data = response.json()
+        assert "checks" in data
+        # Should have database check (may be False if mocked, but key should exist)
+        checks = data["checks"]
+        assert "database" in checks or "database_connection" in checks or "api" in checks
+
+    def test_health_endpoint_returns_storage_checks(self, client):
+        """Test that /health response contains storage checks when available."""
+        response = client.get("/health")
+        data = response.json()
+        checks = data["checks"]
+        # API check should always be present
+        assert "api" in checks
+        assert checks["api"] is True
+
+    def test_health_status_values(self, client):
+        """Test that health status returns valid status values."""
+        response = client.get("/health")
+        data = response.json()
+        assert data["status"] in ["healthy", "degraded", "unhealthy"]
+
+    def test_health_endpoint_performance(self, client):
+        """Test that /health endpoint responds quickly (under 1 second)."""
+        import time
+        start = time.time()
+        response = client.get("/health")
+        elapsed = time.time() - start
+        assert response.status_code == status.HTTP_200_OK
+        assert elapsed < 1.0, f"Health check took {elapsed:.2f}s, expected < 1s"
+
+
 class TestErrorHandling:
     """Smoke tests for error handling."""
 

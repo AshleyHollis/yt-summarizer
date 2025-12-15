@@ -11,11 +11,15 @@ import { test, expect, Page } from '@playwright/test';
  * Prerequisites:
  * - Aspire backend must be running: cd services/aspire/AppHost && dotnet run
  * - Run with: USE_EXTERNAL_SERVER=true npm run test:e2e
+ * - For tests that require real AI processing: LIVE_PROCESSING=true
  */
 
 // Test configuration
 const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
 const PROCESSING_TIMEOUT = 120_000; // 2 minutes for processing
+
+// Check if live processing tests should run (requires real AI services)
+const LIVE_PROCESSING = process.env.LIVE_PROCESSING === 'true';
 
 test.describe('User Story 1: Video Submission Flow', () => {
   // Skip all tests in this suite unless backend is running
@@ -25,6 +29,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
   );
 
   test.describe('Complete Video Submission Journey', () => {
+    // These tests require actual video processing to complete
+    test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
+
     test('user can submit video and view completed result', async ({ page }) => {
       // Step 1: Navigate to submit page
       await page.goto('/submit');
@@ -115,6 +122,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
   });
 
   test.describe('Video Detail Page Features', () => {
+    // These tests require actual video processing to complete
+    test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
+
     let existingVideoId: string | null = null;
 
     test.beforeAll(async ({ browser }) => {
@@ -284,6 +294,8 @@ test.describe('Reprocessing Flow', () => {
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
+  // These tests require actual video processing to complete
+  test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
 
   test('can reprocess an existing video', async ({ page }) => {
     // First submit a video

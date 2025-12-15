@@ -3,6 +3,12 @@ var builder = DistributedApplication.CreateBuilder(args);
 // OpenAI API Key (required for summarize and embed workers)
 var openAiApiKey = builder.AddParameter("openai-api-key", secret: true);
 
+// Azure OpenAI configuration (for the agent framework)
+var azureOpenAiEndpoint = builder.AddParameter("azure-openai-endpoint", secret: false);
+var azureOpenAiApiKey = builder.AddParameter("azure-openai-api-key", secret: true);
+var azureOpenAiDeployment = builder.AddParameter("azure-openai-deployment", secret: false);
+var azureOpenAiEmbeddingDeployment = builder.AddParameter("azure-openai-embedding-deployment", secret: false);
+
 // Azure Storage (Azurite for local dev)
 var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator(azurite =>
@@ -28,7 +34,11 @@ var api = builder.AddPythonModule("api", "../../api", "uvicorn")
     .WithExternalHttpEndpoints()
     .WithReference(blobs)
     .WithReference(queues)
-    .WithReference(sql);
+    .WithReference(sql)
+    .WithEnvironment("AZURE_OPENAI_ENDPOINT", azureOpenAiEndpoint)
+    .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
+    .WithEnvironment("AZURE_OPENAI_DEPLOYMENT", azureOpenAiDeployment)
+    .WithEnvironment("API_BASE_URL", "http://localhost:8000");
 
 // Next.js Frontend
 var web = builder.AddNpmApp("web", "../../../apps/web", "dev")
@@ -55,7 +65,10 @@ var summarizeWorker = builder.AddExecutable("summarize-worker",
     .WithReference(blobs)
     .WithReference(queues)
     .WithReference(sql)
-    .WithEnvironment("OPENAI_API_KEY", openAiApiKey);
+    .WithEnvironment("OPENAI_API_KEY", openAiApiKey)
+    .WithEnvironment("AZURE_OPENAI_ENDPOINT", azureOpenAiEndpoint)
+    .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
+    .WithEnvironment("AZURE_OPENAI_DEPLOYMENT", azureOpenAiDeployment);
 
 var embedWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/embed"));
 var embedWorker = builder.AddExecutable("embed-worker",
@@ -65,7 +78,10 @@ var embedWorker = builder.AddExecutable("embed-worker",
     .WithReference(blobs)
     .WithReference(queues)
     .WithReference(sql)
-    .WithEnvironment("OPENAI_API_KEY", openAiApiKey);
+    .WithEnvironment("OPENAI_API_KEY", openAiApiKey)
+    .WithEnvironment("AZURE_OPENAI_ENDPOINT", azureOpenAiEndpoint)
+    .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
+    .WithEnvironment("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", azureOpenAiEmbeddingDeployment);
 
 var relationshipsWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/relationships"));
 var relationshipsWorker = builder.AddExecutable("relationships-worker",

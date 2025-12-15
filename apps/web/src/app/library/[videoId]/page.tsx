@@ -14,6 +14,7 @@ import { Pagination } from '@/components/common/Pagination';
 import { SegmentList } from '@/components/library';
 import type { Segment, VideoDetailResponse } from '@/services/api';
 import { libraryApi } from '@/services/api';
+import { useVideoContext } from '@/app/providers';
 
 /**
  * Format duration in seconds to HH:MM:SS or MM:SS
@@ -76,6 +77,7 @@ const SEGMENTS_PAGE_SIZE = 20;
 export default function VideoDetailPage() {
   const params = useParams();
   const videoId = params.videoId as string;
+  const { setCurrentVideo } = useVideoContext();
 
   const [video, setVideo] = useState<VideoDetailResponse | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -85,7 +87,7 @@ export default function VideoDetailPage() {
   const [segmentsLoading, setSegmentsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch video detail
+  // Fetch video detail and set context for copilot
   useEffect(() => {
     async function fetchVideo() {
       try {
@@ -94,6 +96,15 @@ export default function VideoDetailPage() {
         const response = await libraryApi.getVideoDetail(videoId);
         setVideo(response);
         setTotalSegments(response.segment_count);
+        
+        // Set the video context for the copilot to use
+        setCurrentVideo({
+          videoId: response.video_id,
+          title: response.title,
+          channelName: response.channel_name,
+          youtubeVideoId: response.youtube_video_id,
+          summary: response.summary,
+        });
       } catch (err) {
         console.error('Failed to fetch video:', err);
         setError('Failed to load video. Please try again.');
@@ -105,7 +116,12 @@ export default function VideoDetailPage() {
     if (videoId) {
       fetchVideo();
     }
-  }, [videoId]);
+    
+    // Clear the video context when leaving this page
+    return () => {
+      setCurrentVideo(null);
+    };
+  }, [videoId, setCurrentVideo]);
 
   // Fetch segments
   const fetchSegments = useCallback(async () => {

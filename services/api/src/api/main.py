@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .middleware import CorrelationIdMiddleware
-from .routes import batches, channels, health, jobs, library, videos
+from .routes import batches, channels, copilot, health, jobs, library, videos
 
 # Import shared modules (path will be configured via PYTHONPATH)
 try:
@@ -47,6 +47,7 @@ except ImportError:
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup/shutdown events."""
     import asyncio
+    import os
     logger = get_logger(__name__)
     settings = get_settings()
     
@@ -58,23 +59,42 @@ async def lifespan(app: FastAPI):
         environment=settings.environment,
     )
     
-    # Initialize database connection and create tables with retry
-    max_retries = 30
-    retry_delay = 2  # seconds
-    for attempt in range(max_retries):
+    # Initialize database connection with retry logic
+    # SQL Server container may take time to be ready
+    max_retries = int(os.environ.get("DB_STARTUP_RETRIES", "10"))
+    retry_delay = int(os.environ.get("DB_STARTUP_RETRY_DELAY", "3"))
+    
+    db_initialized = False
+    last_error = None
+    
+    for attempt in range(1, max_retries + 1):
         try:
             db = get_db()
             await db.connect()
             await db.create_tables()
-            logger.info("Database connection established and tables created")
+            db_initialized = True
+            logger.info(
+                "Database connection established and tables created",
+                attempt=attempt,
+            )
             break
         except Exception as e:
-            if attempt < max_retries - 1:
-                logger.warning(f"Database initialization attempt {attempt + 1}/{max_retries} failed: {e}. Retrying in {retry_delay}s...")
+            last_error = e
+            if attempt < max_retries:
+                logger.warning(
+                    f"Database initialization attempt {attempt}/{max_retries} failed: {e}. "
+                    f"Retrying in {retry_delay}s..."
+                )
                 await asyncio.sleep(retry_delay)
             else:
-                logger.error(f"Failed to initialize database after {max_retries} attempts: {e}")
-                # Continue anyway - let individual requests fail with better error messages
+                logger.error(
+                    f"Database initialization failed after {max_retries} attempts: {e}. "
+                    "Service will start but database-dependent features will not work."
+                )
+    
+    # Store database status on the app for health checks
+    app.state.db_initialized = db_initialized
+    app.state.db_error = str(last_error) if last_error and not db_initialized else None
     
     yield
     
@@ -142,6 +162,12 @@ def create_app() -> FastAPI:
     app.include_router(library.router)
     app.include_router(channels.router)
     app.include_router(batches.router)
+    app.include_router(copilot.router)
+    
+    # Add Microsoft Agent Framework AG-UI endpoint for CopilotKit
+    # See: https://docs.copilotkit.ai/microsoft-agent-framework
+    from .agents import setup_agui_endpoint
+    setup_agui_endpoint(app)
     
     return app
 

@@ -48,23 +48,60 @@ class ReadinessStatus(BaseModel):
     "/health",
     response_model=HealthStatus,
     summary="Health Check",
-    description="Check if the service is running and get version info",
+    description="Check if the service is running and get version info with dependency status",
 )
 async def health_check(request: Request) -> HealthStatus:
     """Health check endpoint for liveness probes.
     
-    Returns basic health status without checking dependencies.
-    Used by container orchestrators to verify the service is running.
+    Returns health status including dependency checks for database, 
+    blob storage, and queue services.
+    Used by container orchestrators and monitoring systems.
     """
     # Get version from app or settings
     version = getattr(request.app, "version", "0.1.0")
     
+    checks = {"api": True}
+    overall_status = "healthy"
+    
+    # Check database status from app state (set during startup)
+    db_initialized = getattr(request.app.state, "db_initialized", False)
+    checks["database"] = db_initialized
+    
+    # Try to verify database connection is still alive
+    if db_initialized:
+        try:
+            from shared.db.connection import get_db
+            db = get_db()
+            await db.connect()
+            checks["database_connection"] = True
+        except Exception:
+            checks["database_connection"] = False
+            overall_status = "degraded"
+    else:
+        overall_status = "degraded"
+    
+    # Check blob storage connectivity
+    try:
+        from shared.blob.client import get_connection_string as get_blob_conn
+        get_blob_conn()  # Verify connection string is available
+        checks["blob_storage"] = True
+    except Exception:
+        checks["blob_storage"] = False
+        # Blob storage is optional for basic health, don't degrade
+    
+    # Check queue storage connectivity
+    try:
+        from shared.queue.client import get_connection_string as get_queue_conn
+        get_queue_conn()  # Verify connection string is available
+        checks["queue_storage"] = True
+    except Exception:
+        checks["queue_storage"] = False
+        # Queue storage is optional for basic health, don't degrade
+    
     return HealthStatus(
-        status="healthy",
+        status=overall_status,
         version=version,
-        checks={
-            "api": True,
-        },
+        checks=checks,
     )
 
 
@@ -83,18 +120,26 @@ async def readiness_check(request: Request) -> ReadinessStatus:
     checks = {}
     all_ready = True
     
-    # TODO: Add actual dependency checks
-    # Example:
-    # try:
-    #     db = get_db()
-    #     await db.connect()
-    #     checks["database"] = True
-    # except Exception:
-    #     checks["database"] = False
-    #     all_ready = False
-    
-    # For now, just check that the API is running
+    # Check if API is running
     checks["api"] = True
+    
+    # Check database initialization status from startup
+    db_initialized = getattr(request.app.state, "db_initialized", False)
+    checks["database_init"] = db_initialized
+    if not db_initialized:
+        all_ready = False
+    
+    # Also verify we can actually connect to the database
+    if db_initialized:
+        try:
+            from shared.db.connection import get_db
+            db = get_db()
+            await db.connect()
+            checks["database_connection"] = True
+        except Exception as e:
+            checks["database_connection"] = False
+            checks["database_error"] = str(e)[:100]  # Truncate error message
+            all_ready = False
     
     return ReadinessStatus(
         ready=all_ready,
