@@ -56,6 +56,17 @@ from .video import (
     VideoSummaryResponse,
     extract_youtube_video_id,
 )
+from .synthesis import (
+    LearningPath,
+    LearningPathEvidence,
+    LearningPathItem,
+    Priority,
+    SynthesisType,
+    SynthesizeRequest,
+    SynthesizeResponse,
+    WatchList,
+    WatchListItem,
+)
 
 __all__ = [
     # Base
@@ -107,6 +118,16 @@ __all__ = [
     "VideoCard",
     "VideoDetailResponse",
     "VideoFilterParams",
+    # Synthesis
+    "LearningPath",
+    "LearningPathEvidence",
+    "LearningPathItem",
+    "Priority",
+    "SynthesisType",
+    "SynthesizeRequest",
+    "SynthesizeResponse",
+    "WatchList",
+    "WatchListItem",
     # Video
     "ProcessingStatus",
     "ReprocessVideoRequest",

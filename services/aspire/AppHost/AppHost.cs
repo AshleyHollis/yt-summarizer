@@ -23,8 +23,9 @@ var storage = builder.AddAzureStorage("storage")
 var blobs = storage.AddBlobs("blobs");
 var queues = storage.AddQueues("queues");
 
-// SQL Server Database
+// SQL Server Database - using SQL Server 2025 for native VECTOR support
 var sql = builder.AddSqlServer("sql")
+    .WithImageTag("2025-latest")
     .AddDatabase("ytsummarizer");
 
 // Python API (FastAPI) - using uvicorn module

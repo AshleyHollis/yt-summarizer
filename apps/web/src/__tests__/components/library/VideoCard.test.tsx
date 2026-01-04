@@ -5,7 +5,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { VideoCard } from '@/components/library/VideoCard';
+import { VideoSelectionProvider } from '@/contexts/VideoSelectionContext';
 import type { VideoCard as VideoCardType } from '@/services/api';
+
+// Helper to render with required providers
+const renderVideoCard = (props: { video: VideoCardType }) => {
+  return render(
+    <VideoSelectionProvider>
+      <VideoCard {...props} />
+    </VideoSelectionProvider>
+  );
+};
 
 // Mock next/image
 vi.mock('next/image', () => ({
@@ -54,45 +64,40 @@ describe('VideoCard', () => {
 
   describe('Rendering', () => {
     it('renders video title', () => {
-      render(<VideoCard video={mockVideo} />);
+      renderVideoCard({ video: mockVideo });
 
       expect(screen.getByText('Test Video Title')).toBeInTheDocument();
     });
 
     it('renders channel name', () => {
-      render(<VideoCard video={mockVideo} />);
+      renderVideoCard({ video: mockVideo });
 
       expect(screen.getByText('Test Channel')).toBeInTheDocument();
     });
 
     it('renders formatted duration', () => {
-      render(<VideoCard video={mockVideo} />);
+      renderVideoCard({ video: mockVideo });
 
       // 215 seconds = 3:35
       expect(screen.getByText('3:35')).toBeInTheDocument();
     });
 
-    it('renders processing status badge', () => {
-      render(<VideoCard video={mockVideo} />);
+    it('hides status badge for completed videos', () => {
+      renderVideoCard({ video: mockVideo });
 
-      expect(screen.getByText('completed')).toBeInTheDocument();
+      // Completed status badge is intentionally hidden for cleaner UI
+      expect(screen.queryByText('completed')).not.toBeInTheDocument();
     });
 
-    it('renders segment count when available', () => {
-      render(<VideoCard video={mockVideo} />);
+    it('shows status badge for non-completed videos', () => {
+      const pendingVideo = { ...mockVideo, processing_status: 'pending' };
+      renderVideoCard({ video: pendingVideo });
 
-      expect(screen.getByText('25 segments')).toBeInTheDocument();
-    });
-
-    it('renders facet tags', () => {
-      render(<VideoCard video={mockVideo} />);
-
-      expect(screen.getByText('Python')).toBeInTheDocument();
-      expect(screen.getByText('Tutorial')).toBeInTheDocument();
+      expect(screen.getByText('pending')).toBeInTheDocument();
     });
 
     it('links to video detail page', () => {
-      render(<VideoCard video={mockVideo} />);
+      renderVideoCard({ video: mockVideo });
 
       const link = screen.getByRole('link');
       expect(link).toHaveAttribute(
@@ -102,7 +107,7 @@ describe('VideoCard', () => {
     });
 
     it('uses thumbnail URL from video', () => {
-      render(<VideoCard video={mockVideo} />);
+      renderVideoCard({ video: mockVideo });
 
       const thumbnail = screen.getByTestId('video-thumbnail');
       expect(thumbnail).toHaveAttribute('src', mockVideo.thumbnail_url);
@@ -110,7 +115,7 @@ describe('VideoCard', () => {
 
     it('uses YouTube thumbnail as fallback when thumbnail_url is null', () => {
       const videoWithoutThumbnail = { ...mockVideo, thumbnail_url: null };
-      render(<VideoCard video={videoWithoutThumbnail} />);
+      renderVideoCard({ video: videoWithoutThumbnail });
 
       const thumbnail = screen.getByTestId('video-thumbnail');
       expect(thumbnail).toHaveAttribute(
@@ -123,7 +128,7 @@ describe('VideoCard', () => {
   describe('Duration formatting', () => {
     it('formats short duration correctly', () => {
       const shortVideo = { ...mockVideo, duration: 65 };
-      render(<VideoCard video={shortVideo} />);
+      renderVideoCard({ video: shortVideo });
 
       // 65 seconds = 1:05
       expect(screen.getByText('1:05')).toBeInTheDocument();
@@ -131,7 +136,7 @@ describe('VideoCard', () => {
 
     it('formats long duration with hours', () => {
       const longVideo = { ...mockVideo, duration: 3725 };
-      render(<VideoCard video={longVideo} />);
+      renderVideoCard({ video: longVideo });
 
       // 3725 seconds = 1:02:05
       expect(screen.getByText('1:02:05')).toBeInTheDocument();
@@ -141,51 +146,41 @@ describe('VideoCard', () => {
   describe('Status badges', () => {
     it('renders pending status', () => {
       const pendingVideo = { ...mockVideo, processing_status: 'pending' };
-      render(<VideoCard video={pendingVideo} />);
+      renderVideoCard({ video: pendingVideo });
 
       expect(screen.getByText('pending')).toBeInTheDocument();
     });
 
     it('renders processing status', () => {
       const processingVideo = { ...mockVideo, processing_status: 'processing' };
-      render(<VideoCard video={processingVideo} />);
+      renderVideoCard({ video: processingVideo });
 
       expect(screen.getByText('processing')).toBeInTheDocument();
     });
 
     it('renders failed status', () => {
       const failedVideo = { ...mockVideo, processing_status: 'failed' };
-      render(<VideoCard video={failedVideo} />);
+      renderVideoCard({ video: failedVideo });
 
       expect(screen.getByText('failed')).toBeInTheDocument();
     });
   });
 
-  describe('Facets display', () => {
-    it('shows only first 3 facets when more than 3 exist', () => {
-      const manyFacetsVideo = {
-        ...mockVideo,
-        facets: [
-          { facet_id: 'f1', name: 'Facet1', type: 'topic' },
-          { facet_id: 'f2', name: 'Facet2', type: 'topic' },
-          { facet_id: 'f3', name: 'Facet3', type: 'format' },
-          { facet_id: 'f4', name: 'Facet4', type: 'level' },
-          { facet_id: 'f5', name: 'Facet5', type: 'tool' },
-        ],
-      };
-      render(<VideoCard video={manyFacetsVideo} />);
+  // Note: VideoCard component has been redesigned to be minimal/YouTube-style
+  // and no longer displays facets. These tests are kept for documentation.
+  describe('Minimal card design', () => {
+    it('does not show facets (minimal YouTube-style design)', () => {
+      renderVideoCard({ video: mockVideo });
 
-      expect(screen.getByText('Facet1')).toBeInTheDocument();
-      expect(screen.getByText('Facet2')).toBeInTheDocument();
-      expect(screen.getByText('Facet3')).toBeInTheDocument();
-      expect(screen.queryByText('Facet4')).not.toBeInTheDocument();
-      expect(screen.getByText('+2')).toBeInTheDocument();
+      // Facets are not displayed in the minimal card design
+      expect(screen.queryByText('Python')).not.toBeInTheDocument();
+      expect(screen.queryByText('Tutorial')).not.toBeInTheDocument();
     });
 
-    it('does not show +N badge when 3 or fewer facets', () => {
-      render(<VideoCard video={mockVideo} />);
+    it('does not show segment count (minimal design)', () => {
+      renderVideoCard({ video: mockVideo });
 
-      expect(screen.queryByText(/^\+\d+$/)).not.toBeInTheDocument();
+      expect(screen.queryByText('25 segments')).not.toBeInTheDocument();
     });
   });
 });

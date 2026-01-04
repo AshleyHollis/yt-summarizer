@@ -29,7 +29,7 @@ from ..models.video import (
     SubmitVideoResponse,
     VideoResponse,
 )
-from ..services.video_service import VideoService
+from ..services.video_service import VideoNotFoundError, VideoService
 
 router = APIRouter(prefix="/api/v1/videos", tags=["Videos"])
 
@@ -67,6 +67,11 @@ async def submit_video(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    except VideoNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
     except Exception as e:
         import traceback
         error_detail = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
@@ -100,6 +105,29 @@ async def get_video(
         )
 
     return result
+
+
+@router.delete(
+    "/{video_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Video",
+    description="Delete a video and all associated data",
+)
+async def delete_video(
+    video_id: UUID,
+    service: VideoService = Depends(get_video_service),
+) -> None:
+    """Delete a video by ID.
+
+    Deletes the video, associated jobs, and segments.
+    """
+    deleted = await service.delete_video(video_id)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found",
+        )
 
 
 @router.post(

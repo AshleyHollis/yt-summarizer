@@ -1,0 +1,36 @@
+@echo off
+setlocal enabledelayedexpansion
+
+REM Find the real aspire.exe on PATH (skip .cmd/.bat wrappers)
+set "REAL_ASPIRE="
+for /f "delims=" %%I in ('where aspire 2^>nul') do (
+  set "CANDIDATE=%%I"
+  if /I "!CANDIDATE:~-4!"==".exe" (
+    set "REAL_ASPIRE=!CANDIDATE!"
+    goto :found
+  )
+)
+
+:found
+if not defined REAL_ASPIRE (
+  echo ERROR: Could not locate the real 'aspire.exe' executable on PATH. 1>&2
+  exit /b 1
+)
+
+REM Workspace root is tools\..
+set "WORKSPACE=%~dp0.."
+if "%WORKSPACE:~-1%"=="\" set "WORKSPACE=%WORKSPACE:~0,-1%"
+
+REM Log the launch attempt
+set "LOG=%WORKSPACE%\aspire.log"
+echo [%date% %time%] Launching: "!REAL_ASPIRE!" %* > "%LOG%"
+
+REM Create a temp script that runs aspire directly (not via PATH)
+set "TEMPSCRIPT=%TEMP%\run-aspire-%RANDOM%.cmd"
+echo @echo off > "%TEMPSCRIPT%"
+echo cd /d "%CD%" >> "%TEMPSCRIPT%"
+echo "!REAL_ASPIRE!" %* >> "%TEMPSCRIPT%"
+
+REM Launch the temp script minimized
+start "Aspire" /MIN "%TEMPSCRIPT%"
+exit /b 0

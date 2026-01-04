@@ -152,7 +152,7 @@ export function ChannelVideoList({
         <div className="flex gap-2">
           <button
             onClick={selectAll}
-            className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors dark:bg-blue-900 dark:text-blue-300"
+            className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors dark:bg-red-900 dark:text-red-300"
           >
             Select All ({notIngestedCount})
           </button>
@@ -167,8 +167,8 @@ export function ChannelVideoList({
 
       {/* Selection info */}
       {selectedCount > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-          <p className="text-sm text-blue-700 dark:text-blue-300">
+        <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg border border-red-200 dark:border-red-800">
+          <p className="text-sm text-red-700 dark:text-red-300">
             <strong>{selectedCount}</strong> video{selectedCount !== 1 ? 's' : ''} selected for ingestion
           </p>
         </div>
@@ -184,8 +184,8 @@ export function ChannelVideoList({
               video.already_ingested
                 ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-60'
                 : selectedIds.has(video.youtube_video_id)
-                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700'
-                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
+                ? 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700'
+                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-red-300 dark:hover:border-red-700'
             }`}
             onClick={() => !video.already_ingested && toggleSelection(video.youtube_video_id)}
           >
@@ -200,7 +200,7 @@ export function ChannelVideoList({
                   type="checkbox"
                   checked={selectedIds.has(video.youtube_video_id)}
                   onChange={() => toggleSelection(video.youtube_video_id)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
                 />
               )}
             </div>

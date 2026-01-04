@@ -25,7 +25,7 @@ function getStatusColor(status: BatchStatus | BatchItemStatus): string {
     case 'pending':
       return 'text-gray-500 dark:text-gray-400';
     case 'running':
-      return 'text-blue-600 dark:text-blue-400';
+      return 'text-red-600 dark:text-red-400';
     case 'completed':
     case 'succeeded':
       return 'text-green-600 dark:text-green-400';
@@ -228,7 +228,7 @@ export function BatchProgress({
     return (
       <div className={`flex items-center justify-center p-8 ${className}`}>
         <svg
-          className="animate-spin h-8 w-8 text-blue-600"
+          className="animate-spin h-8 w-8 text-red-600"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"

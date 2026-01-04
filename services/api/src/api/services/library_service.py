@@ -180,6 +180,7 @@ class LibraryService:
                     title=video.title,
                     channel_id=video.channel_id,
                     channel_name=video.channel.name,
+                    channel_thumbnail_url=video.channel.thumbnail_url,
                     duration=video.duration,
                     publish_date=video.publish_date,
                     thumbnail_url=video.thumbnail_url,
@@ -257,7 +258,13 @@ class LibraryService:
             if artifact.artifact_type == "summary":
                 summary_artifact = artifact_info
                 # Extract blob name from blob_uri for fetching content
-                summary_blob_name = artifact.blob_uri.split("/")[-1] if artifact.blob_uri else None
+                # blob_uri format: http://host/account/container/{video_id}/{youtube_video_id}_summary.md
+                # We need to extract: {video_id}/{youtube_video_id}_summary.md (everything after container name)
+                if artifact.blob_uri:
+                    parts = artifact.blob_uri.split(f"/{SUMMARIES_CONTAINER}/")
+                    summary_blob_name = parts[1] if len(parts) > 1 else artifact.blob_uri.split("/")[-1]
+                else:
+                    summary_blob_name = None
             elif artifact.artifact_type == "transcript":
                 transcript_artifact = artifact_info
 

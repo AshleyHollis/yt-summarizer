@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .middleware import CorrelationIdMiddleware
-from .routes import batches, channels, copilot, health, jobs, library, videos
+from .routes import batches, channels, copilot, health, jobs, library, threads, videos
 
 # Import shared modules (path will be configured via PYTHONPATH)
 try:
@@ -163,6 +163,7 @@ def create_app() -> FastAPI:
     app.include_router(channels.router)
     app.include_router(batches.router)
     app.include_router(copilot.router)
+    app.include_router(threads.router)
     
     # Add Microsoft Agent Framework AG-UI endpoint for CopilotKit
     # See: https://docs.copilotkit.ai/microsoft-agent-framework

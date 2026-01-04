@@ -92,6 +92,17 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 transcript,
             )
 
+            # Also fetch and store timestamped segments for semantic search
+            timestamped_segments = await self._fetch_transcript_with_timestamps(
+                message.youtube_video_id
+            )
+            if timestamped_segments:
+                await self._store_timestamped_segments(
+                    message.video_id,
+                    message.youtube_video_id,
+                    timestamped_segments,
+                )
+
             # Create artifact record
             await self._create_artifact(
                 message.video_id,
@@ -125,6 +136,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         """Fetch transcript from YouTube.
 
         Tries YouTube captions API first, falls back to yt-dlp.
+        Returns plain text transcript for summarization.
         """
         # Try youtube-transcript-api first
         try:
@@ -186,6 +198,39 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
 
         return None
 
+    async def _fetch_transcript_with_timestamps(self, youtube_video_id: str) -> list[dict] | None:
+        """Fetch transcript segments with timestamps from YouTube.
+        
+        Returns a list of segments with start_time, duration, and text.
+        Used for semantic search to enable timestamp-based citations.
+        """
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+
+            ytt_api = YouTubeTranscriptApi()
+            transcript_data = ytt_api.fetch(youtube_video_id, languages=["en"])
+            
+            segments = []
+            for entry in transcript_data:
+                segments.append({
+                    "start": entry.start,  # Start time in seconds
+                    "duration": entry.duration,  # Duration in seconds
+                    "text": entry.text,
+                })
+            
+            logger.info(
+                "Fetched timestamped transcript",
+                segment_count=len(segments),
+            )
+            return segments
+            
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch timestamped transcript",
+                error=str(e),
+            )
+            return None
+
     def _parse_subtitles(self, content: str) -> str:
         """Parse VTT/SRT subtitle content to plain text."""
         import re
@@ -221,6 +266,74 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             content_type="text/plain",
         )
 
+        return uri
+
+    async def _store_timestamped_segments(
+        self,
+        video_id: str,
+        youtube_video_id: str,
+        segments: list[dict],
+    ) -> str:
+        """Store timestamped transcript segments as JSON for semantic search.
+        
+        Groups small segments into ~30 second chunks for better semantic coherence
+        while preserving timestamp information.
+        """
+        import json
+        
+        # Group small segments into larger chunks (~30 seconds each)
+        # This improves semantic search quality while preserving timestamps
+        chunked_segments = []
+        current_chunk = {
+            "start": 0.0,
+            "end": 0.0,
+            "text": "",
+        }
+        chunk_duration = 30.0  # Target ~30 seconds per chunk
+        
+        for seg in segments:
+            seg_start = seg["start"]
+            seg_end = seg_start + seg.get("duration", 0)
+            seg_text = seg["text"].strip()
+            
+            if not seg_text:
+                continue
+                
+            # Start a new chunk if this segment would exceed the target duration
+            if current_chunk["text"] and (seg_start - current_chunk["start"]) > chunk_duration:
+                chunked_segments.append(current_chunk)
+                current_chunk = {
+                    "start": seg_start,
+                    "end": seg_end,
+                    "text": seg_text,
+                }
+            else:
+                # Add to current chunk
+                if not current_chunk["text"]:
+                    current_chunk["start"] = seg_start
+                current_chunk["end"] = seg_end
+                current_chunk["text"] += (" " if current_chunk["text"] else "") + seg_text
+        
+        # Don't forget the last chunk
+        if current_chunk["text"]:
+            chunked_segments.append(current_chunk)
+        
+        blob_client = get_blob_client()
+        blob_name = f"{video_id}/{youtube_video_id}_segments.json"
+        
+        uri = blob_client.upload_blob(
+            TRANSCRIPTS_CONTAINER,
+            blob_name,
+            json.dumps(chunked_segments).encode("utf-8"),
+            content_type="application/json",
+        )
+        
+        logger.info(
+            "Stored timestamped segments",
+            video_id=video_id,
+            segment_count=len(chunked_segments),
+        )
+        
         return uri
 
     async def _create_artifact(

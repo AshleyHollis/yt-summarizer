@@ -131,7 +131,7 @@ class TestAgentCreation:
         tools = get_agent_tools()
         
         # Check we have the expected number of tools
-        assert len(tools) == 5, f"Expected 5 tools, got {len(tools)}"
+        assert len(tools) == 6, f"Expected 6 tools, got {len(tools)}"
         
         # Check each tool has a name attribute (not __name__)
         for tool in tools:
@@ -156,6 +156,7 @@ class TestAgentCreation:
             'get_video_summary',
             'get_library_coverage',
             'get_topics_for_channel',
+            'query_library',  # Main RAG query tool with AI settings support
         }
         
         assert tool_names == expected_names, f"Tool names mismatch. Got: {tool_names}, Expected: {expected_names}"

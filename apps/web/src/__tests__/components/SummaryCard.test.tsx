@@ -57,7 +57,7 @@ This concludes the summary.`;
       });
     });
 
-    it('renders video title when provided', async () => {
+    it('renders AI Summary header when summary loads', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         text: async () => 'Summary content',
@@ -65,11 +65,10 @@ This concludes the summary.`;
       render(
         <SummaryCard
           summaryUrl="https://example.com/summary.txt"
-          videoTitle="Test Video Title"
         />
       );
       await waitFor(() => {
-        expect(screen.getByText('Test Video Title')).toBeInTheDocument();
+        expect(screen.getByText('AI Summary')).toBeInTheDocument();
       });
     });
   });

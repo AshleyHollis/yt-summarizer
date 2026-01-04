@@ -36,7 +36,7 @@ const StageIcon = ({ stage, status }: { stage: JobType; status: JobStatus }) => 
   const baseClass = 'w-6 h-6';
 
   // Completed checkmark
-  if (status === 'succeeded') {
+  if (status === 'completed') {
     return (
       <svg className={`${baseClass} text-green-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -53,7 +53,7 @@ const StageIcon = ({ stage, status }: { stage: JobType; status: JobStatus }) => 
     );
   }
 
-  // Running spinner
+  // Running spinner - blue for processing (semantic color)
   if (status === 'running') {
     return (
       <svg className={`${baseClass} text-blue-500 animate-spin`} fill="none" viewBox="0 0 24 24">
@@ -205,7 +205,7 @@ export function JobProgress({
             className={`
               flex items-center gap-4 p-3 rounded-lg border
               ${job.status === 'running' ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20' : ''}
-              ${job.status === 'succeeded' ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20' : ''}
+              ${job.status === 'completed' ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20' : ''}
               ${job.status === 'failed' ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20' : ''}
               ${job.status === 'pending' ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800' : ''}
             `}
@@ -216,7 +216,7 @@ export function JobProgress({
                 className={`font-medium ${
                   job.status === 'running' ? 'text-blue-700 dark:text-blue-300' : ''
                 } ${
-                  job.status === 'succeeded' ? 'text-green-700 dark:text-green-300' : ''
+                  job.status === 'completed' ? 'text-green-700 dark:text-green-300' : ''
                 } ${
                   job.status === 'failed' ? 'text-red-700 dark:text-red-300' : ''
                 } ${

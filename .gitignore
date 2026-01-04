@@ -133,12 +133,24 @@ Thumbs.db
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+.playwright-mcp/
+
+# -----------------------------------------------------------------------------
+# Debug Screenshots (never commit)
+# -----------------------------------------------------------------------------
+*.jpeg
+*.jpg
+*.png
+!public/**/*.jpeg
+!public/**/*.jpg
+!public/**/*.png
 
 # -----------------------------------------------------------------------------
 # Logs & Temporary
 # -----------------------------------------------------------------------------
 logs/
 *.log
+aspire.log
 *.err
 *.out
 npm-debug.log*
@@ -148,6 +160,7 @@ lerna-debug.log*
 .pnpm-debug.log*
 *.tmp
 *.temp
+test-req.json
 
 # -----------------------------------------------------------------------------
 # .NET Aspire Local Settings

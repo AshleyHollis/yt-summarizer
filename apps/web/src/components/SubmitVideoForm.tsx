@@ -131,7 +131,7 @@ export function SubmitVideoForm({ onSuccess, className = '' }: SubmitVideoFormPr
                 text-gray-900 dark:text-white
                 bg-white dark:bg-gray-800
                 placeholder-gray-400 dark:placeholder-gray-500
-                focus:outline-none focus:ring-2 focus:ring-blue-500
+                focus:outline-none focus:ring-2 focus:ring-red-500
                 disabled:opacity-50 disabled:cursor-not-allowed
                 ${error?.field === 'url' ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}
               `}
@@ -143,7 +143,7 @@ export function SubmitVideoForm({ onSuccess, className = '' }: SubmitVideoFormPr
             {isSubmitting && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
                 <svg
-                  className="animate-spin h-5 w-5 text-blue-500"
+                  className="animate-spin h-5 w-5 text-red-500"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -216,8 +216,8 @@ export function SubmitVideoForm({ onSuccess, className = '' }: SubmitVideoFormPr
           disabled={isSubmitting || !url.trim()}
           className={`
             w-full py-3 px-4 rounded-lg font-medium
-            text-white bg-blue-600 hover:bg-blue-700
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+            text-white bg-red-600 hover:bg-red-700
+            focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2
             disabled:opacity-50 disabled:cursor-not-allowed
             transition-colors duration-200
           `}
@@ -226,7 +226,7 @@ export function SubmitVideoForm({ onSuccess, className = '' }: SubmitVideoFormPr
         </button>
 
         {/* Helper Text */}
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+        <p className="text-sm text-gray-600 dark:text-gray-300 text-center">
           Paste a YouTube URL to extract the transcript and generate an AI summary.
         </p>
       </form>

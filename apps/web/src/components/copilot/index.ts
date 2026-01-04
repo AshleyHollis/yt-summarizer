@@ -7,3 +7,7 @@ export { FollowupButtons } from "./FollowupButtons";
 export { ScopeChips } from "./ScopeChips";
 export { TopicsPanel } from "./TopicsPanel";
 export { UncertaintyMessage } from "./UncertaintyMessage";
+
+// Tool UI components
+export { ToolLoadingState, isToolLoading, isToolComplete } from "./ToolLoadingState";
+export { WorkflowProgressPanel, WorkflowProgressInline } from "./WorkflowProgressPanel";

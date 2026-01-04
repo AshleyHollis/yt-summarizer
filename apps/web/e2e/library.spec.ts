@@ -401,16 +401,176 @@ test.describe('User Story 3: Browse the Library', () => {
       await expect(page).toHaveURL('/library');
     });
 
-    test('can navigate from submit to library and back', async ({ page }) => {
-      await page.goto('/submit');
+    test('can navigate from add to library and back', async ({ page }) => {
+      await page.goto('/add');
       
       // Go to library
       await page.getByRole('link', { name: /Library/i }).click();
       await expect(page).toHaveURL('/library');
       
-      // Go back to submit
-      await page.getByRole('link', { name: /Submit/i }).click();
-      await expect(page).toHaveURL('/submit');
+      // Go back to add
+      await page.getByRole('link', { name: /Add/i }).click();
+      await expect(page).toHaveURL('/add');
+    });
+  });
+
+  test.describe('Summary Content Verification', () => {
+    /**
+     * REGRESSION TESTS: These tests catch the blob path extraction bug
+     * 
+     * Bug description: The API was extracting only the filename from blob URIs
+     * instead of the full path including the video_id folder:
+     *   WRONG: "hzkm3hM8FUg_summary.md" 
+     *   RIGHT: "a7311eb9-xxx/hzkm3hM8FUg_summary.md"
+     * 
+     * This caused 404 errors when fetching summaries from blob storage.
+     */
+
+    test('completed video API returns summary content', async ({ request }) => {
+      // Get a completed video from the library
+      const listResponse = await request.get(
+        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        { headers: { 'X-Correlation-ID': 'e2e-summary-test' } }
+      );
+      
+      expect(listResponse.ok()).toBeTruthy();
+      const listData = await listResponse.json();
+      
+      // Skip if no completed videos
+      if (!listData.videos || listData.videos.length === 0) {
+        test.skip();
+        return;
+      }
+      
+      const videoId = listData.videos[0].video_id;
+      
+      // Fetch video detail - this is where the blob path bug manifested
+      const detailResponse = await request.get(
+        `http://localhost:8000/api/v1/library/videos/${videoId}`,
+        { headers: { 'X-Correlation-ID': 'e2e-summary-test' } }
+      );
+      
+      expect(detailResponse.ok()).toBeTruthy();
+      const detailData = await detailResponse.json();
+      
+      // CRITICAL ASSERTION: Completed videos MUST have summary content
+      // If summary is null for a completed video, the blob path extraction is broken
+      expect(detailData.summary).not.toBeNull();
+      expect(detailData.summary).toBeTruthy();
+      expect(typeof detailData.summary).toBe('string');
+      expect(detailData.summary.length).toBeGreaterThan(0);
+    });
+
+    test('video detail page displays summary for completed videos', async ({ page, request }) => {
+      // Get a completed video
+      const listResponse = await request.get(
+        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        { headers: { 'X-Correlation-ID': 'e2e-summary-ui-test' } }
+      );
+      
+      const listData = await listResponse.json();
+      
+      if (!listData.videos || listData.videos.length === 0) {
+        test.skip();
+        return;
+      }
+      
+      const videoId = listData.videos[0].video_id;
+      
+      // Navigate to video detail page
+      await page.goto(`/library/${videoId}`);
+      await page.waitForLoadState('networkidle');
+      
+      // The summary section should be visible and contain content
+      // This catches UI issues where summary is fetched but not displayed
+      const summarySection = page.locator('[data-testid="summary-content"], .summary-content, .markdown-body').first();
+      
+      // Allow for either summary section or markdown content
+      const summaryText = page.getByText(/summary|overview|key points/i).first();
+      
+      // At least one indicator of summary content should be present
+      await expect(summarySection.or(summaryText)).toBeVisible({ timeout: 10000 });
+    });
+
+    test('API response time for video detail is acceptable', async ({ request }) => {
+      // Get a completed video
+      const listResponse = await request.get(
+        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        { headers: { 'X-Correlation-ID': 'e2e-perf-test' } }
+      );
+      
+      const listData = await listResponse.json();
+      
+      if (!listData.videos || listData.videos.length === 0) {
+        test.skip();
+        return;
+      }
+      
+      const videoId = listData.videos[0].video_id;
+      
+      // Time the API call - the bug caused 3-5 second delays due to retries
+      const startTime = Date.now();
+      
+      const detailResponse = await request.get(
+        `http://localhost:8000/api/v1/library/videos/${videoId}`,
+        { headers: { 'X-Correlation-ID': 'e2e-perf-test' } }
+      );
+      
+      const responseTime = Date.now() - startTime;
+      
+      expect(detailResponse.ok()).toBeTruthy();
+      
+      // Response should be fast (under 2 seconds)
+      // The bug caused responses to take 3-5+ seconds due to blob 404 retries
+      expect(responseTime).toBeLessThan(2000);
+    });
+
+    test('summary artifact blob_uri format is valid', async ({ request }) => {
+      // This test validates the blob URI format at the database level
+      const listResponse = await request.get(
+        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=5',
+        { headers: { 'X-Correlation-ID': 'e2e-blob-uri-test' } }
+      );
+      
+      const listData = await listResponse.json();
+      
+      if (!listData.videos || listData.videos.length === 0) {
+        test.skip();
+        return;
+      }
+      
+      for (const video of listData.videos) {
+        const detailResponse = await request.get(
+          `http://localhost:8000/api/v1/library/videos/${video.video_id}`,
+          { headers: { 'X-Correlation-ID': 'e2e-blob-uri-test' } }
+        );
+        
+        const detailData = await detailResponse.json();
+        
+        // If there's a summary artifact, validate the blob_uri contains video_id folder
+        if (detailData.summary_artifact?.blob_uri) {
+          const blobUri = detailData.summary_artifact.blob_uri;
+          
+          // The blob URI should include the video_id in the path
+          // Format: http://host/account/summaries/{video_id}/{youtube_id}_summary.md
+          expect(blobUri).toContain('/summaries/');
+          expect(blobUri).toContain('_summary.md');
+          
+          // Extract path after /summaries/
+          const pathMatch = blobUri.match(/\/summaries\/(.+)/);
+          expect(pathMatch).toBeTruthy();
+          
+          if (pathMatch) {
+            const blobPath = pathMatch[1];
+            // Should have format: {uuid}/{filename}
+            // The UUID should match the video_id
+            expect(blobPath).toContain('/');
+            const [folderPart] = blobPath.split('/');
+            // Folder should be a UUID (video_id)
+            expect(folderPart).toMatch(/^[a-f0-9-]{36}$/);
+          }
+        }
+      }
     });
   });
 });

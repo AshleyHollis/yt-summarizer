@@ -22,33 +22,33 @@ function getFacetTypeColor(type: string): {
   switch (type) {
     case 'topic':
       return {
-        bg: 'bg-indigo-50',
-        text: 'text-indigo-700',
-        border: 'border-indigo-200',
+        bg: 'bg-indigo-50 dark:bg-indigo-900/30',
+        text: 'text-indigo-700 dark:text-indigo-300',
+        border: 'border-indigo-200 dark:border-indigo-700',
       };
     case 'format':
       return {
-        bg: 'bg-purple-50',
-        text: 'text-purple-700',
-        border: 'border-purple-200',
+        bg: 'bg-purple-50 dark:bg-purple-900/30',
+        text: 'text-purple-700 dark:text-purple-300',
+        border: 'border-purple-200 dark:border-purple-700',
       };
     case 'level':
       return {
-        bg: 'bg-orange-50',
-        text: 'text-orange-700',
-        border: 'border-orange-200',
+        bg: 'bg-orange-50 dark:bg-orange-900/30',
+        text: 'text-orange-700 dark:text-orange-300',
+        border: 'border-orange-200 dark:border-orange-700',
       };
     case 'tool':
       return {
-        bg: 'bg-cyan-50',
-        text: 'text-cyan-700',
-        border: 'border-cyan-200',
+        bg: 'bg-cyan-50 dark:bg-cyan-900/30',
+        text: 'text-cyan-700 dark:text-cyan-300',
+        border: 'border-cyan-200 dark:border-cyan-700',
       };
     default:
       return {
-        bg: 'bg-gray-50',
-        text: 'text-gray-700',
-        border: 'border-gray-200',
+        bg: 'bg-gray-50 dark:bg-gray-800',
+        text: 'text-gray-700 dark:text-gray-300',
+        border: 'border-gray-200 dark:border-gray-700',
       };
   }
 }

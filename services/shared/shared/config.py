@@ -206,6 +206,28 @@ class OpenAISettings(BaseSettings):
         return os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT") or None
     
     @property
+    def effective_model(self) -> str:
+        """Get the effective model/deployment name.
+        
+        For Azure OpenAI, uses the deployment name.
+        For standard OpenAI, uses the model name.
+        """
+        if self.azure_deployment:
+            return self.azure_deployment
+        return self.model
+    
+    @property
+    def effective_embedding_model(self) -> str:
+        """Get the effective embedding model/deployment name.
+        
+        For Azure OpenAI, uses the embedding deployment name.
+        For standard OpenAI, uses the embedding model name.
+        """
+        if self.azure_embedding_deployment:
+            return self.azure_embedding_deployment
+        return self.embedding_model
+    
+    @property
     def is_azure_configured(self) -> bool:
         """Check if Azure OpenAI is fully configured."""
         return bool(

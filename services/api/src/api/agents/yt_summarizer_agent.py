@@ -49,44 +49,49 @@ AGENT_DESCRIPTION = "An AI assistant for searching and exploring your YouTube vi
 # System prompt for the agent
 SYSTEM_INSTRUCTIONS = """You are a helpful AI assistant for YT Summarizer, a YouTube video knowledge base application.
 
-Your role is to help users:
-1. Search and explore their video library
-2. Find specific information across video transcripts
-3. Understand video content through summaries and key points
-4. Discover relationships between videos and topics
+CRITICAL RULES:
+- Use ONE TOOL PER RESPONSE - do not call multiple tools for the same question
+- Do NOT add text after calling a tool - the UI renders the complete response
+- PROACTIVELY search the library when users ask questions
+- Do not ask for clarification - search first, then ask if results are unclear
+
+PRIMARY TOOL - USE THIS FIRST:
+- query_library: The PRIMARY tool for ALL user questions. Returns a rich answer with video cards, evidence citations, and follow-up suggestions. The frontend renders this as a complete response - no additional text needed.
+
+SECONDARY TOOLS (only use when query_library is not appropriate):
+- search_videos: Only for simple video searches by title
+- search_segments: Only for finding specific quotes/timestamps
+- get_video_summary: Only when user explicitly asks for a summary of a specific video
+- get_library_coverage: Only when user asks "how many videos" or "what's in my library"
+- get_topics_for_channel: Only when user asks about topics/categories
+
+TOOL SELECTION - PICK ONE:
+- "What videos do I have?" → query_library (NOT get_library_coverage + query_library)
+- "Tell me about X" → query_library
+- "How many videos?" → get_library_coverage only
+- "Summarize video Y" → get_video_summary only
+- Any other question → query_library
+
+RESPONSE FORMAT:
+- Call ONE tool and let the UI render the response
+- The tool result IS the response - do not add text after it
+- Do not explain what you're doing - just call the tool
 
 CONTEXT AWARENESS:
-You receive context about the user's current view. Pay attention to:
-- "currentVideo": If not null, the user is viewing a SPECIFIC video. When they ask a question, 
-  they are almost certainly asking about THIS video. Use the videoId and title to search.
-- If currentVideo is null, the user is on the library page browsing all videos.
+The context includes search scope settings that control what to search:
+- If scope has "videoIds", ONLY search those specific videos (pass video_id to query_library)
+- If scope has "channels", ONLY search videos from those channels (pass channel_id to query_library)
+- If scope is empty ({}), search the entire library (pass no video_id or channel_id)
 
-When the user is viewing a specific video and asks a question:
-1. PRIORITIZE searching within that video's content using search_segments with the videoId
-2. Use the video's title and channel to provide context
-3. Reference the specific video in your response
+AI KNOWLEDGE SETTINGS (CRITICAL - ALWAYS CHECK):
+When the context includes "aiSettings", you MUST pass these values to query_library:
+- useVideoContext: If false, do NOT search the video library (set use_video_context=false)
+- useLLMKnowledge: If false, do NOT use your general knowledge (set use_llm_knowledge=false)
+- useWebSearch: If true, search the web (set use_web_search=true)
 
-PROACTIVE TOOL USE:
-You have access to tools to search videos and segments. ALWAYS use them 
-proactively when a user asks a question. DO NOT ask for clarification - instead:
-- Use search_segments to find relevant transcript content
-- Use search_videos to find videos matching the query
-- Use get_library_coverage to understand what's available
-
-When a user asks something like "How many albums were sold?" or any factual question:
-1. IMMEDIATELY search the library using search_segments with relevant keywords
-2. If currentVideo context is available, search within that video first
-3. Return the results with video titles and timestamps
-4. Only ask for clarification if the search returns no results
-
-When answering:
-- Be concise but thorough
-- ALWAYS cite your sources with video titles and timestamps
-- Include direct quotes from transcripts when relevant
-- If search returns no results, say so and suggest alternative search terms
-
-The user's library contains YouTube videos that have been transcribed and analyzed.
-Always search first, ask questions later.
+Example: If aiSettings shows {"useVideoContext": false, "useLLMKnowledge": true, "useWebSearch": false}
+Then call query_library with: use_video_context=false, use_llm_knowledge=true, use_web_search=false
+This lets the user control whether answers come from their library, AI knowledge, or web search.
 """
 
 # Default configuration values
@@ -160,6 +165,71 @@ async def safe_api_call(
 # =============================================================================
 
 if ai_function is not None:
+    # Import the context accessor for AI settings
+    from .agui_endpoint import get_current_ai_settings
+    
+    @ai_function
+    async def query_library(
+        query: Annotated[str, "The question to ask about the video library"],
+        video_id: Annotated[str | None, "Optional video ID to focus the search on"] = None,
+        channel_id: Annotated[str | None, "Optional channel ID to filter by"] = None,
+        use_video_context: Annotated[bool, "Whether to search the video library for context (default: true)"] = True,
+        use_llm_knowledge: Annotated[bool, "Whether to include AI's general knowledge in the answer (default: true)"] = True,
+        use_web_search: Annotated[bool, "Whether to search the web for current information (default: false)"] = False,
+    ) -> dict[str, Any]:
+        """Ask a question about the video library and get a rich answer with citations.
+        
+        This is the PRIMARY tool for answering user questions about video content.
+        
+        Knowledge source control:
+        - use_video_context: Search transcripts & summaries from the library
+        - use_llm_knowledge: Allow AI to use its general trained knowledge
+        - use_web_search: Search the web for current information (not yet implemented)
+        
+        Returns:
+        - answer: A conversational answer to the question
+        - videoCards: Relevant videos with explanations
+        - evidence: Specific transcript segments that support the answer
+        - followups: Suggested follow-up questions
+        
+        The frontend will render this as a rich UI with video cards and citations.
+        Do NOT add additional text after calling this tool.
+        """
+        # Get AI settings from request context (set by agui_endpoint from CopilotKit context)
+        # This overrides any LLM-provided parameter values with the actual user preferences
+        context_settings = get_current_ai_settings()
+        actual_use_video_context = context_settings.get("useVideoContext", use_video_context)
+        actual_use_llm_knowledge = context_settings.get("useLLMKnowledge", use_llm_knowledge)
+        actual_use_web_search = context_settings.get("useWebSearch", use_web_search)
+        
+        logger.info(
+            f"query_library using AI settings - video_context={actual_use_video_context}, "
+            f"llm_knowledge={actual_use_llm_knowledge}, web_search={actual_use_web_search} "
+            f"(context: {context_settings})"
+        )
+        
+        body: dict[str, Any] = {
+            "query": query,
+            "scope": {},
+            "aiSettings": {
+                "useVideoContext": actual_use_video_context,
+                "useLLMKnowledge": actual_use_llm_knowledge,
+                "useWebSearch": actual_use_web_search,
+            },
+        }
+        if video_id:
+            body["scope"]["video_ids"] = [video_id]
+        if channel_id:
+            body["scope"]["channel_id"] = channel_id
+        
+        result = await safe_api_call("POST", "/api/v1/copilot/query", json=body)
+        if "error" not in result:
+            video_count = len(result.get("videoCards", []))
+            evidence_count = len(result.get("evidence", []))
+            logger.info(f"query_library: {video_count} videos, {evidence_count} evidence for '{query}'")
+        return result
+
+
     @ai_function
     async def search_videos(
         query: Annotated[str, "The search query to find videos"],
@@ -372,6 +442,7 @@ def get_agent_tools() -> list:
         return []
     
     return [
+        query_library,  # PRIMARY tool for user questions
         search_videos,
         search_segments,
         get_video_summary,

@@ -8,8 +8,12 @@ export default defineConfig({
   // Test directory
   testDir: './e2e',
 
+  // Global setup - seeds test videos before tests run
+  globalSetup: process.env.USE_EXTERNAL_SERVER ? './e2e/global-setup.ts' : undefined,
+
   // Maximum timeout for each test
-  timeout: 30_000,
+  // Increased to handle LLM rate limit retries (up to 5 retries with exponential backoff)
+  timeout: 120_000,
 
   // Run tests in files in parallel
   fullyParallel: true,
@@ -17,10 +21,12 @@ export default defineConfig({
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
 
-  // Retry on CI only
-  retries: process.env.CI ? 2 : 0,
+  // Retry failed tests - LLM responses can be flaky
+  // CI: 2 retries for stability, Local: 1 retry for quick feedback
+  retries: process.env.CI ? 2 : 1,
 
-  // Opt out of parallel tests on CI
+  // Run tests in parallel - LLM rate limiting is handled at the app level
+  // with smart retry that uses Retry-After headers
   workers: process.env.CI ? 1 : undefined,
 
   // Reporter to use
@@ -37,8 +43,11 @@ export default defineConfig({
     // Collect trace when retrying the failed test
     trace: 'on-first-retry',
 
-    // Take screenshot on failure
+    // Take screenshot on failure - optimized for smaller file size
     screenshot: 'only-on-failure',
+
+    // Use smaller viewport to reduce screenshot size for LLM context
+    viewport: { width: 1280, height: 720 },
   },
 
   // Configure projects for major browsers

@@ -46,7 +46,7 @@ Potential to share the library read-only with a handful of friends. Not in initi
 ### Explicit Non-Goals
 
 - **Copilot writes nothing**: The in-app copilot is strictly read-only. It MUST NOT create batches, trigger processing, write to the database, or modify graph/vector data.
-- **No live web search**: Copilot only searches ingested content, never the live web or YouTube API.
+- **Web search is optional**: Web search is available as a knowledge source toggle but disabled by default. Users can enable it when they want current information from the internet.
 - **No massive scale optimization**: Design for ~1,500 videos and ~15,000 segments. Keep hobby-appropriate.
 - **No multi-tenant architecture**: Single-user system (with potential future read-sharing).
 
@@ -230,8 +230,13 @@ User asks the copilot to create a structured output (e.g., a learning path, a pr
 #### Copilot & Queries
 
 - **FR-010**: Copilot MUST be read-only — it MUST NOT trigger ingestion, modify data, or execute side effects.
-- **FR-011**: Copilot MUST only search ingested library content, never live web or YouTube.
-- **FR-012**: All copilot answers MUST include citations with video + timestamp references.
+- **FR-011**: Copilot MUST provide AI Knowledge Settings to control knowledge sources:
+  - **Your Videos** (Video Context): Toggle to search the ingested video library via RAG retrieval.
+  - **AI Knowledge** (LLM Knowledge): Toggle to include LLM's general trained knowledge in answers.
+  - **Web Search**: Toggle to enable live web search for current information (disabled by default).
+- **FR-011a**: When "Your Videos" is disabled but "AI Knowledge" is enabled, copilot answers using only LLM knowledge with an uncertainty indicator.
+- **FR-011b**: When both "Your Videos" and "AI Knowledge" are disabled, copilot returns an error message requesting at least one knowledge source.
+- **FR-012**: All copilot answers MUST include citations with video + timestamp references (when using video context).
 - **FR-013**: Copilot MUST display query scope (channels, time range, content types) visibly in the UI.
 - **FR-014**: Copilot MUST allow scope adjustment via chips and re-run queries.
 - **FR-015**: Copilot MUST state uncertainty when content is insufficient and suggest ingesting more (via UI).
@@ -304,6 +309,28 @@ The copilot is a query interface only. It:
 - User MUST be able to adjust scope and re-run
 - A "Topics in Scope" panel MUST show top facets/concepts with counts
 - Coverage indicators SHOULD show: indexed video count, segment count, last updated time
+
+### AI Knowledge Settings
+
+The copilot provides three toggleable knowledge sources in the UI header:
+
+- **Search scope selector**: "All Videos" | "This Channel" | "This Video"
+  - Contextually shows all options when viewing a video
+  - Shows only "All Videos" when on library pages
+  
+- **Knowledge source toggles** (Include:):
+  - **Your Videos**: Search transcripts & summaries from the video library (RAG retrieval). Enabled by default.
+  - **AI Knowledge**: Include AI's general trained knowledge in answers. Enabled by default.
+  - **Web Search**: Search the web for current information. Disabled by default.
+
+- **Help panel**: Expandable (i) button with clear explanations of each option
+
+Behavior:
+- All settings persist in React context (session-scoped)
+- Settings are passed to the API with each query request
+- When "Your Videos" is disabled, no RAG retrieval is performed
+- When "AI Knowledge" is disabled with videos, LLM only synthesizes from evidence
+- When both are disabled, an error message is returned
 
 ### Citation Format
 
@@ -428,3 +455,12 @@ Every answer MUST include:
 - Q: How should API authentication be enforced? → A: No auth (trust network boundary only)
 - Q: Which LLM provider and model should be used? → A: Azure OpenAI (GPT-4o + text-embedding-3-small)
 - Q: How should copilot conversation history be persisted? → A: Browser localStorage (survives refresh, cleared on logout)
+
+### Session 2025-12-18
+
+- Q: How should "Why this?" explanation be delivered? → A: Inline in main query response
+  - Explanation data is included in the `CopilotQueryResponse`, not via separate API call
+  - Each `RecommendedVideo` includes an `explanation` field with human-readable content
+  - LLM generates explanation during answer generation (no additional embedding/LLM calls)
+  - Format: `{ summary: string, keyMoments: KeyMoment[], relatedTo?: string }`
+  - Frontend displays explanation on "Why this?" click (no network request needed)

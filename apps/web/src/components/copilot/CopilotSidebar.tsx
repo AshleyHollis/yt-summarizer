@@ -1,35 +1,19 @@
 "use client";
 
-import { CopilotSidebar as CKSidebar } from "@copilotkit/react-ui";
-import { useCopilotActions } from "@/hooks/useCopilotActions";
-import { ScopeChips } from "./ScopeChips";
-import { CoverageIndicator } from "./CoverageIndicator";
+import { Suspense } from "react";
+// Using CopilotKit Custom Sub-Components pattern
+// for proper header customization without CSS conflicts
+import { ThreadedCopilotSidebar } from "./ThreadedCopilotSidebar";
 
+// Wrap ThreadedCopilotSidebar in Suspense since it uses useSearchParams
 interface CopilotSidebarProps {
   defaultOpen?: boolean;
 }
 
-export function CopilotSidebar({ defaultOpen = false }: CopilotSidebarProps) {
-  // Register copilot actions
-  useCopilotActions();
-
+export function CopilotSidebar(props: CopilotSidebarProps) {
   return (
-    <CKSidebar
-      defaultOpen={defaultOpen}
-      labels={{
-        title: "Ask about your videos",
-        initial:
-          "Hi! I can help you find information across your video library. Ask me anything about the videos you've ingested.",
-      }}
-      Header={() => (
-        <div className="flex flex-col gap-2 border-b border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Copilot</h2>
-            <CoverageIndicator />
-          </div>
-          <ScopeChips />
-        </div>
-      )}
-    />
+    <Suspense fallback={null}>
+      <ThreadedCopilotSidebar {...props} />
+    </Suspense>
   );
 }

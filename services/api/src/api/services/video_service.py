@@ -45,6 +45,26 @@ from ..models.video import (
 logger = get_logger(__name__)
 
 
+class VideoNotFoundError(Exception):
+    """Raised when a YouTube video does not exist or is unavailable."""
+    
+    def __init__(self, youtube_video_id: str, reason: str = "Video not found on YouTube"):
+        self.youtube_video_id = youtube_video_id
+        self.reason = reason
+        super().__init__(f"{reason}: {youtube_video_id}")
+
+
+class NoTranscriptError(Exception):
+    """Raised when a YouTube video has no transcripts/captions available."""
+    
+    def __init__(self, youtube_video_id: str):
+        self.youtube_video_id = youtube_video_id
+        super().__init__(
+            f"No transcript available for video {youtube_video_id}. "
+            "This video does not have captions or auto-generated subtitles on YouTube."
+        )
+
+
 class VideoService:
     """Service for video operations."""
 
@@ -347,6 +367,43 @@ class VideoService:
             message=f"Video reprocessing started from {start_stage.value}",
         )
 
+    async def delete_video(self, video_id: UUID) -> bool:
+        """Delete a video and all associated data.
+
+        Args:
+            video_id: Video ID.
+
+        Returns:
+            True if video was deleted, False if not found.
+        """
+        from sqlalchemy import delete as sql_delete
+        
+        # Check if video exists
+        result = await self.session.execute(
+            select(Video).where(Video.video_id == video_id)
+        )
+        video = result.scalar_one_or_none()
+
+        if not video:
+            return False
+
+        logger.info("Deleting video", video_id=str(video_id), youtube_video_id=video.youtube_video_id)
+
+        # Delete associated jobs first (foreign key constraint)
+        await self.session.execute(
+            sql_delete(Job).where(Job.video_id == video_id)
+        )
+
+        # Delete the video (segments will cascade)
+        await self.session.execute(
+            sql_delete(Video).where(Video.video_id == video_id)
+        )
+
+        await self.session.commit()
+        
+        logger.info("Video deleted successfully", video_id=str(video_id))
+        return True
+
     async def _fetch_video_metadata(self, youtube_video_id: str) -> dict:
         """Fetch video metadata from YouTube using yt-dlp.
 
@@ -429,24 +486,129 @@ class VideoService:
             }
 
         except Exception as e:
+            error_str = str(e).lower()
+            
+            # Check for specific error patterns that indicate video doesn't exist
+            video_not_found_patterns = [
+                "video unavailable",
+                "private video",
+                "video is unavailable",
+                "this video has been removed",
+                "this video is no longer available",
+                "this video is private",
+                "sign in to confirm your age",
+                "video is not available",
+                "unable to extract",
+                "is not a valid url",
+                "no video formats found",
+            ]
+            
+            if any(pattern in error_str for pattern in video_not_found_patterns):
+                logger.warning(
+                    "Video not found on YouTube",
+                    youtube_video_id=youtube_video_id,
+                    error=str(e),
+                )
+                raise VideoNotFoundError(
+                    youtube_video_id=youtube_video_id,
+                    reason="Video not found or unavailable on YouTube",
+                )
+            
+            # For other errors (network issues, rate limits), log warning and raise
+            # to allow retry rather than silently creating bad data
             logger.warning(
-                "Failed to fetch video metadata, using fallback",
+                "Failed to fetch video metadata",
                 youtube_video_id=youtube_video_id,
                 error=str(e),
             )
-            # Return fallback data if yt-dlp fails
-            return {
-                "title": f"Video {youtube_video_id}",
-                "description": None,
-                "duration": 0,
-                "publish_date": datetime.utcnow(),
-                "thumbnail_url": f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg",
-                "channel": {
-                    "youtube_channel_id": "UC_unknown",
-                    "name": "Unknown Channel",
-                    "thumbnail_url": None,
-                },
+            raise VideoNotFoundError(
+                youtube_video_id=youtube_video_id,
+                reason=f"Failed to verify video exists: {str(e)}",
+            )
+
+    async def _check_transcript_availability(self, youtube_video_id: str) -> bool:
+        """Check if transcripts are available for a YouTube video.
+
+        Args:
+            youtube_video_id: YouTube video ID.
+
+        Returns:
+            True if transcripts are available.
+
+        Raises:
+            NoTranscriptError: If no transcripts are available.
+        """
+        import asyncio
+
+        try:
+            # First try youtube-transcript-api (faster, more reliable)
+            from youtube_transcript_api import YouTubeTranscriptApi
+            from youtube_transcript_api._errors import (
+                NoTranscriptFound,
+                TranscriptsDisabled,
+                VideoUnavailable,
+            )
+
+            loop = asyncio.get_event_loop()
+
+            def get_transcript():
+                try:
+                    # Just check if transcript list is available
+                    transcript_list = YouTubeTranscriptApi.list_transcripts(youtube_video_id)
+                    # Try to find English transcript
+                    for transcript in transcript_list:
+                        if transcript.language_code.startswith("en"):
+                            return True
+                    # If no English, check if any transcript exists
+                    return len(list(transcript_list)) > 0
+                except (NoTranscriptFound, TranscriptsDisabled):
+                    return False
+                except VideoUnavailable:
+                    return False
+
+            has_transcript = await loop.run_in_executor(None, get_transcript)
+            if has_transcript:
+                return True
+
+        except ImportError:
+            logger.warning("youtube-transcript-api not available, using yt-dlp fallback")
+        except Exception as e:
+            logger.warning("youtube-transcript-api failed", error=str(e))
+
+        # Fallback to yt-dlp
+        try:
+            import yt_dlp
+
+            ydl_opts = {
+                "skip_download": True,
+                "writesubtitles": True,
+                "writeautomaticsub": True,
+                "subtitleslangs": ["en"],
+                "quiet": True,
+                "no_warnings": True,
             }
+
+            loop = asyncio.get_event_loop()
+
+            def check_subtitles():
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(
+                        f"https://www.youtube.com/watch?v={youtube_video_id}",
+                        download=False,
+                    )
+                    subtitles = info.get("subtitles", {})
+                    auto_captions = info.get("automatic_captions", {})
+                    return bool(subtitles.get("en") or auto_captions.get("en"))
+
+            has_subtitles = await loop.run_in_executor(None, check_subtitles)
+            if has_subtitles:
+                return True
+
+        except Exception as e:
+            logger.warning("yt-dlp subtitle check failed", error=str(e))
+
+        # No transcripts available
+        raise NoTranscriptError(youtube_video_id)
 
     async def _get_or_create_channel(self, channel_data: dict) -> Channel:
         """Get or create a channel record.

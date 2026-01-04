@@ -14,74 +14,58 @@ export const metadata: Metadata = {
  */
 export default function SubmitPage() {
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            YouTube Summarizer
-          </h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Transform YouTube videos into actionable summaries
-          </p>
-        </div>
-      </header>
-
+    <main className="min-h-[calc(100vh-4rem)] bg-gray-100 dark:bg-[#0f0f0f]">
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        {/* Hero Section */}
-        <section className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Hero Section - Compact */}
+        <section className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Get AI-Powered Video Summaries
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Paste a YouTube URL below and we&apos;ll extract the transcript,
-            generate a comprehensive summary, and find related content.
+          </h1>
+          <p className="text-gray-700 dark:text-gray-300 max-w-xl mx-auto">
+            Paste a YouTube URL to extract transcripts and generate summaries
           </p>
         </section>
 
         {/* Submit Form */}
-        <section className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 md:p-8">
+        <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-5 md:p-6">
           <SubmitVideoForm />
         </section>
 
         {/* Channel Ingestion CTA */}
-        <section className="mt-8 text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Want to ingest multiple videos from a channel?
-          </p>
+        <section className="mt-5 text-center">
           <Link
             href="/ingest"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 transition-colors"
           >
             <ChannelIcon />
-            Ingest from Channel
+            Want to ingest multiple videos from a channel?
           </Link>
         </section>
 
-        {/* Features Section */}
-        <section className="mt-16 grid md:grid-cols-3 gap-8">
+        {/* Features Section - Compact */}
+        <section className="mt-8 grid md:grid-cols-3 gap-6">
           <FeatureCard
             icon={<TranscriptIcon />}
             title="Transcript Extraction"
-            description="Automatically extract captions and subtitles from any YouTube video."
+            description="Automatically extract captions from any YouTube video."
           />
           <FeatureCard
             icon={<SummaryIcon />}
             title="AI Summaries"
-            description="Generate comprehensive summaries with key points and takeaways."
+            description="Generate summaries with key points and takeaways."
           />
           <FeatureCard
             icon={<RelatedIcon />}
             title="Related Videos"
-            description="Discover semantically related content based on video embeddings."
+            description="Discover related content via embeddings."
           />
         </section>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
-        <div className="max-w-4xl mx-auto px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+      {/* Footer - Minimal */}
+      <footer className="border-t border-gray-200 dark:border-gray-800 mt-auto">
+        <div className="max-w-4xl mx-auto px-4 py-4 text-center text-xs text-gray-500 dark:text-gray-400">
           Built with Next.js, FastAPI, and OpenAI
         </div>
       </footer>
@@ -100,14 +84,14 @@ interface FeatureCardProps {
 
 function FeatureCard({ icon, title, description }: FeatureCardProps) {
   return (
-    <div className="text-center">
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 mb-4">
+    <div className="text-center p-4 rounded-lg bg-white dark:bg-gray-800/30 border border-gray-300 dark:border-gray-700/30 shadow-sm">
+      <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 mb-3">
         {icon}
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
         {title}
       </h3>
-      <p className="text-gray-600 dark:text-gray-400">{description}</p>
+      <p className="text-xs text-gray-600 dark:text-gray-300">{description}</p>
     </div>
   );
 }

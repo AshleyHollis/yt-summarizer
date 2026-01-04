@@ -1,8 +1,30 @@
 import type { NextConfig } from 'next';
+import bundleAnalyzer from '@next/bundle-analyzer';
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+});
+
+// Disable React Compiler in dev to reduce memory overhead
+const isDev = process.env.NODE_ENV !== 'production';
 
 const nextConfig: NextConfig = {
-  // Enable React Compiler (React 19)
-  reactCompiler: true,
+  // Enable React Compiler only in production (reduces dev memory ~15-20%)
+  reactCompiler: !isDev,
+
+  // Memory optimizations for dev server (see: https://github.com/vercel/next.js/issues/54708)
+  experimental: {
+    webpackMemoryOptimizations: true,
+    preloadEntriesOnStart: false,
+    // Optimize barrel imports for heavy libraries (reduces module resolution significantly)
+    // CopilotKit and icon libraries have many exports
+    optimizePackageImports: [
+      '@copilotkit/react-core',
+      '@copilotkit/react-ui',
+      '@copilotkit/runtime',
+      'react-markdown',
+    ],
+  },
 
   // Environment variables that are exposed to the browser
   // NEXT_PUBLIC_* variables are automatically exposed
@@ -43,5 +65,5 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);
 

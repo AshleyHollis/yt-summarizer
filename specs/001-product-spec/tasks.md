@@ -265,46 +265,60 @@
 - [X] T128 [US4] Integrate CopilotSidebar into library and video detail pages in apps/web/src/app/layout.tsx
 - [X] T129 [US4] Add scope chip interactions (click to narrow/broaden scope) in apps/web/src/components/copilot/ScopeChips.tsx
 
+### AI Knowledge Settings for US4
+
+- [X] T129a [P] [US4] Create AIKnowledgeSettings Pydantic model (useVideoContext, useLLMKnowledge, useWebSearch) in services/api/src/api/models/copilot.py
+- [X] T129b [US4] Add ai_settings field to CopilotQueryRequest model in services/api/src/api/models/copilot.py
+- [X] T129c [US4] Update CopilotService.query() to respect AI settings (skip RAG when useVideoContext=false) in services/api/src/api/services/copilot_service.py
+- [X] T129d [US4] Add generate_answer_without_evidence() to LLMService for LLM-only answers in services/api/src/api/services/llm_service.py
+- [X] T129e [US4] Update query_library agent tool with AI settings parameters in services/api/src/api/agents/yt_summarizer_agent.py
+- [X] T129f [P] [US4] Create AISettingsContext and useAISettings hook in apps/web/src/app/providers.tsx
+- [X] T129g [US4] Update ScopeIndicator with knowledge source toggles (Your Videos, AI Knowledge, Web Search) in apps/web/src/components/copilot/subcomponents/ScopeIndicator.tsx
+- [X] T129h [US4] Add help panel to ScopeIndicator explaining each option in apps/web/src/components/copilot/subcomponents/ScopeIndicator.tsx
+- [X] T129i [US4] Pass AI settings to agent via useCopilotReadable in apps/web/src/hooks/useCopilotActionsRefactored.tsx
+
 ### Tests for US4
 
 - [X] T130 [P] [US4] Create API tests for copilot endpoints in services/api/tests/test_copilot.py
+- [X] T130a [P] [US4] Create API tests for AI knowledge settings combinations in services/api/tests/test_copilot.py
 - [X] T131 [P] [US4] Create integration tests for vector search in services/api/tests/test_search_service.py
 - [X] T132 [P] [US4] Create E2E tests for copilot query flow in apps/web/e2e/copilot.spec.ts
 - [X] T132a [P] [US4] Create unit tests for agent module and AG-UI endpoint registration in services/api/tests/test_agents.py
+- [X] T132b [P] [US4] Create unit tests for ScopeIndicator component toggles in apps/web/src/__tests__/components/copilot/ScopeIndicator.test.tsx
 
-**Checkpoint**: User Story 4 complete — full copilot query with scope visibility, citations, follow-ups ✅
+**Checkpoint**: User Story 4 complete — full copilot query with scope visibility, citations, follow-ups, AI knowledge settings ✅
 
 ---
 
 ## Phase 7: User Story 5 — "Explain Why" (Transparency) (Priority: P3)
 
-**Goal**: For any recommended video, user sees why it was recommended — similarity basis, relationship basis, evidence
+**Goal**: Each recommended video includes explanation data; user clicks "Why this?" to reveal it (no API call)
 
-**Independent Test**: After a query, click "Why this?" on a video card, see explanation with evidence links
+**Independent Test**: After a query, click "Why this?" on a video card, see human-readable explanation with evidence links
 
-### API Implementation for US5
+**Design Decision**: Explanation is generated during the main query LLM call and included in the response. No separate `/explain` endpoint needed. This eliminates redundant embedding calls and provides instant UI response.
 
-- [ ] T133 [P] [US5] Create ExplainRequest model (queryText, scope) in services/api/src/api/models/explanation.py
-- [ ] T134 [P] [US5] Create ExplainResponse model (similarityBasis, relationshipBasis, overallConfidence) in services/api/src/api/models/explanation.py
-- [ ] T135 [P] [US5] Create SimilarityEvidence model (segmentId, segmentText, startTime, score) in services/api/src/api/models/explanation.py
-- [ ] T136 [P] [US5] Create RelationshipEvidence model (relationshipType, relatedVideoId, confidence, rationale) in services/api/src/api/models/explanation.py
-- [ ] T137 [US5] Implement explanation service in services/api/src/api/services/explanation_service.py
-- [ ] T138 [US5] Implement POST /api/v1/copilot/explain/{videoId} endpoint in services/api/src/api/routes/copilot.py
+### API Changes for US5
+
+- [X] T133 [US5] Add VideoExplanation, KeyMoment models to services/api/src/api/models/copilot.py
+- [X] T134 [US5] Add `explanation` field to RecommendedVideo model in services/api/src/api/models/copilot.py
+- [X] T135 [US5] Update LLM prompt in copilot_service.py to generate per-video explanations during answer generation
+- [X] T136 [US5] Update copilot response builder to populate explanation from LLM output in services/api/src/api/services/copilot_service.py
 
 ### Frontend for US5
 
-- [ ] T139 [US5] Create "Why this?" button on video cards in apps/web/src/components/copilot/WhyThisButton.tsx
-- [ ] T140 [US5] Create explanation panel component in apps/web/src/components/copilot/ExplanationPanel.tsx
-- [ ] T141 [P] [US5] Create similarity evidence display in apps/web/src/components/copilot/SimilarityEvidence.tsx
-- [ ] T142 [P] [US5] Create relationship evidence display in apps/web/src/components/copilot/RelationshipEvidence.tsx
-- [ ] T143 [US5] Add clickable evidence segments linking to video timestamps
+- [X] T137 [US5] Create "Why this?" button on video cards in apps/web/src/components/copilot/WhyThisButton.tsx
+- [X] T138 [US5] Create ExplanationPanel component (displays inline explanation data) in apps/web/src/components/copilot/ExplanationPanel.tsx
+- [X] T139 [P] [US5] Create KeyMomentsList component with clickable timestamps in apps/web/src/components/copilot/KeyMomentsList.tsx
+- [X] T140 [P] [US5] Create RelationshipBadge component (shows series/related info) in apps/web/src/components/copilot/RelationshipBadge.tsx
+- [X] T141 [US5] Wire "Why this?" to toggle ExplanationPanel visibility (local state, no API call)
 
 ### Tests for US5
 
-- [ ] T144 [P] [US5] Create API tests for explain endpoint in services/api/tests/test_explain.py
-- [ ] T145 [P] [US5] Create E2E tests for "Why this?" flow in apps/web/e2e/explain.spec.ts
+- [X] T142 [P] [US5] Update copilot API tests to verify explanation field populated in services/api/tests/test_copilot.py
+- [X] T143 [P] [US5] Create E2E tests for "Why this?" toggle in apps/web/e2e/explain.spec.ts
 
-**Checkpoint**: User Story 5 complete — transparency for all recommendations
+**Checkpoint**: User Story 5 complete — transparency for all recommendations ✅
 
 ---
 

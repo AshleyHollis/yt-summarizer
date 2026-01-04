@@ -77,6 +77,34 @@ class QueryScope(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class AIKnowledgeSettings(BaseModel):
+    """Settings for what knowledge sources the AI can use.
+    
+    Controls which sources the copilot draws from when answering questions:
+    - Video context from the library (RAG retrieval)
+    - LLM's trained general knowledge
+    - Web search for current information
+    """
+    
+    use_video_context: bool = Field(
+        default=True,
+        alias="useVideoContext",
+        description="Search video library for relevant context (RAG retrieval)"
+    )
+    use_llm_knowledge: bool = Field(
+        default=True,
+        alias="useLLMKnowledge",
+        description="Allow LLM to use its trained general knowledge"
+    )
+    use_web_search: bool = Field(
+        default=False,
+        alias="useWebSearch",
+        description="Enable web search for current information (not yet implemented)"
+    )
+    
+    model_config = {"populate_by_name": True}
+
+
 class CopilotQueryRequest(BaseModel):
     """Request to execute a copilot query."""
     
@@ -88,6 +116,11 @@ class CopilotQueryRequest(BaseModel):
         default=None,
         description="Optional scope filters"
     )
+    ai_settings: AIKnowledgeSettings | None = Field(
+        default=None,
+        alias="aiSettings",
+        description="Knowledge source settings for the AI"
+    )
     conversation_id: UUID | None = Field(
         default=None,
         alias="conversationId",
@@ -97,6 +130,48 @@ class CopilotQueryRequest(BaseModel):
         default=None,
         alias="correlationId",
         description="Correlation ID for tracing"
+    )
+    
+    model_config = {"populate_by_name": True}
+
+
+class KeyMoment(BaseModel):
+    """A key moment in a video that supports the recommendation (US5)."""
+    
+    timestamp: str = Field(description="Formatted timestamp e.g. '2:34'")
+    description: str = Field(description="What happens at this moment")
+    segment_id: UUID | None = Field(
+        default=None,
+        alias="segmentId",
+        description="Segment ID for deep linking"
+    )
+    youtube_url: str | None = Field(
+        default=None,
+        alias="youTubeUrl",
+        description="Direct YouTube link to this timestamp"
+    )
+    
+    model_config = {"populate_by_name": True}
+
+
+class VideoExplanation(BaseModel):
+    """Explanation for why a video was recommended (US5 transparency).
+    
+    Generated during the main query LLM call - no separate API request needed.
+    """
+    
+    summary: str = Field(
+        description="Human-readable explanation: 'This video covers the exact technique you asked about'"
+    )
+    key_moments: list[KeyMoment] = Field(
+        default_factory=list,
+        alias="keyMoments",
+        description="Timestamped evidence supporting the recommendation"
+    )
+    related_to: str | None = Field(
+        default=None,
+        alias="relatedTo",
+        description="If via relationship: 'Part of the Kettlebell Fundamentals series'"
     )
     
     model_config = {"populate_by_name": True}
@@ -137,6 +212,10 @@ class RecommendedVideo(BaseModel):
         alias="primaryReason",
         description="Brief reason for recommendation"
     )
+    explanation: VideoExplanation | None = Field(
+        default=None,
+        description="Detailed explanation for 'Why this?' UI (US5 transparency)"
+    )
     
     model_config = {"populate_by_name": True}
 
@@ -158,6 +237,11 @@ class CopilotQueryResponse(BaseResponse):
         default=None,
         alias="scopeEcho",
         description="The scope that was actually searched"
+    )
+    ai_settings_echo: AIKnowledgeSettings | None = Field(
+        default=None,
+        alias="aiSettingsEcho",
+        description="The AI knowledge settings that were used for this query"
     )
     followups: list[str] = Field(
         default_factory=list,
@@ -182,7 +266,7 @@ class SegmentSearchRequest(BaseModel):
     
     query_text: str = Field(alias="queryText", description="Text to search for semantically")
     scope: QueryScope | None = Field(default=None, description="Optional scope filters")
-    limit: int = Field(default=10, ge=1, le=50, description="Maximum results to return")
+    limit: int = Field(default=10, ge=1, le=200, description="Maximum results to return")
     
     model_config = {"populate_by_name": True}
 

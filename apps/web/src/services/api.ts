@@ -492,6 +492,7 @@ export interface VideoCard {
   title: string;
   channel_id: string;
   channel_name: string;
+  channel_thumbnail_url: string | null;
   duration: number;
   publish_date: string;
   thumbnail_url: string | null;

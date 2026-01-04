@@ -128,15 +128,18 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
 
     async def _get_video_embeddings(self, video_id: str) -> list[list[float]]:
         """Get all embeddings for a video."""
+        import json
         from uuid import UUID
 
         db = get_db()
         async with db.session() as session:
-            # Get embeddings from Segments using raw SQL (VARBINARY column)
+            # Get embeddings from Segments using raw SQL
+            # Use CAST to convert VECTOR to VARCHAR for reliable retrieval
             result = await session.execute(
                 sa.text("""
-                    SELECT Embedding FROM Segments 
+                    SELECT CAST(Embedding AS VARCHAR(MAX)) FROM Segments 
                     WHERE video_id = :video_id 
+                    AND Embedding IS NOT NULL
                     ORDER BY sequence_number
                 """),
                 {"video_id": str(video_id)}
@@ -145,11 +148,17 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
             embeddings = []
             for row in result.fetchall():
                 if row[0]:  # If embedding exists
-                    # Decode binary embedding (stored as float array)
-                    embedding_bytes = row[0]
-                    num_floats = len(embedding_bytes) // 4
-                    embedding = list(struct.unpack(f'{num_floats}f', embedding_bytes))
-                    embeddings.append(embedding)
+                    embedding_str = row[0]
+                    # VECTOR type returns as JSON array string like "[0.123, -0.456, ...]"
+                    if isinstance(embedding_str, str):
+                        # Parse JSON array string
+                        embedding = json.loads(embedding_str)
+                        embeddings.append(embedding)
+                    elif isinstance(embedding_str, bytes):
+                        # Fallback for binary format (legacy)
+                        num_floats = len(embedding_str) // 4
+                        embedding = list(struct.unpack(f'{num_floats}f', embedding_str))
+                        embeddings.append(embedding)
             
             return embeddings
 
@@ -177,6 +186,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
 
         Returns list of (video_id, similarity_score) tuples.
         """
+        import json
         from uuid import UUID
 
         settings = get_settings()
@@ -194,9 +204,10 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
         db = get_db()
         async with db.session() as session:
             # Get all other videos with their embeddings
+            # Use CAST to convert VECTOR to VARCHAR for reliable retrieval
             result = await session.execute(
                 sa.text("""
-                    SELECT video_id, Embedding FROM Segments 
+                    SELECT video_id, CAST(Embedding AS VARCHAR(MAX)) FROM Segments 
                     WHERE video_id != :current_video_id 
                     AND Embedding IS NOT NULL
                 """),
@@ -208,9 +219,16 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
             for row in result.fetchall():
                 vid = str(row[0])
                 if row[1]:  # If embedding exists
-                    embedding_bytes = row[1]
-                    num_floats = len(embedding_bytes) // 4
-                    embedding = list(struct.unpack(f'{num_floats}f', embedding_bytes))
+                    embedding_str = row[1]
+                    # VECTOR type returns as JSON array string like "[0.123, -0.456, ...]"
+                    if isinstance(embedding_str, str):
+                        embedding = json.loads(embedding_str)
+                    elif isinstance(embedding_str, bytes):
+                        # Fallback for binary format (legacy)
+                        num_floats = len(embedding_str) // 4
+                        embedding = list(struct.unpack(f'{num_floats}f', embedding_str))
+                    else:
+                        continue
                     if vid not in video_embeddings:
                         video_embeddings[vid] = []
                     video_embeddings[vid].append(embedding)
@@ -262,7 +280,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
                 relationship = Relationship(
                     source_video_id=UUID(video_id),
                     target_video_id=UUID(related_vid),
-                    relationship_type="semantic_similarity",
+                    relationship_type="same_topic",  # Valid enum: series, progression, same_topic, references, related
                     confidence=score,
                     rationale=f"Videos share similar content based on embedding similarity (score: {score:.3f})",
                     evidence_type="embedding",

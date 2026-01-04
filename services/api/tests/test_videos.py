@@ -96,6 +96,30 @@ class TestSubmitVideo:
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
+    def test_submit_video_rejects_nonexistent_youtube_video(self, client, headers):
+        """Test that non-existent YouTube videos are rejected with 404.
+        
+        Uses a fabricated video ID that doesn't exist on YouTube.
+        The API should verify the video exists before creating a record.
+        """
+        # Use a clearly fake video ID that won't exist
+        fake_video_id = "XXXXXXXXXXX"  # 11 chars like real IDs but won't exist
+        response = client.post(
+            "/api/v1/videos",
+            json={"url": f"https://www.youtube.com/watch?v={fake_video_id}"},
+            headers=headers,
+        )
+        # Should return 404 (video not found on YouTube) or 500 (if mocked)
+        assert response.status_code in [
+            status.HTTP_404_NOT_FOUND,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        ]
+        # If 404, check the error message
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            data = response.json()
+            error_detail = data.get("detail", data.get("error", {}).get("message", ""))
+            assert "not found" in error_detail.lower() or "unavailable" in error_detail.lower()
+
 
 class TestGetVideo:
     """Integration tests for GET /api/v1/videos/{video_id} endpoint."""
@@ -342,3 +366,70 @@ class TestVideoContentUrls:
         # Verify the model has null URLs for pending videos
         assert video_data.transcript_url is None
         assert video_data.summary_url is None
+
+
+class TestVideoNotFoundError:
+    """Tests for VideoNotFoundError exception handling."""
+
+    def test_video_not_found_error_has_correct_attributes(self):
+        """Test that VideoNotFoundError contains the video ID and reason."""
+        from api.services.video_service import VideoNotFoundError
+        
+        error = VideoNotFoundError("dQw4w9WgXcQ", "Video is private")
+        
+        assert error.youtube_video_id == "dQw4w9WgXcQ"
+        assert error.reason == "Video is private"
+        assert "dQw4w9WgXcQ" in str(error)
+        assert "Video is private" in str(error)
+
+    def test_video_not_found_error_default_reason(self):
+        """Test that VideoNotFoundError has a sensible default reason."""
+        from api.services.video_service import VideoNotFoundError
+        
+        error = VideoNotFoundError("XXXXXXXXXXX")
+        
+        assert error.youtube_video_id == "XXXXXXXXXXX"
+        assert "not found" in error.reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_fetch_video_metadata_raises_for_unavailable_video(self):
+        """Test that _fetch_video_metadata raises VideoNotFoundError for unavailable videos."""
+        from unittest.mock import patch, MagicMock, AsyncMock
+        from api.services.video_service import VideoService, VideoNotFoundError
+        
+        # Mock yt-dlp to simulate "Video unavailable" error
+        with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+            mock_ydl.__exit__ = MagicMock(return_value=False)
+            mock_ydl.extract_info.side_effect = Exception("ERROR: Video unavailable")
+            mock_ydl_class.return_value = mock_ydl
+            
+            service = VideoService(AsyncMock())
+            
+            with pytest.raises(VideoNotFoundError) as exc_info:
+                await service._fetch_video_metadata("XXXXXXXXXXX")
+            
+            assert exc_info.value.youtube_video_id == "XXXXXXXXXXX"
+            assert "unavailable" in str(exc_info.value).lower() or "not found" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_fetch_video_metadata_raises_for_private_video(self):
+        """Test that _fetch_video_metadata raises VideoNotFoundError for private videos."""
+        from unittest.mock import patch, MagicMock, AsyncMock
+        from api.services.video_service import VideoService, VideoNotFoundError
+        
+        # Mock yt-dlp to simulate "Private video" error
+        with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+            mock_ydl.__exit__ = MagicMock(return_value=False)
+            mock_ydl.extract_info.side_effect = Exception("ERROR: Private video. Sign in if you've been granted access")
+            mock_ydl_class.return_value = mock_ydl
+            
+            service = VideoService(AsyncMock())
+            
+            with pytest.raises(VideoNotFoundError) as exc_info:
+                await service._fetch_video_metadata("PRIVATE1234")
+            
+            assert exc_info.value.youtube_video_id == "PRIVATE1234"

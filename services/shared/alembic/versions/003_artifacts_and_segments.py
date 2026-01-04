@@ -90,13 +90,11 @@ def upgrade() -> None:
         ["video_id", "start_time", "end_time"],
     )
 
-    # Add embedding column - use VARBINARY(MAX) for local SQL Server, 
-    # VECTOR(1536) is only available in Azure SQL
-    # Store embeddings as binary-encoded float arrays
+    # Add embedding column - SQL Server 2025 supports native VECTOR type
     op.execute(
         """
         ALTER TABLE Segments
-        ADD Embedding VARBINARY(MAX) NULL
+        ADD Embedding VECTOR(1536) NULL
         """
     )
 

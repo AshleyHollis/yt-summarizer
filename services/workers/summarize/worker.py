@@ -28,22 +28,58 @@ from shared.worker.base_worker import BaseWorker, WorkerResult, run_worker
 logger = get_logger(__name__)
 
 # Summarization prompt template
-SUMMARIZE_PROMPT = """You are an expert at summarizing YouTube video transcripts.
-Given the following transcript, provide a comprehensive summary that includes:
+SUMMARIZE_PROMPT = """Analyze and summarize this YouTube video transcript. First, identify the content type, then create a structured summary tailored to that type.
 
-1. **Main Topic**: What is this video about?
-2. **Key Points**: The most important points or arguments made (use bullet points)
-3. **Key Takeaways**: What should viewers remember? (3-5 bullet points)
-4. **Summary**: A 2-3 paragraph executive summary
+## Content Type
+Identify ONE primary type: News, Tutorial, Product Review, Educational, Entertainment, Music, Documentary, Interview, Vlog, Gaming, or Other.
 
-Format your response in Markdown.
+## Main Topic
+One sentence describing what the video covers.
+
+## Key Points
+1. First key point (most important information or insight)
+2. Second key point
+3. Third key point
+(Include up to 5 key points for longer/denser content)
+
+## Notable Quotes
+Include 1-3 memorable or important quotes from the transcript. Use "quote" format.
+
+## Watch This If...
+One sentence describing who would benefit from this video (e.g., "Watch this if you want to understand X" or "Skip if you already know Y").
+
+## Key Takeaways
+(ONLY include this section if the content has actionable advice, lessons, or recommendations. Skip entirely for news reports, music videos, entertainment, or purely informational content.)
+1. First actionable takeaway the viewer can apply
+2. Second actionable takeaway
+3. Third actionable takeaway
+
+## Summary
+Two to three paragraphs providing a narrative overview. Focus on:
+- The main argument or story arc
+- Important context not captured in key points
+- How the content concludes or what it leads to
+
+FORMATTING RULES:
+- Start each section with ## followed by the exact header name
+- Use numbered lists (1. 2. 3.) for Key Points and Key Takeaways
+- Write prose paragraphs for Summary section
+- Do NOT use ** for headers or section titles
+- Do NOT use bullet points (-) anywhere except in the Summary section if needed for clarity
+- For Notable Quotes, use quotation marks around the text
+
+CONTENT TYPE GUIDELINES:
+- News: Focus on who, what, when, where, why. Skip Key Takeaways unless there are clear lessons.
+- Tutorial/How-To: Emphasize steps, prerequisites, and Key Takeaways with actionable items.
+- Product Review: Highlight pros/cons, comparisons, and specific recommendations.
+- Educational: Include Key Takeaways with learning outcomes and concepts to remember.
+- Music: Focus on themes, lyrics interpretation, musical elements. Skip Key Takeaways.
+- Entertainment: Describe the content, style, and appeal. Key Takeaways optional.
 
 Transcript:
 {transcript}
 
----
-
-Provide your summary below:"""
+Your markdown summary:"""
 
 
 @dataclass

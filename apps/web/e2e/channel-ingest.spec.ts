@@ -28,7 +28,7 @@ test.describe('Channel Ingestion Flow', () => {
       await page.goto('/submit');
 
       // Check for channel ingestion link
-      const ingestLink = page.getByRole('link', { name: /Ingest from Channel/i });
+      const ingestLink = page.getByRole('link', { name: /ingest multiple videos from a channel/i });
       await expect(ingestLink).toBeVisible();
       await expect(ingestLink).toHaveAttribute('href', '/ingest');
     });
@@ -37,7 +37,7 @@ test.describe('Channel Ingestion Flow', () => {
       await page.goto('/submit');
 
       // Click the channel ingestion link
-      await page.getByRole('link', { name: /Ingest from Channel/i }).click();
+      await page.getByRole('link', { name: /ingest multiple videos from a channel/i }).click();
 
       // Should be on ingest page
       await expect(page).toHaveURL('/ingest');
@@ -271,8 +271,8 @@ test.describe('Channel Ingestion Flow', () => {
     test('batches page is accessible', async ({ page }) => {
       await page.goto('/batches');
 
-      // Check page renders
-      await expect(page.getByRole('heading', { name: /Batch/i })).toBeVisible();
+      // Check page renders - the page shows "Jobs" heading
+      await expect(page.getByRole('heading', { name: /Jobs/i })).toBeVisible();
     });
   });
 

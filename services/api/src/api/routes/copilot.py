@@ -94,6 +94,7 @@ async def query(
         body = CopilotQueryRequest(
             query=body.query,
             scope=body.scope,
+            ai_settings=body.ai_settings,
             conversation_id=body.conversation_id,
             correlation_id=correlation_id,
         )

@@ -326,6 +326,28 @@ interface CopilotResponse {
   uncertainty?: string;        // If content insufficient
 }
 
+interface VideoCard {
+  videoId: string;
+  title: string;
+  channelName: string;
+  thumbnailUrl: string;
+  relevanceScore: number;
+  primaryReason: string;
+  explanation: VideoExplanation;  // Why this video was recommended (for "Why this?" UI)
+}
+
+interface VideoExplanation {
+  summary: string;              // Human-readable: "This video covers the exact technique you asked about"
+  keyMoments: KeyMoment[];      // Timestamped evidence: ["2:34 - Hip hinge demo", "5:12 - Common mistakes"]
+  relatedTo?: string;           // If via relationship: "Part of 'Kettlebell Fundamentals' series"
+}
+
+interface KeyMoment {
+  timestamp: string;            // "2:34"
+  description: string;          // "Proper hip hinge demonstration"
+  segmentId: string;            // For deep linking
+}
+
 interface Evidence {
   videoId: string;
   videoTitle: string;

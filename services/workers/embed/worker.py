@@ -71,10 +71,10 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
     ) -> WorkerResult:
         """Process an embed job.
 
-        1. Fetch transcript and summary from blob storage
-        2. Chunk the content
+        1. Fetch timestamped segments from blob storage (preferred)
+        2. Fall back to transcript/summary if segments not available
         3. Generate embeddings for each chunk
-        4. Store embeddings in database
+        4. Store embeddings in database with timestamps
         5. Queue next job (relationships)
         """
         logger.info(
@@ -87,28 +87,51 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             # Mark job as running
             await mark_job_running(message.job_id, "embedding")
 
-            # Fetch content
-            transcript = await self._fetch_content(
+            # Try to fetch timestamped segments first (preferred for semantic search)
+            segments_json = await self._fetch_content(
                 TRANSCRIPTS_CONTAINER,
-                f"{message.video_id}/{message.youtube_video_id}_transcript.txt",
+                f"{message.video_id}/{message.youtube_video_id}_segments.json",
             )
-            summary = await self._fetch_content(
-                SUMMARIES_CONTAINER,
-                f"{message.video_id}/{message.youtube_video_id}_summary.md",
-            )
-
-            if not transcript and not summary:
-                await mark_job_failed(message.job_id, "Could not find transcript or summary")
-                return WorkerResult.failed(
-                    Exception("No content found"),
-                    "Could not find transcript or summary",
+            
+            timestamped_segments = None
+            if segments_json:
+                import json
+                try:
+                    timestamped_segments = json.loads(segments_json)
+                    logger.info(
+                        "Using timestamped segments for embeddings",
+                        segment_count=len(timestamped_segments),
+                    )
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse segments JSON, falling back to transcript")
+            
+            chunk_timestamps: list[tuple[float, float]] | None = None
+            
+            if timestamped_segments:
+                # Use timestamped segments - extract text for embedding
+                chunks = [seg["text"] for seg in timestamped_segments]
+                chunk_timestamps = [(seg["start"], seg["end"]) for seg in timestamped_segments]
+            else:
+                # Fallback: Fetch transcript and summary
+                transcript = await self._fetch_content(
+                    TRANSCRIPTS_CONTAINER,
+                    f"{message.video_id}/{message.youtube_video_id}_transcript.txt",
                 )
+                summary = await self._fetch_content(
+                    SUMMARIES_CONTAINER,
+                    f"{message.video_id}/{message.youtube_video_id}_summary.md",
+                )
+                
+                if not transcript and not summary:
+                    await mark_job_failed(message.job_id, "Could not find transcript or summary")
+                    return WorkerResult.failed(
+                        Exception("No content found"),
+                        "Could not find transcript or summary",
+                    )
 
-            # Combine content for embedding
-            content = f"# Summary\n{summary or ''}\n\n# Transcript\n{transcript or ''}"
-
-            # Chunk the content
-            chunks = self._chunk_content(content)
+                # Combine content for embedding (fallback path - no timestamps)
+                content = f"# Summary\n{summary or ''}\n\n# Transcript\n{transcript or ''}"
+                chunks = self._chunk_content(content)
 
             # Generate embeddings
             embeddings, error = await self._generate_embeddings(chunks)
@@ -124,8 +147,14 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                     error_msg,
                 )
 
-            # Store embeddings
-            await self._store_embeddings(message.video_id, chunks, embeddings)
+            # Store embeddings with timestamps if available
+            await self._store_embeddings(
+                message.video_id,
+                message.youtube_video_id,
+                chunks,
+                embeddings,
+                chunk_timestamps,
+            )
 
             # Mark job as completed
             await mark_job_completed(message.job_id)
@@ -328,10 +357,20 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
     async def _store_embeddings(
         self,
         video_id: str,
+        youtube_video_id: str,
         chunks: list[str],
         embeddings: list[list[float]],
+        timestamps: list[tuple[float, float]] | None = None,
     ) -> None:
-        """Store embeddings in database as Segments."""
+        """Store embeddings in database as Segments.
+        
+        Args:
+            video_id: Internal UUID for the video
+            youtube_video_id: YouTube video ID for logging
+            chunks: List of text chunks to store
+            embeddings: List of embedding vectors
+            timestamps: Optional list of (start_time, end_time) tuples for each chunk
+        """
         import hashlib
         import struct
         from uuid import UUID
@@ -349,7 +388,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                             WHERE TABLE_NAME = 'Segments' AND COLUMN_NAME = 'Embedding'
                         )
                         BEGIN
-                            ALTER TABLE Segments ADD Embedding VARBINARY(MAX) NULL
+                            ALTER TABLE Segments ADD Embedding VECTOR(1536) NULL
                         END
                     """)
                 )
@@ -364,18 +403,23 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             )
 
             # Create new segments
+            has_timestamps = timestamps and len(timestamps) == len(chunks)
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                # Convert embedding to binary (VARBINARY) format
-                embedding_bytes = struct.pack(f'{len(embedding)}f', *embedding)
+                # Convert embedding to JSON array format for VECTOR type
+                embedding_json = "[" + ",".join(str(x) for x in embedding) + "]"
                 
                 # Calculate content hash
                 content_hash = hashlib.sha256(chunk.encode()).hexdigest()
                 
+                # Use real timestamps if available, otherwise default to 0.0
+                start_time = timestamps[i][0] if has_timestamps else 0.0
+                end_time = timestamps[i][1] if has_timestamps else 0.0
+                
                 segment = Segment(
                     video_id=UUID(video_id),
                     sequence_number=i,
-                    start_time=0.0,  # Not applicable for summary chunks
-                    end_time=0.0,
+                    start_time=start_time,
+                    end_time=end_time,
                     text=chunk[:4000],  # Limit text size for database
                     content_hash=content_hash,
                     model_name="text-embedding-3-small",
@@ -383,16 +427,19 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 session.add(segment)
                 await session.flush()
                 
-                # Store embedding as binary using raw SQL
+                # Store embedding as VECTOR - use literal SQL to avoid type conversion issues
+                # SQL Server 2025 VECTOR accepts JSON array format directly
                 await session.execute(
-                    sa.text("UPDATE Segments SET Embedding = :embedding WHERE segment_id = :segment_id"),
-                    {"embedding": embedding_bytes, "segment_id": segment.segment_id}
+                    sa.text(f"UPDATE Segments SET Embedding = CAST('{embedding_json}' AS VECTOR(1536)) WHERE segment_id = :segment_id"),
+                    {"segment_id": segment.segment_id}
                 )
 
             logger.info(
                 "Embeddings stored",
                 video_id=video_id,
+                youtube_video_id=youtube_video_id,
                 chunk_count=len(chunks),
+                has_timestamps=has_timestamps,
             )
 
     async def _queue_next_job(

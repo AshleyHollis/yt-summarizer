@@ -348,23 +348,38 @@ class BatchService:
             }
 
         except Exception as e:
+            error_str = str(e).lower()
+            
+            # Check for specific error patterns that indicate video doesn't exist
+            video_not_found_patterns = [
+                "video unavailable",
+                "private video",
+                "video is unavailable",
+                "this video has been removed",
+                "this video is no longer available",
+                "this video is private",
+                "sign in to confirm your age",
+                "video is not available",
+                "unable to extract",
+                "is not a valid url",
+                "no video formats found",
+            ]
+            
+            if any(pattern in error_str for pattern in video_not_found_patterns):
+                logger.warning(
+                    "Video not found on YouTube",
+                    youtube_video_id=youtube_video_id,
+                    error=str(e),
+                )
+                raise ValueError(f"Video not found or unavailable on YouTube: {youtube_video_id}")
+            
+            # For other errors, also raise to prevent creating bad data
             logger.warning(
-                "Failed to fetch video metadata, using fallback",
+                "Failed to fetch video metadata",
                 youtube_video_id=youtube_video_id,
                 error=str(e),
             )
-            return {
-                "title": f"Video {youtube_video_id}",
-                "description": None,
-                "duration": 0,
-                "publish_date": datetime.utcnow(),
-                "thumbnail_url": f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg",
-                "channel": {
-                    "youtube_channel_id": "UC_unknown",
-                    "name": "Unknown Channel",
-                    "thumbnail_url": None,
-                },
-            }
+            raise ValueError(f"Failed to verify video exists: {youtube_video_id} - {str(e)}")
 
     async def get_batches(
         self,

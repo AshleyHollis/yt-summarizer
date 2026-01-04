@@ -72,7 +72,7 @@ def app(mock_session):
     from fastapi.middleware.cors import CORSMiddleware
     
     from api.middleware import CorrelationIdMiddleware
-    from api.routes import batches, channels, copilot, health, jobs, library, videos
+    from api.routes import batches, channels, copilot, health, jobs, library, threads, videos
     from shared.db.connection import get_session
     
     @asynccontextmanager
@@ -110,6 +110,7 @@ def app(mock_session):
     application.include_router(channels.router)
     application.include_router(batches.router)
     application.include_router(copilot.router)
+    application.include_router(threads.router)
     
     # Override the database session dependency
     async def mock_get_session():

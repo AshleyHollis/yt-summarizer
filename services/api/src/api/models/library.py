@@ -49,6 +49,7 @@ class VideoCard(BaseResponse):
     title: str = Field(description="Video title")
     channel_id: UUID = Field(description="Channel ID")
     channel_name: str = Field(description="Channel name")
+    channel_thumbnail_url: str | None = Field(default=None, description="Channel avatar URL")
     duration: int = Field(description="Duration in seconds")
     publish_date: datetime = Field(description="Video publish date")
     thumbnail_url: str | None = Field(default=None, description="Video thumbnail URL")

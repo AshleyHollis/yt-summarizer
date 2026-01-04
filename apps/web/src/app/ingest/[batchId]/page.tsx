@@ -31,13 +31,14 @@ export default function BatchPage({ params }: BatchPageProps) {
   };
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-4">
           <Link
             href="/ingest"
-            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
           >
             ← Back to Ingest
           </Link>
@@ -63,7 +64,7 @@ export default function BatchPage({ params }: BatchPageProps) {
       <div className="mt-8 flex flex-wrap gap-4">
         <Link
           href="/ingest"
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
         >
           Ingest More Videos
         </Link>
@@ -81,6 +82,7 @@ export default function BatchPage({ params }: BatchPageProps) {
         >
           View Library
         </Link>
+      </div>
       </div>
     </main>
   );

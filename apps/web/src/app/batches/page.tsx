@@ -69,22 +69,30 @@ export default function BatchesPage() {
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="min-h-[calc(100vh-4rem)] bg-gray-100 dark:bg-[#0f0f0f]">
+      <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Batch Imports
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            View and manage your batch video imports.
-          </p>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-sm shadow-red-500/20">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              Jobs
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              View and manage batch imports
+            </p>
+          </div>
         </div>
         <Link
-          href="/ingest"
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-center"
+          href="/add"
+          className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors font-medium"
         >
-          New Batch Import
+          New Import
         </Link>
       </div>
 
@@ -92,7 +100,7 @@ export default function BatchesPage() {
       {isLoading && (
         <div className="flex items-center justify-center py-12">
           <svg
-            className="animate-spin h-8 w-8 text-blue-600"
+            className="animate-spin h-8 w-8 text-red-600"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -123,13 +131,21 @@ export default function BatchesPage() {
 
       {/* Empty state */}
       {!isLoading && !error && batches.length === 0 && (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl">
+        <div className="text-center py-12 bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700/50 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            No batches found. Start your first batch import!
+            No batch imports yet
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+            Start by importing a channel to begin processing videos
           </p>
           <Link
-            href="/ingest"
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-block"
+            href="/add"
+            className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors inline-block font-medium"
           >
             Import from Channel
           </Link>
@@ -138,7 +154,7 @@ export default function BatchesPage() {
 
       {/* Batches table */}
       {!isLoading && !error && batches.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow overflow-hidden">
+        <div className="bg-white dark:bg-gray-800/50 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700/50 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -173,7 +189,7 @@ export default function BatchesPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Link
                         href={`/ingest/${batch.id}`}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium"
                       >
                         {batch.name || 'Unnamed Batch'}
                       </Link>
@@ -209,7 +225,7 @@ export default function BatchesPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                       <Link
                         href={`/ingest/${batch.id}`}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                       >
                         View Details
                       </Link>
@@ -222,7 +238,7 @@ export default function BatchesPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-200 dark:border-gray-700/50 flex items-center justify-between">
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Showing {(page - 1) * pageSize + 1} to{' '}
                 {Math.min(page * pageSize, totalCount)} of {totalCount} batches
@@ -247,6 +263,7 @@ export default function BatchesPage() {
           )}
         </div>
       )}
+      </div>
     </main>
   );
 }

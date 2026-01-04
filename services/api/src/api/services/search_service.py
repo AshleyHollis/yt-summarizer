@@ -1,7 +1,7 @@
 """Search service for vector and text search operations.
 
-Implements semantic search over segment embeddings using pgvector/SQL Server VECTOR
-and text search over video metadata.
+Implements semantic search over segment embeddings using SQL Server 2025's
+native VECTOR_DISTANCE function for cosine similarity.
 """
 
 from datetime import datetime
@@ -182,8 +182,10 @@ class SearchService:
         
         # Execute vector search query
         # Note: This uses SQL Server VECTOR_DISTANCE function
+        # We embed the limit directly to avoid SQL parameter issues with VECTOR functions
+        limit = int(request.limit)  # Ensure it's an integer
         sql = text(f"""
-            SELECT TOP :limit
+            SELECT TOP {limit}
                 s.segment_id,
                 s.video_id,
                 v.title as video_title,
@@ -201,7 +203,7 @@ class SearchService:
         """)
         
         try:
-            result = await self.session.execute(sql, {"limit": request.limit})
+            result = await self.session.execute(sql)
             rows = result.fetchall()
         except Exception as e:
             logger.warning(f"Vector search failed: {e}. Falling back to text search.")
@@ -253,6 +255,9 @@ class SearchService:
     ) -> SegmentSearchResponse:
         """Internal fallback text search when vector search is not available.
         
+        Extracts keywords from the query and searches for segments containing
+        any of them.
+        
         Args:
             request: The search request.
             
@@ -261,11 +266,47 @@ class SearchService:
         """
         video_ids = await self._get_video_ids_for_scope(request.scope)
         
+        # Extract keywords (remove stop words, keep meaningful terms)
+        stop_words = {
+            'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+            'should', 'may', 'might', 'must', 'can', 'to', 'of', 'in', 'for',
+            'on', 'with', 'at', 'by', 'from', 'up', 'about', 'into', 'through',
+            'during', 'before', 'after', 'above', 'below', 'between', 'under',
+            'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where',
+            'why', 'how', 'all', 'each', 'few', 'more', 'most', 'other', 'some',
+            'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than',
+            'too', 'very', 'just', 'i', 'me', 'my', 'myself', 'we', 'our',
+            'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those',
+            'am', 'if', 'or', 'and', 'but', 'as', 'because', 'until', 'while',
+        }
+        
+        # Split query into words and filter
+        words = [
+            word.lower().strip('?.,!;:')
+            for word in request.query_text.split()
+            if word.lower().strip('?.,!;:') not in stop_words
+            and len(word) > 2
+        ]
+        
+        if not words:
+            # No meaningful keywords, return empty
+            return SegmentSearchResponse(
+                segments=[],
+                scope_echo=request.scope,
+            )
+        
+        # Build OR conditions for each keyword
+        keyword_conditions = [
+            Segment.text.ilike(f"%{word}%")
+            for word in words[:5]  # Limit to first 5 keywords
+        ]
+        
         query = (
             select(Segment, Video, Channel)
             .join(Video, Segment.video_id == Video.video_id)
             .join(Channel, Video.channel_id == Channel.channel_id)
-            .where(Segment.text.ilike(f"%{request.query_text}%"))
+            .where(or_(*keyword_conditions))
         )
         
         if video_ids is not None:
@@ -519,7 +560,16 @@ class SearchService:
         rows = result.fetchall()
         
         neighbors = []
+        # Valid relationship types from RelationshipType enum
+        valid_types = {"series", "progression", "same_topic", "references", "related"}
+        
         for rel, video, channel in rows:
+            # Map invalid relationship types to valid ones
+            rel_type = rel.relationship_type
+            if rel_type not in valid_types:
+                # Fallback for legacy/invalid types like "semantic_similarity"
+                rel_type = "same_topic"
+            
             recommended = RecommendedVideo(
                 video_id=video.video_id,
                 youtube_video_id=video.youtube_video_id,
@@ -528,12 +578,12 @@ class SearchService:
                 thumbnail_url=video.thumbnail_url,
                 duration=video.duration,
                 relevance_score=rel.confidence or 0.5,
-                primary_reason=rel.rationale or f"Related via {rel.relationship_type}",
+                primary_reason=rel.rationale or f"Related via {rel_type}",
             )
             
             neighbors.append(NeighborVideo(
                 video=recommended,
-                relationship_type=rel.relationship_type,
+                relationship_type=rel_type,
                 confidence=rel.confidence or 0.5,
                 rationale=rel.rationale,
                 evidence_text=None,  # Would require joining to segments

@@ -131,6 +131,119 @@ class TestTranscribeWorkerProcessing:
         assert callable(worker.parse_message)
         assert callable(worker.process_message)
 
+    @pytest.mark.asyncio
+    async def test_transcribe_worker_fails_when_no_transcript_available(
+        self,
+        sample_job_id,
+        sample_video_id,
+        sample_correlation_id,
+    ):
+        """Test that transcribe worker properly fails when video has no transcript.
+        
+        This validates that videos without captions or auto-generated subtitles
+        are marked as failed with a clear error message, preventing them from
+        progressing through the pipeline with empty content.
+        """
+        from shared.worker.base_worker import WorkerStatus
+        from transcribe.worker import TranscribeWorker, TranscribeMessage
+
+        worker = TranscribeWorker()
+        
+        # Create a message for a video without transcripts
+        # Using a known video ID that has no transcripts (CrossFit's "The Push-Up")
+        message = TranscribeMessage(
+            job_id=sample_job_id,
+            video_id=sample_video_id,
+            youtube_video_id="rRcg6m4pIEg",  # CrossFit's "The Push-Up" - no transcripts
+            correlation_id=sample_correlation_id,
+            retry_count=0,
+        )
+        
+        # Mock the job status updates to avoid DB calls
+        with patch("transcribe.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
+             patch("transcribe.worker.mark_job_failed", new_callable=AsyncMock) as mock_failed:
+            
+            # Process the message - should fail due to no transcript
+            result = await worker.process_message(message, sample_correlation_id)
+            
+            # Verify the job was marked as failed
+            assert result.status == WorkerStatus.FAILED
+            assert "No transcript available" in result.message
+            
+            # Verify mark_job_running was called
+            mock_running.assert_called_once_with(sample_job_id, "transcribing")
+            
+            # Verify mark_job_failed was called with appropriate error message
+            mock_failed.assert_called_once()
+            call_args = mock_failed.call_args
+            assert "No transcript available" in call_args[0][1]
+            assert "captions" in call_args[0][1] or "subtitles" in call_args[0][1]
+
+    @pytest.mark.asyncio
+    async def test_transcribe_worker_succeeds_with_valid_transcript(
+        self,
+        sample_job_id,
+        sample_video_id,
+        sample_correlation_id,
+        sample_transcript,
+    ):
+        """Test that transcribe worker succeeds when transcript is available.
+        
+        This validates the happy path where a video has transcripts and
+        the worker extracts them successfully.
+        """
+        from shared.worker.base_worker import WorkerStatus
+        from transcribe.worker import TranscribeWorker, TranscribeMessage
+
+        worker = TranscribeWorker()
+        
+        message = TranscribeMessage(
+            job_id=sample_job_id,
+            video_id=sample_video_id,
+            youtube_video_id="dQw4w9WgXcQ",  # Rick Astley - has transcripts
+            correlation_id=sample_correlation_id,
+            retry_count=0,
+        )
+        
+        # Mock all external dependencies
+        with patch("transcribe.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
+             patch("transcribe.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
+             patch.object(worker, "_fetch_transcript", new_callable=AsyncMock) as mock_fetch, \
+             patch.object(worker, "_fetch_transcript_with_timestamps", new_callable=AsyncMock) as mock_fetch_ts, \
+             patch.object(worker, "_store_transcript", new_callable=AsyncMock) as mock_store, \
+             patch.object(worker, "_store_timestamped_segments", new_callable=AsyncMock) as mock_store_ts, \
+             patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact, \
+             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue:
+            
+            # Configure mocks
+            mock_fetch.return_value = sample_transcript
+            mock_fetch_ts.return_value = [
+                {"start": 0.0, "duration": 5.0, "text": "Hello world"},
+                {"start": 5.0, "duration": 5.0, "text": "This is a test"},
+            ]
+            mock_store.return_value = f"transcripts/{sample_video_id}.txt"
+            mock_store_ts.return_value = f"transcripts/{sample_video_id}_segments.json"
+            
+            # Process the message
+            result = await worker.process_message(message, sample_correlation_id)
+            
+            # Verify success
+            assert result.status == WorkerStatus.SUCCESS
+            
+            # Verify job status updates
+            mock_running.assert_called_once_with(sample_job_id, "transcribing")
+            mock_completed.assert_called_once_with(sample_job_id)
+            
+            # Verify transcript was stored and artifact created
+            mock_store.assert_called_once()
+            mock_artifact.assert_called_once()
+            
+            # Verify timestamped segments were stored
+            mock_store_ts.assert_called_once()
+            
+            # Verify next job was queued
+            mock_queue.assert_called_once()
+
 
 # =============================================================================
 # Summarize Worker Tests
@@ -249,6 +362,94 @@ class TestRelationshipsWorkerMessageParsing:
         assert message.job_id == raw_message["job_id"]
         assert message.video_id == raw_message["video_id"]
         assert message.youtube_video_id == raw_message["youtube_video_id"]
+
+    def test_parse_message_with_batch_id(self):
+        """Test parsing a message with batch_id."""
+        from relationships.worker import RelationshipsWorker
+
+        worker = RelationshipsWorker()
+        
+        raw_message = {
+            "job_id": "123e4567-e89b-12d3-a456-426614174000",
+            "video_id": "123e4567-e89b-12d3-a456-426614174001",
+            "youtube_video_id": "dQw4w9WgXcQ",
+            "correlation_id": "test-correlation-123",
+            "batch_id": "batch-123",
+            "retry_count": 2,
+        }
+        
+        message = worker.parse_message(raw_message)
+        
+        assert message.batch_id == "batch-123"
+        assert message.retry_count == 2
+
+
+class TestRelationshipsWorkerEmbeddingMath:
+    """Tests for relationships worker embedding calculations."""
+
+    def test_average_embeddings_single(self):
+        """Test averaging a single embedding."""
+        from relationships.worker import RelationshipsWorker
+        import numpy as np
+
+        worker = RelationshipsWorker()
+        
+        # Single embedding
+        embeddings = [[1.0, 0.0, 0.0]]
+        result = worker._average_embeddings(embeddings)
+        
+        # Should be normalized unit vector
+        assert len(result) == 3
+        np.testing.assert_almost_equal(np.linalg.norm(result), 1.0)
+        
+    def test_average_embeddings_multiple(self):
+        """Test averaging multiple embeddings."""
+        from relationships.worker import RelationshipsWorker
+        import numpy as np
+
+        worker = RelationshipsWorker()
+        
+        # Two embeddings
+        embeddings = [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ]
+        result = worker._average_embeddings(embeddings)
+        
+        # Result should be normalized
+        assert len(result) == 3
+        np.testing.assert_almost_equal(np.linalg.norm(result), 1.0)
+        # Average of [1,0,0] and [0,1,0] normalized should have equal x and y components
+        np.testing.assert_almost_equal(result[0], result[1])
+        
+    def test_average_embeddings_empty(self):
+        """Test averaging empty embeddings returns empty list."""
+        from relationships.worker import RelationshipsWorker
+
+        worker = RelationshipsWorker()
+        
+        result = worker._average_embeddings([])
+        
+        assert result == []
+
+
+class TestRelationshipsWorkerSimilarityThreshold:
+    """Tests for relationship similarity threshold behavior."""
+
+    def test_similarity_threshold_default(self):
+        """Test default similarity threshold is 0.7."""
+        from relationships.worker import DEFAULT_SIMILARITY_THRESHOLD
+        
+        # The system should use 0.7 as the default similarity threshold
+        # Videos must be at least 70% similar to be considered related
+        assert DEFAULT_SIMILARITY_THRESHOLD == 0.7
+
+    def test_max_related_default(self):
+        """Test default max related videos is 10."""
+        from relationships.worker import DEFAULT_MAX_RELATED
+        
+        # Should not return more than 10 related videos per video
+        assert DEFAULT_MAX_RELATED == 10
 
 
 # =============================================================================

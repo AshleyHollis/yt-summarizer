@@ -108,40 +108,43 @@ export default function IngestPage() {
   };
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="mb-8">
+    <main className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
           Ingest from Channel
         </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
+        <p className="text-gray-700 dark:text-gray-300 mt-2">
           Enter a YouTube channel URL to browse and select videos for batch ingestion.
         </p>
       </div>
 
       {/* Channel URL form */}
-      <ChannelForm
-        onChannelLoaded={handleChannelLoaded}
-        className="mb-8"
-      />
+      <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-5 md:p-6 mb-8">
+        <ChannelForm
+          onChannelLoaded={handleChannelLoaded}
+        />
+      </section>
 
       {/* Channel videos */}
       {channelData && (
-        <div className="space-y-6">
-          {/* Batch name input */}
-          <div>
-            <label
-              htmlFor="batch-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              Batch Name (optional)
-            </label>
-            <input
-              type="text"
-              id="batch-name"
-              value={batchName}
-              onChange={(e) => setBatchName(e.target.value)}
-              placeholder="My Batch Import"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+        <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-5 md:p-6">
+          <div className="space-y-6">
+            {/* Batch name input */}
+            <div>
+              <label
+                htmlFor="batch-name"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Batch Name (optional)
+              </label>
+              <input
+                type="text"
+                id="batch-name"
+                value={batchName}
+                onChange={(e) => setBatchName(e.target.value)}
+                placeholder="My Batch Import"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 hover:border-red-400 dark:bg-[#1a1a1a] dark:border-gray-600 dark:text-white"
             />
           </div>
 
@@ -164,7 +167,7 @@ export default function IngestPage() {
             <button
               onClick={handleStartIngestion}
               disabled={selectedVideoIds.length === 0 || isSubmitting}
-              className="flex-1 py-3 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
@@ -203,8 +206,10 @@ export default function IngestPage() {
               Ingest All Channel Videos
             </button>
           </div>
-        </div>
+          </div>
+        </section>
       )}
+      </div>
     </main>
   );
 }
