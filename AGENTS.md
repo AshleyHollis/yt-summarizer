@@ -59,3 +59,29 @@ IMPORTANT! Always prefer official documentation when available. The following si
 1. https://aspire.dev
 2. https://learn.microsoft.com/dotnet/aspire
 3. https://nuget.org (for specific integration package details)
+
+## Test Gate Enforcement (Spec Kit Integration)
+
+**CRITICAL: Before marking ANY task as [X] complete, you MUST run the test gate script:**
+
+```powershell
+.\.specify\scripts\powershell\run-test-gate.ps1
+```
+
+This script runs ALL test suites (API, Workers, Shared, Frontend, E2E) and outputs a PASS/FAIL gate result.
+
+### Rules:
+1. **NEVER mark a task [X] if the test gate returns FAIL**
+2. **NEVER rationalize skipping E2E tests** - they catch integration issues that unit tests miss
+3. **If Aspire isn't running, the script will start it automatically**
+4. **Unit tests alone are NOT sufficient** - E2E tests are required for completion verification
+
+### What the test gate checks:
+- API tests (pytest, 437+ tests)
+- Worker tests (pytest, 98+ tests)
+- Shared package tests (pytest)
+- Frontend tests (Vitest, 229+ tests)
+- E2E tests (Playwright, 82+ tests) - **This is the integration layer that catches real bugs**
+
+### Why this matters:
+Unit tests verify individual components work in isolation. E2E tests verify the **actual user experience** with real services running. A feature is NOT complete until both pass.

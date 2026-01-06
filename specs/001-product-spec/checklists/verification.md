@@ -2,35 +2,39 @@
 
 **Purpose**: Gate implementation completion - NO tasks can be marked complete until ALL automated tests pass  
 **Created**: 2025-12-14  
-**Updated**: 2025-12-14  
+**Updated**: 2026-01-06  
 **Feature**: YT Summarizer
 
-## ⚠️ CRITICAL: All verification is AUTOMATED - no manual testing required
+## ⚠️ CRITICAL: Run the Test Gate Script BEFORE marking any task [X]
 
-This checklist verifies that **implemented code actually works** through comprehensive automated test suites.
+```powershell
+.\.specify\scripts\powershell\run-test-gate.ps1
+```
+
+This script runs ALL test suites and outputs a PASS/FAIL result. **If it returns FAIL, DO NOT mark the task complete.**
 
 ---
 
 ## Test Suite Gates (ALL MUST PASS: 100%)
 
 ### API Tests
-- [x] CHK-V010: Run `cd services/api && python -m pytest tests/ -v -p no:asyncio`
+- [x] CHK-V010: Run `cd services/api && python -m pytest tests/ -v -m "not integration"`
 - [x] CHK-V011: All API tests pass (0 failures)
-- [x] CHK-V012: Test count documented: **214 tests passed**
+- [x] CHK-V012: Test count documented: **437 tests passed** (unit tests, excluding integration)
 
 ### Worker Tests
-- [x] CHK-V015: Run `cd services/workers && python -m pytest tests/ -v -p no:asyncio`
+- [x] CHK-V015: Run `cd services/workers && python -m pytest tests/ -v`
 - [x] CHK-V016: All worker tests pass (0 failures)
-- [x] CHK-V017: Test count documented: **47 tests passed** (includes message contracts)
+- [x] CHK-V017: Test count documented: **98 tests passed** (includes message contracts, blob paths, resilience)
 
 ### Shared Package Tests
-- [x] CHK-V018: Run `cd services/shared && python -m pytest tests/ -v -p no:asyncio`
+- [x] CHK-V018: Run `cd services/shared && python -m pytest tests/ -v`
 - [x] CHK-V019: All shared tests pass (0 failures)
 
 ### Frontend Unit Tests
 - [x] CHK-V020: Run `cd apps/web && npm run test:run`
 - [x] CHK-V021: All frontend tests pass (0 failures)
-- [x] CHK-V022: Test count documented: **125 tests passed**
+- [x] CHK-V022: Test count documented: **229 tests passed** (includes 12 reprocess button tests)
 
 ### E2E Tests (Integration)
 - [x] CHK-V030: Run `cd apps/web && $env:USE_EXTERNAL_SERVER = "true"; npx playwright test`

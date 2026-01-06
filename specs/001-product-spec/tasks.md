@@ -382,7 +382,7 @@
 ### Re-Ingest API
 
 - [X] T179 [US1] Add POST /api/v1/videos/{videoId}/reprocess endpoint to re-queue failed videos (already exists)
-- [ ] T180 [US1] Add "Reprocess" button to video detail page for videos with failed/empty transcripts
+- [X] T180 [US1] Add "Reprocess" button to video detail page for videos with failed/empty transcripts
 
 **Checkpoint**: Workers gracefully handle YouTube rate limits and transient failures ✅
 

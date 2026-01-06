@@ -281,6 +281,39 @@ yt-dlp --list-subs "https://www.youtube.com/watch?v=VIDEO_ID"
 
 ## Running Tests
 
+### ⚠️ Test Gate Script (REQUIRED before marking tasks complete)
+
+**Before marking ANY implementation task as complete, run the test gate:**
+
+```powershell
+.\.specify\scripts\powershell\run-test-gate.ps1
+```
+
+This script:
+- Runs ALL test suites (API, Workers, Shared, Frontend, E2E)
+- Outputs a clear PASS/FAIL result
+- Writes failure details to `test-gate-failures.log` for debugging
+- Auto-starts Aspire if needed for E2E tests
+
+**Rules:**
+1. **NEVER mark a task [X] if the test gate returns FAIL**
+2. **NEVER rationalize skipping E2E tests** - they catch integration issues
+3. Review `test-gate-failures.log` to diagnose and fix failures
+
+**Options:**
+```powershell
+# Full gate (required for task completion)
+.\.specify\scripts\powershell\run-test-gate.ps1
+
+# Skip E2E (faster, but incomplete - use only during development)
+.\.specify\scripts\powershell\run-test-gate.ps1 -SkipE2E
+
+# JSON output for CI integration
+.\.specify\scripts\powershell\run-test-gate.ps1 -Json
+```
+
+---
+
 ### Quick Reference
 
 ```powershell
@@ -321,6 +354,7 @@ npx playwright test --headed
 
 | Script | Purpose |
 |--------|---------|
+| `.specify/scripts/powershell/run-test-gate.ps1` | **Pre-completion verification gate** |
 | `scripts/run-tests.ps1` | Master test runner with flags |
 | `scripts/smoke-test.ps1` | Quick deployment verification |
 | `scripts/clean-dev.ps1` | Reset development environment |

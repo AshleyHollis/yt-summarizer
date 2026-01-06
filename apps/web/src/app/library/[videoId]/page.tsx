@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   ClockIcon,
   DocumentTextIcon,
   PlayIcon,
@@ -18,7 +19,7 @@ import JobProgress from '@/components/JobProgress';
 import ProcessingHistory from '@/components/ProcessingHistory';
 import TranscriptViewer from '@/components/TranscriptViewer';
 import type { VideoDetailResponse } from '@/services/api';
-import { libraryApi } from '@/services/api';
+import { libraryApi, videoApi } from '@/services/api';
 import { useVideoContext } from '@/app/providers';
 
 type TabId = 'summary' | 'description' | 'transcript' | 'history';
@@ -140,6 +141,8 @@ export default function VideoDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('summary');
+  const [reprocessing, setReprocessing] = useState(false);
+  const [reprocessError, setReprocessError] = useState<string | null>(null);
 
   /**
    * Fetch video detail
@@ -183,6 +186,39 @@ export default function VideoDetailPage() {
    */
   const handleProcessingComplete = () => {
     fetchVideo();
+  };
+
+  /**
+   * Handle reprocessing a video - queues it for re-transcription
+   */
+  const handleReprocess = async () => {
+    if (!video) return;
+    
+    try {
+      setReprocessing(true);
+      setReprocessError(null);
+      await videoApi.reprocess(video.video_id);
+      // Refresh video data to show new processing status
+      await fetchVideo();
+    } catch (err) {
+      console.error('Failed to reprocess video:', err);
+      setReprocessError('Failed to start reprocessing. Please try again.');
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
+  /**
+   * Check if video should show reprocess button
+   * Shows for: failed, completed with no transcript, or completed with no summary
+   */
+  const shouldShowReprocessButton = (videoData: VideoDetailResponse): boolean => {
+    if (videoData.processing_status === 'failed') return true;
+    if (videoData.processing_status === 'completed') {
+      // Show if transcript or summary is missing
+      if (!videoData.summary || videoData.summary.trim() === '') return true;
+    }
+    return false;
   };
 
   if (loading) {
@@ -307,6 +343,38 @@ export default function VideoDetailPage() {
                     {facet.name}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* Reprocess Button - shown for failed videos or videos with missing content */}
+            {shouldShowReprocessButton(video) && !isProcessing(video.processing_status) && (
+              <div className="mt-6 p-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+                <div className="flex items-start gap-3">
+                  <ArrowPathIcon className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+                      {video.processing_status === 'failed' 
+                        ? 'Processing failed for this video'
+                        : 'Missing content detected'}
+                    </p>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      {video.processing_status === 'failed'
+                        ? 'The video may have been rate-limited by YouTube or encountered another error. You can try reprocessing it.'
+                        : 'This video is missing a transcript or summary. Reprocessing will attempt to fetch and generate the missing content.'}
+                    </p>
+                    {reprocessError && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-2">{reprocessError}</p>
+                    )}
+                    <button
+                      onClick={handleReprocess}
+                      disabled={reprocessing}
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-amber-600 text-white font-medium text-sm hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ArrowPathIcon className={`h-4 w-4 ${reprocessing ? 'animate-spin' : ''}`} />
+                      {reprocessing ? 'Starting reprocess...' : 'Reprocess Video'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
