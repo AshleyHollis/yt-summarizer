@@ -825,6 +825,73 @@ Respond in JSON:
             formatted.append(f"- {title}: {summary[:500]}")
         
         return "\n".join(formatted)
+    
+    async def generate_structured_output(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> dict[str, Any]:
+        """Generate a structured JSON output from the LLM.
+        
+        Used for synthesis operations like learning paths and watch lists.
+        
+        Args:
+            system_prompt: The system prompt with instructions.
+            user_prompt: The user's request.
+            
+        Returns:
+            Parsed JSON response from LLM.
+        """
+        try:
+            # Build completion kwargs based on model type
+            model = self.settings.openai.effective_model.lower()
+            completion_kwargs = {
+                "model": self.settings.openai.effective_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            }
+            
+            # Use max_completion_tokens for newer models, max_tokens for older ones
+            if any(m in model for m in ["gpt-5", "o1", "o3", "deepseek"]):
+                completion_kwargs["max_completion_tokens"] = self.settings.openai.max_tokens
+                # DeepSeek supports temperature
+                if "deepseek" in model:
+                    completion_kwargs["temperature"] = self.settings.openai.temperature
+            else:
+                completion_kwargs["max_tokens"] = self.settings.openai.max_tokens
+                completion_kwargs["temperature"] = self.settings.openai.temperature
+            
+            response = await retry_with_backoff(
+                self.client.chat.completions.create,
+                **completion_kwargs
+            )
+            
+            content = response.choices[0].message.content.strip()
+            
+            # Handle markdown code blocks
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+                content = content.strip()
+            
+            result = json.loads(content)
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse LLM structured output as JSON: {e}")
+            # Return a minimal valid structure
+            return {
+                "title": "Generated Output",
+                "description": "Unable to parse LLM response",
+                "items": [],
+                "gaps": [],
+            }
+        except Exception as e:
+            logger.error(f"Failed to generate structured output: {e}")
+            raise
 
 
 # Singleton instance

@@ -30,6 +30,7 @@ class WorkerStatus(str, Enum):
     FAILED = "failed"
     RETRY = "retry"
     DEAD_LETTER = "dead_letter"
+    RATE_LIMITED = "rate_limited"  # Infinite retry with long delays
 
 
 @dataclass
@@ -60,6 +61,20 @@ class WorkerResult:
     def dead_letter(cls, message: str | None = None) -> "WorkerResult":
         """Create a dead letter result."""
         return cls(status=WorkerStatus.DEAD_LETTER, message=message)
+    
+    @classmethod
+    def rate_limited(cls, message: str | None = None, retry_delay: int = 300) -> "WorkerResult":
+        """Create a rate limited result (infinite retry with long delay).
+        
+        Args:
+            message: Error message to display.
+            retry_delay: Seconds before retry (default 5 minutes).
+        """
+        return cls(
+            status=WorkerStatus.RATE_LIMITED, 
+            message=message,
+            data={"retry_delay": retry_delay}
+        )
 
 
 class BaseWorker(ABC, Generic[T]):
@@ -82,6 +97,8 @@ class BaseWorker(ABC, Generic[T]):
         batch_size: int = 1,
         visibility_timeout: int | None = None,
         max_retries: int | None = None,
+        min_request_delay: float = 0.0,
+        request_delay_jitter: float = 0.0,
     ):
         """Initialize the worker.
         
@@ -90,12 +107,16 @@ class BaseWorker(ABC, Generic[T]):
             batch_size: Number of messages to fetch per poll (1-32).
             visibility_timeout: Seconds to hide message while processing.
             max_retries: Maximum retry attempts before dead lettering.
+            min_request_delay: Minimum seconds to wait after each request (rate limiting).
+            request_delay_jitter: Random additional delay (0 to this value) to avoid patterns.
         """
         self.poll_interval = poll_interval
         self.batch_size = min(max(batch_size, 1), 32)
         self._settings = get_settings()
         self.visibility_timeout = visibility_timeout or self._settings.queue.visibility_timeout
         self.max_retries = max_retries or self._settings.queue.max_retries
+        self.min_request_delay = min_request_delay
+        self.request_delay_jitter = request_delay_jitter
         self._running = False
         self._queue_client: QueueClient | None = None
         self._logger = get_logger(self.__class__.__name__)
@@ -242,6 +263,25 @@ class BaseWorker(ABC, Generic[T]):
             elif result.status == WorkerStatus.DEAD_LETTER:
                 self.queue_client.delete_message(self.queue_name, queue_message)
                 await self.on_dead_letter(message, result)
+            
+            elif result.status == WorkerStatus.RATE_LIMITED:
+                # Infinite retry with long delays - don't increment retry_count for rate limits
+                retry_delay = result.data.get("retry_delay", 300) if result.data else 300
+                # Cap at 1 hour between retries
+                retry_delay = min(retry_delay, 3600)
+                self._logger.warning(
+                    "Rate limited, will retry",
+                    retry_delay_seconds=retry_delay,
+                    message=result.message,
+                )
+                # Requeue with same retry_count (doesn't count toward max_retries)
+                self.queue_client.send_message(
+                    self.queue_name,
+                    raw_message,
+                    visibility_timeout=retry_delay,
+                )
+                self.queue_client.delete_message(self.queue_name, queue_message)
+                await self.on_failure(message, result, retry_count)
                 
         finally:
             set_correlation_id(None)
@@ -253,6 +293,8 @@ class BaseWorker(ABC, Generic[T]):
         Returns:
             Number of messages processed.
         """
+        import random
+        
         messages = self.queue_client.receive_messages(
             self.queue_name,
             max_messages=self.batch_size,
@@ -261,6 +303,14 @@ class BaseWorker(ABC, Generic[T]):
         
         for queue_message, raw_message in messages:
             await self._process_single_message(queue_message, raw_message)
+            
+            # Rate limiting: delay after each request to avoid hitting external API limits
+            if self.min_request_delay > 0:
+                delay = self.min_request_delay
+                if self.request_delay_jitter > 0:
+                    delay += random.uniform(0, self.request_delay_jitter)
+                self._logger.debug("Rate limit delay", delay_seconds=delay)
+                await asyncio.sleep(delay)
         
         return len(messages)
     

@@ -194,6 +194,16 @@ User asks the copilot to create a structured output (e.g., a learning path, a pr
 
 3. **Given** a synthesized output, **When** content is insufficient, **Then** the copilot states what's missing and suggests ingesting more (via UI, not chat).
 
+4. **Given** a curated video series with a known correct pedagogical order (e.g., "Lecture 1", "Lecture 2", etc.), **When** user asks for a "learning path", **Then** the returned order matches the human-verified correct sequence (beginner → intermediate → advanced).
+
+5. **Given** videos with explicit difficulty indicators in their content (e.g., "for beginners", "advanced technique"), **When** building a learning path, **Then** beginner content appears before advanced content.
+
+**Testing Constraints for Ordering Verification**:
+- Tests MUST use videos from curated sources (e.g., GitHub repos like `karpathy/nn-zero-to-hero`) with known human-verified correct order
+- Videos shorter than 60 seconds (shorts) MUST be excluded as they lack captions and are insufficient for LLM analysis
+- All test videos MUST have YouTube auto-captions to avoid expensive Whisper transcription
+- Tests should verify that the LLM returns the same ordering that humans determined is correct
+
 ---
 
 ### Edge Cases
@@ -201,7 +211,7 @@ User asks the copilot to create a structured output (e.g., a learning path, a pr
 - **Duplicate URL submission**: System detects already-ingested videos and offers skip or reprocess options.
 - **Video unavailable**: If YouTube returns 404 or private, system marks job as failed with clear message.
 - **Partial transcript**: If transcription is incomplete, system marks it and shows what's available.
-- **Serverless DB cold start**: API retries with timeout; UI shows "Warming up..." instead of error.
+- **Serverless DB cold start**: API retries with timeout; UI polls health endpoint (which includes uptime) and shows "Warming up..." indicator instead of crashing. UI retries failed requests with backoff while status is "degraded".
 - **Empty query scope**: If user narrows scope to zero videos, system explains and suggests broadening.
 - **Very long video**: System handles gracefully (may take longer); shows progress.
 - **Rate limiting**: If YouTube or AI provider rate-limits, system queues retries with backoff.
@@ -251,8 +261,13 @@ User asks the copilot to create a structured output (e.g., a learning path, a pr
 #### Error Handling & Resilience
 
 - **FR-020**: System MUST handle Azure SQL serverless wake-up latency with retries and user-friendly "Warming up" messaging.
+- **FR-020a**: The health endpoint MUST include uptime (seconds since API started) so the UI can determine if the service recently restarted and may need time for dependencies to warm up.
+- **FR-020b**: The UI MUST poll the health endpoint on startup and display a "Warming up" indicator when the API reports database unavailable or degraded status.
+- **FR-020c**: The UI MUST retry failed API calls automatically when the health status is "degraded" (database waking up), with exponential backoff.
 - **FR-021**: System MUST implement retry with exponential backoff for transient failures.
 - **FR-022**: System MUST dead-letter failed jobs after max retries with diagnostic context.
+- **FR-026**: System MUST validate fetched content before storing (e.g., detect when YouTube returns HTML error pages instead of valid VTT/SRT transcripts).
+- **FR-027**: System MUST detect and retry on rate-limit responses from YouTube (including HTML error pages with "automated queries" messages).
 
 #### Observability
 
@@ -367,8 +382,11 @@ Every answer MUST include:
 ### Retry & Dead-Letter
 
 - Transient failures MUST retry with exponential backoff.
+- Rate-limit errors from external services (YouTube, OpenAI) MUST trigger automatic retry with appropriate delay.
+- Content validation failures (e.g., HTML error page instead of transcript) MUST be treated as transient and retried.
 - After max retries, job MUST be dead-lettered with diagnostic context.
 - Dead-lettered jobs MUST be visible in UI with error details.
+- Videos with failed processing MUST support manual re-ingestion from the UI.
 
 ### Job Status Exposure
 

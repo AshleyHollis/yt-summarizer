@@ -173,13 +173,19 @@ class VideoService:
                 )
             raise  # Re-raise if we still can't find it
 
-        # Create initial transcribe job
+        # Calculate estimated queue wait before creating the job
+        from .stats_service import StatsService
+        stats_service = StatsService(self.session)
+        estimated_wait = await stats_service.estimate_queue_wait()
+
+        # Create initial transcribe job with estimated wait
         job = Job(
             video_id=video.video_id,
             job_type=JobType.TRANSCRIBE.value,
             stage=JobStage.QUEUED.value,
             status=JobStatus.PENDING.value,
             correlation_id=correlation_id,
+            estimated_wait_seconds=estimated_wait,
         )
         self.session.add(job)
         await self.session.flush()  # Get job_id
@@ -193,6 +199,7 @@ class VideoService:
                     "job_id": str(job.job_id),
                     "video_id": str(video.video_id),
                     "youtube_video_id": youtube_video_id,
+                    "channel_name": channel.name,
                     "correlation_id": correlation_id,
                 },
             )
@@ -200,6 +207,7 @@ class VideoService:
                 "Queued transcribe job",
                 job_id=str(job.job_id),
                 video_id=str(video.video_id),
+                channel_name=channel.name,
             )
         except Exception as e:
             logger.warning(
@@ -310,12 +318,17 @@ class VideoService:
             ValueError: If video not found.
         """
         result = await self.session.execute(
-            select(Video).where(Video.video_id == video_id)
+            select(Video)
+            .options(selectinload(Video.channel))
+            .where(Video.video_id == video_id)
         )
         video = result.scalar_one_or_none()
 
         if not video:
             raise ValueError("Video not found")
+
+        # Get channel name for blob storage path
+        channel_name = video.channel.name if video.channel else "unknown-channel"
 
         # Determine which stage to start from
         start_stage = JobType.TRANSCRIBE
@@ -351,6 +364,7 @@ class VideoService:
                     "job_id": str(job.job_id),
                     "video_id": str(video.video_id),
                     "youtube_video_id": video.youtube_video_id,
+                    "channel_name": channel_name,
                     "correlation_id": correlation_id,
                 },
             )

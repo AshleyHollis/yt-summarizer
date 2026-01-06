@@ -208,19 +208,20 @@ class TestTranscribeWorkerProcessing:
         # Mock all external dependencies
         with patch("transcribe.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
              patch("transcribe.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
-             patch.object(worker, "_fetch_transcript", new_callable=AsyncMock) as mock_fetch, \
-             patch.object(worker, "_fetch_transcript_with_timestamps", new_callable=AsyncMock) as mock_fetch_ts, \
+             patch.object(worker, "_fetch_transcript_with_timestamps_and_text", new_callable=AsyncMock) as mock_fetch, \
              patch.object(worker, "_store_transcript", new_callable=AsyncMock) as mock_store, \
              patch.object(worker, "_store_timestamped_segments", new_callable=AsyncMock) as mock_store_ts, \
              patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact, \
              patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue:
             
-            # Configure mocks
-            mock_fetch.return_value = sample_transcript
-            mock_fetch_ts.return_value = [
-                {"start": 0.0, "duration": 5.0, "text": "Hello world"},
-                {"start": 5.0, "duration": 5.0, "text": "This is a test"},
-            ]
+            # Configure mocks - method returns (transcript, segments) tuple
+            mock_fetch.return_value = (
+                sample_transcript,
+                [
+                    {"start": 0.0, "duration": 5.0, "text": "Hello world"},
+                    {"start": 5.0, "duration": 5.0, "text": "This is a test"},
+                ]
+            )
             mock_store.return_value = f"transcripts/{sample_video_id}.txt"
             mock_store_ts.return_value = f"transcripts/{sample_video_id}_segments.json"
             
@@ -272,6 +273,66 @@ class TestSummarizeWorkerMessageParsing:
         assert message.job_id == raw_message["job_id"]
         assert message.video_id == raw_message["video_id"]
         assert message.youtube_video_id == raw_message["youtube_video_id"]
+
+
+class TestSummarizeWorkerProcessing:
+    """Tests for summarize worker processing logic."""
+
+    def test_summarize_worker_has_required_methods(self):
+        """Test that summarize worker has all required methods."""
+        from summarize.worker import SummarizeWorker
+
+        worker = SummarizeWorker()
+        
+        assert hasattr(worker, "queue_name")
+        assert hasattr(worker, "parse_message")
+        assert hasattr(worker, "process_message")
+        assert callable(worker.parse_message)
+        assert callable(worker.process_message)
+
+    @pytest.mark.asyncio
+    async def test_summarize_worker_succeeds_with_valid_transcript(
+        self,
+        sample_job_id,
+        sample_video_id,
+        sample_correlation_id,
+        sample_transcript,
+        sample_summary,
+    ):
+        """Test that summarize worker succeeds when transcript exists."""
+        from shared.worker.base_worker import WorkerStatus
+        from summarize.worker import SummarizeWorker, SummarizeMessage
+
+        worker = SummarizeWorker()
+        
+        message = SummarizeMessage(
+            job_id=sample_job_id,
+            video_id=sample_video_id,
+            youtube_video_id="dQw4w9WgXcQ",
+            channel_name="Test Channel",
+            correlation_id=sample_correlation_id,
+            retry_count=0,
+        )
+        
+        # Mock all external dependencies
+        with patch("summarize.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
+             patch("summarize.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
+             patch.object(worker, "_fetch_transcript", new_callable=AsyncMock) as mock_fetch, \
+             patch.object(worker, "_generate_summary", new_callable=AsyncMock) as mock_gen, \
+             patch.object(worker, "_store_summary", new_callable=AsyncMock) as mock_store, \
+             patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact, \
+             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue:
+            
+            mock_fetch.return_value = sample_transcript
+            mock_gen.return_value = (sample_summary, sample_summary)  # Returns tuple (summary, summary_text)
+            mock_store.return_value = f"summaries/{sample_video_id}.md"
+            
+            result = await worker.process_message(message, sample_correlation_id)
+            
+            assert result.status == WorkerStatus.SUCCESS
+            mock_running.assert_called_once_with(sample_job_id, "summarizing")
+            mock_completed.assert_called_once_with(sample_job_id)
+            mock_queue.assert_called_once()
 
 
 # =============================================================================
@@ -334,6 +395,66 @@ class TestEmbedWorkerChunking:
         assert len(chunks) >= 1
         # First chunk should contain the text
         assert short_text in chunks[0]
+
+
+class TestEmbedWorkerProcessing:
+    """Tests for embed worker processing logic."""
+
+    def test_embed_worker_has_required_methods(self):
+        """Test that embed worker has all required methods."""
+        from embed.worker import EmbedWorker
+
+        worker = EmbedWorker()
+        
+        assert hasattr(worker, "queue_name")
+        assert hasattr(worker, "parse_message")
+        assert hasattr(worker, "process_message")
+        assert hasattr(worker, "_chunk_content")
+        assert callable(worker.process_message)
+
+    @pytest.mark.asyncio
+    async def test_embed_worker_succeeds_with_valid_content(
+        self,
+        sample_job_id,
+        sample_video_id,
+        sample_correlation_id,
+        sample_transcript,
+    ):
+        """Test that embed worker succeeds when content exists."""
+        from shared.worker.base_worker import WorkerStatus
+        from embed.worker import EmbedWorker, EmbedMessage
+        import numpy as np
+
+        worker = EmbedWorker()
+        
+        message = EmbedMessage(
+            job_id=sample_job_id,
+            video_id=sample_video_id,
+            youtube_video_id="dQw4w9WgXcQ",
+            channel_name="Test Channel",
+            correlation_id=sample_correlation_id,
+            retry_count=0,
+        )
+        
+        # Mock external dependencies
+        fake_embedding = np.random.rand(1536).tolist()
+        
+        with patch("embed.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
+             patch("embed.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
+             patch.object(worker, "_fetch_content", new_callable=AsyncMock) as mock_fetch, \
+             patch.object(worker, "_generate_embeddings", new_callable=AsyncMock) as mock_gen, \
+             patch.object(worker, "_store_embeddings", new_callable=AsyncMock) as mock_store, \
+             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue:
+            
+            mock_fetch.return_value = sample_transcript
+            mock_gen.return_value = ([fake_embedding], None)  # Returns tuple (embeddings, error)
+            
+            result = await worker.process_message(message, sample_correlation_id)
+            
+            assert result.status == WorkerStatus.SUCCESS
+            mock_running.assert_called_once()
+            mock_completed.assert_called_once()
+            mock_queue.assert_called_once()
 
 
 # =============================================================================
@@ -450,6 +571,64 @@ class TestRelationshipsWorkerSimilarityThreshold:
         
         # Should not return more than 10 related videos per video
         assert DEFAULT_MAX_RELATED == 10
+
+
+class TestRelationshipsWorkerProcessing:
+    """Tests for relationships worker processing logic."""
+
+    def test_relationships_worker_has_required_methods(self):
+        """Test that relationships worker has all required methods."""
+        from relationships.worker import RelationshipsWorker
+
+        worker = RelationshipsWorker()
+        
+        assert hasattr(worker, "queue_name")
+        assert hasattr(worker, "parse_message")
+        assert hasattr(worker, "process_message")
+        assert hasattr(worker, "_average_embeddings")
+        assert callable(worker.process_message)
+
+    @pytest.mark.asyncio
+    async def test_relationships_worker_succeeds_with_valid_embeddings(
+        self,
+        sample_job_id,
+        sample_video_id,
+        sample_correlation_id,
+    ):
+        """Test that relationships worker succeeds when embeddings exist."""
+        from shared.worker.base_worker import WorkerStatus
+        from relationships.worker import RelationshipsWorker, RelationshipsMessage
+        import numpy as np
+
+        worker = RelationshipsWorker()
+        
+        message = RelationshipsMessage(
+            job_id=sample_job_id,
+            video_id=sample_video_id,
+            youtube_video_id="dQw4w9WgXcQ",
+            channel_name="Test Channel",
+            correlation_id=sample_correlation_id,
+            retry_count=0,
+        )
+        
+        # Mock external dependencies
+        fake_embedding = np.random.rand(1536).tolist()
+        
+        with patch("relationships.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
+             patch("relationships.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
+             patch.object(worker, "_get_video_embeddings", new_callable=AsyncMock) as mock_get_embed, \
+             patch.object(worker, "_find_related_videos", new_callable=AsyncMock) as mock_find, \
+             patch.object(worker, "_store_relationships", new_callable=AsyncMock) as mock_store, \
+             patch.object(worker, "_update_video_status", new_callable=AsyncMock) as mock_update:
+            
+            mock_get_embed.return_value = [fake_embedding]  # Returns list of embeddings
+            mock_find.return_value = []  # No similar videos found
+            
+            result = await worker.process_message(message, sample_correlation_id)
+            
+            assert result.status == WorkerStatus.SUCCESS
+            mock_running.assert_called_once()
+            mock_completed.assert_called_once()
 
 
 # =============================================================================

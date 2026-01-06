@@ -16,6 +16,8 @@ from shared.blob.client import (
     TRANSCRIPTS_CONTAINER,
     compute_content_hash,
     get_blob_client,
+    get_summary_blob_path,
+    get_transcript_blob_path,
 )
 from shared.config import get_settings
 from shared.db.connection import get_db
@@ -89,6 +91,7 @@ class SummarizeMessage:
     job_id: str
     video_id: str
     youtube_video_id: str
+    channel_name: str
     correlation_id: str
     batch_id: str | None = None
     retry_count: int = 0
@@ -108,6 +111,7 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
             job_id=raw_message["job_id"],
             video_id=raw_message["video_id"],
             youtube_video_id=raw_message["youtube_video_id"],
+            channel_name=raw_message.get("channel_name", "unknown-channel"),
             correlation_id=raw_message.get("correlation_id", "unknown"),
             batch_id=raw_message.get("batch_id"),
             retry_count=raw_message.get("retry_count", 0),
@@ -137,9 +141,9 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
             # Mark job as running
             await mark_job_running(message.job_id, "summarizing")
 
-            # Fetch transcript
+            # Fetch transcript (using channel-based blob path)
             transcript = await self._fetch_transcript(
-                message.video_id,
+                message.channel_name,
                 message.youtube_video_id,
             )
 
@@ -164,9 +168,9 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
                     error_msg,
                 )
 
-            # Store summary
+            # Store summary (using channel-based blob path)
             blob_uri = await self._store_summary(
-                message.video_id,
+                message.channel_name,
                 message.youtube_video_id,
                 summary,
             )
@@ -202,17 +206,27 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
 
     async def _fetch_transcript(
         self,
-        video_id: str,
+        channel_name: str,
         youtube_video_id: str,
     ) -> str | None:
-        """Fetch transcript from blob storage."""
+        """Fetch transcript from blob storage.
+        
+        Uses channel-based blob path organization:
+        {sanitized_channel_name}/{youtube_video_id}/transcript.txt
+        """
         try:
             blob_client = get_blob_client()
-            blob_name = f"{video_id}/{youtube_video_id}_transcript.txt"
+            blob_name = get_transcript_blob_path(channel_name, youtube_video_id)
             content = blob_client.download_blob(TRANSCRIPTS_CONTAINER, blob_name)
             return content.decode("utf-8")
         except Exception as e:
-            logger.error("Failed to fetch transcript", error=str(e))
+            logger.error(
+                "Failed to fetch transcript",
+                error=str(e),
+                channel_name=channel_name,
+                youtube_video_id=youtube_video_id,
+                blob_name=get_transcript_blob_path(channel_name, youtube_video_id),
+            )
             return None
 
     async def _generate_summary(self, transcript: str) -> tuple[str | None, str | None]:
@@ -357,13 +371,17 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
 
     async def _store_summary(
         self,
-        video_id: str,
+        channel_name: str,
         youtube_video_id: str,
         summary: str,
     ) -> str:
-        """Store summary in blob storage."""
+        """Store summary in blob storage.
+        
+        Uses channel-based blob path organization:
+        {sanitized_channel_name}/{youtube_video_id}/summary.md
+        """
         blob_client = get_blob_client()
-        blob_name = f"{video_id}/{youtube_video_id}_summary.md"
+        blob_name = get_summary_blob_path(channel_name, youtube_video_id)
 
         uri = blob_client.upload_blob(
             SUMMARIES_CONTAINER,
@@ -440,6 +458,7 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
                 "job_id": str(job.job_id),
                 "video_id": message.video_id,
                 "youtube_video_id": message.youtube_video_id,
+                "channel_name": message.channel_name,
                 "correlation_id": correlation_id,
             }
             if message.batch_id:

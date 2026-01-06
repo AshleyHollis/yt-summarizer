@@ -58,6 +58,10 @@ CRITICAL RULES:
 PRIMARY TOOL - USE THIS FIRST:
 - query_library: The PRIMARY tool for ALL user questions. Returns a rich answer with video cards, evidence citations, and follow-up suggestions. The frontend renders this as a complete response - no additional text needed.
 
+SYNTHESIS TOOLS (for structured outputs):
+- synthesize_learning_path: When user asks for a learning path, progression, or ordered sequence of videos. Creates beginner-to-advanced ordered content. Use for: "Create a learning path", "What order should I watch", "Progressive tutorial for", "Beginner to advanced".
+- synthesize_watch_list: When user asks for recommendations or prioritized videos. Creates a prioritized list. Use for: "What should I watch", "Recommend videos", "Best videos on", "Top videos for".
+
 SECONDARY TOOLS (only use when query_library is not appropriate):
 - search_videos: Only for simple video searches by title
 - search_segments: Only for finding specific quotes/timestamps
@@ -70,6 +74,10 @@ TOOL SELECTION - PICK ONE:
 - "Tell me about X" → query_library
 - "How many videos?" → get_library_coverage only
 - "Summarize video Y" → get_video_summary only
+- "Create a learning path for X" → synthesize_learning_path
+- "What order should I watch these?" → synthesize_learning_path
+- "Recommend videos about X" → synthesize_watch_list
+- "Best videos for learning X" → synthesize_watch_list
 - Any other question → query_library
 
 RESPONSE FORMAT:
@@ -329,6 +337,86 @@ if ai_function is not None:
         return result
 
 
+    @ai_function
+    async def synthesize_learning_path(
+        query: Annotated[str, "Description of the learning path to create (e.g., 'beginner to advanced push-ups')"],
+        max_items: Annotated[int, "Maximum number of videos to include (1-20)"] = 10,
+        channel_id: Annotated[str | None, "Optional channel ID to restrict to"] = None,
+    ) -> dict[str, Any]:
+        """Create a learning path from videos in the library.
+        
+        Synthesizes an ordered sequence of videos for progressive learning.
+        The learning path orders videos from beginner to advanced based on content analysis.
+        
+        Returns:
+        - learningPath: Ordered list of videos with rationale, prerequisites, and evidence
+        - insufficientContent: True if not enough videos available
+        - insufficientMessage: Explanation if content is insufficient
+        
+        Use this when users ask for:
+        - "Create a learning path for..."
+        - "What order should I watch..."
+        - "Progressive tutorial for..."
+        - "Beginner to advanced..."
+        """
+        body: dict[str, Any] = {
+            "synthesisType": "learning_path",
+            "query": query,
+            "maxItems": min(max(max_items, 1), 20),
+        }
+        if channel_id:
+            body["scope"] = {"channels": [channel_id]}
+        
+        result = await safe_api_call("POST", "/api/v1/copilot/synthesize", json=body)
+        if "error" not in result:
+            if result.get("insufficientContent"):
+                logger.info(f"synthesize_learning_path: insufficient content for '{query}'")
+            else:
+                item_count = len(result.get("learningPath", {}).get("items", []))
+                logger.info(f"synthesize_learning_path: {item_count} items for '{query}'")
+        return result
+
+
+    @ai_function
+    async def synthesize_watch_list(
+        query: Annotated[str, "Description of what videos to recommend (e.g., 'fitness for beginners')"],
+        max_items: Annotated[int, "Maximum number of videos to include (1-20)"] = 10,
+        channel_id: Annotated[str | None, "Optional channel ID to restrict to"] = None,
+    ) -> dict[str, Any]:
+        """Create a prioritized watch list from videos in the library.
+        
+        Synthesizes a prioritized collection of recommended videos based on user interests.
+        Videos are assigned high/medium/low priority with reasons for inclusion.
+        
+        Returns:
+        - watchList: Prioritized list of videos with reasons, tags, and priority levels
+        - insufficientContent: True if no videos available
+        - insufficientMessage: Explanation if content is insufficient
+        
+        Use this when users ask for:
+        - "What should I watch about..."
+        - "Recommend videos for..."
+        - "Best videos on..."
+        - "Top videos for..."
+        """
+        body: dict[str, Any] = {
+            "synthesisType": "watch_list",
+            "query": query,
+            "maxItems": min(max(max_items, 1), 20),
+        }
+        if channel_id:
+            body["scope"] = {"channels": [channel_id]}
+        
+        result = await safe_api_call("POST", "/api/v1/copilot/synthesize", json=body)
+        if "error" not in result:
+            if result.get("insufficientContent"):
+                logger.info(f"synthesize_watch_list: insufficient content for '{query}'")
+            else:
+                item_count = len(result.get("watchList", {}).get("items", []))
+                logger.info(f"synthesize_watch_list: {item_count} items for '{query}'")
+        return result
+
+
 # =============================================================================
 # OpenAI Client Factory
 # =============================================================================
@@ -448,6 +536,8 @@ def get_agent_tools() -> list:
         get_video_summary,
         get_library_coverage,
         get_topics_for_channel,
+        synthesize_learning_path,  # US6: Structured output tools
+        synthesize_watch_list,     # US6: Structured output tools
     ]
 
 

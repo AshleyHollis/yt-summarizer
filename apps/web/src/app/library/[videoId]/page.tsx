@@ -11,15 +11,17 @@ import {
   PlayIcon,
   SparklesIcon,
   TagIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { MarkdownRenderer, DescriptionRenderer } from '@/components/common';
 import JobProgress from '@/components/JobProgress';
+import ProcessingHistory from '@/components/ProcessingHistory';
 import TranscriptViewer from '@/components/TranscriptViewer';
 import type { VideoDetailResponse } from '@/services/api';
 import { libraryApi } from '@/services/api';
 import { useVideoContext } from '@/app/providers';
 
-type TabId = 'summary' | 'description' | 'transcript';
+type TabId = 'summary' | 'description' | 'transcript' | 'history';
 
 interface Tab {
   id: TabId;
@@ -107,6 +109,11 @@ function getStatusBadge(status: string): { className: string; label: string } {
         className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
         label: 'Pending',
       };
+    case 'rate_limited':
+      return {
+        className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300',
+        label: 'Rate Limited - Retrying...',
+      };
     case 'failed':
       return { className: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300', label: 'Failed' };
     default:
@@ -118,7 +125,7 @@ function getStatusBadge(status: string): { className: string; label: string } {
  * Check if video is still processing
  */
 function isProcessing(status: string): boolean {
-  return ['pending', 'transcribing', 'summarizing', 'embedding', 'building_relationships'].includes(status);
+  return ['pending', 'transcribing', 'summarizing', 'embedding', 'building_relationships', 'rate_limited'].includes(status);
 }
 
 /**
@@ -321,6 +328,7 @@ export default function VideoDetailPage() {
               { id: 'summary' as TabId, label: 'Summary', icon: SparklesIcon },
               { id: 'description' as TabId, label: 'Description', icon: DocumentTextIcon },
               { id: 'transcript' as TabId, label: 'Transcript', icon: DocumentTextIcon },
+              { id: 'history' as TabId, label: 'History', icon: ChartBarIcon },
             ] as Tab[]).map((tab) => (
               <TabButton
                 key={tab.id}
@@ -365,6 +373,11 @@ export default function VideoDetailPage() {
                 transcriptUrl={`/api/v1/videos/${video.video_id}/transcript`}
                 videoTitle={video.title}
               />
+            )}
+
+            {/* History Tab */}
+            {activeTab === 'history' && (
+              <ProcessingHistory videoId={video.video_id} />
             )}
           </div>
         </div>

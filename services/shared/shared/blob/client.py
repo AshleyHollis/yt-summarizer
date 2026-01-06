@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import re
 from io import BytesIO
 from typing import BinaryIO
 from urllib.parse import urlparse
@@ -15,6 +16,102 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 # Default container names
 TRANSCRIPTS_CONTAINER = "transcripts"
 SUMMARIES_CONTAINER = "summaries"
+
+
+def sanitize_channel_name(channel_name: str) -> str:
+    """Sanitize channel name for use as a blob storage folder name.
+    
+    Azure Blob Storage folder names must be valid and URL-safe.
+    This function:
+    - Converts to lowercase for consistency
+    - Replaces spaces with hyphens
+    - Removes or replaces special characters
+    - Limits length to 63 characters (Azure limit for blob prefixes)
+    
+    Args:
+        channel_name: The channel name to sanitize.
+    
+    Returns:
+        A sanitized, URL-safe folder name.
+    """
+    if not channel_name:
+        return "unknown-channel"
+    
+    # Convert to lowercase
+    name = channel_name.lower()
+    
+    # Replace spaces and underscores with hyphens
+    name = re.sub(r"[\s_]+", "-", name)
+    
+    # Remove any characters that aren't alphanumeric or hyphens
+    name = re.sub(r"[^a-z0-9-]", "", name)
+    
+    # Remove consecutive hyphens
+    name = re.sub(r"-+", "-", name)
+    
+    # Remove leading/trailing hyphens
+    name = name.strip("-")
+    
+    # Ensure we have something left
+    if not name:
+        return "unknown-channel"
+    
+    # Limit length (Azure blob prefix limit)
+    if len(name) > 63:
+        name = name[:63].rstrip("-")
+    
+    return name
+
+
+def get_transcript_blob_path(channel_name: str, youtube_video_id: str) -> str:
+    """Get the blob path for a transcript file.
+    
+    Organizes transcripts by channel name for easy navigation in blob storage.
+    Pattern: {sanitized_channel_name}/{youtube_video_id}/transcript.txt
+    
+    Args:
+        channel_name: The YouTube channel name.
+        youtube_video_id: The YouTube video ID.
+    
+    Returns:
+        The blob path for the transcript file.
+    """
+    sanitized = sanitize_channel_name(channel_name)
+    return f"{sanitized}/{youtube_video_id}/transcript.txt"
+
+
+def get_segments_blob_path(channel_name: str, youtube_video_id: str) -> str:
+    """Get the blob path for a segments file.
+    
+    Organizes segments by channel name for easy navigation in blob storage.
+    Pattern: {sanitized_channel_name}/{youtube_video_id}/segments.json
+    
+    Args:
+        channel_name: The YouTube channel name.
+        youtube_video_id: The YouTube video ID.
+    
+    Returns:
+        The blob path for the segments file.
+    """
+    sanitized = sanitize_channel_name(channel_name)
+    return f"{sanitized}/{youtube_video_id}/segments.json"
+
+
+def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
+    """Get the blob path for a summary file.
+    
+    Organizes summaries by channel name for easy navigation in blob storage.
+    Pattern: {sanitized_channel_name}/{youtube_video_id}/summary.md
+    
+    Args:
+        channel_name: The YouTube channel name.
+        youtube_video_id: The YouTube video ID.
+    
+    Returns:
+        The blob path for the summary file.
+    """
+    sanitized = sanitize_channel_name(channel_name)
+    return f"{sanitized}/{youtube_video_id}/summary.md"
 
 
 def convert_uri_to_connection_string(uri: str, service: str = "blob") -> str:

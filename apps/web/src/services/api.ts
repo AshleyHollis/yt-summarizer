@@ -267,7 +267,8 @@ export type ProcessingStatus =
   | 'embedding'
   | 'building_relationships'
   | 'completed'
-  | 'failed';
+  | 'failed'
+  | 'rate_limited';
 
 /**
  * Request to submit a video for processing
@@ -331,12 +332,12 @@ export type JobType = 'transcribe' | 'summarize' | 'embed' | 'build_relationship
 /**
  * Job stage
  */
-export type JobStage = 'queued' | 'processing' | 'completed' | 'failed';
+export type JobStage = 'queued' | 'running' | 'completed' | 'failed' | 'dead_lettered' | 'rate_limited';
 
 /**
  * Job status
  */
-export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'retrying';
+export type JobStatus = 'pending' | 'running' | 'succeeded' | 'failed';
 
 /**
  * Job response
@@ -363,6 +364,10 @@ export interface JobSummaryResponse {
   stage: JobStage;
   status: JobStatus;
   error_message?: string | null;
+  retry_count: number;
+  created_at: string;
+  updated_at?: string | null;
+  next_retry_at?: string | null;
 }
 
 /**
@@ -376,6 +381,124 @@ export interface StageProgress {
 }
 
 /**
+ * Estimated time for a processing stage
+ */
+export interface StageEstimate {
+  stage: string;
+  estimated_seconds: number;
+}
+
+/**
+ * Historical record of a completed processing stage
+ */
+export interface StageHistoryItem {
+  /** Stage name (transcribe, summarize, embed, build_relationships) */
+  stage: string;
+  /** Human-readable stage label */
+  stage_label: string;
+  /** Final status (succeeded, failed) */
+  status: string;
+  /** When the job was queued (ISO string) */
+  queued_at: string | null;
+  /** When the stage started (ISO string) */
+  started_at: string | null;
+  /** When the stage completed (ISO string) */
+  completed_at: string | null;
+  /** Time spent waiting in queue before processing */
+  wait_seconds: number | null;
+  /** Predicted queue wait time at submission */
+  estimated_wait_seconds: number | null;
+  /** Intentional delay for rate limiting (e.g., yt-dlp subtitle_sleep) */
+  enforced_delay_seconds: number | null;
+  /** Actual processing time in seconds */
+  actual_seconds: number | null;
+  /** Estimated processing time based on historical averages */
+  estimated_seconds: number;
+  /** Estimated enforced delay based on historical averages */
+  estimated_delay_seconds: number;
+  /** Difference between actual and estimated (positive = slower than expected) */
+  variance_seconds: number | null;
+  /** Percentage difference from estimate */
+  variance_percent: number | null;
+  /** Number of retries for this stage */
+  retry_count: number;
+}
+
+/**
+ * Complete processing history for a video
+ */
+export interface VideoProcessingHistory {
+  video_id: string;
+  video_title: string | null;
+  video_duration_seconds: number | null;
+  processing_status: string;
+  
+  /** When the video was first submitted (ISO string) */
+  submitted_at: string | null;
+  /** When first job started (ISO string) */
+  first_job_started_at: string | null;
+  /** When last job completed (ISO string) */
+  last_job_completed_at: string | null;
+  /** Total time spent waiting in queues */
+  total_wait_seconds: number | null;
+  /** Total estimated queue wait time at submission */
+  total_estimated_wait_seconds: number | null;
+  /** Total intentional delays for rate limiting (e.g., yt-dlp subtitle_sleep) */
+  total_enforced_delay_seconds: number | null;
+  /** Total actual processing time in seconds */
+  total_actual_seconds: number | null;
+  /** Total estimated processing time in seconds */
+  total_estimated_seconds: number;
+  /** Total estimated enforced delays */
+  total_estimated_delay_seconds: number;
+  /** Total wall-clock time from submission to completion */
+  total_elapsed_seconds: number | null;
+  /** Total variance (positive = slower than expected) */
+  total_variance_seconds: number | null;
+  
+  /** History for each processing stage */
+  stages: StageHistoryItem[];
+  
+  /** Number of stages completed */
+  stages_completed: number;
+  /** Number of stages failed */
+  stages_failed: number;
+  /** Total retry attempts across all stages */
+  total_retries: number;
+  
+  /** Whether this video processed faster than average */
+  faster_than_average: boolean | null;
+  /** Processing speed percentile (1-100, higher = faster) */
+  percentile: number | null;
+}
+
+/**
+ * Estimated time of arrival information
+ */
+export interface ETAInfo {
+  /** Total estimated seconds until processing completes */
+  estimated_seconds_remaining: number;
+  /** Total estimated processing time for all stages */
+  estimated_total_seconds: number;
+  /** Estimated datetime when video will be ready (ISO string) */
+  estimated_ready_at: string;
+  /** Seconds elapsed since processing started */
+  elapsed_seconds: number;
+  /** When processing first started (ISO string, for timer continuity) */
+  processing_started_at: string | null;
+  /** Position in the processing queue (1-indexed, 1 = you're next) */
+  queue_position: number;
+  /** Total videos currently in the queue */
+  total_in_queue: number;
+  /** Number of videos ahead in the queue */
+  videos_ahead: number;
+  /** Estimated seconds waiting for videos ahead */
+  queue_wait_seconds: number;
+  /** Breakdown of remaining stages and their estimates */
+  stages_remaining: StageEstimate[];
+}
+
+/**
  * Video jobs progress
  */
 export interface VideoJobsProgress {
@@ -383,6 +506,10 @@ export interface VideoJobsProgress {
   overall_status: string;
   overall_progress: number; // 0-100
   jobs: JobSummaryResponse[];
+  /** Estimated time and queue position info (only for in-progress videos) */
+  eta: ETAInfo | null;
+  /** Human-readable name of the current processing stage */
+  current_stage_name: string | null;
 }
 
 /**
@@ -453,6 +580,12 @@ export const jobApi = {
    */
   getVideoProgress: (videoId: string): Promise<VideoJobsProgress> =>
     api.get(`/api/v1/jobs/video/${videoId}/progress`),
+
+  /**
+   * Get video processing history with actual vs estimated times
+   */
+  getVideoHistory: (videoId: string): Promise<VideoProcessingHistory> =>
+    api.get(`/api/v1/jobs/video/${videoId}/history`),
 };
 
 // ============================================================================
@@ -462,7 +595,7 @@ export const jobApi = {
 /**
  * Processing status filter for library
  */
-export type ProcessingStatusFilter = 'pending' | 'processing' | 'completed' | 'failed';
+export type ProcessingStatusFilter = 'pending' | 'processing' | 'completed' | 'failed' | 'rate_limited';
 
 /**
  * Sort field options

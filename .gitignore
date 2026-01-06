@@ -169,3 +169,6 @@ test-req.json
 appsettings.Development.json
 appsettings.*.json
 !appsettings.json
+
+# UV lockfiles
+uv.lock

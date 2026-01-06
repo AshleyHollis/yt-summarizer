@@ -433,3 +433,90 @@ class TestVideoNotFoundError:
                 await service._fetch_video_metadata("PRIVATE1234")
             
             assert exc_info.value.youtube_video_id == "PRIVATE1234"
+
+
+class TestBlobPathConsistency:
+    """Tests to ensure API uses same blob paths as workers.
+    
+    This addresses the bug where the API was looking for transcripts/summaries
+    at the wrong blob path, causing "Failed to load transcript" errors.
+    
+    Workers store at: {channel_name}/{youtube_video_id}/transcript.txt
+    API must read from the same path, not: {video_id}/{youtube_video_id}_transcript.txt
+    """
+
+    def test_transcript_endpoint_uses_channel_based_path(self):
+        """Test that transcript endpoint uses get_transcript_blob_path helper."""
+        # Verify the import exists and is accessible
+        from api.routes.videos import get_transcript_blob_path
+        
+        # Verify the helper produces correct path format
+        channel_name = "Test Channel"
+        youtube_video_id = "abc123XYZ"
+        
+        path = get_transcript_blob_path(channel_name, youtube_video_id)
+        
+        # Should use channel-based path, not video_id-based
+        assert "test-channel" in path.lower(), "Path should contain sanitized channel name"
+        assert youtube_video_id in path, "Path should contain youtube video id"
+        assert path.endswith("transcript.txt"), "Path should end with transcript.txt"
+        # Should NOT contain old format patterns
+        assert "_transcript.txt" not in path, "Should not use old underscore format"
+
+    def test_summary_endpoint_uses_channel_based_path(self):
+        """Test that summary endpoint uses get_summary_blob_path helper."""
+        from api.routes.videos import get_summary_blob_path
+        
+        channel_name = "Test Channel"
+        youtube_video_id = "abc123XYZ"
+        
+        path = get_summary_blob_path(channel_name, youtube_video_id)
+        
+        # Should use channel-based path
+        assert "test-channel" in path.lower(), "Path should contain sanitized channel name"
+        assert youtube_video_id in path, "Path should contain youtube video id"
+        assert path.endswith("summary.md"), "Path should end with summary.md"
+        # Should NOT contain old format patterns
+        assert "_summary.md" not in path, "Should not use old underscore format"
+
+    def test_api_and_worker_transcript_paths_match(self):
+        """Test that API and workers use the same transcript path helper."""
+        from api.routes.videos import get_transcript_blob_path as api_helper
+        from shared.blob.client import get_transcript_blob_path as worker_helper
+        
+        test_cases = [
+            ("Simple Channel", "dQw4w9WgXcQ"),
+            ("Channel With Spaces", "abc123XYZ"),
+            ("Channel-With-Dashes", "xyz789ABC"),
+            ("CamelCaseChannel", "TEST12345"),
+        ]
+        
+        for channel_name, youtube_video_id in test_cases:
+            api_path = api_helper(channel_name, youtube_video_id)
+            worker_path = worker_helper(channel_name, youtube_video_id)
+            
+            assert api_path == worker_path, (
+                f"API and worker paths must match for channel='{channel_name}', "
+                f"video='{youtube_video_id}': API={api_path}, Worker={worker_path}"
+            )
+
+    def test_api_and_worker_summary_paths_match(self):
+        """Test that API and workers use the same summary path helper."""
+        from api.routes.videos import get_summary_blob_path as api_helper
+        from shared.blob.client import get_summary_blob_path as worker_helper
+        
+        test_cases = [
+            ("Simple Channel", "dQw4w9WgXcQ"),
+            ("Channel With Spaces", "abc123XYZ"),
+            ("Channel-With-Dashes", "xyz789ABC"),
+            ("CamelCaseChannel", "TEST12345"),
+        ]
+        
+        for channel_name, youtube_video_id in test_cases:
+            api_path = api_helper(channel_name, youtube_video_id)
+            worker_path = worker_helper(channel_name, youtube_video_id)
+            
+            assert api_path == worker_path, (
+                f"API and worker paths must match for channel='{channel_name}', "
+                f"video='{youtube_video_id}': API={api_path}, Worker={worker_path}"
+            )

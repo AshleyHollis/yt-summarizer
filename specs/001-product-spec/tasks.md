@@ -330,61 +330,111 @@
 
 ### API Implementation for US6
 
-- [ ] T146 [P] [US6] Create LearningPath model (items with order, rationale, videoId, evidence) in services/api/src/api/models/synthesis.py
-- [ ] T147 [P] [US6] Create WatchList model (items with videoId, reason, priority) in services/api/src/api/models/synthesis.py
-- [ ] T148 [US6] Implement synthesis service in services/api/src/api/services/synthesis_service.py
-- [ ] T149 [US6] Add structured output tools to copilot query handler in services/api/src/api/services/copilot_service.py
-- [ ] T150 [US6] Implement POST /api/v1/copilot/synthesize endpoint in services/api/src/api/routes/copilot.py
+- [X] T146 [P] [US6] Create LearningPath model (items with order, rationale, videoId, evidence) in services/api/src/api/models/synthesis.py
+- [X] T147 [P] [US6] Create WatchList model (items with videoId, reason, priority) in services/api/src/api/models/synthesis.py
+- [X] T148 [US6] Implement synthesis service in services/api/src/api/services/synthesis_service.py
+- [X] T149 [US6] Add structured output tools to copilot query handler in services/api/src/api/agents/yt_summarizer_agent.py
+- [X] T150 [US6] Implement POST /api/v1/copilot/synthesize endpoint in services/api/src/api/routes/copilot.py
 
 ### Frontend for US6
 
-- [ ] T151 [US6] Create learning path renderer in apps/web/src/components/copilot/LearningPathView.tsx
-- [ ] T152 [P] [US6] Create watch list renderer in apps/web/src/components/copilot/WatchListView.tsx
-- [ ] T153 [US6] Add rationale display for each item in structured outputs
-- [ ] T154 [US6] Add "what's missing" messaging when content insufficient for synthesis
+- [X] T151 [US6] Create learning path renderer in apps/web/src/components/copilot/LearningPathView.tsx
+- [X] T152 [P] [US6] Create watch list renderer in apps/web/src/components/copilot/WatchListView.tsx
+- [X] T153 [US6] Add rationale display for each item in structured outputs
+- [X] T154 [US6] Add "what's missing" messaging when content insufficient for synthesis
 
 ### Tests for US6
 
-- [ ] T155 [P] [US6] Create API tests for synthesis endpoint in services/api/tests/test_synthesis.py
-- [ ] T156 [P] [US6] Create E2E tests for synthesis flow in apps/web/e2e/synthesis.spec.ts
+- [X] T155 [P] [US6] Create API tests for synthesis endpoint in services/api/tests/test_synthesis.py
+- [X] T156 [P] [US6] Create E2E tests for synthesis flow in apps/web/e2e/synthesis.spec.ts
 
-**Checkpoint**: User Story 6 complete — full synthesis capabilities
+### Learning Path Ordering Verification Tests
+
+- [X] T157 [P] [US6] Add test video fixture with curated series having known correct order (e.g., push-up progression) in apps/web/e2e/global-setup.ts
+- [X] T158 [P] [US6] Create ordering verification tests using videos with explicit difficulty levels in apps/web/e2e/synthesis-api.spec.ts
+- [X] T159 [P] [US6] Add validation that videos under 60 seconds (shorts) are excluded from learning path generation
+- [X] T160a [P] [US6] Create test that verifies beginner content appears before advanced content in learning path results
+
+**Checkpoint**: User Story 6 complete — full synthesis capabilities with verified ordering ✅
 
 ---
 
-## Phase 9: Polish & Cross-Cutting Concerns
+## Phase 9: Worker Resilience & Content Validation ✅
+
+**Purpose**: Ensure workers handle transient failures and validate external content
+
+### Transcribe Worker Resilience
+
+- [X] T175 [US1] Add content validation to detect HTML error pages vs valid VTT/SRT in services/workers/transcribe/worker.py
+- [X] T176 [US1] Implement retry with exponential backoff for YouTube rate-limit errors in transcribe worker
+- [X] T177 [US1] Add HTTP status code validation when fetching subtitles (reject non-2xx responses)
+- [X] T178 [US1] Add unit tests for content validation and rate-limit detection in services/workers/tests/test_transcribe_resilience.py
+
+### Transcribe Worker Optimization
+
+- [X] T178a [US1] Refactor transcribe worker to use yt-dlp exclusively (remove youtube-transcript-api dependency)
+  - yt-dlp has better rate-limit handling: cookie support, client spoofing, frequent updates
+  - youtube-transcript-api was making duplicate requests, triggering rate limits faster
+  - Single library = simpler codebase, fewer requests per video
+- [X] T178b [US1] Add request timing logs to monitor YouTube API request rate in transcribe worker
+- [X] T178c [US1] Parse VTT subtitles with timestamps for semantic search (start_time, duration, text)
+
+### Re-Ingest API
+
+- [X] T179 [US1] Add POST /api/v1/videos/{videoId}/reprocess endpoint to re-queue failed videos (already exists)
+- [ ] T180 [US1] Add "Reprocess" button to video detail page for videos with failed/empty transcripts
+
+**Checkpoint**: Workers gracefully handle YouTube rate limits and transient failures ✅
+
+---
+
+## Phase 10: Polish & Cross-Cutting Concerns
 
 **Purpose**: Production readiness, deployment, observability
 
 ### Error Handling & UX Polish
 
-- [ ] T157 [P] Implement serverless DB wake-up handling with "Warming up" toast in apps/web
-- [ ] T158 [P] Add dead-letter visibility page in apps/web/src/app/jobs/dead-letter/page.tsx
-- [ ] T159 [P] Create global error boundary in apps/web/src/app/error.tsx
-- [ ] T160 Add loading skeletons for all async data fetches
+#### Serverless DB Wake-up Handling (FR-020, FR-020a, FR-020b, FR-020c)
+
+- [ ] T181a Add `uptime_seconds` and `started_at` fields to HealthStatus response model in services/api/src/api/routes/health.py
+- [ ] T181b Store API startup timestamp in app.state during FastAPI lifespan startup in services/api/src/api/main.py
+- [ ] T181c Calculate and return uptime in health endpoint from stored startup timestamp
+- [ ] T181d Update healthApi types in apps/web/src/services/api.ts to include uptime_seconds and started_at fields
+- [ ] T181e Create useHealthCheck hook in apps/web/src/hooks/useHealthCheck.ts that polls /health endpoint
+- [ ] T181f Create HealthStatusProvider context in apps/web/src/contexts/HealthStatusContext.tsx to share health state across app
+- [ ] T181g Create WarmingUpIndicator component in apps/web/src/components/common/WarmingUpIndicator.tsx showing "Warming up..." banner when status is degraded
+- [ ] T181h Integrate WarmingUpIndicator into layout.tsx to display globally when database is unavailable
+- [ ] T181i Add retry logic to API client fetch wrapper that auto-retries on 503/degraded with exponential backoff
+- [ ] T181j Add unit tests for health endpoint uptime calculation in services/api/tests/test_health.py
+- [ ] T181k Add unit tests for useHealthCheck hook and WarmingUpIndicator component
+- [ ] T181l Add E2E test verifying warming up indicator displays when API returns degraded status
+
+- [ ] T182 [P] Add dead-letter visibility page in apps/web/src/app/jobs/dead-letter/page.tsx
+- [ ] T183 [P] Create global error boundary in apps/web/src/app/error.tsx
+- [ ] T184 Add loading skeletons for all async data fetches
 
 ### Observability
 
-- [ ] T161 [P] Add OpenTelemetry SDK to Python API in services/api
-- [ ] T162 [P] Add OpenTelemetry to workers in services/workers
-- [ ] T163 Verify correlation ID propagation from UI → API → workers
-- [ ] T164 [P] Create Log Analytics queries for common issues in docs/runbooks/
+- [ ] T185 [P] Add OpenTelemetry SDK to Python API in services/api
+- [ ] T186 [P] Add OpenTelemetry to workers in services/workers
+- [ ] T187 Verify correlation ID propagation from UI → API → workers
+- [ ] T188 [P] Create Log Analytics queries for common issues in docs/runbooks/
 
 ### Infrastructure
 
-- [ ] T165 [P] Create Bicep module for Azure SQL in infra/bicep/modules/sql.bicep
-- [ ] T166 [P] Create Bicep module for Storage (blob + queue) in infra/bicep/modules/storage.bicep
-- [ ] T167 [P] Create Bicep module for Container Apps in infra/bicep/modules/aca.bicep
-- [ ] T168 [P] Create Bicep module for Key Vault in infra/bicep/modules/keyvault.bicep
-- [ ] T169 Create main.bicep composing all modules in infra/bicep/main.bicep
-- [ ] T170 [P] Create GitHub Actions workflow for CI in .github/workflows/ci.yml
-- [ ] T171 [P] Create GitHub Actions workflow for CD in .github/workflows/deploy.yml
+- [ ] T189 [P] Create Bicep module for Azure SQL in infra/bicep/modules/sql.bicep
+- [ ] T190 [P] Create Bicep module for Storage (blob + queue) in infra/bicep/modules/storage.bicep
+- [ ] T191 [P] Create Bicep module for Container Apps in infra/bicep/modules/aca.bicep
+- [ ] T192 [P] Create Bicep module for Key Vault in infra/bicep/modules/keyvault.bicep
+- [ ] T193 Create main.bicep composing all modules in infra/bicep/main.bicep
+- [ ] T194 [P] Create GitHub Actions workflow for CI in .github/workflows/ci.yml
+- [ ] T195 [P] Create GitHub Actions workflow for CD in .github/workflows/deploy.yml
 
 ### Documentation
 
-- [ ] T172 [P] Create architecture overview in docs/architecture.md
-- [ ] T173 [P] Create operational runbook in docs/runbooks/operations.md
-- [ ] T174 Run quickstart.md validation and update as needed
+- [ ] T196 [P] Create architecture overview in docs/architecture.md
+- [ ] T197 [P] Create operational runbook in docs/runbooks/operations.md
+- [ ] T198 Run quickstart.md validation and update as needed
 
 ---
 
@@ -522,8 +572,8 @@ This delivers:
 | YouTube caption access | T045 includes fallback to yt-dlp + Whisper |
 | Vector search latency | T103 implements exact search first; add HNSW later |
 | LLM grounding quality | T105, T108 handle uncertainty explicitly |
-| Cold start UX | T157 adds "Warming up" toast |
-| YouTube rate limiting | T074 uses yt-dlp with backoff for channel extraction |
+| Cold start UX | T181a-T181l: Health endpoint includes uptime, UI polls and shows "Warming up" indicator, auto-retries on degraded status |
+| YouTube rate limiting | T074 uses yt-dlp with backoff for channel extraction; T175-T177 add content validation and retry |
 
 ---
 
@@ -531,7 +581,7 @@ This delivers:
 
 | Metric | Count |
 |--------|-------|
-| **Total Tasks** | 174 |
+| **Total Tasks** | 209 |
 | **Setup Phase** | 10 |
 | **Foundational Phase** | 24 |
 | **US1 (Single Video)** | 21 |
@@ -539,8 +589,9 @@ This delivers:
 | **US3 (Browse Library)** | 17 |
 | **US4 (Copilot Query)** | 37 |
 | **US5 (Explain Why)** | 13 |
-| **US6 (Synthesis)** | 11 |
-| **Polish Phase** | 18 |
-| **Parallel Tasks** | ~85 (49%) |
+| **US6 (Synthesis)** | 15 |
+| **Worker Resilience** | 6 |
+| **Polish Phase** | 29 |
+| **Parallel Tasks** | ~95 (45%) |
 
 **MVP Scope**: Phases 1-3 + Phase 6 = ~92 tasks for core value delivery

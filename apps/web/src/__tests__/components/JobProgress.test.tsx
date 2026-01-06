@@ -26,6 +26,8 @@ const createMockProgress = (overrides = {}) => ({
     { job_id: 'job-3', job_type: 'embed', stage: 'queued', status: 'pending' },
     { job_id: 'job-4', job_type: 'build_relationships', stage: 'queued', status: 'pending' },
   ],
+  eta: null,
+  current_stage_name: null,
   ...overrides,
 });
 

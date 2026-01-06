@@ -11,6 +11,7 @@ from .connection import (
 from .job_service import (
     mark_job_completed,
     mark_job_failed,
+    mark_job_rate_limited,
     mark_job_running,
     update_job_status,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "get_session",
     "mark_job_completed",
     "mark_job_failed",
+    "mark_job_rate_limited",
     "mark_job_running",
     "update_job_status",
 ]

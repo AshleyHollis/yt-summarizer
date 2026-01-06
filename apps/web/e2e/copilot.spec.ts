@@ -61,20 +61,19 @@ test.describe('Copilot Feature', () => {
     });
 
     test('has query input field', async ({ page }) => {
-      // Look for chat/query input
-      const input = page.getByRole('textbox', { name: /ask|query|message|chat/i }).or(
+      // The copilot chat input should be visible on the library page
+      // It's either in the sidebar or accessible via a toggle button
+      const chatInput = page.getByRole('textbox', { name: /ask|message/i }).or(
         page.locator('[placeholder*="ask" i]')
       ).or(
-        page.locator('[placeholder*="query" i]')
-      ).or(
-        page.locator('input[type="text"]').filter({ hasText: /ask|query/i })
+        page.getByRole('textbox').first()
       );
       
-      // The input should exist somewhere on the page
-      const inputExists = await input.count() > 0;
+      // Give the page time to fully render the chat interface
+      await page.waitForTimeout(2000);
       
-      // If copilot isn't visible by default, this is still valid
-      expect(inputExists || true).toBeTruthy();
+      // Assert that a chat input exists and is visible
+      await expect(chatInput).toBeVisible({ timeout: 5000 });
     });
 
     test('can type in query input when visible', async ({ page }) => {
@@ -93,29 +92,27 @@ test.describe('Copilot Feature', () => {
       await page.waitForLoadState('networkidle');
     });
 
-    test('scope chips container exists when copilot visible', async ({ page }) => {
-      // Look for scope-related UI elements
-      const scopeElements = page.locator('[class*="scope" i], [class*="chip" i], [class*="filter" i]');
+    test('scope indicator is visible in copilot header', async ({ page }) => {
+      // The scope indicator shows what knowledge sources are being searched
+      // It should display "Your Videos", "AI Knowledge", etc.
+      const scopeIndicator = page.locator('[data-testid="scope-indicator"]').or(
+        page.getByText(/your videos|all videos|library/i)
+      );
       
-      // Scope filtering may not be visible by default
-      // Just verify page loads
-      await expect(page).toHaveURL(/library/);
+      await expect(scopeIndicator.first()).toBeVisible({ timeout: 5000 });
     });
   });
 
   test.describe('Coverage Indicator', () => {
-    test('coverage information is accessible', async ({ page }) => {
+    test('coverage information displays video count', async ({ page }) => {
       await page.goto('/library');
       await page.waitForLoadState('networkidle');
       
-      // Look for coverage-related elements
-      const coverageElements = page.locator('[class*="coverage" i], [class*="Coverage" i]').or(
-        page.getByText(/videos indexed|segments|coverage/i)
-      );
+      // Look for coverage indicator showing indexed content count
+      // This should display something like "X videos indexed" or "X segments"
+      const coverageText = page.getByText(/\d+\s*(videos?|segments?)/i);
       
-      // Coverage may not be visible unless copilot is open
-      // Just verify page loads correctly
-      await expect(page).toHaveURL(/library/);
+      await expect(coverageText.first()).toBeVisible({ timeout: 5000 });
     });
   });
 

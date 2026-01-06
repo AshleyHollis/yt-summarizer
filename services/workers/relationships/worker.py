@@ -29,6 +29,7 @@ class RelationshipsMessage:
     job_id: str
     video_id: str
     youtube_video_id: str
+    channel_name: str
     correlation_id: str
     batch_id: str | None = None
     retry_count: int = 0
@@ -48,6 +49,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
             job_id=raw_message["job_id"],
             video_id=raw_message["video_id"],
             youtube_video_id=raw_message["youtube_video_id"],
+            channel_name=raw_message.get("channel_name", "unknown-channel"),
             correlation_id=raw_message.get("correlation_id", "unknown"),
             batch_id=raw_message.get("batch_id"),
             retry_count=raw_message.get("retry_count", 0),

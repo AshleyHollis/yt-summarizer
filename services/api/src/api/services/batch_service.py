@@ -257,6 +257,7 @@ class BatchService:
                     "job_id": str(job.job_id),
                     "video_id": str(video.video_id),
                     "youtube_video_id": youtube_video_id,
+                    "channel_name": channel.name,
                     "batch_id": str(batch.batch_id),
                     "correlation_id": correlation_id,
                 },
@@ -488,7 +489,12 @@ class BatchService:
         """
         result = await self.session.execute(
             select(Batch)
-            .options(selectinload(Batch.items).selectinload(BatchItem.video))
+            .options(
+                selectinload(Batch.items)
+                .selectinload(BatchItem.video)
+                .selectinload(Video.channel),
+                selectinload(Batch.channel),
+            )
             .where(Batch.batch_id == batch_id)
         )
         batch = result.scalar_one_or_none()
@@ -532,6 +538,13 @@ class BatchService:
 
                 # Queue job
                 try:
+                    # Get channel name for blob storage path
+                    channel_name = "unknown-channel"
+                    if item.video.channel:
+                        channel_name = item.video.channel.name
+                    elif batch.channel:
+                        channel_name = batch.channel.name
+                    
                     queue_client = get_queue_client()
                     queue_client.send_message(
                         TRANSCRIBE_QUEUE,
@@ -539,6 +552,7 @@ class BatchService:
                             "job_id": str(job.job_id),
                             "video_id": str(item.video_id),
                             "youtube_video_id": item.video.youtube_video_id,
+                            "channel_name": channel_name,
                             "batch_id": str(batch_id),
                             "correlation_id": correlation_id,
                         },
@@ -581,7 +595,12 @@ class BatchService:
         """
         result = await self.session.execute(
             select(Batch)
-            .options(selectinload(Batch.items).selectinload(BatchItem.video))
+            .options(
+                selectinload(Batch.items)
+                .selectinload(BatchItem.video)
+                .selectinload(Video.channel),
+                selectinload(Batch.channel),
+            )
             .where(Batch.batch_id == batch_id)
         )
         batch = result.scalar_one_or_none()
@@ -629,6 +648,13 @@ class BatchService:
 
             # Queue job
             try:
+                # Get channel name for blob storage path
+                channel_name = "unknown-channel"
+                if item.video.channel:
+                    channel_name = item.video.channel.name
+                elif batch.channel:
+                    channel_name = batch.channel.name
+                
                 queue_client = get_queue_client()
                 queue_client.send_message(
                     TRANSCRIBE_QUEUE,
@@ -636,6 +662,7 @@ class BatchService:
                         "job_id": str(job.job_id),
                         "video_id": str(item.video_id),
                         "youtube_video_id": item.video.youtube_video_id,
+                        "channel_name": channel_name,
                         "batch_id": str(batch_id),
                         "correlation_id": correlation_id,
                     },

@@ -29,7 +29,7 @@ const FAST_POLLING_INTERVAL = 5000;  // 5 seconds when videos are processing
 const SLOW_POLLING_INTERVAL = 30000; // 30 seconds to check for new videos
 
 // Valid processing status filter values
-const VALID_STATUSES: ProcessingStatusFilter[] = ['pending', 'processing', 'completed', 'failed'];
+const VALID_STATUSES: ProcessingStatusFilter[] = ['pending', 'processing', 'completed', 'failed', 'rate_limited'];
 
 /**
  * Toggle button for entering/exiting selection mode
@@ -89,11 +89,13 @@ function LibraryContent() {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
-   * Check if any videos need status updates (pending or processing)
+   * Check if any videos need status updates (pending, processing, or rate_limited)
    */
   const hasVideosNeedingUpdates = useCallback((videoList: VideoCardType[]): boolean => {
     return videoList.some(
-      (video) => video.processing_status === 'pending' || video.processing_status === 'processing'
+      (video) => video.processing_status === 'pending' || 
+                 video.processing_status === 'processing' ||
+                 video.processing_status === 'rate_limited'
     );
   }, []);
 

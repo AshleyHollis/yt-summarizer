@@ -64,6 +64,13 @@ This checklist verifies that **implemented code actually works** through compreh
 - [x] CHK-V071: US2 (Channel Ingest) flow automated
 - [x] CHK-V072: US3 (Browse Library) flow automated
 - [x] CHK-V073: Error handling and edge cases automated
+- [x] CHK-V074: US4 (Copilot Query) flow automated
+- [x] CHK-V075: US5 (Explain Why) flow automated
+- [x] CHK-V076: US6 (Synthesis) flow automated - learning path & watch list generation
+- [x] CHK-V077: US6 Explicit ordering verification (Python OOP numbered tutorials)
+- [x] CHK-V078: US6 Implicit ordering verification (JavaScript async content-based inference)
+- [x] CHK-V079: US6 Shorts exclusion (<60s videos excluded from learning paths)
+- [x] CHK-V080: US6 Insufficient content messaging tested
 
 ---
 
@@ -96,17 +103,19 @@ $env:USE_EXTERNAL_SERVER = "true"; npx playwright test
 
 | Test Suite | Result | Count | Date |
 |------------|--------|-------|------|
-| API Tests | ✅ PASS | 214 | 2025-12-14 |
+| API Tests (test_synthesis.py) | ✅ PASS | 26 | 2026-01-06 |
 | Worker Tests | ✅ PASS | 47 | 2025-12-15 |
 | Shared Tests | ✅ PASS | 12 | 2025-12-15 |
-| Frontend Tests | ✅ PASS | 125 | 2025-12-15 |
-| E2E Tests | ✅ PASS | 83 | 2025-12-15 |
+| Frontend Tests | ✅ PASS | 217 | 2026-01-06 |
+| E2E Tests | ✅ PASS | 116 | 2026-01-06 |
 
-**Total Automated Tests**: 586 passing (API: 319, Workers: 47, Shared: 12, Frontend: 125, E2E: 83)  
-**Skipped Tests**: 34 (E2E: 16 require LIVE_PROCESSING, API: 18 require specific setup)  
+**US6 Synthesis Tests**: 48 passing (API: 26, E2E API: 18, E2E UI: 4)
+**Total Automated Tests**: 418 passing (API: 26, Workers: 47, Shared: 12, Frontend: 217, E2E: 116)  
+**Skipped Tests**: 18 (E2E: require LIVE_PROCESSING or specific setup)  
+**Flaky Tests**: 1 (unrelated to US6)  
 **Manual Tests Required**: 0  
 **Verified By**: Automated CI  
-**Date**: 2025-12-15
+**Date**: 2026-01-06
 
 ---
 

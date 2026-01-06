@@ -17,6 +17,9 @@ from shared.blob.client import (
     SUMMARIES_CONTAINER,
     TRANSCRIPTS_CONTAINER,
     get_blob_client,
+    get_segments_blob_path,
+    get_summary_blob_path,
+    get_transcript_blob_path,
 )
 from shared.config import get_settings
 from shared.db.connection import get_db
@@ -40,6 +43,7 @@ class EmbedMessage:
     job_id: str
     video_id: str
     youtube_video_id: str
+    channel_name: str
     correlation_id: str
     batch_id: str | None = None
     retry_count: int = 0
@@ -59,6 +63,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             job_id=raw_message["job_id"],
             video_id=raw_message["video_id"],
             youtube_video_id=raw_message["youtube_video_id"],
+            channel_name=raw_message.get("channel_name", "unknown-channel"),
             correlation_id=raw_message.get("correlation_id", "unknown"),
             batch_id=raw_message.get("batch_id"),
             retry_count=raw_message.get("retry_count", 0),
@@ -88,9 +93,11 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             await mark_job_running(message.job_id, "embedding")
 
             # Try to fetch timestamped segments first (preferred for semantic search)
+            # Use channel-based blob path
+            segments_blob_path = get_segments_blob_path(message.channel_name, message.youtube_video_id)
             segments_json = await self._fetch_content(
                 TRANSCRIPTS_CONTAINER,
-                f"{message.video_id}/{message.youtube_video_id}_segments.json",
+                segments_blob_path,
             )
             
             timestamped_segments = None
@@ -112,14 +119,17 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 chunks = [seg["text"] for seg in timestamped_segments]
                 chunk_timestamps = [(seg["start"], seg["end"]) for seg in timestamped_segments]
             else:
-                # Fallback: Fetch transcript and summary
+                # Fallback: Fetch transcript and summary (using channel-based blob paths)
+                transcript_blob_path = get_transcript_blob_path(message.channel_name, message.youtube_video_id)
+                summary_blob_path = get_summary_blob_path(message.channel_name, message.youtube_video_id)
+                
                 transcript = await self._fetch_content(
                     TRANSCRIPTS_CONTAINER,
-                    f"{message.video_id}/{message.youtube_video_id}_transcript.txt",
+                    transcript_blob_path,
                 )
                 summary = await self._fetch_content(
                     SUMMARIES_CONTAINER,
-                    f"{message.video_id}/{message.youtube_video_id}_summary.md",
+                    summary_blob_path,
                 )
                 
                 if not transcript and not summary:
@@ -470,6 +480,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 "job_id": str(job.job_id),
                 "video_id": message.video_id,
                 "youtube_video_id": message.youtube_video_id,
+                "channel_name": message.channel_name,
                 "correlation_id": correlation_id,
             }
             if message.batch_id:

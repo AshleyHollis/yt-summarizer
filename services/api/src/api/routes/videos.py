@@ -9,7 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Import shared modules
 try:
     from shared.db.connection import get_session
-    from shared.blob.client import get_blob_client, TRANSCRIPTS_CONTAINER, SUMMARIES_CONTAINER
+    from shared.blob.client import (
+        get_blob_client,
+        get_transcript_blob_path,
+        get_summary_blob_path,
+        TRANSCRIPTS_CONTAINER,
+        SUMMARIES_CONTAINER,
+    )
 except ImportError:
     # Fallback for development
     async def get_session():
@@ -17,6 +23,12 @@ except ImportError:
     
     def get_blob_client():
         raise NotImplementedError("Blob client not available")
+    
+    def get_transcript_blob_path(channel_name: str, youtube_video_id: str) -> str:
+        raise NotImplementedError("Blob path helper not available")
+    
+    def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
+        raise NotImplementedError("Blob path helper not available")
     
     TRANSCRIPTS_CONTAINER = "transcripts"
     SUMMARIES_CONTAINER = "summaries"
@@ -182,10 +194,13 @@ async def get_video_transcript(
             detail="Video not found",
         )
     
-    # Try to fetch transcript from blob storage
+    # Get channel name for blob path lookup
+    channel_name = video.channel.name if video.channel else "unknown-channel"
+    
+    # Try to fetch transcript from blob storage using channel-based path
     try:
         blob_client = get_blob_client()
-        blob_name = f"{video_id}/{video.youtube_video_id}_transcript.txt"
+        blob_name = get_transcript_blob_path(channel_name, video.youtube_video_id)
         content = blob_client.download_blob(TRANSCRIPTS_CONTAINER, blob_name)
         return PlainTextResponse(content.decode("utf-8"), media_type="text/plain")
     except Exception as e:
@@ -217,10 +232,13 @@ async def get_video_summary(
             detail="Video not found",
         )
     
-    # Try to fetch summary from blob storage
+    # Get channel name for blob path lookup
+    channel_name = video.channel.name if video.channel else "unknown-channel"
+    
+    # Try to fetch summary from blob storage using channel-based path
     try:
         blob_client = get_blob_client()
-        blob_name = f"{video_id}/{video.youtube_video_id}_summary.md"
+        blob_name = get_summary_blob_path(channel_name, video.youtube_video_id)
         content = blob_client.download_blob(SUMMARIES_CONTAINER, blob_name)
         return PlainTextResponse(content.decode("utf-8"), media_type="text/markdown")
     except Exception as e:

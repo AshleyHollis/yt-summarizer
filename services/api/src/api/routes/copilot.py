@@ -41,9 +41,11 @@ from ..models.copilot import (
     VideoSearchResponse,
     WarmingUpResponse,
 )
+from ..models.synthesis import SynthesizeRequest, SynthesizeResponse
 from ..services.copilot_service import CopilotService
 from ..services.llm_service import get_llm_service
 from ..services.search_service import SearchService
+from ..services.synthesis_service import SynthesisService
 
 router = APIRouter(prefix="/api/v1/copilot", tags=["Copilot"])
 logger = get_logger(__name__)
@@ -372,3 +374,85 @@ async def explain_recommendation(
         relationship_basis=relationship_basis,
         overall_confidence=overall_confidence,
     )
+
+
+def get_synthesis_service(session: AsyncSession = Depends(get_session)) -> SynthesisService:
+    """Dependency to get synthesis service."""
+    return SynthesisService(session)
+
+
+@router.post(
+    "/synthesize",
+    response_model=SynthesizeResponse,
+    summary="Synthesize Structured Output",
+    description="""
+    Synthesize a structured output (learning path or watch list) from library content.
+    
+    - **learning_path**: Ordered sequence of videos for progressive learning
+    - **watch_list**: Prioritized collection based on user interests
+    
+    Returns synthesized output with rationale for each item and gap detection.
+    
+    **This is a read-only operation.** The copilot cannot:
+    - Trigger ingestion or reprocessing
+    - Modify any data
+    - Access external content
+    """,
+    responses={
+        200: {"description": "Synthesized output with items and rationale"},
+        400: {"description": "Invalid synthesis type or query"},
+        422: {"description": "Validation error"},
+        503: {"model": WarmingUpResponse, "description": "Database warming up"},
+    },
+)
+async def synthesize(
+    request_: Request,
+    body: SynthesizeRequest,
+    session: AsyncSession = Depends(get_session),
+) -> SynthesizeResponse:
+    """Synthesize a structured output from library content.
+    
+    Creates learning paths or watch lists from indexed videos.
+    """
+    correlation_id = get_correlation_id(request_)
+    
+    # Inject correlation ID if not provided
+    if not body.correlation_id:
+        body = SynthesizeRequest(
+            synthesis_type=body.synthesis_type,
+            query=body.query,
+            scope=body.scope,
+            max_items=body.max_items,
+            correlation_id=correlation_id,
+        )
+    
+    # Validate query is not empty
+    if not body.query or not body.query.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Query cannot be empty",
+        )
+    
+    try:
+        service = SynthesisService(session)
+        result = await service.synthesize(body)
+        return result
+    except Exception as e:
+        logger.error(f"Synthesis failed: {e}", correlation_id=correlation_id)
+        
+        # Check for database warming up
+        error_str = str(e).lower()
+        if "connection" in error_str or "timeout" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=WarmingUpResponse(
+                    message="Database is warming up, please retry in a few seconds",
+                    retry_after=5,
+                    correlation_id=correlation_id,
+                ).model_dump(),
+            )
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )

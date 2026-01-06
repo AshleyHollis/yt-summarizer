@@ -325,6 +325,77 @@ test.describe('User Story 3: Browse the Library', () => {
         await expect(page).toHaveURL('/library');
       }
     });
+
+    test('transcript tab loads content for completed videos', async ({ page, request }) => {
+      /**
+       * REGRESSION TEST: Transcript Tab Blob Path Loading
+       * 
+       * This test verifies that clicking the Transcript tab successfully loads
+       * transcript content from blob storage. This is a regression test for a bug
+       * where the API used incorrect blob paths (video_id-based) instead of the
+       * correct channel-based paths used by workers.
+       * 
+       * Bug: API looked for transcripts at {video_id}/{youtube_video_id}_transcript.txt
+       * Fix: API now uses get_transcript_blob_path() -> {channel_name}/{youtube_video_id}/transcript.txt
+       */
+      
+      // Get a completed video from the library
+      const listResponse = await request.get(
+        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        { headers: { 'X-Correlation-ID': 'e2e-transcript-tab-test' } }
+      );
+      
+      if (!listResponse.ok()) {
+        test.skip();
+        return;
+      }
+      
+      const listData = await listResponse.json();
+      
+      if (!listData.videos || listData.videos.length === 0) {
+        test.skip();
+        return;
+      }
+      
+      const completedVideoId = listData.videos[0].video_id;
+      
+      // Navigate to the video detail page
+      await page.goto(`/library/${completedVideoId}`);
+      await page.waitForLoadState('networkidle');
+      
+      // Click on the Transcript tab
+      const transcriptTab = page.getByRole('button', { name: /Transcript/i });
+      await expect(transcriptTab).toBeVisible({ timeout: 5000 });
+      await transcriptTab.click();
+      
+      // Wait for transcript content to load
+      await page.waitForTimeout(2000); // Allow time for API call
+      
+      // CRITICAL ASSERTION: Transcript should load successfully
+      // If we see "Failed to load transcript", the blob path is broken
+      const errorMessage = page.getByText(/Failed to load transcript/i);
+      
+      // Error should NOT be visible
+      const isErrorVisible = await errorMessage.isVisible().catch(() => false);
+      expect(isErrorVisible).toBe(false);
+      
+      // The transcript content appears in the tab panel after the "Transcript for:" text
+      // Look for substantial text content (paragraph elements with significant content)
+      const transcriptText = page.getByText(/Transcript for:/i);
+      await expect(transcriptText).toBeVisible({ timeout: 5000 });
+      
+      // Get the parent container and verify there's substantial content
+      const contentArea = page.locator('h3:has-text("Transcript") + div, h3:has-text("Transcript") ~ div').first();
+      if (await contentArea.isVisible()) {
+        const allText = await contentArea.textContent();
+        // Transcript should have substantial content (at least 100 chars for a real video)
+        expect(allText?.length).toBeGreaterThan(100);
+      } else {
+        // Alternative: just check for any visible text after clicking transcript
+        const wordCount = page.getByText(/\d+ words$/);
+        await expect(wordCount).toBeVisible({ timeout: 5000 });
+      }
+    });
   });
 
   test.describe('Error Handling', () => {
@@ -459,6 +530,53 @@ test.describe('User Story 3: Browse the Library', () => {
       expect(detailData.summary).toBeTruthy();
       expect(typeof detailData.summary).toBe('string');
       expect(detailData.summary.length).toBeGreaterThan(0);
+    });
+
+    test('transcript endpoint returns content for completed videos', async ({ request }) => {
+      /**
+       * REGRESSION TEST: Transcript API Endpoint Blob Path
+       * 
+       * This test verifies that the /api/v1/videos/{video_id}/transcript endpoint
+       * correctly fetches transcript content from blob storage using channel-based paths.
+       * 
+       * Bug: API used path "{video_id}/{youtube_video_id}_transcript.txt"
+       * Fix: API now uses get_transcript_blob_path() -> "{channel_name}/{youtube_video_id}/transcript.txt"
+       * 
+       * This was the root cause of "Failed to load transcript. Please try again." errors.
+       */
+      
+      // Get a completed video from the library
+      const listResponse = await request.get(
+        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        { headers: { 'X-Correlation-ID': 'e2e-transcript-api-test' } }
+      );
+      
+      expect(listResponse.ok()).toBeTruthy();
+      const listData = await listResponse.json();
+      
+      // Skip if no completed videos
+      if (!listData.videos || listData.videos.length === 0) {
+        test.skip();
+        return;
+      }
+      
+      const videoId = listData.videos[0].video_id;
+      
+      // Call the transcript endpoint directly - this is what the TranscriptViewer component uses
+      const transcriptResponse = await request.get(
+        `http://localhost:8000/api/v1/videos/${videoId}/transcript`,
+        { headers: { 'X-Correlation-ID': 'e2e-transcript-api-test' } }
+      );
+      
+      // CRITICAL ASSERTION: Transcript endpoint should return 200 for completed videos
+      // A 404 here means the blob path is wrong
+      expect(transcriptResponse.ok()).toBeTruthy();
+      expect(transcriptResponse.status()).toBe(200);
+      
+      // Transcript content should be present
+      const transcriptText = await transcriptResponse.text();
+      expect(transcriptText).toBeTruthy();
+      expect(transcriptText.length).toBeGreaterThan(10);
     });
 
     test('video detail page displays summary for completed videos', async ({ page, request }) => {

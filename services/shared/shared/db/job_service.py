@@ -1,6 +1,6 @@
 """Job status update utilities."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from shared.db.connection import get_db
-from shared.db.models import Batch, BatchItem, Job, Video
+from shared.db.models import Batch, BatchItem, Job, JobHistory, Video
 from shared.logging.config import get_logger
 
 logger = get_logger(__name__)
@@ -239,12 +239,15 @@ async def mark_job_running(job_id: str, stage: str = "running") -> None:
 
 
 async def mark_job_completed(job_id: str) -> None:
-    """Mark a job as completed.
+    """Mark a job as completed and record in job history.
 
     Args:
         job_id: The job ID to update.
     """
     await update_job_status(job_id, status="succeeded", stage="completed", progress=100)
+    
+    # Record in job history for ETA calculations
+    await _record_job_history(job_id, success=True)
 
 
 async def mark_job_failed(job_id: str, error_message: str) -> None:
@@ -255,3 +258,126 @@ async def mark_job_failed(job_id: str, error_message: str) -> None:
         error_message: Description of the error.
     """
     await update_job_status(job_id, status="failed", stage="failed", error_message=error_message)
+
+
+async def mark_job_rate_limited(job_id: str, video_id: str, retry_delay_seconds: int) -> None:
+    """Mark a job as rate limited.
+    
+    Updates the job stage to 'rate_limited' and also updates the
+    video's processing_status so the UI can display the rate limit state.
+
+    Args:
+        job_id: The job ID to update.
+        video_id: The video ID to update processing_status.
+        retry_delay_seconds: Seconds until the next retry (default 5 minutes).
+    """
+    # Calculate next retry time
+    next_retry_at = datetime.utcnow() + timedelta(seconds=retry_delay_seconds)
+    
+    # Update job stage and next_retry_at
+    db = get_db()
+    async with db.session() as session:
+        result = await session.execute(
+            select(Job).where(Job.job_id == UUID(job_id))
+        )
+        job = result.scalar_one_or_none()
+        if job:
+            job.stage = "rate_limited"
+            job.status = "running"
+            job.next_retry_at = next_retry_at
+            job.retry_count = job.retry_count + 1  # Increment to track attempts
+            await session.commit()
+            logger.info(
+                "Marked job as rate limited",
+                job_id=job_id,
+                next_retry_at=next_retry_at.isoformat(),
+                retry_count=job.retry_count,
+            )
+        else:
+            logger.warning("Job not found for rate limited update", job_id=job_id)
+    
+    # Also update video processing_status directly so UI shows it
+    async with db.session() as session:
+        result = await session.execute(
+            select(Video).where(Video.video_id == UUID(video_id))
+        )
+        video = result.scalar_one_or_none()
+        if video:
+            video.processing_status = "rate_limited"
+            await session.commit()
+            logger.info(
+                "Updated video processing_status to rate_limited",
+                video_id=video_id,
+            )
+
+
+async def _record_job_history(job_id: str, success: bool) -> None:
+    """Record a job completion in the JobHistory table for ETA calculations.
+
+    Args:
+        job_id: The job ID that completed.
+        success: Whether the job succeeded.
+    """
+    db = get_db()
+    async with db.session() as session:
+        # Get the job details
+        result = await session.execute(
+            select(Job).where(Job.job_id == UUID(job_id))
+        )
+        job = result.scalar_one_or_none()
+
+        if not job:
+            logger.warning("Job not found for history recording", job_id=job_id)
+            return
+
+        if not job.started_at or not job.completed_at:
+            logger.warning(
+                "Job missing timestamps for history recording",
+                job_id=job_id,
+                started_at=job.started_at,
+                completed_at=job.completed_at,
+            )
+            return
+
+        # Get the video duration if available
+        video_result = await session.execute(
+            select(Video).where(Video.video_id == job.video_id)
+        )
+        video = video_result.scalar_one_or_none()
+        video_duration = video.duration if video else None
+
+        # Calculate processing duration
+        processing_duration = (job.completed_at - job.started_at).total_seconds()
+
+        # Calculate wait time (time from creation to start)
+        wait_seconds = None
+        if job.created_at and job.started_at:
+            wait_seconds = (job.started_at - job.created_at).total_seconds()
+
+        # Create history record with estimated and actual wait times
+        history = JobHistory(
+            job_id=job.job_id,
+            video_id=job.video_id,
+            job_type=job.job_type,
+            video_duration_seconds=video_duration,
+            queued_at=job.created_at,
+            wait_seconds=wait_seconds,
+            estimated_wait_seconds=job.estimated_wait_seconds,
+            processing_duration_seconds=processing_duration,
+            started_at=job.started_at,
+            completed_at=job.completed_at,
+            success=success,
+            retry_count=job.retry_count,
+        )
+        session.add(history)
+        await session.commit()
+
+        logger.info(
+            "Recorded job history",
+            job_id=job_id,
+            job_type=job.job_type,
+            processing_duration_seconds=processing_duration,
+            wait_seconds=wait_seconds,
+            estimated_wait_seconds=job.estimated_wait_seconds,
+            success=success,
+        )

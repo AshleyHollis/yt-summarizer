@@ -23,17 +23,79 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def convert_ado_connection_string(ado_string: str) -> str:
+    """Convert ADO.NET style connection string to SQLAlchemy URL.
+    
+    Converts strings like:
+        Server=localhost,1433;Database=ytsummarizer;User Id=sa;Password=xxx;TrustServerCertificate=True
+    To:
+        mssql+pyodbc://sa:xxx@localhost,1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+    """
+    from urllib.parse import quote_plus
+    
+    parts = {}
+    for part in ado_string.split(";"):
+        if "=" in part:
+            key, value = part.split("=", 1)
+            parts[key.strip().lower()] = value.strip()
+    
+    # Extract components
+    server = parts.get("server", parts.get("data source", "localhost"))
+    database = parts.get("database", parts.get("initial catalog", ""))
+    user = parts.get("user id", parts.get("uid", "sa"))
+    password = parts.get("password", parts.get("pwd", ""))
+    
+    # Handle port in server (e.g., "localhost,1433" or "localhost:1433")
+    if "," in server:
+        host, port = server.split(",", 1)
+    elif ":" in server:
+        host, port = server.split(":", 1)
+    else:
+        host, port = server, "1433"
+    
+    # URL-encode the password
+    encoded_password = quote_plus(password)
+    
+    # Build SQLAlchemy URL (SQL Server ODBC uses comma for port)
+    url = f"mssql+pyodbc://{user}:{encoded_password}@{host},{port}/{database}"
+    url += "?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+    
+    return url
+
+
 def get_url() -> str:
-    """Get database URL from environment."""
+    """Get database URL from environment.
+    
+    Supports multiple environment variable formats:
+    1. DATABASE_URL - Standard SQLAlchemy-style URL
+    2. ConnectionStrings__ytsummarizer - .NET Aspire-injected connection string
+    3. ConnectionStrings__sql - Alternative Aspire format
+    """
+    # Try standard DATABASE_URL first
     url = os.environ.get("DATABASE_URL")
+    
+    # Try Aspire-injected connection strings
     if not url:
-        raise ValueError("DATABASE_URL environment variable is required")
+        url = os.environ.get("ConnectionStrings__ytsummarizer")
+    if not url:
+        url = os.environ.get("ConnectionStrings__sql")
+    
+    if not url:
+        raise ValueError(
+            "Database connection string not found. Set one of: "
+            "DATABASE_URL, ConnectionStrings__ytsummarizer, or ConnectionStrings__sql"
+        )
+    
+    # Handle ADO.NET style connection strings from Aspire
+    if "Server=" in url and ";" in url:
+        url = convert_ado_connection_string(url)
     # Handle pyodbc connection string format
-    if "://" not in url:
-        return f"mssql+pyodbc://{url}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+    elif "://" not in url:
+        url = f"mssql+pyodbc://{url}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
     # Convert async driver to sync for Alembic
-    if "mssql+aioodbc://" in url:
+    elif "mssql+aioodbc://" in url:
         url = url.replace("mssql+aioodbc://", "mssql+pyodbc://")
+    
     return url
 
 

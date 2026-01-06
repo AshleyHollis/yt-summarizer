@@ -43,6 +43,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'i.ytimg.com',
+        pathname: '/vi_webp/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'yt3.ggpht.com',
         pathname: '/**',
       },

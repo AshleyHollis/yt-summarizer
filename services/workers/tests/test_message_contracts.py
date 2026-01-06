@@ -68,18 +68,26 @@ def sample_correlation_id():
 
 
 @pytest.fixture
+def sample_channel_name():
+    """Sample channel name."""
+    return "Test Channel"
+
+
+@pytest.fixture
 def complete_api_message(
     sample_job_id,
     sample_video_id,
     sample_youtube_video_id,
     sample_batch_id,
     sample_correlation_id,
+    sample_channel_name,
 ):
     """Complete message as sent by API with all fields."""
     return {
         "job_id": sample_job_id,
         "video_id": sample_video_id,
         "youtube_video_id": sample_youtube_video_id,
+        "channel_name": sample_channel_name,
         "batch_id": sample_batch_id,
         "correlation_id": sample_correlation_id,
     }
@@ -122,6 +130,7 @@ class TestWorkerMessageRequiredFields:
         assert message.job_id == complete_api_message["job_id"]
         assert message.video_id == complete_api_message["video_id"]
         assert message.youtube_video_id == complete_api_message["youtube_video_id"]
+        assert message.channel_name == complete_api_message["channel_name"]
 
     def test_summarize_worker_required_fields(self, complete_api_message):
         """Test SummarizeWorker can parse all required fields."""
@@ -218,6 +227,19 @@ class TestWorkerMessageOptionalFields:
         })
 
         assert message.correlation_id == "unknown"
+
+    def test_transcribe_worker_handles_missing_channel_name(self, sample_job_id, sample_video_id, sample_youtube_video_id):
+        """Test TranscribeWorker defaults channel_name to 'unknown-channel'."""
+        from transcribe.worker import TranscribeWorker
+
+        worker = TranscribeWorker()
+        message = worker.parse_message({
+            "job_id": sample_job_id,
+            "video_id": sample_video_id,
+            "youtube_video_id": sample_youtube_video_id,
+        })
+
+        assert message.channel_name == "unknown-channel"
 
     def test_all_workers_default_retry_count_to_zero(self, minimal_api_message):
         """Test all workers default retry_count to 0."""
@@ -392,7 +414,7 @@ class TestJobStatusConsistency:
         """Test JobStage enum has expected values."""
         from api.models.job import JobStage
 
-        expected_values = {"queued", "running", "completed", "failed", "dead_lettered"}
+        expected_values = {"queued", "running", "completed", "failed", "dead_lettered", "rate_limited"}
         actual_values = {js.value for js in JobStage}
 
         assert actual_values == expected_values, \

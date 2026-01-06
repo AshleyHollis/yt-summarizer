@@ -24,6 +24,8 @@ var blobs = storage.AddBlobs("blobs");
 var queues = storage.AddQueues("queues");
 
 // SQL Server Database - using SQL Server 2025 for native VECTOR support
+// Non-persistent: each Aspire restart creates a fresh database
+// This avoids stale container issues and ensures clean state for development
 var sql = builder.AddSqlServer("sql")
     .WithImageTag("2025-latest")
     .AddDatabase("ytsummarizer");

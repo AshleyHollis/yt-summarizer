@@ -131,7 +131,7 @@ class TestAgentCreation:
         tools = get_agent_tools()
         
         # Check we have the expected number of tools
-        assert len(tools) == 6, f"Expected 6 tools, got {len(tools)}"
+        assert len(tools) == 8, f"Expected 8 tools, got {len(tools)}"
         
         # Check each tool has a name attribute (not __name__)
         for tool in tools:
@@ -157,6 +157,8 @@ class TestAgentCreation:
             'get_library_coverage',
             'get_topics_for_channel',
             'query_library',  # Main RAG query tool with AI settings support
+            'synthesize_learning_path',  # US6: Learning path synthesis
+            'synthesize_watch_list',  # US6: Watch list synthesis
         }
         
         assert tool_names == expected_names, f"Tool names mismatch. Got: {tool_names}, Expected: {expected_names}"
@@ -235,24 +237,25 @@ class TestAgentSystemPrompt:
             "System prompt should mention search_segments tool"
 
     def test_system_prompt_has_context_awareness_instructions(self):
-        """Verify system prompt tells agent to use currentVideo context."""
+        """Verify system prompt tells agent to use scope/context for video targeting."""
         from src.api.agents.yt_summarizer_agent import SYSTEM_INSTRUCTIONS
         
         prompt_lower = SYSTEM_INSTRUCTIONS.lower()
         
-        # Should mention currentVideo context
-        assert "currentvideo" in prompt_lower, \
-            "System prompt should mention currentVideo context"
+        # Should mention scope or videoIds context (the current implementation)
+        has_scope_context = "scope" in prompt_lower or "videoids" in prompt_lower
+        assert has_scope_context, \
+            "System prompt should mention scope or videoIds for video targeting"
         
-        # Should instruct prioritizing the current video
-        priority_phrases = [
-            "prioritize",
-            "this video",
-            "viewing a specific video",
+        # Should instruct scoping to specific videos
+        scope_phrases = [
+            "only search those specific videos",
+            "video_id",
+            "pass video_id",
         ]
-        has_priority = any(phrase in prompt_lower for phrase in priority_phrases)
-        assert has_priority, \
-            "System prompt should instruct agent to prioritize the current video context"
+        has_scoping = any(phrase in prompt_lower for phrase in scope_phrases)
+        assert has_scoping, \
+            "System prompt should instruct agent to scope searches to specific videos"
 
 
 # =============================================================================

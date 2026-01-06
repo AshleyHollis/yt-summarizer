@@ -16,6 +16,7 @@ class ProcessingStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    RATE_LIMITED = "rate_limited"  # YouTube is rate limiting, will retry automatically
 
 
 class SubmitVideoRequest(BaseModel):

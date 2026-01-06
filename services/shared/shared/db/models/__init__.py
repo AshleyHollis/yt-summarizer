@@ -2,7 +2,7 @@
 
 from .artifact import Artifact
 from .base import Base, TimestampMixin, generate_uuid
-from .batch import Batch, BatchItem, Job
+from .batch import Batch, BatchItem, Job, JobHistory
 from .channel import Channel, Video
 from .chat_thread import ChatThread
 from .relationship import Facet, Relationship, VideoFacet
@@ -17,6 +17,7 @@ __all__ = [
     "ChatThread",
     "Facet",
     "Job",
+    "JobHistory",
     "Relationship",
     "Segment",
     "TimestampMixin",

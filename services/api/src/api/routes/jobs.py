@@ -24,6 +24,7 @@ from ..models.job import (
     RetryJobRequest,
     RetryJobResponse,
     VideoJobsProgress,
+    VideoProcessingHistory,
 )
 from ..services.job_service import JobService
 
@@ -140,6 +141,36 @@ async def get_video_progress(
     processing stage (transcribe, summarize, embed, relationships).
     """
     result = await service.get_video_jobs_progress(video_id)
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found",
+        )
+
+    return result
+
+
+@router.get(
+    "/video/{video_id}/history",
+    response_model=VideoProcessingHistory,
+    summary="Get Video Processing History",
+    description="Get detailed processing history with actual vs estimated times",
+)
+async def get_video_history(
+    video_id: UUID,
+    service: JobService = Depends(get_job_service),
+) -> VideoProcessingHistory:
+    """Get detailed processing history for a video.
+
+    Returns actual vs estimated times for each stage, variance analysis,
+    and comparison to average processing times. Useful for:
+    - Seeing how long each processing step took
+    - Comparing actual vs estimated times
+    - Identifying slow stages for debugging
+    - Understanding retry history
+    """
+    result = await service.get_video_processing_history(video_id)
 
     if not result:
         raise HTTPException(
