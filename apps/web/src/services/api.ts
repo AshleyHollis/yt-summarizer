@@ -117,7 +117,29 @@ function buildUrl(
 }
 
 /**
- * Make an API request with automatic JSON handling and error processing
+ * Delay helper for exponential backoff
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Configuration for retry behavior on degraded/unavailable API
+ */
+const RETRY_CONFIG = {
+  /** Maximum number of retry attempts */
+  maxRetries: 3,
+  /** Base delay in milliseconds (doubles each retry) */
+  baseDelayMs: 1000,
+  /** Maximum delay between retries */
+  maxDelayMs: 10000,
+  /** Status codes that trigger retry (503 = service unavailable, 502 = bad gateway) */
+  retryableStatusCodes: [502, 503, 504],
+};
+
+/**
+ * Make an API request with automatic JSON handling, error processing,
+ * and retry logic for degraded service (serverless DB wake-up).
  */
 async function request<T>(
   endpoint: string,
@@ -146,9 +168,48 @@ async function request<T>(
     requestOptions.body = JSON.stringify(body);
   }
 
-  // Make the request
+  // Make the request with retry logic for degraded service
   const url = buildUrl(endpoint, params);
-  const response = await fetch(url, requestOptions);
+  let lastError: Error | null = null;
+  let response: Response | null = null;
+  
+  for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      response = await fetch(url, requestOptions);
+      
+      // If successful or not a retryable status, break out of retry loop
+      if (response.ok || !RETRY_CONFIG.retryableStatusCodes.includes(response.status)) {
+        break;
+      }
+      
+      // Retryable error - wait and try again
+      if (attempt < RETRY_CONFIG.maxRetries) {
+        const delayMs = Math.min(
+          RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
+          RETRY_CONFIG.maxDelayMs
+        );
+        console.log(`API returned ${response.status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries})`);
+        await delay(delayMs);
+      }
+    } catch (err) {
+      // Network error - save it and retry
+      lastError = err instanceof Error ? err : new Error(String(err));
+      
+      if (attempt < RETRY_CONFIG.maxRetries) {
+        const delayMs = Math.min(
+          RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
+          RETRY_CONFIG.maxDelayMs
+        );
+        console.log(`Network error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries})`);
+        await delay(delayMs);
+      }
+    }
+  }
+  
+  // If we never got a response, throw the last network error
+  if (!response) {
+    throw lastError || new Error('Failed to connect to API');
+  }
 
   // Get correlation ID from response
   const responseCorrelationId = response.headers.get(CORRELATION_ID_HEADER);
@@ -230,6 +291,8 @@ export interface HealthStatus {
   timestamp: string;
   version: string;
   checks: Record<string, boolean>;
+  uptime_seconds: number | null;
+  started_at: string | null;
 }
 
 /**

@@ -6,6 +6,8 @@ import { ThemeProvider } from "next-themes";
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { ToolResultProvider } from "@/contexts/ToolResultContext";
+import { HealthStatusProvider, useHealthStatus } from "@/contexts/HealthStatusContext";
+import { WarmingUpIndicator } from "@/components/common";
 
 // Types for scope management
 export interface DateRange {
@@ -285,21 +287,42 @@ export function Providers({ children }: ProvidersProps) {
   
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <CopilotKit 
-        runtimeUrl={runtimeUrl} 
-        agent="yt-summarizer" 
-        showDevConsole={false}
-        enableInspector={false}
-        threadId={mounted ? (urlThreadId || undefined) : undefined}
-      >
-        <ToolResultProvider>
-          <VideoContextProvider>
-            <ScopeProvider>
-              <AISettingsProvider>{children}</AISettingsProvider>
-            </ScopeProvider>
-          </VideoContextProvider>
-        </ToolResultProvider>
-      </CopilotKit>
+      <HealthStatusProvider pollInterval={5000}>
+        <HealthStatusBanner />
+        <CopilotKit 
+          runtimeUrl={runtimeUrl} 
+          agent="yt-summarizer" 
+          showDevConsole={false}
+          enableInspector={false}
+          threadId={mounted ? (urlThreadId || undefined) : undefined}
+        >
+          <ToolResultProvider>
+            <VideoContextProvider>
+              <ScopeProvider>
+                <AISettingsProvider>{children}</AISettingsProvider>
+              </ScopeProvider>
+            </VideoContextProvider>
+          </ToolResultProvider>
+        </CopilotKit>
+      </HealthStatusProvider>
     </ThemeProvider>
+  );
+}
+
+/**
+ * Component that reads health status from context and shows the warming up indicator.
+ */
+function HealthStatusBanner() {
+  const { health, isDegraded, isUnhealthy } = useHealthStatus();
+  
+  if (!isDegraded && !isUnhealthy) {
+    return null;
+  }
+  
+  return (
+    <WarmingUpIndicator 
+      status={health?.status || 'unhealthy'} 
+      show={isDegraded || isUnhealthy}
+    />
   );
 }

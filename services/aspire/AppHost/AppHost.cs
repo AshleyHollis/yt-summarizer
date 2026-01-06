@@ -51,6 +51,7 @@ var web = builder.AddNpmApp("web", "../../../apps/web", "dev")
 
 // Python Workers - each worker has its own directory and virtual environment
 // Using AddExecutable to avoid pip install conflicts - venvs are pre-created
+// Workers use gRPC protocol for OTLP (default) with SSL certs from SSL_CERT_DIR
 var transcribeWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/transcribe"));
 var transcribeWorker = builder.AddExecutable("transcribe-worker", 
         Path.Combine(transcribeWorkerPath, ".venv/Scripts/python.exe"),
@@ -58,7 +59,10 @@ var transcribeWorker = builder.AddExecutable("transcribe-worker",
         "__main__.py")
     .WithReference(blobs)
     .WithReference(queues)
-    .WithReference(sql);
+    .WithReference(sql)
+    .WithEnvironment("HEALTH_PORT", "8091")
+    .WithHttpEndpoint(port: 8091, targetPort: 8091, name: "health", isProxied: false)
+    .WithOtlpExporter();
 
 var summarizeWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/summarize"));
 var summarizeWorker = builder.AddExecutable("summarize-worker",
@@ -71,7 +75,10 @@ var summarizeWorker = builder.AddExecutable("summarize-worker",
     .WithEnvironment("OPENAI_API_KEY", openAiApiKey)
     .WithEnvironment("AZURE_OPENAI_ENDPOINT", azureOpenAiEndpoint)
     .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
-    .WithEnvironment("AZURE_OPENAI_DEPLOYMENT", azureOpenAiDeployment);
+    .WithEnvironment("AZURE_OPENAI_DEPLOYMENT", azureOpenAiDeployment)
+    .WithEnvironment("HEALTH_PORT", "8092")
+    .WithHttpEndpoint(port: 8092, targetPort: 8092, name: "health", isProxied: false)
+    .WithOtlpExporter();
 
 var embedWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/embed"));
 var embedWorker = builder.AddExecutable("embed-worker",
@@ -84,7 +91,10 @@ var embedWorker = builder.AddExecutable("embed-worker",
     .WithEnvironment("OPENAI_API_KEY", openAiApiKey)
     .WithEnvironment("AZURE_OPENAI_ENDPOINT", azureOpenAiEndpoint)
     .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
-    .WithEnvironment("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", azureOpenAiEmbeddingDeployment);
+    .WithEnvironment("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", azureOpenAiEmbeddingDeployment)
+    .WithEnvironment("HEALTH_PORT", "8093")
+    .WithHttpEndpoint(port: 8093, targetPort: 8093, name: "health", isProxied: false)
+    .WithOtlpExporter();
 
 var relationshipsWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/relationships"));
 var relationshipsWorker = builder.AddExecutable("relationships-worker",
@@ -93,6 +103,9 @@ var relationshipsWorker = builder.AddExecutable("relationships-worker",
         "__main__.py")
     .WithReference(blobs)
     .WithReference(queues)
-    .WithReference(sql);
+    .WithReference(sql)
+    .WithEnvironment("HEALTH_PORT", "8094")
+    .WithHttpEndpoint(port: 8094, targetPort: 8094, name: "health", isProxied: false)
+    .WithOtlpExporter();
 
 builder.Build().Run();

@@ -17,6 +17,19 @@ dependencies = [
     "alembic>=1.14.0",
     "pyodbc>=5.2.0",
     "aioodbc>=0.5.0",
+    # OpenTelemetry for distributed tracing
+    "opentelemetry-api>=1.28.0",
+    "opentelemetry-sdk>=1.28.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.28.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.28.0",
+    # OpenTelemetry instrumentation packages
+    "opentelemetry-instrumentation-openai-v2>=2.0b0",  # Gen AI traces for OpenAI/Azure OpenAI
+    "opentelemetry-instrumentation-sqlalchemy>=0.50b0",  # Database query traces
+    "opentelemetry-instrumentation-httpx>=0.50b0",  # HTTP client traces (OpenAI SDK uses httpx)
+    "opentelemetry-instrumentation-logging>=0.50b0",  # Log-trace correlation
+    "opentelemetry-instrumentation-system-metrics>=0.50b0",  # Process/system runtime metrics
+    # Azure SDK tracing support
+    "azure-core-tracing-opentelemetry>=1.0.0b11",  # Azure Storage Queue/Blob traces
 ]
 
 [project.optional-dependencies]

@@ -25,6 +25,7 @@ from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_
 from shared.db.models import Artifact, Job, Video
 from shared.logging.config import get_logger
 from shared.queue.client import EMBED_QUEUE, SUMMARIZE_QUEUE, get_queue_client
+from shared.telemetry.config import inject_trace_context
 from shared.worker.base_worker import BaseWorker, WorkerResult, run_worker
 
 logger = get_logger(__name__)
@@ -104,6 +105,10 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
     def queue_name(self) -> str:
         """Return the queue name."""
         return SUMMARIZE_QUEUE
+
+    def get_additional_connectivity_checks(self) -> dict[str, Any]:
+        """Add OpenAI connectivity check since this worker requires it for summarization."""
+        return {"openai": self._check_openai_connectivity}
 
     def parse_message(self, raw_message: dict[str, Any]) -> SummarizeMessage:
         """Parse raw message to SummarizeMessage."""
@@ -454,13 +459,13 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
 
             # Queue the job
             queue_client = get_queue_client()
-            queue_message = {
+            queue_message = inject_trace_context({
                 "job_id": str(job.job_id),
                 "video_id": message.video_id,
                 "youtube_video_id": message.youtube_video_id,
                 "channel_name": message.channel_name,
                 "correlation_id": correlation_id,
-            }
+            })
             if message.batch_id:
                 queue_message["batch_id"] = message.batch_id
             

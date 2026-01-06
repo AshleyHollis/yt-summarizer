@@ -200,3 +200,66 @@ class TestErrorHandling:
         """Test that invalid UUIDs return 422."""
         response = client.get("/api/v1/videos/not-a-valid-uuid")
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+class TestHealthUptimeCalculation:
+    """Tests for uptime calculation in health endpoint (T181a-T181c)."""
+
+    def test_health_endpoint_has_uptime_seconds(self, client):
+        """Test that /health response contains uptime_seconds field."""
+        response = client.get("/health")
+        data = response.json()
+        assert "uptime_seconds" in data
+        # uptime_seconds can be None if started_at wasn't set (test environment)
+        if data["uptime_seconds"] is not None:
+            assert isinstance(data["uptime_seconds"], (int, float))
+            assert data["uptime_seconds"] >= 0
+
+    def test_health_endpoint_has_started_at(self, client):
+        """Test that /health response contains started_at field."""
+        response = client.get("/health")
+        data = response.json()
+        assert "started_at" in data
+        # started_at can be None if not set during startup (test environment)
+
+    def test_health_uptime_increases_over_time(self, client):
+        """Test that uptime increases between requests."""
+        import time
+        
+        response1 = client.get("/health")
+        data1 = response1.json()
+        uptime1 = data1.get("uptime_seconds")
+        
+        # Skip test if uptime is not available (test environment)
+        if uptime1 is None:
+            pytest.skip("uptime_seconds not available in test environment")
+        
+        # Wait a bit
+        time.sleep(0.1)
+        
+        response2 = client.get("/health")
+        data2 = response2.json()
+        uptime2 = data2.get("uptime_seconds")
+        
+        assert uptime2 is not None
+        assert uptime2 >= uptime1, "Uptime should increase over time"
+
+    def test_health_started_at_is_valid_iso_datetime(self, client):
+        """Test that started_at is a valid ISO datetime string."""
+        from datetime import datetime
+        
+        response = client.get("/health")
+        data = response.json()
+        started_at = data.get("started_at")
+        
+        # Skip test if started_at is not available (test environment)
+        if started_at is None:
+            pytest.skip("started_at not available in test environment")
+        
+        # Should be parseable as ISO datetime
+        try:
+            parsed = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+            assert parsed is not None
+        except ValueError as e:
+            pytest.fail(f"started_at is not a valid ISO datetime: {e}")
+

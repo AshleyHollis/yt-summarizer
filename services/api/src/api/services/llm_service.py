@@ -2,6 +2,7 @@
 
 Provides a wrapper around Azure OpenAI for copilot query processing.
 Includes smart retry logic that respects API rate limit headers.
+Instrumented with OpenTelemetry Gen AI semantic conventions for Aspire dashboard.
 """
 
 import asyncio
@@ -16,6 +17,7 @@ from openai import AsyncAzureOpenAI, AsyncOpenAI, RateLimitError, APITimeoutErro
 try:
     from shared.config import get_settings
     from shared.logging.config import get_logger
+    from shared.telemetry import get_tracer, add_span_event, record_exception_on_span
 except ImportError:
     import logging
     import os
@@ -36,9 +38,26 @@ except ImportError:
     
     def get_logger(name):
         return logging.getLogger(name)
+    
+    def get_tracer(name):
+        class NoOpSpan:
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def set_attribute(self, k, v): pass
+            def add_event(self, name, attributes=None): pass
+            def record_exception(self, e, attributes=None): pass
+        class NoOpTracer:
+            def start_as_current_span(self, name, **kwargs): return NoOpSpan()
+        return NoOpTracer()
+    
+    def add_span_event(span, name, attributes=None): pass
+    def record_exception_on_span(span, e, attributes=None): pass
 
 
 logger = get_logger(__name__)
+
+# Get tracer for Gen AI operations
+_tracer = get_tracer("llm_service")
 
 # Retry configuration
 MAX_RETRIES = 5
@@ -378,17 +397,42 @@ class LLMService:
         Returns:
             Embedding vector (1536 dimensions for text-embedding-3-small).
         """
-        try:
-            # Use retry with backoff for rate limiting
-            response = await retry_with_backoff(
-                self.client.embeddings.create,
-                model=self.settings.openai.effective_embedding_model,
-                input=text,
-            )
-            return response.data[0].embedding
-        except Exception as e:
-            logger.error(f"Failed to get embedding: {e}")
-            raise
+        model = self.settings.openai.effective_embedding_model
+        
+        with _tracer.start_as_current_span(
+            "gen_ai.embeddings",
+            attributes={
+                "gen_ai.system": "openai",
+                "gen_ai.request.model": model,
+                "gen_ai.operation.name": "embeddings",
+                "gen_ai.request.encoding_format": "float",
+                "input.text_length": len(text),
+            },
+        ) as span:
+            try:
+                start_time = time.monotonic()
+                
+                # Use retry with backoff for rate limiting
+                response = await retry_with_backoff(
+                    self.client.embeddings.create,
+                    model=model,
+                    input=text,
+                )
+                
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                
+                # Record Gen AI response attributes
+                span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
+                span.set_attribute("gen_ai.usage.input_tokens", getattr(response.usage, "prompt_tokens", 0))
+                span.set_attribute("gen_ai.usage.total_tokens", getattr(response.usage, "total_tokens", 0))
+                span.set_attribute("gen_ai.response.embedding_dimensions", len(response.data[0].embedding))
+                span.set_attribute("duration_ms", elapsed_ms)
+                
+                return response.data[0].embedding
+            except Exception as e:
+                record_exception_on_span(span, e)
+                logger.error(f"Failed to get embedding: {e}")
+                raise
     
     async def expand_query(self, query: str) -> list[str]:
         """Expand a query with semantically related search terms.
@@ -403,7 +447,20 @@ class LLMService:
         Returns:
             List of expanded query strings (including the original).
         """
-        expansion_prompt = """Generate 2-3 alternative search queries that would help find relevant content for this question.
+        model = self.settings.openai.effective_model
+        
+        with _tracer.start_as_current_span(
+            "gen_ai.chat",
+            attributes={
+                "gen_ai.system": "openai",
+                "gen_ai.request.model": model,
+                "gen_ai.operation.name": "query_expansion",
+                "gen_ai.request.max_tokens": 150,
+                "gen_ai.request.temperature": 0.3,
+                "input.query_length": len(query),
+            },
+        ) as span:
+            expansion_prompt = """Generate 2-3 alternative search queries that would help find relevant content for this question.
 
 Think about:
 - Synonyms and related terms (e.g., "public assemblies" → "marching", "protests", "demonstrations")
@@ -417,40 +474,58 @@ Example: ["protests marching demonstrations", "neo-Nazi extremist groups", "publ
 
 Return ONLY the JSON array, no other text."""
 
-        try:
-            response = await retry_with_backoff(
-                self.client.chat.completions.create,
-                model=self.settings.openai.effective_model,
-                messages=[
-                    {"role": "user", "content": expansion_prompt.format(query=query)}
-                ],
-                max_tokens=150,
-                temperature=0.3,
-            )
-            
-            content = response.choices[0].message.content.strip()
-            
-            # Parse JSON array
-            # Handle potential markdown code blocks
-            if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-                content = content.strip()
-            
-            expanded_queries = json.loads(content)
-            
-            if isinstance(expanded_queries, list):
-                # Return original query plus expansions
-                result = [query] + [str(q) for q in expanded_queries[:3]]
-                logger.debug(f"Query expanded: {query!r} → {result}")
-                return result
+            try:
+                start_time = time.monotonic()
                 
-        except Exception as e:
-            logger.warning(f"Query expansion failed, using original: {e}")
-        
-        # Fallback to original query only
-        return [query]
+                response = await retry_with_backoff(
+                    self.client.chat.completions.create,
+                    model=model,
+                    messages=[
+                        {"role": "user", "content": expansion_prompt.format(query=query)}
+                    ],
+                    max_tokens=150,
+                    temperature=0.3,
+                )
+                
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                
+                # Record Gen AI response attributes
+                usage = getattr(response, "usage", None)
+                if usage:
+                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
+                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
+                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
+                span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason if response.choices else "unknown")
+                span.set_attribute("duration_ms", elapsed_ms)
+                
+                content = response.choices[0].message.content.strip()
+                
+                # Parse JSON array
+                # Handle potential markdown code blocks
+                if content.startswith("```"):
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                    content = content.strip()
+                
+                expanded_queries = json.loads(content)
+                
+                if isinstance(expanded_queries, list):
+                    # Return original query plus expansions
+                    result = [query] + [str(q) for q in expanded_queries[:3]]
+                    span.set_attribute("output.expanded_query_count", len(result))
+                    logger.debug(f"Query expanded: {query!r} → {result}")
+                    return result
+                    
+            except Exception as e:
+                add_span_event(span, "query_expansion_failed", {"error": str(e)})
+                logger.warning(f"Query expansion failed, using original: {e}")
+            
+            # Fallback to original query only
+            span.set_attribute("output.expanded_query_count", 1)
+            span.set_attribute("output.fallback", True)
+            return [query]
     
     async def generate_answer(
         self,
@@ -472,22 +547,40 @@ Return ONLY the JSON array, no other text."""
         Returns:
             Dict with answer, citations, follow-ups, and uncertainty.
         """
-        # Build context from evidence
-        evidence_text = self._format_evidence(evidence)
-        video_context_text = self._format_video_context(video_context) if video_context else ""
+        model = self.settings.openai.effective_model
+        max_tokens = self.settings.openai.max_tokens
+        temperature = self.settings.openai.temperature
         
-        # Build messages
-        messages = [
-            {"role": "system", "content": COPILOT_SYSTEM_PROMPT},
-        ]
-        
-        # Add conversation history if provided
-        if conversation_history:
-            messages.extend(conversation_history[-6:])  # Keep last 3 exchanges
-        
-        # Build instructions based on whether AI knowledge is allowed
-        if use_llm_knowledge:
-            instructions = """INSTRUCTIONS:
+        with _tracer.start_as_current_span(
+            "gen_ai.chat",
+            attributes={
+                "gen_ai.system": "openai",
+                "gen_ai.request.model": model,
+                "gen_ai.operation.name": "generate_answer",
+                "gen_ai.request.max_tokens": max_tokens,
+                "gen_ai.request.temperature": temperature,
+                "input.query_length": len(query),
+                "input.evidence_count": len(evidence),
+                "input.use_llm_knowledge": use_llm_knowledge,
+                "input.has_conversation_history": conversation_history is not None,
+            },
+        ) as span:
+            # Build context from evidence
+            evidence_text = self._format_evidence(evidence)
+            video_context_text = self._format_video_context(video_context) if video_context else ""
+            
+            # Build messages
+            messages = [
+                {"role": "system", "content": COPILOT_SYSTEM_PROMPT},
+            ]
+            
+            # Add conversation history if provided
+            if conversation_history:
+                messages.extend(conversation_history[-6:])  # Keep last 3 exchanges
+            
+            # Build instructions based on whether AI knowledge is allowed
+            if use_llm_knowledge:
+                instructions = """INSTRUCTIONS:
 - ANSWER THE QUESTION FIRST. Your first sentence should directly address what the user asked.
 - If you can't directly answer from the evidence, say so upfront (e.g., "Your videos don't cover this topic.").
 - CLEARLY SEPARATE SOURCES: Use "**From your videos:**" and "**From AI knowledge:**" headers
@@ -508,8 +601,8 @@ When videos partially cover the topic:
   "**From your videos:** [relevant video content with citations]
   
   **From AI knowledge:** Additionally, [supplementary info not in videos]\""""
-        else:
-            instructions = """INSTRUCTIONS:
+            else:
+                instructions = """INSTRUCTIONS:
 - ANSWER THE QUESTION using ONLY the evidence from the user's videos below. DO NOT add any information from your general AI knowledge.
 - ANSWER THE QUESTION FIRST. Your first sentence should directly address what the user asked.
 - If the evidence doesn't contain enough information to answer the question, say: "Your videos don't contain information about this topic."
@@ -525,8 +618,8 @@ Always use only:
 If the evidence doesn't cover the topic:
   "**From your videos:** Your library doesn't contain information about [topic]. Try enabling 'AI Knowledge' for general information.\""""
 
-        # Build the user message with evidence
-        user_message = f"""Answer this question using the evidence below:
+            # Build the user message with evidence
+            user_message = f"""Answer this question using the evidence below:
 
 QUESTION: {query}
 
@@ -571,67 +664,94 @@ BAD follow-ups:
 - "Would you like more details on this topic?"
 - "Do you want to know about the gun buyback or hate speech measures?"
 - "Should I explain more about Minns's announcement?\""""
-        
-        messages.append({"role": "user", "content": user_message})
-        
-        try:
-            # Build kwargs for chat completion
-            completion_kwargs = {
-                "model": self.settings.openai.effective_model,
-                "messages": messages,
-                "response_format": {"type": "json_object"},
-            }
             
-            # Use max_completion_tokens for newer models (gpt-4o, gpt-5, o1, DeepSeek, etc.)
-            # Use max_tokens for older models (gpt-3.5, gpt-4)
-            # Some models don't support temperature parameter
-            model = self.settings.openai.effective_model.lower()
-            if any(m in model for m in ["gpt-5", "o1", "o3", "deepseek"]):
-                completion_kwargs["max_completion_tokens"] = self.settings.openai.max_tokens
-                # DeepSeek supports temperature, add it for those models
-                if "deepseek" in model:
-                    completion_kwargs["temperature"] = self.settings.openai.temperature
-                # gpt-5 and o-series don't support temperature parameter
-            else:
-                completion_kwargs["max_tokens"] = self.settings.openai.max_tokens
-                completion_kwargs["temperature"] = self.settings.openai.temperature
+            messages.append({"role": "user", "content": user_message})
             
-            # Use retry with backoff for rate limiting
-            response = await retry_with_backoff(
-                self.client.chat.completions.create,
-                **completion_kwargs
-            )
+            # Record message count for tracing
+            span.set_attribute("gen_ai.request.message_count", len(messages))
             
-            content = response.choices[0].message.content
-            result = json.loads(content)
-            
-            # Handle LLM returning literal "null" string instead of JSON null
-            uncertainty_value = result.get("uncertainty")
-            if uncertainty_value == "null" or uncertainty_value == "":
-                uncertainty_value = None
-            
-            return {
-                "answer": result.get("answer", "I couldn't generate an answer."),
-                "confidence": result.get("confidence", "low"),
-                "cited_videos": result.get("cited_videos", []),
-                "follow_ups": result.get("follow_ups", []),
-                "uncertainty": uncertainty_value,
-                "video_explanations": result.get("video_explanations", {}),
-            }
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse LLM response as JSON: {e}")
-            # Return the raw content as answer
-            return {
-                "answer": response.choices[0].message.content if response else "Failed to generate answer",
-                "confidence": "low",
-                "cited_videos": [],
-                "follow_ups": [],
-                "uncertainty": "Response format was unexpected",
-                "video_explanations": {},
-            }
-        except Exception as e:
-            logger.error(f"Failed to generate answer: {e}")
-            raise
+            try:
+                start_time = time.monotonic()
+                
+                # Build kwargs for chat completion
+                completion_kwargs = {
+                    "model": model,
+                    "messages": messages,
+                    "response_format": {"type": "json_object"},
+                }
+                
+                # Use max_completion_tokens for newer models (gpt-4o, gpt-5, o1, DeepSeek, etc.)
+                # Use max_tokens for older models (gpt-3.5, gpt-4)
+                # Some models don't support temperature parameter
+                model_lower = model.lower()
+                if any(m in model_lower for m in ["gpt-5", "o1", "o3", "deepseek"]):
+                    completion_kwargs["max_completion_tokens"] = max_tokens
+                    # DeepSeek supports temperature, add it for those models
+                    if "deepseek" in model_lower:
+                        completion_kwargs["temperature"] = temperature
+                    # gpt-5 and o-series don't support temperature parameter
+                else:
+                    completion_kwargs["max_tokens"] = max_tokens
+                    completion_kwargs["temperature"] = temperature
+                
+                # Use retry with backoff for rate limiting
+                response = await retry_with_backoff(
+                    self.client.chat.completions.create,
+                    **completion_kwargs
+                )
+                
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                
+                # Record Gen AI response attributes
+                usage = getattr(response, "usage", None)
+                if usage:
+                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
+                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
+                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
+                span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason if response.choices else "unknown")
+                span.set_attribute("duration_ms", elapsed_ms)
+                
+                content = response.choices[0].message.content
+                result = json.loads(content)
+                
+                # Handle LLM returning literal "null" string instead of JSON null
+                uncertainty_value = result.get("uncertainty")
+                if uncertainty_value == "null" or uncertainty_value == "":
+                    uncertainty_value = None
+                
+                # Record response quality metrics
+                confidence = result.get("confidence", "low")
+                span.set_attribute("output.confidence", confidence)
+                span.set_attribute("output.cited_video_count", len(result.get("cited_videos", [])))
+                span.set_attribute("output.follow_up_count", len(result.get("follow_ups", [])))
+                span.set_attribute("output.has_uncertainty", uncertainty_value is not None)
+                span.set_attribute("output.answer_length", len(result.get("answer", "")))
+                
+                return {
+                    "answer": result.get("answer", "I couldn't generate an answer."),
+                    "confidence": confidence,
+                    "cited_videos": result.get("cited_videos", []),
+                    "follow_ups": result.get("follow_ups", []),
+                    "uncertainty": uncertainty_value,
+                    "video_explanations": result.get("video_explanations", {}),
+                }
+            except json.JSONDecodeError as e:
+                add_span_event(span, "json_parse_failed", {"error": str(e)})
+                logger.warning(f"Failed to parse LLM response as JSON: {e}")
+                # Return the raw content as answer
+                return {
+                    "answer": response.choices[0].message.content if response else "Failed to generate answer",
+                    "confidence": "low",
+                    "cited_videos": [],
+                    "follow_ups": [],
+                    "uncertainty": "Response format was unexpected",
+                    "video_explanations": {},
+                }
+            except Exception as e:
+                record_exception_on_span(span, e)
+                logger.error(f"Failed to generate answer: {e}")
+                raise
     
     async def generate_follow_ups(
         self,
@@ -649,11 +769,25 @@ BAD follow-ups:
         Returns:
             List of suggested follow-up questions.
         """
-        topics_context = ""
-        if available_topics:
-            topics_context = f"\nAvailable topics in the library: {', '.join(available_topics[:20])}"
+        model = self.settings.openai.model
         
-        prompt = f"""Given this Q&A exchange, suggest 3 natural follow-up questions.
+        with _tracer.start_as_current_span(
+            "gen_ai.chat",
+            attributes={
+                "gen_ai.system": "openai",
+                "gen_ai.request.model": model,
+                "gen_ai.operation.name": "generate_follow_ups",
+                "gen_ai.request.max_tokens": 256,
+                "gen_ai.request.temperature": 0.7,
+                "input.query_length": len(query),
+                "input.answer_length": len(answer),
+            },
+        ) as span:
+            topics_context = ""
+            if available_topics:
+                topics_context = f"\nAvailable topics in the library: {', '.join(available_topics[:20])}"
+            
+            prompt = f"""Given this Q&A exchange, suggest 3 natural follow-up questions.
 
 IMPORTANT: Write questions from the USER'S perspective (first person), as if they are asking the question themselves.
 - GOOD: "How do I practice this technique?", "What equipment do I need?", "Can I do this at home?"
@@ -665,37 +799,54 @@ Answer: {answer}
 
 Return a JSON array of 3 follow-up questions (first-person, user perspective):
 ["How do I...", "What should I...", "Can I..."]"""
-        
-        try:
-            # Use retry with backoff for rate limiting
-            response = await retry_with_backoff(
-                self.client.chat.completions.create,
-                model=self.settings.openai.model,
-                messages=[
-                    {"role": "system", "content": "You suggest helpful follow-up questions written from the user's perspective (first person, e.g. 'How do I...' not 'How to...')."},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=256,
-                temperature=0.7,
-                response_format={"type": "json_object"},
-            )
             
-            content = response.choices[0].message.content
-            # Parse JSON - might be wrapped in an object
-            parsed = json.loads(content)
-            
-            if isinstance(parsed, list):
-                return parsed[:3]
-            elif isinstance(parsed, dict):
-                # Look for an array in the response
-                for key, value in parsed.items():
-                    if isinstance(value, list):
-                        return value[:3]
-            
-            return []
-        except Exception as e:
-            logger.warning(f"Failed to generate follow-ups: {e}")
-            return []
+            try:
+                start_time = time.monotonic()
+                
+                # Use retry with backoff for rate limiting
+                response = await retry_with_backoff(
+                    self.client.chat.completions.create,
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": "You suggest helpful follow-up questions written from the user's perspective (first person, e.g. 'How do I...' not 'How to...')."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_tokens=256,
+                    temperature=0.7,
+                    response_format={"type": "json_object"},
+                )
+                
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                
+                # Record Gen AI response attributes
+                usage = getattr(response, "usage", None)
+                if usage:
+                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
+                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
+                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
+                span.set_attribute("duration_ms", elapsed_ms)
+                
+                content = response.choices[0].message.content
+                # Parse JSON - might be wrapped in an object
+                parsed = json.loads(content)
+                
+                if isinstance(parsed, list):
+                    span.set_attribute("output.follow_up_count", len(parsed[:3]))
+                    return parsed[:3]
+                elif isinstance(parsed, dict):
+                    # Look for an array in the response
+                    for key, value in parsed.items():
+                        if isinstance(value, list):
+                            span.set_attribute("output.follow_up_count", len(value[:3]))
+                            return value[:3]
+                
+                span.set_attribute("output.follow_up_count", 0)
+                return []
+            except Exception as e:
+                add_span_event(span, "follow_up_generation_failed", {"error": str(e)})
+                logger.warning(f"Failed to generate follow-ups: {e}")
+                return []
     
     async def generate_answer_without_evidence(
         self,
@@ -720,7 +871,22 @@ Return a JSON array of 3 follow-up questions (first-person, user perspective):
                 "follow_ups": ["Enable 'AI Knowledge' to get answers"],
             }
         
-        system_prompt = """You are a helpful AI assistant. The user has chosen not to search their video library, so you should answer based on your general knowledge.
+        model = self.settings.openai.effective_model
+        max_tokens = self.settings.openai.max_tokens
+        temperature = self.settings.openai.temperature
+        
+        with _tracer.start_as_current_span(
+            "gen_ai.chat",
+            attributes={
+                "gen_ai.system": "openai",
+                "gen_ai.request.model": model,
+                "gen_ai.operation.name": "generate_answer_without_evidence",
+                "gen_ai.request.max_tokens": max_tokens,
+                "input.query_length": len(query),
+                "input.allow_general_knowledge": allow_general_knowledge,
+            },
+        ) as span:
+            system_prompt = """You are a helpful AI assistant. The user has chosen not to search their video library, so you should answer based on your general knowledge.
 
 IMPORTANT:
 - Answer the question directly using your training knowledge
@@ -733,51 +899,68 @@ Respond in JSON:
     "answer": "Your helpful answer based on general knowledge",
     "follow_ups": ["Suggested follow-up question 1", "Suggested follow-up question 2"]
 }"""
-        
-        try:
-            # Build completion kwargs based on model type
-            model = self.settings.openai.effective_model.lower()
-            completion_kwargs = {
-                "model": self.settings.openai.effective_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query},
-                ],
-            }
             
-            # Use max_completion_tokens for newer models, max_tokens for older ones
-            if any(m in model for m in ["gpt-5", "o1", "o3", "deepseek"]):
-                completion_kwargs["max_completion_tokens"] = self.settings.openai.max_tokens
-                # DeepSeek supports temperature
-                if "deepseek" in model:
-                    completion_kwargs["temperature"] = self.settings.openai.temperature
-            else:
-                completion_kwargs["max_tokens"] = self.settings.openai.max_tokens
-                completion_kwargs["temperature"] = self.settings.openai.temperature
-            
-            response = await retry_with_backoff(
-                self.client.chat.completions.create,
-                **completion_kwargs
-            )
-            
-            content = response.choices[0].message.content.strip()
-            
-            # Handle markdown code blocks
-            if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-                content = content.strip()
-            
-            result = json.loads(content)
-            return result
-            
-        except Exception as e:
-            logger.error(f"Failed to generate answer without evidence: {e}")
-            return {
-                "answer": f"I encountered an error while processing your question. Please try again.",
-                "follow_ups": ["Try rephrasing your question"],
-            }
+            try:
+                start_time = time.monotonic()
+                
+                # Build completion kwargs based on model type
+                model_lower = model.lower()
+                completion_kwargs = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": query},
+                    ],
+                }
+                
+                # Use max_completion_tokens for newer models, max_tokens for older ones
+                if any(m in model_lower for m in ["gpt-5", "o1", "o3", "deepseek"]):
+                    completion_kwargs["max_completion_tokens"] = max_tokens
+                    # DeepSeek supports temperature
+                    if "deepseek" in model_lower:
+                        completion_kwargs["temperature"] = temperature
+                else:
+                    completion_kwargs["max_tokens"] = max_tokens
+                    completion_kwargs["temperature"] = temperature
+                
+                response = await retry_with_backoff(
+                    self.client.chat.completions.create,
+                    **completion_kwargs
+                )
+                
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                
+                # Record Gen AI response attributes
+                usage = getattr(response, "usage", None)
+                if usage:
+                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
+                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
+                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
+                span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason if response.choices else "unknown")
+                span.set_attribute("duration_ms", elapsed_ms)
+                
+                content = response.choices[0].message.content.strip()
+                
+                # Handle markdown code blocks
+                if content.startswith("```"):
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                    content = content.strip()
+                
+                result = json.loads(content)
+                span.set_attribute("output.answer_length", len(result.get("answer", "")))
+                span.set_attribute("output.follow_up_count", len(result.get("follow_ups", [])))
+                return result
+                
+            except Exception as e:
+                record_exception_on_span(span, e)
+                logger.error(f"Failed to generate answer without evidence: {e}")
+                return {
+                    "answer": f"I encountered an error while processing your question. Please try again.",
+                    "follow_ups": ["Try rephrasing your question"],
+                }
     
     def _format_evidence(self, evidence: list[dict[str, Any]]) -> str:
         """Format evidence segments for the LLM prompt.
@@ -842,56 +1025,88 @@ Respond in JSON:
         Returns:
             Parsed JSON response from LLM.
         """
-        try:
-            # Build completion kwargs based on model type
-            model = self.settings.openai.effective_model.lower()
-            completion_kwargs = {
-                "model": self.settings.openai.effective_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            }
-            
-            # Use max_completion_tokens for newer models, max_tokens for older ones
-            if any(m in model for m in ["gpt-5", "o1", "o3", "deepseek"]):
-                completion_kwargs["max_completion_tokens"] = self.settings.openai.max_tokens
-                # DeepSeek supports temperature
-                if "deepseek" in model:
-                    completion_kwargs["temperature"] = self.settings.openai.temperature
-            else:
-                completion_kwargs["max_tokens"] = self.settings.openai.max_tokens
-                completion_kwargs["temperature"] = self.settings.openai.temperature
-            
-            response = await retry_with_backoff(
-                self.client.chat.completions.create,
-                **completion_kwargs
-            )
-            
-            content = response.choices[0].message.content.strip()
-            
-            # Handle markdown code blocks
-            if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-                content = content.strip()
-            
-            result = json.loads(content)
-            return result
-            
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse LLM structured output as JSON: {e}")
-            # Return a minimal valid structure
-            return {
-                "title": "Generated Output",
-                "description": "Unable to parse LLM response",
-                "items": [],
-                "gaps": [],
-            }
-        except Exception as e:
-            logger.error(f"Failed to generate structured output: {e}")
-            raise
+        model = self.settings.openai.effective_model
+        max_tokens = self.settings.openai.max_tokens
+        temperature = self.settings.openai.temperature
+        
+        with _tracer.start_as_current_span(
+            "gen_ai.chat",
+            attributes={
+                "gen_ai.system": "openai",
+                "gen_ai.request.model": model,
+                "gen_ai.operation.name": "generate_structured_output",
+                "gen_ai.request.max_tokens": max_tokens,
+                "input.system_prompt_length": len(system_prompt),
+                "input.user_prompt_length": len(user_prompt),
+            },
+        ) as span:
+            try:
+                start_time = time.monotonic()
+                
+                # Build completion kwargs based on model type
+                model_lower = model.lower()
+                completion_kwargs = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                }
+                
+                # Use max_completion_tokens for newer models, max_tokens for older ones
+                if any(m in model_lower for m in ["gpt-5", "o1", "o3", "deepseek"]):
+                    completion_kwargs["max_completion_tokens"] = max_tokens
+                    # DeepSeek supports temperature
+                    if "deepseek" in model_lower:
+                        completion_kwargs["temperature"] = temperature
+                else:
+                    completion_kwargs["max_tokens"] = max_tokens
+                    completion_kwargs["temperature"] = temperature
+                
+                response = await retry_with_backoff(
+                    self.client.chat.completions.create,
+                    **completion_kwargs
+                )
+                
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                
+                # Record Gen AI response attributes
+                usage = getattr(response, "usage", None)
+                if usage:
+                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
+                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
+                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
+                span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason if response.choices else "unknown")
+                span.set_attribute("duration_ms", elapsed_ms)
+                
+                content = response.choices[0].message.content.strip()
+                
+                # Handle markdown code blocks
+                if content.startswith("```"):
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                    content = content.strip()
+                
+                result = json.loads(content)
+                span.set_attribute("output.item_count", len(result.get("items", [])))
+                return result
+                
+            except json.JSONDecodeError as e:
+                add_span_event(span, "json_parse_failed", {"error": str(e)})
+                logger.warning(f"Failed to parse LLM structured output as JSON: {e}")
+                # Return a minimal valid structure
+                return {
+                    "title": "Generated Output",
+                    "description": "Unable to parse LLM response",
+                    "items": [],
+                    "gaps": [],
+                }
+            except Exception as e:
+                record_exception_on_span(span, e)
+                logger.error(f"Failed to generate structured output: {e}")
+                raise
 
 
 # Singleton instance

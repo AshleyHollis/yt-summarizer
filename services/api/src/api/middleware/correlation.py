@@ -1,4 +1,11 @@
-"""Correlation ID middleware for request tracing."""
+"""Correlation ID middleware for request tracing.
+
+This middleware ensures correlation IDs propagate through:
+1. HTTP request/response headers (X-Correlation-ID)
+2. Structured logging context
+3. OpenTelemetry trace spans (as span attribute)
+4. OpenTelemetry baggage (for cross-service propagation)
+"""
 
 import uuid
 from typing import Callable
@@ -18,6 +25,33 @@ def generate_correlation_id() -> str:
     return str(uuid.uuid4())
 
 
+def _set_trace_correlation(correlation_id: str) -> None:
+    """Add correlation ID to the current trace span and baggage.
+    
+    This ensures the correlation ID propagates through:
+    - The current span as an attribute (for filtering in dashboards)
+    - OpenTelemetry baggage (for cross-service propagation)
+    """
+    try:
+        from opentelemetry import trace, baggage
+        from opentelemetry.context import attach, get_current
+        
+        # Add to current span as attribute
+        span = trace.get_current_span()
+        if span and span.is_recording():
+            span.set_attribute("correlation_id", correlation_id)
+            span.set_attribute("app.correlation_id", correlation_id)
+        
+        # Add to baggage for cross-service propagation
+        ctx = baggage.set_baggage("correlation_id", correlation_id, get_current())
+        attach(ctx)
+        
+    except ImportError:
+        pass  # OpenTelemetry not available
+    except Exception:
+        pass  # Ignore telemetry errors
+
+
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
     """Middleware to handle correlation IDs for request tracing.
     
@@ -26,6 +60,7 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
     2. Generates a new one if not present
     3. Adds it to the response headers
     4. Makes it available throughout the request lifecycle
+    5. Adds it to OpenTelemetry span and baggage for distributed tracing
     """
     
     def __init__(
@@ -73,6 +108,9 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         # Set correlation ID for logging
         set_correlation_id(correlation_id)
         bind_context(correlation_id=correlation_id)
+        
+        # Add to OpenTelemetry trace span and baggage
+        _set_trace_correlation(correlation_id)
         
         try:
             # Process the request

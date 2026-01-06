@@ -31,8 +31,10 @@ test.describe('Copilot Feature', () => {
         page.locator('[class*="CopilotSidebar"]')
       );
       
-      // Either sidebar is visible or there's a toggle
-      const toggle = page.getByRole('button', { name: /copilot|chat|ask/i });
+      // Either sidebar is visible or there's a toggle button (FAB)
+      const toggle = page.getByRole('button', { name: /copilot|chat|ask|assistant/i }).or(
+        page.locator('[data-testid="copilot-fab"]')
+      );
       
       const sidebarVisible = await sidebar.isVisible().catch(() => false);
       const toggleVisible = await toggle.isVisible().catch(() => false);
@@ -56,17 +58,18 @@ test.describe('Copilot Feature', () => {
 
   test.describe('Query Interface', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/library');
+      // Navigate with chat=open to have the sidebar open by default
+      await page.goto('/library?chat=open');
       await page.waitForLoadState('networkidle');
     });
 
     test('has query input field', async ({ page }) => {
       // The copilot chat input should be visible on the library page
-      // It's either in the sidebar or accessible via a toggle button
-      const chatInput = page.getByRole('textbox', { name: /ask|message/i }).or(
+      // When chat=open, the sidebar should show the chat input
+      const chatInput = page.getByPlaceholder('Ask about your videos...').or(
         page.locator('[placeholder*="ask" i]')
       ).or(
-        page.getByRole('textbox').first()
+        page.getByRole('textbox', { name: /ask|message/i })
       );
       
       // Give the page time to fully render the chat interface
@@ -88,7 +91,8 @@ test.describe('Copilot Feature', () => {
 
   test.describe('Scope Filtering', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/library');
+      // Navigate with chat=open to have the sidebar open by default
+      await page.goto('/library?chat=open');
       await page.waitForLoadState('networkidle');
     });
 
@@ -255,7 +259,8 @@ test.describe('Copilot Feature', () => {
 
     test.beforeEach(async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 720 });
-      await page.goto('/library');
+      // Navigate with chat=open to have the sidebar open by default
+      await page.goto('/library?chat=open');
       await page.waitForLoadState('networkidle');
     });
 

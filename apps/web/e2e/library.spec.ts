@@ -27,8 +27,8 @@ test.describe('User Story 3: Browse the Library', () => {
       await page.goto('/library');
       await expect(page).toHaveURL('/library');
       
-      // Check page header
-      await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+      // Check for main content area and video count indicator
+      await expect(page.getByText(/\d+ videos/)).toBeVisible({ timeout: 10000 });
     });
 
     test('library page shows filter sidebar', async ({ page }) => {

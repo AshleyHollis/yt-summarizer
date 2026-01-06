@@ -61,7 +61,8 @@ async function getResponseText(page: Page): Promise<string> {
 test.describe("Chat Response Quality", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library");
+    // Navigate with chat=open to have the sidebar open by default
+    await page.goto("/library?chat=open");
     await page.waitForLoadState("networkidle");
   });
 
@@ -270,7 +271,8 @@ test.describe("Chat Response Quality", () => {
 test.describe("Chat Edge Cases", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library");
+    // Navigate with chat=open to have the sidebar open by default
+    await page.goto("/library?chat=open");
     await page.waitForLoadState("networkidle");
   });
 

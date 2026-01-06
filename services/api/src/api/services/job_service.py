@@ -11,6 +11,7 @@ try:
     from shared.db.models import Job, JobHistory, Video
     from shared.logging.config import get_logger
     from shared.queue.client import get_queue_client
+    from shared.telemetry.config import inject_trace_context
 except ImportError:
     from typing import Any
 
@@ -25,6 +26,9 @@ except ImportError:
 
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
+    
+    def inject_trace_context(message):
+        return message
 
 
 from ..models.base import PaginationMeta
@@ -348,13 +352,13 @@ class JobService:
 
             queue_client.send_message(
                 queue_name,
-                {
+                inject_trace_context({
                     "job_id": str(job.job_id),
                     "video_id": str(job.video_id),
                     "youtube_video_id": video.youtube_video_id if video else "",
                     "correlation_id": correlation_id,
                     "retry_count": job.retry_count,
-                },
+                }),
             )
             logger.info("Queued retry job", job_id=str(job.job_id))
         except Exception as e:

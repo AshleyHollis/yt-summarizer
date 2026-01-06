@@ -35,6 +35,30 @@ def add_correlation_id(
     return event_dict
 
 
+def add_trace_context(
+    logger: logging.Logger,
+    method_name: str,
+    event_dict: dict[str, Any],
+) -> dict[str, Any]:
+    """Add OpenTelemetry trace context to log events (T188)."""
+    try:
+        from opentelemetry import trace
+        
+        span = trace.get_current_span()
+        if span is not None:
+            context = span.get_span_context()
+            if context.is_valid:
+                # Format trace_id and span_id as hex strings
+                event_dict["trace_id"] = format(context.trace_id, "032x")
+                event_dict["span_id"] = format(context.span_id, "016x")
+    except ImportError:
+        pass  # OpenTelemetry not available
+    except Exception:
+        pass  # Ignore any tracing errors
+    
+    return event_dict
+
+
 def add_service_info(
     logger: logging.Logger,
     method_name: str,
@@ -77,6 +101,7 @@ def configure_logging(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.UnicodeDecoder(),
         add_correlation_id,
+        add_trace_context,  # Add OpenTelemetry trace IDs (T188)
         add_service_info,
     ]
     

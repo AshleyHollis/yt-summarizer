@@ -14,6 +14,7 @@ try:
     from shared.db.models import Channel, Job, Video
     from shared.logging.config import get_logger
     from shared.queue.client import TRANSCRIBE_QUEUE, get_queue_client
+    from shared.telemetry.config import inject_trace_context
 except ImportError:
     # Fallback for development
     from typing import Any
@@ -31,6 +32,9 @@ except ImportError:
 
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
+    
+    def inject_trace_context(message):
+        return message
 
 
 from ..models.job import JobStage, JobStatus, JobType
@@ -193,15 +197,17 @@ class VideoService:
         # Queue the job
         try:
             queue_client = get_queue_client()
+            # Inject trace context for distributed tracing
+            message = inject_trace_context({
+                "job_id": str(job.job_id),
+                "video_id": str(video.video_id),
+                "youtube_video_id": youtube_video_id,
+                "channel_name": channel.name,
+                "correlation_id": correlation_id,
+            })
             queue_client.send_message(
                 TRANSCRIBE_QUEUE,
-                {
-                    "job_id": str(job.job_id),
-                    "video_id": str(video.video_id),
-                    "youtube_video_id": youtube_video_id,
-                    "channel_name": channel.name,
-                    "correlation_id": correlation_id,
-                },
+                message,
             )
             logger.info(
                 "Queued transcribe job",

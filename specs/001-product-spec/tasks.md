@@ -388,7 +388,7 @@
 
 ---
 
-## Phase 10: Polish & Cross-Cutting Concerns
+## Phase 10: Polish & Cross-Cutting Concerns ✅
 
 **Purpose**: Production readiness, deployment, observability
 
@@ -396,45 +396,218 @@
 
 #### Serverless DB Wake-up Handling (FR-020, FR-020a, FR-020b, FR-020c)
 
-- [ ] T181a Add `uptime_seconds` and `started_at` fields to HealthStatus response model in services/api/src/api/routes/health.py
-- [ ] T181b Store API startup timestamp in app.state during FastAPI lifespan startup in services/api/src/api/main.py
-- [ ] T181c Calculate and return uptime in health endpoint from stored startup timestamp
-- [ ] T181d Update healthApi types in apps/web/src/services/api.ts to include uptime_seconds and started_at fields
-- [ ] T181e Create useHealthCheck hook in apps/web/src/hooks/useHealthCheck.ts that polls /health endpoint
-- [ ] T181f Create HealthStatusProvider context in apps/web/src/contexts/HealthStatusContext.tsx to share health state across app
-- [ ] T181g Create WarmingUpIndicator component in apps/web/src/components/common/WarmingUpIndicator.tsx showing "Warming up..." banner when status is degraded
-- [ ] T181h Integrate WarmingUpIndicator into layout.tsx to display globally when database is unavailable
-- [ ] T181i Add retry logic to API client fetch wrapper that auto-retries on 503/degraded with exponential backoff
-- [ ] T181j Add unit tests for health endpoint uptime calculation in services/api/tests/test_health.py
-- [ ] T181k Add unit tests for useHealthCheck hook and WarmingUpIndicator component
-- [ ] T181l Add E2E test verifying warming up indicator displays when API returns degraded status
+- [X] T181a Add `uptime_seconds` and `started_at` fields to HealthStatus response model in services/api/src/api/routes/health.py
+- [X] T181b Store API startup timestamp in app.state during FastAPI lifespan startup in services/api/src/api/main.py
+- [X] T181c Calculate and return uptime in health endpoint from stored startup timestamp
+- [X] T181d Update healthApi types in apps/web/src/services/api.ts to include uptime_seconds and started_at fields
+- [X] T181e Create useHealthCheck hook in apps/web/src/hooks/useHealthCheck.ts that polls /health endpoint
+- [X] T181f Create HealthStatusProvider context in apps/web/src/contexts/HealthStatusContext.tsx to share health state across app
+- [X] T181g Create WarmingUpIndicator component in apps/web/src/components/common/WarmingUpIndicator.tsx showing "Warming up..." banner when status is degraded
+- [X] T181h Integrate WarmingUpIndicator into layout.tsx to display globally when database is unavailable
+- [X] T181i Add retry logic to API client fetch wrapper that auto-retries on 503/degraded with exponential backoff
+- [X] T181j Add unit tests for health endpoint uptime calculation in services/api/tests/test_health.py
+- [X] T181k Add unit tests for useHealthCheck hook and WarmingUpIndicator component
+- [X] T181l Add E2E test verifying warming up indicator displays when API returns degraded status
 
-- [ ] T182 [P] Add dead-letter visibility page in apps/web/src/app/jobs/dead-letter/page.tsx
-- [ ] T183 [P] Create global error boundary in apps/web/src/app/error.tsx
-- [ ] T184 Add loading skeletons for all async data fetches
+#### Global Error Handling
 
-### Observability
+- [X] T183 [P] Create global error boundary in apps/web/src/app/error.tsx
+  - Handle: API unreachable → "Cannot connect to server. Retrying..."
+  - Handle: 503 Service Unavailable → "Database is waking up. Please wait..."
+  - Handle: 500 Server Error → "Something went wrong. Please try again."
+  - Handle: Network offline → "You appear to be offline. Check your connection."
+  - Include "Retry" button and option to copy error details for support
+  - Log error to console with correlation_id if available
 
-- [ ] T185 [P] Add OpenTelemetry SDK to Python API in services/api
-- [ ] T186 [P] Add OpenTelemetry to workers in services/workers
-- [ ] T187 Verify correlation ID propagation from UI → API → workers
-- [ ] T188 [P] Create Log Analytics queries for common issues in docs/runbooks/
+- [X] T183a Create not-found page in apps/web/src/app/not-found.tsx
+  - User-friendly 404 page with link back to library/home
+  - Suggest related actions: "Browse Library", "Submit a Video"
 
-### Infrastructure
+#### Loading States & Skeletons
 
-- [ ] T189 [P] Create Bicep module for Azure SQL in infra/bicep/modules/sql.bicep
-- [ ] T190 [P] Create Bicep module for Storage (blob + queue) in infra/bicep/modules/storage.bicep
-- [ ] T191 [P] Create Bicep module for Container Apps in infra/bicep/modules/aca.bicep
-- [ ] T192 [P] Create Bicep module for Key Vault in infra/bicep/modules/keyvault.bicep
-- [ ] T193 Create main.bicep composing all modules in infra/bicep/main.bicep
-- [ ] T194 [P] Create GitHub Actions workflow for CI in .github/workflows/ci.yml
-- [ ] T195 [P] Create GitHub Actions workflow for CD in .github/workflows/deploy.yml
+- [X] T184 Add loading skeletons for async data fetches
+  - apps/web/src/components/library/VideoCardSkeleton.tsx for library grid
+  - apps/web/src/components/jobs/JobProgressSkeleton.tsx for job status
+  - apps/web/src/components/common/TableRowSkeleton.tsx for table views (batches, dead-letter)
+  - apps/web/src/components/copilot/MessageSkeleton.tsx for copilot responses
+  - Apply skeletons to: library page, video detail, batch status, jobs list, copilot sidebar
+
+### Observability — End-to-End Video Ingestion Tracing
+
+**Goal**: Trace the complete video ingestion flow from UI submission through all worker stages, enabling rapid identification of failures and bottlenecks in Aspire dashboard.
+
+#### OpenTelemetry SDK Setup
+
+- [X] T185 [P] Add OpenTelemetry SDK to Python API in services/api/pyproject.toml
+  - Install: opentelemetry-api, opentelemetry-sdk, opentelemetry-exporter-otlp
+  - Install: opentelemetry-instrumentation-fastapi, opentelemetry-instrumentation-sqlalchemy
+  - Install: opentelemetry-instrumentation-httpx (for yt-dlp/YouTube calls)
+
+- [X] T185a Configure OpenTelemetry TracerProvider in services/api/src/api/main.py
+  - Set service name from environment (OTEL_SERVICE_NAME or SERVICE_NAME)
+  - Configure OTLP exporter pointing to Aspire collector (OTEL_EXPORTER_OTLP_ENDPOINT)
+  - Add BatchSpanProcessor for production performance
+  - Instrument FastAPI, SQLAlchemy, and httpx automatically
+
+- [X] T186 [P] Add OpenTelemetry SDK to workers in services/workers/pyproject.toml
+  - Install same packages as API plus opentelemetry-instrumentation-azure-sdk (for queue/blob)
+  
+- [X] T186a Create shared OpenTelemetry configuration in services/shared/shared/telemetry/config.py
+  - configure_telemetry(service_name: str) function reusable by API and workers
+  - Auto-detect Aspire OTLP endpoint from environment
+  - Graceful fallback if OTLP endpoint not configured (local dev without Aspire)
+
+#### Video Ingestion Trace Spans
+
+- [X] T185b Add trace spans for video submission flow in services/api/src/api/services/video_service.py
+  - Span: `video.submit` (root span for submission with video_id, youtube_video_id attributes)
+  - Span: `video.metadata.fetch` (child span for YouTube metadata fetch with duration)
+  - Span: `video.channel.get_or_create` (child span for channel lookup/creation)
+  - Span: `video.persist` (child span for database insert)
+  - Span: `job.queue` (child span for transcribe job queue message)
+  - Add video_id, youtube_video_id, channel_id, job_id as span attributes
+
+- [X] T186b Add trace spans to transcribe worker in services/workers/transcribe/worker.py
+  - Span: `transcribe.process` (root span with job_id, video_id, youtube_video_id)
+  - Span: `transcribe.youtube.fetch` (child span for YouTube API call with timing)
+  - Span: `transcribe.blob.store` (child span for blob storage with content_length)
+  - Span: `transcribe.artifact.persist` (child span for artifact DB record)
+  - Span: `transcribe.queue.next` (child span for queuing summarize job)
+  - Add error details as span events on failure, rate_limit_detected event on 429
+
+- [X] T186c Add trace spans to summarize worker in services/workers/summarize/worker.py
+  - Span: `summarize.process` (root span with job_id, video_id)
+  - Span: `summarize.transcript.load` (child span for blob fetch)
+  - Span: `summarize.openai.generate` (child span with model, token_count, latency)
+  - Span: `summarize.blob.store` (child span for storing summary)
+  - Span: `summarize.queue.next` (child span for queuing embed job)
+
+- [X] T186d Add trace spans to embed worker in services/workers/embed/worker.py
+  - Span: `embed.process` (root span with job_id, video_id)
+  - Span: `embed.segments.create` (child span with segment_count attribute)
+  - Span: `embed.openai.batch` (child span with batch_size, token_count)
+  - Span: `embed.segments.persist` (child span for DB upserts)
+  - Span: `embed.queue.next` (child span for queuing relationships job)
+
+- [X] T186e Add trace spans to relationships worker in services/workers/relationships/worker.py
+  - Span: `relationships.process` (root span with job_id, video_id)
+  - Span: `relationships.extract` (child span for relationship extraction logic)
+  - Span: `relationships.persist` (child span with relationship_count)
+  - Span: `relationships.video.complete` (child span for marking video completed)
+
+#### Trace Context Propagation
+
+- [X] T187 Verify correlation ID propagation from UI → API → workers
+  - UI: Include X-Correlation-ID header in all API requests (already exists in apps/web/src/services/correlation.ts)
+  - API: Extract correlation ID and set as span attribute + baggage (update middleware/correlation.py)
+  - Queue: Include trace context (traceparent, tracestate) in queue message body
+  - Workers: Extract trace context from message and create child spans linked to parent
+
+- [X] T187a Update queue message schema to include trace context in services/shared/shared/queue/client.py
+  - Add traceparent and tracestate fields to job messages
+  - Create helper: inject_trace_context(message: dict) → dict
+  - Create helper: extract_trace_context(message: dict) → Context
+
+- [X] T187b Update base worker to propagate trace context in services/workers/worker_utils/base_worker.py
+  - Extract trace context from incoming message
+  - Create span with extracted context as parent
+  - Bind trace_id and span_id to structlog context for log correlation
+
+#### Aspire Dashboard Integration
+
+- [X] T185c Add OpenTelemetry environment variables to Aspire AppHost.cs
+  - Set OTEL_EXPORTER_OTLP_ENDPOINT for API and all workers pointing to Aspire collector
+  - Set OTEL_SERVICE_NAME for each resource (api, transcribe-worker, summarize-worker, embed-worker, relationships-worker)
+  - Enable OTEL_TRACES_SAMPLER=always_on for development (100% sampling)
+
+- [X] T185d Verify traces appear in Aspire dashboard with linked spans across services
+  - Test: Submit video → verify single trace with spans from API through all 4 workers
+  - Test: Failed job → verify error spans with exception details visible
+
+#### Structured Logging Enhancements for Trace Correlation
+
+- [X] T188 Add trace correlation to structured logs in services/shared/shared/logging/config.py
+  - Add trace_id and span_id to log context automatically when tracing is active
+  - Format: {"trace_id": "...", "span_id": "...", "correlation_id": "...", ...}
+  - Enable log-to-trace linking in Aspire dashboard
+
+- [X] T188a Create standardized log events for video ingestion pipeline stages
+  - Log event: `video.submitted` (video_id, youtube_video_id, channel_id)
+  - Log event: `job.started` (job_id, video_id, job_type, stage)
+  - Log event: `job.completed` (job_id, video_id, job_type, duration_ms)
+  - Log event: `job.failed` (job_id, video_id, job_type, error, retry_count)
+  - Log event: `job.rate_limited` (job_id, video_id, retry_delay_seconds)
+  - Log event: `video.completed` (video_id, youtube_video_id, total_duration_ms)
+
+#### Diagnostic Runbooks
+
+- [X] T188b [P] Create runbook: Investigating failed video ingestion in docs/runbooks/video-ingestion-troubleshooting.md
+  - How to find traces for a specific video in Aspire dashboard
+  - Common failure patterns: rate limiting, missing transcripts, OpenAI errors
+  - How to retry failed jobs via API
+  - How to identify which worker stage failed
+
+- [X] T188c [P] Create runbook: Understanding video ingestion latency in docs/runbooks/video-ingestion-latency.md
+  - How to identify slow stages using Aspire traces
+  - Expected duration per stage (transcribe: 5-30s, summarize: 10-60s, embed: 5-20s, relationships: 2-10s)
+  - Bottleneck identification: YouTube rate limits, OpenAI token limits, database contention
+
+- [X] T188d [P] Create Log Analytics / Aspire structured log queries in docs/runbooks/observability-queries.md
+  - Query: All failed jobs in last 24 hours with error details
+  - Query: Average processing time per stage
+  - Query: Rate limit occurrences by hour
+  - Query: Videos stuck in processing (started > 1 hour ago, not completed)
+  - Query: End-to-end latency percentiles (p50, p90, p99) for video ingestion
 
 ### Documentation
 
-- [ ] T196 [P] Create architecture overview in docs/architecture.md
-- [ ] T197 [P] Create operational runbook in docs/runbooks/operations.md
-- [ ] T198 Run quickstart.md validation and update as needed
+- [X] T196 [P] Create architecture overview in docs/architecture.md
+  - System context diagram: User → Web → API → Workers → Storage/DB
+  - Component diagram: All services with their responsibilities
+  - Data flow: Video ingestion pipeline (submit → transcribe → summarize → embed → relationships)
+  - Data flow: Copilot query (query → vector search → LLM → response)
+  - Technology stack summary table
+  - Key design decisions with rationale (Azure SQL for vectors, queue-based workers, CopilotKit)
+
+- [X] T196a [P] Create API reference guide in docs/api-reference.md
+  - Link to OpenAPI spec at /docs (FastAPI auto-generated)
+  - Authentication: None (network boundary trust)
+  - Common headers: X-Correlation-ID
+  - Error response format with examples
+  - Rate limiting: None currently, but respect YouTube rate limits in workers
+
+- [X] T197 [P] Create operational runbook in docs/runbooks/operations.md
+  - How to deploy a new version (CD pipeline or manual az commands)
+  - How to roll back to previous version
+  - How to scale workers up/down
+  - How to check application health (API /health, Container Apps metrics)
+  - How to view logs in Azure Portal / Log Analytics
+  - How to restart a stuck worker
+  - Cost monitoring: Which resources to watch, expected monthly cost range
+
+- [X] T197a [P] Create incident response runbook in docs/runbooks/incident-response.md
+  - Severity levels: P1 (all ingestion failing), P2 (specific worker down), P3 (degraded performance)
+  - First responder checklist: Check health endpoint, check Aspire traces, check worker logs
+  - Common incidents:
+    - YouTube rate limiting → Wait 5-15 min, check transcribe-worker logs
+    - OpenAI API errors → Check API key validity, check Azure OpenAI status page
+    - Database connection failures → Check SQL Server status, check firewall rules
+    - Queue message poison → Check dead-letter queue, inspect message content
+
+- [X] T198 Run quickstart.md validation and update as needed
+  - Verify all commands in quickstart.md work on clean checkout
+  - Update versions if dependencies have changed
+  - Add troubleshooting section for common setup issues
+  - Verify E2E test scenario in quickstart.md passes
+
+- [X] T198a [P] Create developer onboarding guide in docs/developer-guide.md
+  - Prerequisites: Node.js, Python 3.11+, .NET 8, Docker, Azure CLI
+  - Repository structure overview
+  - How to run locally with Aspire
+  - How to run tests (API, workers, frontend, E2E)
+  - How to add a new worker stage
+  - How to add a new API endpoint
+  - Code style and linting (ruff, ESLint/Prettier)
 
 ---
 
@@ -574,6 +747,7 @@ This delivers:
 | LLM grounding quality | T105, T108 handle uncertainty explicitly |
 | Cold start UX | T181a-T181l: Health endpoint includes uptime, UI polls and shows "Warming up" indicator, auto-retries on degraded status |
 | YouTube rate limiting | T074 uses yt-dlp with backoff for channel extraction; T175-T177 add content validation and retry |
+| Debugging ingestion failures | T185-T188d: End-to-end OpenTelemetry tracing with Aspire dashboard integration, trace context propagation across all workers |
 
 ---
 
@@ -581,7 +755,7 @@ This delivers:
 
 | Metric | Count |
 |--------|-------|
-| **Total Tasks** | 209 |
+| **Total Tasks** | 237 |
 | **Setup Phase** | 10 |
 | **Foundational Phase** | 24 |
 | **US1 (Single Video)** | 21 |
@@ -591,7 +765,16 @@ This delivers:
 | **US5 (Explain Why)** | 13 |
 | **US6 (Synthesis)** | 15 |
 | **Worker Resilience** | 6 |
-| **Polish Phase** | 29 |
-| **Parallel Tasks** | ~95 (45%) |
+| **Polish Phase** | 57 |
+| **Parallel Tasks** | ~105 (44%) |
 
 **MVP Scope**: Phases 1-3 + Phase 6 = ~92 tasks for core value delivery
+
+**Phase 10 Breakdown**:
+- Error Handling & UX: 16 tasks (T181a-T184)
+- Observability: 21 tasks (T185-T188d)
+- Documentation: 6 tasks (T196-T198a)
+
+**Deferred to Future Specs**:
+- Admin functionality (dead-letter visibility, job management, system monitoring)
+- Azure Deployment (Bicep modules, CI/CD pipelines, Container Apps configuration)

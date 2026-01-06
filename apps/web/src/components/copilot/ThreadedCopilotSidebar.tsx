@@ -429,6 +429,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
           className={styles.fab}
           title="Open AI Assistant"
           aria-label="Open AI Assistant"
+          data-testid="copilot-fab"
         >
           <MessageCircle className="w-6 h-6" />
         </button>

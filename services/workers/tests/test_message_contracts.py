@@ -28,8 +28,18 @@ try:
 except ImportError:
     HAS_NUMPY = False
 
+# Check if api module is available (for cross-service consistency tests)
+try:
+    from api.models.job import JobStatus, JobType, JobStage
+    HAS_API = True
+except ImportError:
+    HAS_API = False
+
 # Skip relationships worker tests if numpy not available
 requires_numpy = pytest.mark.skipif(not HAS_NUMPY, reason="numpy not installed")
+
+# Skip API consistency tests if api module not available
+requires_api = pytest.mark.skipif(not HAS_API, reason="api module not installed - cross-service tests require api package")
 
 
 # ============================================================================
@@ -360,6 +370,7 @@ class TestBatchIdPropagation:
 # ============================================================================
 
 
+@requires_api
 class TestJobTypeConsistency:
     """Test that job types are consistent between API and workers."""
 
@@ -397,6 +408,7 @@ class TestJobTypeConsistency:
             f"JobType mismatch. Expected: {expected_values}, Got: {actual_values}"
 
 
+@requires_api
 class TestJobStatusConsistency:
     """Test that job statuses are consistent across services."""
 
@@ -794,6 +806,7 @@ class TestMessageContractRegressions:
         assert message.batch_id is not None
         assert message.correlation_id is not None
 
+    @requires_api
     def test_status_completed_not_ready(self):
         """Regression: Status values should use 'completed' not 'ready'."""
         from api.models.job import JobStatus

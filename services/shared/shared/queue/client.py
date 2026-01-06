@@ -27,9 +27,11 @@ def get_connection_string() -> str:
     
     Supports multiple environment variable formats:
     1. AZURE_STORAGE_CONNECTION_STRING - Standard Azure SDK format
-    2. ConnectionStrings__storage - .NET Aspire storage connection string
-    3. ConnectionStrings__blobs - .NET Aspire blobs endpoint
-    4. ConnectionStrings__queues - .NET Aspire queues endpoint
+    2. QUEUES_CONNECTIONSTRING - Aspire queue connection string (preferred)
+    3. BLOBS_CONNECTIONSTRING - Aspire blob connection string
+    4. ConnectionStrings__storage - .NET Aspire storage connection string
+    5. ConnectionStrings__blobs - .NET Aspire blobs endpoint
+    6. ConnectionStrings__queues - .NET Aspire queues endpoint
     
     Aspire may pass a URI (http://...) or a full connection string.
     If a URI is passed, we convert it to a proper Azurite connection string.
@@ -37,7 +39,13 @@ def get_connection_string() -> str:
     # Try standard Azure SDK format first
     conn_str = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
     
-    # Try Aspire-injected connection strings
+    # Try Aspire-injected connection strings (new format with uppercase)
+    if not conn_str:
+        conn_str = os.environ.get("QUEUES_CONNECTIONSTRING")
+    if not conn_str:
+        conn_str = os.environ.get("BLOBS_CONNECTIONSTRING")
+    
+    # Try legacy Aspire format with double underscore
     if not conn_str:
         conn_str = os.environ.get("ConnectionStrings__storage")
     if not conn_str:
@@ -46,10 +54,21 @@ def get_connection_string() -> str:
         conn_str = os.environ.get("ConnectionStrings__blobs")
     
     if not conn_str:
+        # Build helpful error message showing which vars were checked
+        checked_vars = [
+            "AZURE_STORAGE_CONNECTION_STRING",
+            "QUEUES_CONNECTIONSTRING",
+            "BLOBS_CONNECTIONSTRING",
+            "ConnectionStrings__storage",
+            "ConnectionStrings__queues",
+            "ConnectionStrings__blobs",
+        ]
+        available = {k: v[:50] + "..." if v and len(v) > 50 else v 
+                     for k, v in os.environ.items() 
+                     if "QUEUE" in k.upper() or "BLOB" in k.upper() or "STORAGE" in k.upper()}
         raise ValueError(
-            "Azure Storage connection string not found. Set one of: "
-            "AZURE_STORAGE_CONNECTION_STRING, ConnectionStrings__storage, "
-            "ConnectionStrings__blobs, or ConnectionStrings__queues"
+            f"Azure Storage connection string not found. Checked: {checked_vars}. "
+            f"Available storage-related env vars: {available}"
         )
     
     # Check if Aspire passed a URI instead of a connection string

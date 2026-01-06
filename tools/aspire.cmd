@@ -25,10 +25,19 @@ REM Log the launch attempt
 set "LOG=%WORKSPACE%\aspire.log"
 echo [%date% %time%] Launching: "!REAL_ASPIRE!" %* > "%LOG%"
 
+REM AppHost directory (where appsettings.Development.json lives)
+set "APPHOST_DIR=%WORKSPACE%\services\aspire\AppHost"
+
 REM Create a temp script that runs aspire directly (not via PATH)
 set "TEMPSCRIPT=%TEMP%\run-aspire-%RANDOM%.cmd"
 echo @echo off > "%TEMPSCRIPT%"
-echo cd /d "%CD%" >> "%TEMPSCRIPT%"
+REM Change to AppHost directory so appsettings.Development.json is picked up
+echo cd /d "%APPHOST_DIR%" >> "%TEMPSCRIPT%"
+REM Set environment to Development to load appsettings.Development.json (with unsecured auth)
+echo set "DOTNET_ENVIRONMENT=Development" >> "%TEMPSCRIPT%"
+echo set "ASPNETCORE_ENVIRONMENT=Development" >> "%TEMPSCRIPT%"
+REM Enable anonymous access to the Aspire dashboard (no login token required)
+echo set "ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true" >> "%TEMPSCRIPT%"
 echo "!REAL_ASPIRE!" %* >> "%TEMPSCRIPT%"
 
 REM Launch the temp script minimized

@@ -2,8 +2,10 @@
 
 Orchestrates the flow: query → search → LLM → response
 Handles uncertainty detection and follow-up generation.
+Instrumented with OpenTelemetry for distributed tracing.
 """
 
+import time
 from typing import Any
 from uuid import UUID
 
@@ -13,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 try:
     from shared.db.models import Channel, Segment, Video
     from shared.logging.config import get_logger
+    from shared.telemetry import get_tracer, add_span_event, record_exception_on_span
 except ImportError:
     import logging
     from typing import Any as AnyType
@@ -23,6 +26,20 @@ except ImportError:
     
     def get_logger(name):
         return logging.getLogger(name)
+    
+    def get_tracer(name):
+        class NoOpSpan:
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def set_attribute(self, k, v): pass
+            def add_event(self, name, attributes=None): pass
+            def record_exception(self, e, attributes=None): pass
+        class NoOpTracer:
+            def start_as_current_span(self, name, **kwargs): return NoOpSpan()
+        return NoOpTracer()
+    
+    def add_span_event(span, name, attributes=None): pass
+    def record_exception_on_span(span, e, attributes=None): pass
 
 
 from ..models.copilot import (
@@ -40,6 +57,9 @@ from .llm_service import LLMService, get_llm_service
 from .search_service import SearchService
 
 logger = get_logger(__name__)
+
+# Get tracer for copilot operations
+_tracer = get_tracer("copilot_service")
 
 
 # =============================================================================
@@ -144,164 +164,203 @@ class CopilotService:
         # Get AI settings with defaults
         ai_settings = request.ai_settings or AIKnowledgeSettings()
         
-        logger.info(
-            "Processing copilot query",
-            query=request.query[:100],
-            scope=request.scope.model_dump() if request.scope else None,
-            ai_settings=ai_settings.model_dump(),
-            use_expanded_retriever=self._use_expanded_retriever,
-            correlation_id=correlation_id,
-        )
-        
-        # Step 1: Retrieve relevant segments (only if useVideoContext is enabled)
-        relevant_segments = []
-        if ai_settings.use_video_context:
-            if self._use_expanded_retriever:
-                relevant_segments = await self._retrieve_with_expanded_rag(
-                    request.query, request.scope, correlation_id
-                )
-            else:
-                relevant_segments = await self._retrieve_legacy(
-                    request.query, request.scope, correlation_id
-                )
-        
-        # Handle case where video context is disabled or no results found
-        if not relevant_segments:
-            if not ai_settings.use_video_context:
-                # User explicitly disabled video context
-                if not ai_settings.use_llm_knowledge:
-                    # Both video context and LLM knowledge disabled - nothing to do
+        with _tracer.start_as_current_span(
+            "copilot.query",
+            attributes={
+                "copilot.query_length": len(request.query),
+                "copilot.use_video_context": ai_settings.use_video_context,
+                "copilot.use_llm_knowledge": ai_settings.use_llm_knowledge,
+                "copilot.use_expanded_retriever": self._use_expanded_retriever,
+                "copilot.has_scope": request.scope is not None,
+                "correlation_id": correlation_id or "unknown",
+            },
+        ) as span:
+            logger.info(
+                "Processing copilot query",
+                query=request.query[:100],
+                scope=request.scope.model_dump() if request.scope else None,
+                ai_settings=ai_settings.model_dump(),
+                use_expanded_retriever=self._use_expanded_retriever,
+                correlation_id=correlation_id,
+            )
+            
+            start_time = time.monotonic()
+            
+            # Step 1: Retrieve relevant segments (only if useVideoContext is enabled)
+            relevant_segments = []
+            if ai_settings.use_video_context:
+                retrieval_start = time.monotonic()
+                if self._use_expanded_retriever:
+                    relevant_segments = await self._retrieve_with_expanded_rag(
+                        request.query, request.scope, correlation_id
+                    )
+                else:
+                    relevant_segments = await self._retrieve_legacy(
+                        request.query, request.scope, correlation_id
+                    )
+                retrieval_ms = (time.monotonic() - retrieval_start) * 1000
+                add_span_event(span, "retrieval_complete", {
+                    "duration_ms": retrieval_ms,
+                    "segment_count": len(relevant_segments),
+                    "retriever_type": "expanded" if self._use_expanded_retriever else "legacy",
+                })
+                span.set_attribute("copilot.retrieval.segment_count", len(relevant_segments))
+                span.set_attribute("copilot.retrieval.duration_ms", retrieval_ms)
+            
+            # Handle case where video context is disabled or no results found
+            if not relevant_segments:
+                if not ai_settings.use_video_context:
+                    # User explicitly disabled video context
+                    if not ai_settings.use_llm_knowledge:
+                        # Both video context and LLM knowledge disabled - nothing to do
+                        span.set_attribute("copilot.response.type", "no_sources_enabled")
+                        return CopilotQueryResponse(
+                            answer="I cannot answer this question because both video library search and AI knowledge are disabled. Please enable at least one knowledge source.",
+                            video_cards=[],
+                            evidence=[],
+                            scope_echo=request.scope,
+                            ai_settings_echo=ai_settings,
+                            followups=["Enable 'Your Videos' to search your library", "Enable 'AI Knowledge' to use general knowledge"],
+                            uncertainty="No knowledge sources enabled.",
+                            correlation_id=correlation_id,
+                        )
+                    # Only LLM knowledge enabled - generate answer without video context
+                    span.set_attribute("copilot.response.type", "llm_only")
+                    return await self._generate_llm_only_response(request, ai_settings, correlation_id)
+                else:
+                    # Video context enabled but no results found
+                    span.set_attribute("copilot.response.type", "no_results")
                     return CopilotQueryResponse(
-                        answer="I cannot answer this question because both video library search and AI knowledge are disabled. Please enable at least one knowledge source.",
+                        answer="I don't have any information on this topic in your library.",
                         video_cards=[],
                         evidence=[],
                         scope_echo=request.scope,
                         ai_settings_echo=ai_settings,
-                        followups=["Enable 'Your Videos' to search your library", "Enable 'AI Knowledge' to use general knowledge"],
-                        uncertainty="No knowledge sources enabled.",
+                        followups=[
+                            "Try broadening your search scope",
+                            "Consider ingesting more related videos",
+                        ],
+                        uncertainty="No relevant content found in the library.",
                         correlation_id=correlation_id,
                     )
-                # Only LLM knowledge enabled - generate answer without video context
-                return await self._generate_llm_only_response(request, ai_settings, correlation_id)
-            else:
-                # Video context enabled but no results found
-                return CopilotQueryResponse(
-                    answer="I don't have any information on this topic in your library.",
-                    video_cards=[],
-                    evidence=[],
-                    scope_echo=request.scope,
-                    ai_settings_echo=ai_settings,
-                    followups=[
-                        "Try broadening your search scope",
-                        "Consider ingesting more related videos",
-                    ],
-                    uncertainty="No relevant content found in the library.",
-                    correlation_id=correlation_id,
+            
+            # Check for uncertainty (not enough evidence)
+            uncertainty = self._detect_uncertainty(relevant_segments)
+            
+            # Step 2: Build evidence for LLM (only relevant segments)
+            evidence_for_llm = [
+                {
+                    "video_id": str(seg.video_id),
+                    "video_title": seg.video_title,
+                    "channel_name": seg.channel_name,
+                    "text": seg.text,
+                    "start_time": seg.start_time,
+                    "end_time": seg.end_time,
+                    "youtube_url": seg.youtube_url,
+                    "score": seg.score,
+                }
+                for seg in relevant_segments
+            ]
+            
+            # Step 3: Generate answer with LLM (respecting AI knowledge settings)
+            try:
+                llm_start = time.monotonic()
+                llm_result = await self.llm_service.generate_answer(
+                    query=request.query,
+                    evidence=evidence_for_llm,
+                    use_llm_knowledge=ai_settings.use_llm_knowledge,
                 )
-        
-        # Check for uncertainty (not enough evidence)
-        uncertainty = self._detect_uncertainty(relevant_segments)
-        
-        # Step 2: Build evidence for LLM (only relevant segments)
-        evidence_for_llm = [
-            {
-                "video_id": str(seg.video_id),
-                "video_title": seg.video_title,
-                "channel_name": seg.channel_name,
-                "text": seg.text,
-                "start_time": seg.start_time,
-                "end_time": seg.end_time,
-                "youtube_url": seg.youtube_url,
-                "score": seg.score,
-            }
-            for seg in relevant_segments
-        ]
-        
-        # Step 3: Generate answer with LLM (respecting AI knowledge settings)
-        try:
-            llm_result = await self.llm_service.generate_answer(
-                query=request.query,
-                evidence=evidence_for_llm,
-                use_llm_knowledge=ai_settings.use_llm_knowledge,
-            )
-        except Exception as e:
-            logger.error(f"LLM generation failed: {e}")
-            return self._create_error_response(
-                "Failed to generate answer. Please try again.",
-                request.scope,
-                correlation_id,
-            )
-        
-        # Step 4: Build evidence citations (only relevant segments)
-        evidence = [
-            Evidence(
-                video_id=seg.video_id,
-                youtube_video_id=self._extract_youtube_id(seg.youtube_url),
-                video_title=seg.video_title,
-                segment_id=seg.segment_id,
-                segment_text=seg.text,
-                start_time=seg.start_time,
-                end_time=seg.end_time,
-                youtube_url=seg.youtube_url,
-                confidence=1.0 - min(seg.score, 1.0),  # Convert distance to confidence
-            )
-            for seg in relevant_segments[:5]  # Top 5 as citations
-        ]
-        
-        # Step 5: Build video cards (deduplicated by video_id) with explanations
-        # Only use relevant segments to avoid showing irrelevant videos
-        video_explanations = llm_result.get("video_explanations", {})
-        seen_videos: set[UUID] = set()
-        video_cards: list[RecommendedVideo] = []
-        
-        for seg in relevant_segments:
-            if seg.video_id not in seen_videos and len(video_cards) < 5:
-                seen_videos.add(seg.video_id)
-                
-                # Try to get explanation from LLM result
-                video_id_str = str(seg.video_id)
-                explanation = self._build_video_explanation(
-                    video_id_str=video_id_str,
-                    video_explanations=video_explanations,
-                    segment=seg,
+                llm_ms = (time.monotonic() - llm_start) * 1000
+                span.set_attribute("copilot.llm.duration_ms", llm_ms)
+                span.set_attribute("copilot.llm.confidence", llm_result.get("confidence", "unknown"))
+            except Exception as e:
+                record_exception_on_span(span, e)
+                logger.error(f"LLM generation failed: {e}")
+                return self._create_error_response(
+                    "Failed to generate answer. Please try again.",
+                    request.scope,
+                    correlation_id,
                 )
-                
-                video_cards.append(RecommendedVideo(
+            
+            # Step 4: Build evidence citations (only relevant segments)
+            evidence = [
+                Evidence(
                     video_id=seg.video_id,
                     youtube_video_id=self._extract_youtube_id(seg.youtube_url),
-                    title=seg.video_title,
-                    channel_name=seg.channel_name,
-                    thumbnail_url=None,  # Would need to fetch from DB
-                    duration=None,
-                    relevance_score=1.0 - min(seg.score, 1.0),
-                    primary_reason=f"Contains relevant content at {self._format_timestamp(seg.start_time)}",
-                    explanation=explanation,
-                ))
-        
-        # Step 8: Get follow-ups from LLM result or generate new ones
-        followups = llm_result.get("follow_ups", [])
-        
-        if not followups:
-            try:
-                followups = await self.llm_service.generate_follow_ups(
-                    query=request.query,
-                    answer=llm_result.get("answer", ""),
+                    video_title=seg.video_title,
+                    segment_id=seg.segment_id,
+                    segment_text=seg.text,
+                    start_time=seg.start_time,
+                    end_time=seg.end_time,
+                    youtube_url=seg.youtube_url,
+                    confidence=1.0 - min(seg.score, 1.0),  # Convert distance to confidence
                 )
-            except Exception as e:
-                logger.warning(f"Failed to generate follow-ups: {e}")
-                followups = self._generate_default_followups(request.scope)
-        
-        # Step 9: Build final response
-        return CopilotQueryResponse(
-            answer=llm_result.get("answer", "Unable to generate answer."),
-            video_cards=video_cards,
-            evidence=evidence,
-            scope_echo=request.scope,
-            ai_settings_echo=ai_settings,
-            followups=followups,
-            uncertainty=llm_result.get("uncertainty") or uncertainty,
-            correlation_id=correlation_id,
-        )
+                for seg in relevant_segments[:5]  # Top 5 as citations
+            ]
+            
+            # Step 5: Build video cards (deduplicated by video_id) with explanations
+            # Only use relevant segments to avoid showing irrelevant videos
+            video_explanations = llm_result.get("video_explanations", {})
+            seen_videos: set[UUID] = set()
+            video_cards: list[RecommendedVideo] = []
+            
+            for seg in relevant_segments:
+                if seg.video_id not in seen_videos and len(video_cards) < 5:
+                    seen_videos.add(seg.video_id)
+                    
+                    # Try to get explanation from LLM result
+                    video_id_str = str(seg.video_id)
+                    explanation = self._build_video_explanation(
+                        video_id_str=video_id_str,
+                        video_explanations=video_explanations,
+                        segment=seg,
+                    )
+                    
+                    video_cards.append(RecommendedVideo(
+                        video_id=seg.video_id,
+                        youtube_video_id=self._extract_youtube_id(seg.youtube_url),
+                        title=seg.video_title,
+                        channel_name=seg.channel_name,
+                        thumbnail_url=None,  # Would need to fetch from DB
+                        duration=None,
+                        relevance_score=1.0 - min(seg.score, 1.0),
+                        primary_reason=f"Contains relevant content at {self._format_timestamp(seg.start_time)}",
+                        explanation=explanation,
+                    ))
+            
+            # Step 8: Get follow-ups from LLM result or generate new ones
+            followups = llm_result.get("follow_ups", [])
+            
+            if not followups:
+                try:
+                    followups = await self.llm_service.generate_follow_ups(
+                        query=request.query,
+                        answer=llm_result.get("answer", ""),
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to generate follow-ups: {e}")
+                    followups = self._generate_default_followups(request.scope)
+            
+            # Record final metrics on span
+            total_ms = (time.monotonic() - start_time) * 1000
+            span.set_attribute("copilot.response.type", "success")
+            span.set_attribute("copilot.response.video_card_count", len(video_cards))
+            span.set_attribute("copilot.response.evidence_count", len(evidence))
+            span.set_attribute("copilot.response.followup_count", len(followups))
+            span.set_attribute("copilot.response.answer_length", len(llm_result.get("answer", "")))
+            span.set_attribute("copilot.total_duration_ms", total_ms)
+            
+            # Step 9: Build final response
+            return CopilotQueryResponse(
+                answer=llm_result.get("answer", "Unable to generate answer."),
+                video_cards=video_cards,
+                evidence=evidence,
+                scope_echo=request.scope,
+                ai_settings_echo=ai_settings,
+                followups=followups,
+                uncertainty=llm_result.get("uncertainty") or uncertainty,
+                correlation_id=correlation_id,
+            )
     
     def _detect_uncertainty(self, segments: list[Any]) -> str | None:
         """Detect if there's insufficient evidence to answer.

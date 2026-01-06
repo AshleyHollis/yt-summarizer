@@ -48,8 +48,12 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler for startup/shutdown events."""
     import asyncio
     import os
+    from datetime import datetime
     logger = get_logger(__name__)
     settings = get_settings()
+    
+    # Store startup timestamp for uptime calculation (T181b)
+    app.state.started_at = datetime.utcnow()
     
     # Startup
     logger.info(
@@ -124,6 +128,24 @@ def create_app() -> FastAPI:
         service_name=settings.service_name,
     )
     
+    # Configure OpenTelemetry (T185a)
+    try:
+        from shared.telemetry import configure_telemetry
+        configure_telemetry(
+            service_name=settings.service_name,
+            service_version=settings.service_version,
+            environment=settings.environment,
+        )
+        
+        # Instrument FastAPI automatically
+        try:
+            from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+            # Instrumentation is applied after app creation below
+        except ImportError:
+            pass
+    except ImportError:
+        pass  # OpenTelemetry not available
+    
     # Create app
     app = FastAPI(
         title="YT Summarizer API",
@@ -169,6 +191,13 @@ def create_app() -> FastAPI:
     # See: https://docs.copilotkit.ai/microsoft-agent-framework
     from .agents import setup_agui_endpoint
     setup_agui_endpoint(app)
+    
+    # Instrument FastAPI with OpenTelemetry (T185a)
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        FastAPIInstrumentor.instrument_app(app)
+    except ImportError:
+        pass  # OpenTelemetry instrumentation not available
     
     return app
 

@@ -20,6 +20,8 @@ try:
         unbind_context,
     )
     from shared.queue.client import QueueClient, get_queue_client
+    from shared.telemetry import configure_telemetry, get_tracer
+    from shared.telemetry.config import extract_trace_context
 except ImportError:
     # Fallback for development without shared package installed
     import logging
@@ -52,6 +54,16 @@ except ImportError:
     
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
+    
+    def configure_telemetry(service_name, **kwargs):
+        return False
+    
+    def get_tracer(name):
+        from shared.telemetry.config import NoOpTracer
+        return NoOpTracer()
+    
+    def extract_trace_context(message):
+        return None
 
 
 T = TypeVar("T")
@@ -133,6 +145,11 @@ class BaseWorker(ABC, Generic[T]):
         self._running = False
         self._queue_client: QueueClient | None = None
         self._logger = get_logger(self.__class__.__name__)
+        
+        # Configure telemetry - service name comes from worker class name
+        worker_name = self.__class__.__name__.lower().replace("worker", "-worker")
+        configure_telemetry(f"yt-summarizer-{worker_name}")
+        self._tracer = get_tracer(self.__class__.__name__)
     
     @property
     @abstractmethod
@@ -224,62 +241,90 @@ class BaseWorker(ABC, Generic[T]):
             retry_count=retry_count,
         )
         
-        try:
-            # Parse message
+        # Extract trace context from message if available (for distributed tracing)
+        parent_context = extract_trace_context(raw_message)
+        
+        # Start a trace span for message processing (linked to parent if available)
+        with self._tracer.start_as_current_span(
+            f"process_{self.queue_name}",
+            context=parent_context,
+            attributes={
+                "messaging.system": "azure_storage_queue",
+                "messaging.destination": self.queue_name,
+                "messaging.message.correlation_id": correlation_id,
+                "messaging.message.retry_count": retry_count,
+                "worker.class": self.__class__.__name__,
+            },
+        ) as span:
             try:
-                message = self.parse_message(raw_message)
-            except Exception as e:
-                self._logger.error("Failed to parse message", error=str(e))
-                # Delete malformed messages
-                self.queue_client.delete_message(self.queue_name, queue_message)
-                return
-            
-            # Process message
-            self._logger.info("Processing message")
-            start_time = datetime.utcnow()
-            
-            try:
-                result = await self.process_message(message, correlation_id)
-            except Exception as e:
-                self._logger.exception("Unhandled exception during processing")
-                result = WorkerResult.failed(e)
-            
-            elapsed = (datetime.utcnow() - start_time).total_seconds()
-            self._logger.info("Processing complete", elapsed_seconds=elapsed, status=result.status.value)
-            
-            # Handle result
-            if result.status == WorkerStatus.SUCCESS:
-                self.queue_client.delete_message(self.queue_name, queue_message)
-                await self.on_success(message, result)
+                # Parse message
+                try:
+                    message = self.parse_message(raw_message)
+                    # Add video_id to span if available
+                    if hasattr(message, "video_id"):
+                        span.set_attribute("video.id", message.video_id)
+                    if hasattr(message, "job_id"):
+                        span.set_attribute("job.id", str(message.job_id))
+                except Exception as e:
+                    self._logger.error("Failed to parse message", error=str(e))
+                    span.set_attribute("error", True)
+                    span.set_attribute("error.message", str(e))
+                    # Delete malformed messages
+                    self.queue_client.delete_message(self.queue_name, queue_message)
+                    return
                 
-            elif result.status == WorkerStatus.RETRY:
-                # Let message become visible again for retry
-                # Don't delete - visibility timeout will expire
-                await self.on_failure(message, result, retry_count)
+                # Process message
+                self._logger.info("Processing message")
+                start_time = datetime.utcnow()
                 
-            elif result.status == WorkerStatus.FAILED:
-                if retry_count >= self.max_retries:
-                    self._logger.error("Max retries exceeded, dead lettering")
+                try:
+                    result = await self.process_message(message, correlation_id)
+                except Exception as e:
+                    self._logger.exception("Unhandled exception during processing")
+                    result = WorkerResult.failed(e)
+                    span.set_attribute("error", True)
+                    span.set_attribute("error.message", str(e))
+                
+                elapsed = (datetime.utcnow() - start_time).total_seconds()
+                span.set_attribute("processing.duration_seconds", elapsed)
+                span.set_attribute("processing.status", result.status.value)
+                self._logger.info("Processing complete", elapsed_seconds=elapsed, status=result.status.value)
+                
+                # Handle result
+                if result.status == WorkerStatus.SUCCESS:
+                    self.queue_client.delete_message(self.queue_name, queue_message)
+                    await self.on_success(message, result)
+                    
+                elif result.status == WorkerStatus.RETRY:
+                    # Let message become visible again for retry
+                    # Don't delete - visibility timeout will expire
+                    await self.on_failure(message, result, retry_count)
+                    
+                elif result.status == WorkerStatus.FAILED:
+                    if retry_count >= self.max_retries:
+                        self._logger.error("Max retries exceeded, dead lettering")
+                        span.set_attribute("dead_lettered", True)
+                        self.queue_client.delete_message(self.queue_name, queue_message)
+                        await self.on_dead_letter(message, result)
+                    else:
+                        # Requeue with incremented retry count
+                        raw_message["retry_count"] = retry_count + 1
+                        self.queue_client.send_message(
+                            self.queue_name,
+                            raw_message,
+                            visibility_timeout=min(60 * (2 ** retry_count), 3600),  # Exponential backoff
+                        )
+                        self.queue_client.delete_message(self.queue_name, queue_message)
+                        await self.on_failure(message, result, retry_count + 1)
+                        
+                elif result.status == WorkerStatus.DEAD_LETTER:
+                    span.set_attribute("dead_lettered", True)
                     self.queue_client.delete_message(self.queue_name, queue_message)
                     await self.on_dead_letter(message, result)
-                else:
-                    # Requeue with incremented retry count
-                    raw_message["retry_count"] = retry_count + 1
-                    self.queue_client.send_message(
-                        self.queue_name,
-                        raw_message,
-                        visibility_timeout=min(60 * (2 ** retry_count), 3600),  # Exponential backoff
-                    )
-                    self.queue_client.delete_message(self.queue_name, queue_message)
-                    await self.on_failure(message, result, retry_count + 1)
                     
-            elif result.status == WorkerStatus.DEAD_LETTER:
-                self.queue_client.delete_message(self.queue_name, queue_message)
-                await self.on_dead_letter(message, result)
-                
-        finally:
-            set_correlation_id(None)
-            unbind_context("correlation_id", "queue", "retry_count")
+            finally:
+                set_correlation_id(None)
+                unbind_context("correlation_id", "queue", "retry_count")
     
     async def poll_once(self) -> int:
         """Poll the queue once and process any messages.

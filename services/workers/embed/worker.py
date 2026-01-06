@@ -27,6 +27,7 @@ from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_
 from shared.db.models import Job, Video, Segment
 from shared.logging.config import get_logger
 from shared.queue.client import EMBED_QUEUE, RELATIONSHIPS_QUEUE, get_queue_client
+from shared.telemetry.config import inject_trace_context
 from shared.worker.base_worker import BaseWorker, WorkerResult, run_worker
 
 logger = get_logger(__name__)
@@ -56,6 +57,10 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
     def queue_name(self) -> str:
         """Return the queue name."""
         return EMBED_QUEUE
+
+    def get_additional_connectivity_checks(self) -> dict[str, Any]:
+        """Add OpenAI connectivity check since this worker requires it for embeddings."""
+        return {"openai": self._check_openai_connectivity}
 
     def parse_message(self, raw_message: dict[str, Any]) -> EmbedMessage:
         """Parse raw message to EmbedMessage."""
@@ -476,13 +481,13 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
 
             # Queue the job
             queue_client = get_queue_client()
-            queue_message = {
+            queue_message = inject_trace_context({
                 "job_id": str(job.job_id),
                 "video_id": message.video_id,
                 "youtube_video_id": message.youtube_video_id,
                 "channel_name": message.channel_name,
                 "correlation_id": correlation_id,
-            }
+            })
             if message.batch_id:
                 queue_message["batch_id"] = message.batch_id
             

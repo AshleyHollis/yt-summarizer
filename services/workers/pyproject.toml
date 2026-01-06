@@ -19,6 +19,10 @@ dependencies = [
     "tenacity>=9.0.0",
     "numpy>=1.26.0",
     "yt-summarizer-shared",
+    # OpenTelemetry for observability (T186)
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "opentelemetry-exporter-otlp>=1.27.0",
 ]
 
 [project.optional-dependencies]

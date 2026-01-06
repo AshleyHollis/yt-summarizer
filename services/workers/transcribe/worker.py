@@ -17,6 +17,7 @@ from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_
 from shared.db.models import Artifact, Job, Video
 from shared.logging.config import get_logger
 from shared.queue.client import SUMMARIZE_QUEUE, TRANSCRIBE_QUEUE, get_queue_client
+from shared.telemetry.config import inject_trace_context
 from shared.worker.base_worker import BaseWorker, WorkerResult, run_worker
 
 logger = get_logger(__name__)
@@ -783,13 +784,13 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
 
             # Queue the job
             queue_client = get_queue_client()
-            queue_message = {
+            queue_message = inject_trace_context({
                 "job_id": str(job.job_id),
                 "video_id": message.video_id,
                 "youtube_video_id": message.youtube_video_id,
                 "channel_name": message.channel_name,
                 "correlation_id": correlation_id,
-            }
+            })
             if message.batch_id:
                 queue_message["batch_id"] = message.batch_id
             

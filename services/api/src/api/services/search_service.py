@@ -2,8 +2,10 @@
 
 Implements semantic search over segment embeddings using SQL Server 2025's
 native VECTOR_DISTANCE function for cosine similarity.
+Instrumented with OpenTelemetry for distributed tracing.
 """
 
+import time
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -22,6 +24,7 @@ try:
         VideoFacet,
     )
     from shared.logging.config import get_logger
+    from shared.telemetry import get_tracer, add_span_event
 except ImportError:
     import logging
     from typing import Any as AnyType
@@ -34,6 +37,18 @@ except ImportError:
     
     def get_logger(name):
         return logging.getLogger(name)
+    
+    def get_tracer(name):
+        class NoOpSpan:
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def set_attribute(self, k, v): pass
+            def add_event(self, name, attributes=None): pass
+        class NoOpTracer:
+            def start_as_current_span(self, name, **kwargs): return NoOpSpan()
+        return NoOpTracer()
+    
+    def add_span_event(span, name, attributes=None): pass
 
 
 from ..models.copilot import (
@@ -55,6 +70,9 @@ from ..models.copilot import (
 )
 
 logger = get_logger(__name__)
+
+# Get tracer for search operations
+_tracer = get_tracer("search_service")
 
 
 class SearchService:
@@ -160,76 +178,99 @@ class SearchService:
         Returns:
             Matching segments with similarity scores.
         """
-        # Get video IDs for scope filtering
-        video_ids = await self._get_video_ids_for_scope(request.scope)
-        
-        if video_ids is not None and len(video_ids) == 0:
-            # No videos match the scope
+        with _tracer.start_as_current_span(
+            "search.vector_segments",
+            attributes={
+                "search.query_length": len(request.query_text),
+                "search.limit": request.limit,
+                "search.has_scope": request.scope is not None,
+                "search.embedding_dimensions": len(query_embedding),
+            },
+        ) as span:
+            start_time = time.monotonic()
+            
+            # Get video IDs for scope filtering
+            video_ids = await self._get_video_ids_for_scope(request.scope)
+            
+            if video_ids is not None:
+                span.set_attribute("search.scope_video_count", len(video_ids))
+                if len(video_ids) == 0:
+                    # No videos match the scope
+                    span.set_attribute("search.result_count", 0)
+                    span.set_attribute("search.fallback", "scope_empty")
+                    return SegmentSearchResponse(
+                        segments=[],
+                        scope_echo=request.scope,
+                    )
+            
+            # Build the vector search query using raw SQL for vector operations
+            # SQL Server syntax: VECTOR_DISTANCE('cosine', embedding, @query_vector)
+            embedding_str = ",".join(str(x) for x in query_embedding)
+            
+            # Build WHERE clause for video filtering
+            where_clause = ""
+            if video_ids is not None:
+                video_ids_str = ",".join(f"'{str(vid)}'" for vid in video_ids)
+                where_clause = f"WHERE s.video_id IN ({video_ids_str})"
+            
+            # Execute vector search query
+            # Note: This uses SQL Server VECTOR_DISTANCE function
+            # We embed the limit directly to avoid SQL parameter issues with VECTOR functions
+            limit = int(request.limit)  # Ensure it's an integer
+            sql = text(f"""
+                SELECT TOP {limit}
+                    s.segment_id,
+                    s.video_id,
+                    v.title as video_title,
+                    c.name as channel_name,
+                    s.text,
+                    s.start_time,
+                    s.end_time,
+                    v.youtube_video_id,
+                    VECTOR_DISTANCE('cosine', s.embedding, CAST('[{embedding_str}]' AS VECTOR(1536))) as distance
+                FROM Segments s
+                INNER JOIN Videos v ON s.video_id = v.video_id
+                INNER JOIN Channels c ON v.channel_id = c.channel_id
+                {where_clause}
+                ORDER BY distance ASC
+            """)
+            
+            try:
+                result = await self.session.execute(sql)
+                rows = result.fetchall()
+                
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                span.set_attribute("search.result_count", len(rows))
+                span.set_attribute("search.duration_ms", elapsed_ms)
+                if rows:
+                    span.set_attribute("search.top_score", float(rows[0].distance) if hasattr(rows[0], 'distance') else 0)
+            except Exception as e:
+                add_span_event(span, "vector_search_failed", {"error": str(e)})
+                span.set_attribute("search.fallback", "text_search")
+                logger.warning(f"Vector search failed: {e}. Falling back to text search.")
+                # Fallback to text-based search if vector search fails
+                return await self._fallback_text_search_segments(request)
+            
+            segments = []
+            for row in rows:
+                youtube_url = f"https://www.youtube.com/watch?v={row.youtube_video_id}&t={int(row.start_time)}s"
+                
+                segments.append(ScoredSegment(
+                    segment_id=row.segment_id,
+                    video_id=row.video_id,
+                    video_title=row.video_title,
+                    channel_name=row.channel_name,
+                    text=row.text,
+                    start_time=row.start_time,
+                    end_time=row.end_time,
+                    youtube_url=youtube_url,
+                    score=row.distance,
+                ))
+            
             return SegmentSearchResponse(
-                segments=[],
+                segments=segments,
                 scope_echo=request.scope,
             )
-        
-        # Build the vector search query using raw SQL for vector operations
-        # SQL Server syntax: VECTOR_DISTANCE('cosine', embedding, @query_vector)
-        embedding_str = ",".join(str(x) for x in query_embedding)
-        
-        # Build WHERE clause for video filtering
-        where_clause = ""
-        if video_ids is not None:
-            video_ids_str = ",".join(f"'{str(vid)}'" for vid in video_ids)
-            where_clause = f"WHERE s.video_id IN ({video_ids_str})"
-        
-        # Execute vector search query
-        # Note: This uses SQL Server VECTOR_DISTANCE function
-        # We embed the limit directly to avoid SQL parameter issues with VECTOR functions
-        limit = int(request.limit)  # Ensure it's an integer
-        sql = text(f"""
-            SELECT TOP {limit}
-                s.segment_id,
-                s.video_id,
-                v.title as video_title,
-                c.name as channel_name,
-                s.text,
-                s.start_time,
-                s.end_time,
-                v.youtube_video_id,
-                VECTOR_DISTANCE('cosine', s.embedding, CAST('[{embedding_str}]' AS VECTOR(1536))) as distance
-            FROM Segments s
-            INNER JOIN Videos v ON s.video_id = v.video_id
-            INNER JOIN Channels c ON v.channel_id = c.channel_id
-            {where_clause}
-            ORDER BY distance ASC
-        """)
-        
-        try:
-            result = await self.session.execute(sql)
-            rows = result.fetchall()
-        except Exception as e:
-            logger.warning(f"Vector search failed: {e}. Falling back to text search.")
-            # Fallback to text-based search if vector search fails
-            return await self._fallback_text_search_segments(request)
-        
-        segments = []
-        for row in rows:
-            youtube_url = f"https://www.youtube.com/watch?v={row.youtube_video_id}&t={int(row.start_time)}s"
-            
-            segments.append(ScoredSegment(
-                segment_id=row.segment_id,
-                video_id=row.video_id,
-                video_title=row.video_title,
-                channel_name=row.channel_name,
-                text=row.text,
-                start_time=row.start_time,
-                end_time=row.end_time,
-                youtube_url=youtube_url,
-                score=row.distance,
-            ))
-        
-        return SegmentSearchResponse(
-            segments=segments,
-            scope_echo=request.scope,
-        )
     
     async def fallback_text_search_segments(
         self, 

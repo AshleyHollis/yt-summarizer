@@ -11,6 +11,7 @@ try:
     from shared.db.models import Batch, BatchItem, Channel, Job, Video
     from shared.logging.config import get_logger
     from shared.queue.client import TRANSCRIBE_QUEUE, get_queue_client
+    from shared.telemetry.config import inject_trace_context
 except ImportError:
     from typing import Any
 
@@ -29,6 +30,9 @@ except ImportError:
 
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
+    
+    def inject_trace_context(message):
+        return message
 
 
 from ..models.batch import (
@@ -253,14 +257,14 @@ class BatchService:
             queue_client = get_queue_client()
             queue_client.send_message(
                 TRANSCRIBE_QUEUE,
-                {
+                inject_trace_context({
                     "job_id": str(job.job_id),
                     "video_id": str(video.video_id),
                     "youtube_video_id": youtube_video_id,
                     "channel_name": channel.name,
                     "batch_id": str(batch.batch_id),
                     "correlation_id": correlation_id,
-                },
+                }),
             )
         except Exception as e:
             logger.warning(
@@ -548,14 +552,14 @@ class BatchService:
                     queue_client = get_queue_client()
                     queue_client.send_message(
                         TRANSCRIBE_QUEUE,
-                        {
+                        inject_trace_context({
                             "job_id": str(job.job_id),
                             "video_id": str(item.video_id),
                             "youtube_video_id": item.video.youtube_video_id,
                             "channel_name": channel_name,
                             "batch_id": str(batch_id),
                             "correlation_id": correlation_id,
-                        },
+                        }),
                     )
                 except Exception as e:
                     logger.warning(
@@ -658,14 +662,14 @@ class BatchService:
                 queue_client = get_queue_client()
                 queue_client.send_message(
                     TRANSCRIBE_QUEUE,
-                    {
+                    inject_trace_context({
                         "job_id": str(job.job_id),
                         "video_id": str(item.video_id),
                         "youtube_video_id": item.video.youtube_video_id,
                         "channel_name": channel_name,
                         "batch_id": str(batch_id),
                         "correlation_id": correlation_id,
-                    },
+                    }),
                 )
             except Exception as e:
                 logger.warning(
