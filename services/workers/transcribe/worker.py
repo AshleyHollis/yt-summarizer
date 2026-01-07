@@ -1,5 +1,6 @@
 """Transcribe worker for extracting YouTube video transcripts."""
 
+import random
 import time
 from dataclasses import dataclass
 from typing import Any
