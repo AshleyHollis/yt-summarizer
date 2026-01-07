@@ -669,6 +669,14 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         """
         import json
         
+        # Sanity check for very long transcripts that could cause memory issues
+        if len(segments) > 10000:
+            logger.warning(
+                "Very large number of segments detected",
+                segment_count=len(segments),
+                youtube_video_id=youtube_video_id,
+            )
+        
         # Group small segments into larger chunks (~30 seconds each)
         # This improves semantic search quality while preserving timestamps
         chunked_segments = []
