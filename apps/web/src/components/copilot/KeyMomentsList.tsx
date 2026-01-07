@@ -2,6 +2,12 @@
 
 import { Clock, ExternalLink } from "lucide-react";
 
+/**
+ * Known garbage text prefixes that occasionally appear in AI-generated descriptions
+ * due to model hallucinations or parsing errors. These should be filtered out.
+ */
+const GARBAGE_TEXT_PREFIXES = ["orm"] as const;
+
 interface KeyMoment {
   timestamp: string;
   description: string;
@@ -26,7 +32,7 @@ export function KeyMomentsList({ moments, className = "" }: KeyMomentsListProps)
     m.timestamp !== "0:00" &&
     m.description && 
     m.description.length > 5 &&
-    !m.description.startsWith("orm") // Filter out garbage text
+    !GARBAGE_TEXT_PREFIXES.some(prefix => m.description.startsWith(prefix))
   );
 
   if (validMoments.length === 0) {

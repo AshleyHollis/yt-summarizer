@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { jobApi, VideoProcessingHistory, StageHistoryItem } from '@/services/api';
+import { formatElapsedTime } from '@/utils/formatDuration';
 
 /**
  * Props for ProcessingHistory component
@@ -11,24 +12,6 @@ export interface ProcessingHistoryProps {
   videoId: string;
   /** Custom class name */
   className?: string;
-}
-
-/**
- * Format seconds to human readable duration
- */
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return '-';
-  if (seconds < 60) {
-    return `${Math.round(seconds)}s`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  const secs = Math.round(seconds % 60);
-  if (minutes < 60) {
-    return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 /**
@@ -76,7 +59,7 @@ function formatVariance(variance: number | null, variancePercent: number | null)
   
   return (
     <span className={colorClass}>
-      {sign}{formatDuration(Math.abs(variance))}
+      {sign}{formatElapsedTime(Math.abs(variance))}
       {variancePercent !== null && (
         <span className="text-xs ml-1">({sign}{Math.round(variancePercent)}%)</span>
       )}
@@ -120,20 +103,20 @@ function StageRow({ stage, showWait }: { stage: StageHistoryItem; showWait: bool
       {showWait && (
         <td className="py-3 px-4 text-right font-mono text-sm text-gray-500 dark:text-gray-500">
           {stage.wait_seconds !== null && stage.wait_seconds > 0.5 
-            ? formatDuration(stage.wait_seconds) 
+            ? formatElapsedTime(stage.wait_seconds) 
             : '-'}
         </td>
       )}
       <td className="py-3 px-4 text-right font-mono text-sm text-gray-600 dark:text-gray-400">
-        <span>{formatDuration(stage.estimated_seconds)}</span>
+        <span>{formatElapsedTime(stage.estimated_seconds)}</span>
         {hasDelay && (
           <span className="block text-xs text-gray-400 dark:text-gray-500">
-            (incl. ~{formatDuration(stage.estimated_delay_seconds)} delay)
+            (incl. ~{formatElapsedTime(stage.estimated_delay_seconds)} delay)
           </span>
         )}
       </td>
       <td className="py-3 px-4 text-right font-mono text-sm text-gray-900 dark:text-gray-100 font-medium">
-        {formatDuration(stage.actual_seconds)}
+        {formatElapsedTime(stage.actual_seconds)}
       </td>
       <td className="py-3 pl-4 text-right font-mono text-sm">
         {formatVariance(stage.variance_seconds, stage.variance_percent)}
@@ -244,10 +227,10 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Elapsed</p>
           <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {formatDuration(history.total_elapsed_seconds)}
+            {formatElapsedTime(history.total_elapsed_seconds)}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {formatDuration(history.total_wait_seconds)} queue + {formatDuration(history.total_actual_seconds)} processing
+            {formatElapsedTime(history.total_wait_seconds)} queue + {formatElapsedTime(history.total_actual_seconds)} processing
           </p>
         </div>
 
@@ -256,12 +239,12 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
           <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Queue Wait</p>
             <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
-              {formatDuration(history.total_wait_seconds)}
+              {formatElapsedTime(history.total_wait_seconds)}
             </p>
             {history.total_estimated_wait_seconds !== null && history.total_estimated_wait_seconds > 0 && (
               <>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Est. {formatDuration(history.total_estimated_wait_seconds)}
+                  Est. {formatElapsedTime(history.total_estimated_wait_seconds)}
                 </p>
                 <p className="text-xs mt-0.5">
                   {formatVariance(queueWaitVariance, null)}
@@ -275,10 +258,10 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Processing</p>
           <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {formatDuration(history.total_actual_seconds)}
+            {formatElapsedTime(history.total_actual_seconds)}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Est. {formatDuration(history.total_estimated_seconds)}
+            Est. {formatElapsedTime(history.total_estimated_seconds)}
           </p>
           {history.total_variance_seconds !== null && (
             <p className="text-xs mt-0.5">
@@ -341,14 +324,14 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
                   <td className="py-3 px-4 text-gray-900 dark:text-gray-100">Total</td>
                   {showWait && (
                     <td className="py-3 px-4 text-right font-mono text-sm text-gray-500 dark:text-gray-500">
-                      {formatDuration(history.total_wait_seconds)}
+                      {formatElapsedTime(history.total_wait_seconds)}
                     </td>
                   )}
                   <td className="py-3 px-4 text-right font-mono text-sm text-gray-600 dark:text-gray-400">
-                    {formatDuration(history.total_estimated_seconds)}
+                    {formatElapsedTime(history.total_estimated_seconds)}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-sm text-gray-900 dark:text-gray-100">
-                    {formatDuration(history.total_actual_seconds)}
+                    {formatElapsedTime(history.total_actual_seconds)}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-sm">
                     {formatVariance(history.total_variance_seconds, null)}
@@ -363,7 +346,7 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
       {/* Video Duration Note */}
       {history.video_duration_seconds && (
         <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-          Video duration: {formatDuration(history.video_duration_seconds)}
+          Video duration: {formatElapsedTime(history.video_duration_seconds)}
         </p>
       )}
 

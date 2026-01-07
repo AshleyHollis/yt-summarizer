@@ -7,6 +7,7 @@ import { CopilotVideoCard } from "./CopilotVideoCard";
 import { FollowupButtons } from "./FollowupButtons";
 import { UncertaintyMessage } from "./UncertaintyMessage";
 import { useVideoContext, useScope } from "@/app/providers";
+import { formatDuration } from "@/utils/formatDuration";
 
 interface Evidence {
   videoId: string;
@@ -66,20 +67,6 @@ interface CopilotMessageProps {
   scopeEcho?: QueryScope | null;
   aiSettingsEcho?: AISettingsEcho | null;
   onFollowupClick?: (suggestion: string) => void;
-}
-
-/**
- * Format seconds to timestamp string (M:SS or H:MM:SS)
- */
-function formatTimestamp(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -327,7 +314,7 @@ export function CopilotMessage({
                       className="text-[var(--copilot-kit-secondary-contrast-color)]/90 hover:text-[var(--copilot-kit-primary-color)] transition-colors truncate flex items-center gap-1"
                     >
                       <span className="font-medium text-xs">{ev.videoTitle}</span>
-                      <span className="text-[10px] text-[var(--copilot-kit-muted-color)]">@ {formatTimestamp(ev.startTime)}</span>
+                      <span className="text-[10px] text-[var(--copilot-kit-muted-color)]">@ {formatDuration(ev.startTime)}</span>
                       <svg className="w-3 h-3 text-[var(--copilot-kit-muted-color)] group-hover/cite:text-[var(--copilot-kit-primary-color)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>

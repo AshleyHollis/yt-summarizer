@@ -7,20 +7,7 @@ import {
   ChannelVideo,
   ApiClientError,
 } from '@/services/api';
-
-/**
- * Format duration in seconds to human-readable string
- */
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
+import { formatDuration } from '@/utils/formatDuration';
 
 /**
  * Format date string to localized date

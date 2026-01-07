@@ -2,24 +2,11 @@
 
 import { PlayIcon } from '@heroicons/react/24/solid';
 import type { Segment } from '@/services/api';
+import { formatDuration } from '@/utils/formatDuration';
 
 interface SegmentListProps {
   segments: Segment[];
   youtubeVideoId: string;
-}
-
-/**
- * Format seconds to MM:SS or HH:MM:SS
- */
-function formatTime(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -47,10 +34,10 @@ export function SegmentList({ segments, youtubeVideoId }: SegmentListProps) {
             target="_blank"
             rel="noopener noreferrer"
             className="flex shrink-0 flex-col items-center justify-center gap-0.5 w-16 h-14 rounded-lg bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 transition-all hover:bg-red-500 hover:text-white dark:hover:bg-red-600 group-hover:bg-red-100 dark:group-hover:bg-red-900/40 group-hover:text-red-600 dark:group-hover:text-red-400"
-            title={`Watch from ${formatTime(segment.start_time)} on YouTube`}
+            title={`Watch from ${formatDuration(segment.start_time)} on YouTube`}
           >
             <PlayIcon className="h-4 w-4" />
-            <span className="text-xs font-medium tabular-nums">{formatTime(segment.start_time)}</span>
+            <span className="text-xs font-medium tabular-nums">{formatDuration(segment.start_time)}</span>
           </a>
 
           {/* Segment text */}
@@ -59,7 +46,7 @@ export function SegmentList({ segments, youtubeVideoId }: SegmentListProps) {
               {segment.text}
             </p>
             <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-              {formatTime(segment.start_time)} – {formatTime(segment.end_time)}
+              {formatDuration(segment.start_time)} – {formatDuration(segment.end_time)}
             </p>
           </div>
         </div>

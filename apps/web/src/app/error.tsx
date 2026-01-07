@@ -86,20 +86,18 @@ export default function Error({ error, reset }: ErrorProps) {
       };
     }
 
-    if (errorMessage.includes('500') || errorMessage.includes('internal server error')) {
-      return {
-        title: 'Something went wrong',
-        message: 'An unexpected error occurred on the server. Please try again.',
-        icon: <ExclamationIcon className="h-12 w-12 text-red-500" />,
-      };
-    }
-
-    // Default error
-    return {
+    // Default error (also used for 500/internal server errors)
+    const defaultError = {
       title: 'Something went wrong',
       message: 'An unexpected error occurred. Please try again.',
       icon: <ExclamationIcon className="h-12 w-12 text-red-500" />,
     };
+
+    if (errorMessage.includes('500') || errorMessage.includes('internal server error')) {
+      return defaultError;
+    }
+
+    return defaultError;
   };
 
   const { title, message, icon } = getErrorContent();

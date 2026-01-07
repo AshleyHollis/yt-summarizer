@@ -21,6 +21,7 @@ import TranscriptViewer from '@/components/TranscriptViewer';
 import type { VideoDetailResponse } from '@/services/api';
 import { libraryApi, videoApi } from '@/services/api';
 import { useVideoContext } from '@/app/providers';
+import { formatDuration } from '@/utils/formatDuration';
 
 type TabId = 'summary' | 'description' | 'transcript' | 'history';
 
@@ -62,20 +63,6 @@ function TabButton({
       )}
     </button>
   );
-}
-
-/**
- * Format duration in seconds to HH:MM:SS or MM:SS
- */
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**

@@ -4,23 +4,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { VideoCard as VideoCardType } from '@/services/api';
 import { useVideoSelection, toSelectedVideo } from '@/contexts/VideoSelectionContext';
+import { formatDuration } from '@/utils/formatDuration';
 
 interface VideoCardProps {
   video: VideoCardType;
-}
-
-/**
- * Format duration in seconds to HH:MM:SS or MM:SS
- */
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
