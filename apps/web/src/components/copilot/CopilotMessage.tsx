@@ -71,26 +71,11 @@ interface CopilotMessageProps {
 
 /**
  * Custom react-markdown components for copilot message styling
+ * 
+ * Note: Source attribution is handled via structured data (aiSettingsEcho)
+ * rendered in the "Searched:" badge row, not via markdown text parsing.
  */
 const markdownComponents: Components = {
-  // Style source headers like "**From your videos:**" specially
-  strong: ({ children }) => {
-    const text = String(children).toLowerCase();
-    const isSourceHeader = text.includes('from your videos') || 
-                          text.includes('from ai knowledge');
-    
-    return (
-      <strong 
-        className={isSourceHeader 
-          ? "font-semibold text-[var(--copilot-kit-primary-color)] block mt-3 first:mt-0 mb-1" 
-          : "font-semibold"
-        }
-      >
-        {children}
-      </strong>
-    );
-  },
-  // Keep paragraphs simple without extra margins
   p: ({ children }) => (
     <span className="block mb-2 last:mb-0">{children}</span>
   ),
