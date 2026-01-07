@@ -66,9 +66,10 @@ function SelectionModeToggle() {
 }
 
 /**
- * Library page content that uses useSearchParams
+ * Inner component that reads URL search params.
+ * Separated to keep the Suspense boundary tight around useSearchParams.
  */
-function LibraryContent() {
+function LibraryContentWithParams() {
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get('status');
   
@@ -76,10 +77,18 @@ function LibraryContent() {
   const validStatus = statusFromUrl && VALID_STATUSES.includes(statusFromUrl as ProcessingStatusFilter)
     ? (statusFromUrl as ProcessingStatusFilter)
     : null;
+
+  return <LibraryContent initialStatus={validStatus} />;
+}
+
+/**
+ * Library page content that displays videos
+ */
+function LibraryContent({ initialStatus }: { initialStatus: ProcessingStatusFilter | null }) {
   
   const [filters, setFilters] = useState<FilterState>(() => ({
     ...DEFAULT_FILTERS,
-    status: validStatus,
+    status: initialStatus,
   }));
   const [videos, setVideos] = useState<VideoCardType[]>([]);
   const [page, setPage] = useState(1);
@@ -307,7 +316,7 @@ export default function LibraryPage() {
           <div className="text-gray-500">Loading...</div>
         </div>
       }>
-        <LibraryContent />
+        <LibraryContentWithParams />
       </Suspense>
     </VideoSelectionProvider>
   );
