@@ -27,6 +27,9 @@ logger = get_logger(__name__)
 _last_youtube_request_time: float | None = None
 _youtube_request_count: int = 0
 
+# Maximum length for content to be considered an error page when combined with other signals
+MAX_ERROR_PAGE_LENGTH = 1000
+
 
 class RateLimitError(Exception):
     """Raised when YouTube rate limits or IP blocks our requests."""
@@ -254,7 +257,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             return False
         
         # Only reject on rate limit phrases if ALSO short and has HTML markers
-        if has_rate_limit_phrase and html_tag_count >= 2 and len(content) < 1000:
+        if has_rate_limit_phrase and html_tag_count >= 2 and len(content) < MAX_ERROR_PAGE_LENGTH:
             logger.warning("Detected short HTML response with rate limit message")
             return False
         
