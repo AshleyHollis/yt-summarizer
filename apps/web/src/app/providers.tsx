@@ -294,7 +294,7 @@ export function Providers({ children }: ProvidersProps) {
           agent="yt-summarizer" 
           showDevConsole={false}
           enableInspector={false}
-          threadId={mounted ? (urlThreadId || undefined) : undefined}
+          threadId={mounted ? (urlThreadId ?? undefined) : undefined}
         >
           <ToolResultProvider>
             <VideoContextProvider>

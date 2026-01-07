@@ -97,4 +97,4 @@ export function InsufficientContentMessage({
   );
 }
 
-export default InsufficientContentMessage;
+
