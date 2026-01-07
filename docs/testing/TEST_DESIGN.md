@@ -281,81 +281,67 @@ yt-dlp --list-subs "https://www.youtube.com/watch?v=VIDEO_ID"
 
 ## Running Tests
 
-### ⚠️ Test Gate Script (REQUIRED before marking tasks complete)
+### Primary Test Runner
 
-**Before marking ANY implementation task as complete, run the test gate:**
+**One script to run all tests:**
 
 ```powershell
-.\.specify\scripts\powershell\run-test-gate.ps1
+.\scripts\run-tests.ps1
 ```
 
-This script:
-- Runs ALL test suites (API, Workers, Shared, Frontend, E2E)
-- Outputs a clear PASS/FAIL result
-- Writes failure details to `test-gate-failures.log` for debugging
-- Auto-starts Aspire if needed for E2E tests
-
-**Rules:**
-1. **NEVER mark a task [X] if the test gate returns FAIL**
-2. **NEVER rationalize skipping E2E tests** - they catch integration issues
-3. Review `test-gate-failures.log` to diagnose and fix failures
+This runs ALL test suites (Shared, Workers, API, Frontend, E2E) and outputs a clear PASS/FAIL result.
 
 **Options:**
 ```powershell
-# Full gate (required for task completion)
-.\.specify\scripts\powershell\run-test-gate.ps1
+# Run ALL tests including E2E (default - requires Aspire running)
+.\scripts\run-tests.ps1
 
-# Skip E2E (faster, but incomplete - use only during development)
-.\.specify\scripts\powershell\run-test-gate.ps1 -SkipE2E
+# Skip E2E tests (faster for development iteration)
+.\scripts\run-tests.ps1 -SkipE2E
+
+# Run only a specific component
+.\scripts\run-tests.ps1 -Component api
+.\scripts\run-tests.ps1 -Component workers
+.\scripts\run-tests.ps1 -Component shared
+.\scripts\run-tests.ps1 -Component web
+.\scripts\run-tests.ps1 -Component e2e
 
 # JSON output for CI integration
-.\.specify\scripts\powershell\run-test-gate.ps1 -Json
+.\scripts\run-tests.ps1 -Json
 ```
+
+**Rules:**
+1. **NEVER mark a task [X] if tests fail**
+2. **NEVER rationalize skipping E2E tests** - they catch integration issues
+3. Review `test-gate-failures.log` to diagnose failures
 
 ---
 
 ### Quick Reference
 
 ```powershell
-# === Unit Tests (Fast, Free) ===
-# Python shared
-cd services/shared; python -m pytest tests/ -v
+# === Run ALL tests (recommended) ===
+.\scripts\run-tests.ps1
 
-# Python workers
-cd services/workers; python -m pytest tests/ -v
+# === Skip E2E for faster development ===
+.\scripts\run-tests.ps1 -SkipE2E
 
-# Python API
-cd services/api; python -m pytest tests/ -v
+# === Run specific component ===
+.\scripts\run-tests.ps1 -Component api      # API tests only
+.\scripts\run-tests.ps1 -Component web      # Frontend Vitest only
+.\scripts\run-tests.ps1 -Component e2e      # Playwright E2E only
 
-# Frontend Vitest
-cd apps/web; npm run test:run
-
-# === E2E Tests (Slow, Costs Tokens) ===
-# First, start Aspire:
-aspire run
-
-# Then run E2E:
+# === Manual E2E with visible browser ===
 cd apps/web
 $env:USE_EXTERNAL_SERVER = "true"
-npx playwright test
-
-# Run specific E2E file:
-npx playwright test smoke.spec.ts
-
-# Run with visible browser:
 npx playwright test --headed
-
-# === All Tests ===
-.\scripts\run-tests.ps1 -Component all -Mode unit
-.\scripts\run-tests.ps1 -Component all -Mode e2e
 ```
 
 ### Test Script Reference
 
 | Script | Purpose |
 |--------|---------|
-| `.specify/scripts/powershell/run-test-gate.ps1` | **Pre-completion verification gate** |
-| `scripts/run-tests.ps1` | Master test runner with flags |
+| `scripts/run-tests.ps1` | **Unified test runner** - runs all tests |
 | `scripts/smoke-test.ps1` | Quick deployment verification |
 | `scripts/clean-dev.ps1` | Reset development environment |
 

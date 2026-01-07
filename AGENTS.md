@@ -60,28 +60,40 @@ IMPORTANT! Always prefer official documentation when available. The following si
 2. https://learn.microsoft.com/dotnet/aspire
 3. https://nuget.org (for specific integration package details)
 
-## Test Gate Enforcement (Spec Kit Integration)
+## Test Enforcement
 
-**CRITICAL: Before marking ANY task as [X] complete, you MUST run the test gate script:**
+**CRITICAL: Before marking ANY task as [X] complete, you MUST run the test script:**
 
 ```powershell
-.\.specify\scripts\powershell\run-test-gate.ps1
+.\scripts\run-tests.ps1
 ```
 
-This script runs ALL test suites (API, Workers, Shared, Frontend, E2E) and outputs a PASS/FAIL gate result.
+This script runs ALL test suites (Shared, Workers, API, Frontend, E2E) and outputs a PASS/FAIL result.
+
+### Options:
+```powershell
+# Run ALL tests (default - includes E2E, requires Aspire)
+.\scripts\run-tests.ps1
+
+# Skip E2E for faster development iteration
+.\scripts\run-tests.ps1 -SkipE2E
+
+# Run specific component only
+.\scripts\run-tests.ps1 -Component api
+```
 
 ### Rules:
-1. **NEVER mark a task [X] if the test gate returns FAIL**
+1. **NEVER mark a task [X] if tests fail**
 2. **NEVER rationalize skipping E2E tests** - they catch integration issues that unit tests miss
 3. **If Aspire isn't running, the script will start it automatically**
 4. **Unit tests alone are NOT sufficient** - E2E tests are required for completion verification
 
-### What the test gate checks:
-- API tests (pytest, 437+ tests)
-- Worker tests (pytest, 98+ tests)
+### What the tests check:
 - Shared package tests (pytest)
-- Frontend tests (Vitest, 229+ tests)
-- E2E tests (Playwright, 82+ tests) - **This is the integration layer that catches real bugs**
+- Worker tests (pytest, 98+ tests)
+- API tests (pytest, 470+ tests)
+- Frontend tests (Vitest, 246+ tests)
+- E2E tests (Playwright) - **This is the integration layer that catches real bugs**
 
 ### Why this matters:
 Unit tests verify individual components work in isolation. E2E tests verify the **actual user experience** with real services running. A feature is NOT complete until both pass.
