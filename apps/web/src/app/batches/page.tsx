@@ -3,20 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { batchApi, BatchResponse, BatchStatus } from '@/services/api';
-
-/**
- * Format date string to localized date/time
- */
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { formatDateTime } from '@/utils/formatDate';
 
 /**
  * Get status badge color
@@ -220,7 +207,7 @@ export default function BatchesPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                      {formatDate(batch.created_at)}
+                      {formatDateTime(batch.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                       <Link

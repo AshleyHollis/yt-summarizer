@@ -16,8 +16,8 @@ export interface ProcessingHistoryProps {
 
 /**
  * Format ISO datetime string to human-readable format
- */
-function formatDateTime(isoString: string | null): string {
+function formatDuration(seconds: number | null, placeholder: string = '-'): string {
+  if (seconds === null) return placeholder;
   if (!isoString) return '-';
   const date = new Date(isoString);
   return date.toLocaleString(undefined, {

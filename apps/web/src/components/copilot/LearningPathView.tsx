@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { copilotBoxStyles, copilotTextSizes, copilotColors, copilotButtonStyles } from "./copilotStyles";
+import { formatDuration } from "@/utils/formatDuration";
 
 /**
  * Evidence for a learning path item - links back to source video segments
@@ -53,19 +54,6 @@ interface LearningPath {
 interface LearningPathViewProps {
   learningPath: LearningPath;
   onVideoClick?: (videoId: string) => void;
-}
-
-/**
- * Format seconds to human-readable duration (e.g., "1h 23m" or "45m")
- */
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) {
-    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-  }
-  return `${minutes}m`;
 }
 
 /**

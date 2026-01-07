@@ -14,6 +14,7 @@ import {
   ArrowDown,
 } from "lucide-react";
 import { copilotBoxStyles, copilotTextSizes, copilotColors, copilotButtonStyles } from "./copilotStyles";
+import { formatDuration } from "@/utils/formatDuration";
 
 /**
  * Priority levels for watch list items
@@ -47,19 +48,6 @@ interface WatchList {
 interface WatchListViewProps {
   watchList: WatchList;
   onVideoClick?: (videoId: string) => void;
-}
-
-/**
- * Format seconds to human-readable duration (e.g., "1h 23m" or "45m")
- */
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) {
-    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-  }
-  return `${minutes}m`;
 }
 
 /**

@@ -14,6 +14,7 @@ import {
   TagIcon,
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
+import { formatDateLong as formatDate } from '@/utils/formatDate';
 import { MarkdownRenderer, DescriptionRenderer } from '@/components/common';
 import JobProgress from '@/components/JobProgress';
 import ProcessingHistory from '@/components/ProcessingHistory';
@@ -63,18 +64,6 @@ function TabButton({
       )}
     </button>
   );
-}
-
-/**
- * Format date to readable string
- */
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
 }
 
 /**

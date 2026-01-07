@@ -8,18 +8,7 @@ import {
   ApiClientError,
 } from '@/services/api';
 import { formatDuration } from '@/utils/formatDuration';
-
-/**
- * Format date string to localized date
- */
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { formatDate } from '@/utils/formatDate';
 
 /**
  * Props for ChannelVideoList component

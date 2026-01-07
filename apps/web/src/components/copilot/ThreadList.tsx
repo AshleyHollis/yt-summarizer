@@ -2,6 +2,7 @@
 
 import { MessageSquare, Trash2 } from "lucide-react";
 import styles from "./ThreadedCopilotSidebar.module.css";
+import { formatRelativeDate } from "@/utils/formatDate";
 
 // ============================================================================
 // Types
@@ -20,21 +21,6 @@ interface ThreadListProps {
   onSelectThread: (threadId: string) => void;
   onDeleteThread: (threadId: string) => void;
   onClose: () => void;
-}
-
-// ============================================================================
-// Utilities
-// ============================================================================
-
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
 }
 
 // ============================================================================
@@ -78,7 +64,7 @@ export function ThreadList({
                 {thread.title}
               </div>
               <div className={styles.threadMeta}>
-                {formatDate(thread.updatedAt)}
+                {formatRelativeDate(thread.updatedAt)}
                 {thread.messageCount > 0 && ` • ${thread.messageCount}`}
               </div>
             </div>
