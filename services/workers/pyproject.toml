@@ -1,0 +1,54 @@
+[project]
+name = "yt-summarizer-workers"
+version = "0.1.0"
+description = "YT Summarizer Workers - Background job processors"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "sqlalchemy>=2.0.0",
+    "azure-identity>=1.19.0",
+    "azure-storage-queue>=12.12.0",
+    "azure-storage-blob>=12.23.0",
+    "openai>=1.57.0",
+    "tiktoken>=0.7.0",  # Accurate token counting for transcript truncation
+    "yt-dlp>=2024.12.6",
+    "curl_cffi>=0.7.0",  # Browser TLS fingerprint impersonation for yt-dlp
+    "structlog>=24.4.0",
+    "tenacity>=9.0.0",
+    "numpy>=1.26.0",
+    "yt-summarizer-shared",
+    # OpenTelemetry for observability (T186)
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "opentelemetry-exporter-otlp>=1.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["transcribe", "summarize", "embed", "relationships", "worker_utils"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

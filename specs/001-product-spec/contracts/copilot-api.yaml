@@ -1,0 +1,583 @@
+openapi: 3.0.3
+info:
+  title: YT Summarizer - Copilot API
+  description: |
+    API for copilot queries and tools. All operations are read-only.
+    The copilot operates exclusively on ingested library content.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API base path
+
+paths:
+  /copilot/query:
+    post:
+      operationId: query
+      summary: Execute a copilot query
+      description: |
+        Send a natural language query to the copilot with optional scope filters.
+        Returns an answer with citations and recommended videos.
+        
+        **This is a read-only operation.** The copilot cannot:
+        - Trigger ingestion or reprocessing
+        - Modify any data
+        - Access external content
+      tags:
+        - Copilot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopilotQueryRequest'
+      responses:
+        '200':
+          description: Query response with citations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopilotQueryResponse'
+        '400':
+          description: Invalid query or scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Database warming up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarmingUpResponse'
+
+  /copilot/search/segments:
+    post:
+      operationId: searchSegments
+      summary: Semantic search over segments
+      description: Search for relevant transcript segments using vector similarity
+      tags:
+        - Copilot Tools
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SegmentSearchRequest'
+      responses:
+        '200':
+          description: Matching segments with scores
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SegmentSearchResponse'
+
+  /copilot/search/videos:
+    post:
+      operationId: searchVideos
+      summary: Search videos by metadata and summary
+      description: Search for videos matching text in title, description, or summary
+      tags:
+        - Copilot Tools
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoSearchRequest'
+      responses:
+        '200':
+          description: Matching videos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoSearchResponse'
+
+  /copilot/neighbors/{videoId}:
+    get:
+      operationId: getNeighbors
+      summary: Get related videos from graph
+      description: Retrieve videos related to a source video via stored relationships
+      tags:
+        - Copilot Tools
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: types
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [series, progression, same_topic, references, related]
+          description: Filter by relationship types
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Related videos with relationship info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NeighborsResponse'
+
+  /copilot/topics:
+    post:
+      operationId: getTopicsInScope
+      summary: Get topic facets with counts for current scope
+      description: Returns facets/topics and their video counts within the given scope
+      tags:
+        - Copilot Tools
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScopeRequest'
+      responses:
+        '200':
+          description: Topic counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicsResponse'
+
+  /copilot/coverage:
+    post:
+      operationId: getCoverage
+      summary: Get library coverage for scope
+      description: Returns statistics about indexed content within the given scope
+      tags:
+        - Copilot Tools
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScopeRequest'
+      responses:
+        '200':
+          description: Coverage statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverageResponse'
+
+  /copilot/explain/{videoId}:
+    post:
+      operationId: explainRecommendation
+      summary: Explain why a video was recommended
+      description: Get detailed explanation of why a video appeared in results
+      tags:
+        - Copilot Tools
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExplainRequest'
+      responses:
+        '200':
+          description: Recommendation explanation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExplainResponse'
+
+components:
+  schemas:
+    QueryScope:
+      type: object
+      description: Scope filters for copilot queries
+      properties:
+        channels:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Filter to specific channels
+        videoIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Filter to specific videos
+        dateRange:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+        facets:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Filter by facet/tag IDs
+        contentTypes:
+          type: array
+          items:
+            type: string
+            enum: [summary, segment, relationship]
+          description: Types of content to search
+
+    CopilotQueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Natural language query
+          example: "What techniques does he recommend for beginners?"
+        scope:
+          $ref: '#/components/schemas/QueryScope'
+        conversationId:
+          type: string
+          format: uuid
+          description: Optional conversation context
+        correlationId:
+          type: string
+          description: Correlation ID for tracing
+
+    CopilotQueryResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          description: Natural language response
+        videoCards:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendedVideo'
+          description: Recommended videos
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/Evidence'
+          description: Citations supporting the answer
+        scopeEcho:
+          $ref: '#/components/schemas/QueryScope'
+          description: The scope that was actually searched
+        followups:
+          type: array
+          items:
+            type: string
+          description: Suggested follow-up actions
+        uncertainty:
+          type: string
+          description: Explanation if content was insufficient
+        correlationId:
+          type: string
+
+    RecommendedVideo:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        youTubeVideoId:
+          type: string
+        title:
+          type: string
+        channelName:
+          type: string
+        thumbnailUrl:
+          type: string
+          format: uri
+        duration:
+          type: integer
+        relevanceScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        primaryReason:
+          type: string
+          description: Brief reason for recommendation
+
+    Evidence:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        youTubeVideoId:
+          type: string
+        videoTitle:
+          type: string
+        segmentId:
+          type: string
+          format: uuid
+        segmentText:
+          type: string
+        startTime:
+          type: number
+          description: Start time in seconds
+        endTime:
+          type: number
+          description: End time in seconds
+        youTubeUrl:
+          type: string
+          format: uri
+          description: YouTube URL with timestamp
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    SegmentSearchRequest:
+      type: object
+      required:
+        - queryText
+      properties:
+        queryText:
+          type: string
+          description: Text to search for semantically
+        scope:
+          $ref: '#/components/schemas/QueryScope'
+        limit:
+          type: integer
+          default: 10
+          maximum: 50
+
+    SegmentSearchResponse:
+      type: object
+      properties:
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScoredSegment'
+        scopeEcho:
+          $ref: '#/components/schemas/QueryScope'
+
+    ScoredSegment:
+      type: object
+      properties:
+        segmentId:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          format: uuid
+        videoTitle:
+          type: string
+        channelName:
+          type: string
+        text:
+          type: string
+        startTime:
+          type: number
+        endTime:
+          type: number
+        youTubeUrl:
+          type: string
+          format: uri
+        score:
+          type: number
+          description: Similarity score (lower is more similar)
+
+    VideoSearchRequest:
+      type: object
+      required:
+        - queryText
+      properties:
+        queryText:
+          type: string
+          description: Text to search in title, description, summary
+        scope:
+          $ref: '#/components/schemas/QueryScope'
+        limit:
+          type: integer
+          default: 10
+          maximum: 50
+
+    VideoSearchResponse:
+      type: object
+      properties:
+        videos:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendedVideo'
+        scopeEcho:
+          $ref: '#/components/schemas/QueryScope'
+
+    NeighborsResponse:
+      type: object
+      properties:
+        sourceVideoId:
+          type: string
+          format: uuid
+        neighbors:
+          type: array
+          items:
+            $ref: '#/components/schemas/NeighborVideo'
+
+    NeighborVideo:
+      type: object
+      properties:
+        video:
+          $ref: '#/components/schemas/RecommendedVideo'
+        relationshipType:
+          type: string
+          enum: [series, progression, same_topic, references, related]
+        confidence:
+          type: number
+        rationale:
+          type: string
+        evidenceText:
+          type: string
+
+    ScopeRequest:
+      type: object
+      properties:
+        scope:
+          $ref: '#/components/schemas/QueryScope'
+
+    TopicsResponse:
+      type: object
+      properties:
+        topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicCount'
+        scopeEcho:
+          $ref: '#/components/schemas/QueryScope'
+
+    TopicCount:
+      type: object
+      properties:
+        facetId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        videoCount:
+          type: integer
+        segmentCount:
+          type: integer
+
+    CoverageResponse:
+      type: object
+      properties:
+        videoCount:
+          type: integer
+        segmentCount:
+          type: integer
+        channelCount:
+          type: integer
+        dateRange:
+          type: object
+          properties:
+            earliest:
+              type: string
+              format: date
+            latest:
+              type: string
+              format: date
+        lastUpdatedAt:
+          type: string
+          format: date-time
+        scopeEcho:
+          $ref: '#/components/schemas/QueryScope'
+
+    ExplainRequest:
+      type: object
+      properties:
+        queryText:
+          type: string
+          description: The original query (for context)
+        scope:
+          $ref: '#/components/schemas/QueryScope'
+
+    ExplainResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        videoTitle:
+          type: string
+        similarityBasis:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimilarityEvidence'
+          description: Evidence from semantic similarity
+        relationshipBasis:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationshipEvidence'
+          description: Evidence from stored relationships
+        overallConfidence:
+          type: number
+
+    SimilarityEvidence:
+      type: object
+      properties:
+        segmentId:
+          type: string
+          format: uuid
+        segmentText:
+          type: string
+        startTime:
+          type: number
+        endTime:
+          type: number
+        score:
+          type: number
+
+    RelationshipEvidence:
+      type: object
+      properties:
+        relationshipType:
+          type: string
+        relatedVideoId:
+          type: string
+          format: uuid
+        relatedVideoTitle:
+          type: string
+        confidence:
+          type: number
+        rationale:
+          type: string
+
+    WarmingUpResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Database is warming up, please retry in a few seconds"
+        retryAfter:
+          type: integer
+          description: Suggested retry delay in seconds
+        correlationId:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string

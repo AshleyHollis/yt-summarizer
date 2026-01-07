@@ -2,7 +2,7 @@
 ===============================================================================
 SYNC IMPACT REPORT
 ===============================================================================
-Version: 1.0.0 (Initial ratification)
+Version: 1.0.1 (Development environment clarification)
 
 Core capabilities this constitution supports:
   - Cross-video and cross-channel queries
@@ -19,6 +19,10 @@ Principles:
   V.   Security (no secrets, least-privilege)
   VI.  Engineering Quality (simplicity, testing, migrations)
   VII. Change Management (amendments, compliance, pre-merge checks)
+
+Changes in 1.0.1:
+  - Clarified VI.4 to explicitly warn against 'aspire run' in addition to 'dotnet run'
+  - Updated PowerShell example to use full project path argument
 ===============================================================================
 -->
 
@@ -36,7 +40,7 @@ Principles:
 |-------|-----------|-------|
 | Frontend | Next.js | Deployed to Azure Static Web Apps |
 | Backend | Azure Container Apps | .NET Aspire for orchestration (dev + deploy composition) |
-| Services | Polyglot (.NET + Python) | Python workers for ML/transcript processing |
+| Services | Python (API + Workers) | Unified Python backend for code sharing |
 | Database | Azure SQL (serverless) | Entities, relationships, and vector embeddings |
 | Storage | Azure Blob Storage | Large artifacts (transcripts, media references) |
 | Queue | Azure Storage Queue | Background job coordination |
@@ -155,18 +159,29 @@ Principles:
 
 3. **Cost-aware defaults**: Prefer serverless tiers with auto-pause, batched processing over real-time where latency tolerance exists, and cached results over recomputation.
 
-4. **Testing**:
+4. **Development environment**:
+   - **.NET Aspire MUST run as a detached background process** when running tests or subsequent terminal commands. Launching Aspire as a blocking foreground process will cause it to exit when the next terminal command is entered.
+   - **PowerShell pattern for background Aspire**:
+     ```powershell
+     # Start Aspire in background (detached) - REQUIRED for non-blocking execution
+     Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WindowStyle Hidden
+     Start-Sleep -Seconds 30  # Wait for services to initialize
+     ```
+   - **⚠️ NEVER use `aspire run` or `dotnet run` directly** when you need to execute follow-up commands in the same session—they block the terminal and will be killed when the next command runs.
+   - **Fixed ports**: API runs on `http://localhost:8000`, Web runs on `http://localhost:3000`. These are configured with `isProxied: false` in AppHost.cs.
+
+5. **Testing**:
    - **Unit tests**: MUST cover business logic and transformation functions.
    - **Integration tests**: SHOULD cover database access and job processing.
    - **Smoke tests**: SHOULD verify deployment succeeded and critical paths work.
 
-5. **Migration-driven schema changes**: Database schema changes MUST be defined as versioned migrations, source-controlled, and idempotent where possible.
+6. **Migration-driven schema changes**: Database schema changes MUST be defined as versioned migrations, source-controlled, and idempotent where possible.
 
-6. **Small, reviewable PRs**: Prefer incremental changes. Each PR SHOULD address a single concern and include relevant tests.
+7. **Small, reviewable PRs**: Prefer incremental changes. Each PR SHOULD address a single concern and include relevant tests.
 
-7. **Dependency discipline**: Keep dependencies minimal and versions pinned.
+8. **Dependency discipline**: Keep dependencies minimal and versions pinned.
 
-8. **Documentation separation**:
+9. **Documentation separation**:
    - **Specs** describe WHAT and WHY (user-visible behavior).
    - **Plans** describe HOW (architecture, stack choices).
    - **Tasks** are concrete, ordered, and testable.
@@ -212,4 +227,4 @@ Principles:
 
 ---
 
-**Version**: 1.0.0 | **Ratified**: 2025-12-13 | **Last Amended**: 2025-12-13
+**Version**: 1.0.1 | **Ratified**: 2025-12-13 | **Last Amended**: 2025-12-14

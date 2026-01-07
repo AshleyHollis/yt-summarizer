@@ -1,0 +1,436 @@
+/**
+ * ThreadedCopilotSidebar CSS Module (Refactored)
+ *
+ * SIMPLIFIED: Uses CopilotKit's Custom Sub-Components pattern instead of CSS hacks.
+ * The Header, ScopeIndicator, and other customizations are now passed as props.
+ *
+ * This file only contains:
+ * 1. Layout styles for our wrapper/container
+ * 2. Minor CopilotKit overrides that don't fight with positioning
+ */
+
+/* ============================================================================
+   CopilotKit Overrides (Non-Positional)
+   ============================================================================ */
+
+/* Make CopilotKit fill our container naturally */
+.container :global(.copilotKitSidebar) {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  inset: auto !important;
+}
+
+.container :global(.copilotKitWindow) {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+.container :global(.copilotKitSidebarContentWrapper) {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Hide default CopilotKit button - we use our own FAB */
+.container :global(.copilotKitButton) {
+  display: none !important;
+}
+
+/* ============================================================================
+   Messages Area
+   ============================================================================ */
+
+.container :global([class*="copilotKitMessages"]) {
+  padding: 8px !important;
+  scroll-behavior: smooth;
+  justify-content: flex-start !important;
+}
+
+/* Scrollbar styling */
+.container :global([class*="copilotKitMessages"])::-webkit-scrollbar {
+  width: 6px;
+}
+
+.container :global([class*="copilotKitMessages"])::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.container :global([class*="copilotKitMessages"])::-webkit-scrollbar-thumb {
+  background: var(--copilot-kit-separator-color);
+  border-radius: 3px;
+}
+
+.container :global([class*="copilotKitMessages"])::-webkit-scrollbar-thumb:hover {
+  background: var(--copilot-kit-muted-color);
+}
+
+/* Message styling */
+.container :global([class*="copilotKitMessage"]) {
+  padding: 0;
+  margin: 0;
+  border-radius: 12px;
+}
+
+/* User message - right-aligned chat bubble with accent */
+.container :global(.copilotKitUserMessage) {
+  background: rgba(204, 0, 0, 0.15) !important;
+  border: 1px solid rgba(204, 0, 0, 0.3) !important;
+  border-radius: 16px 16px 4px 16px !important;
+  padding: 10px 14px !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  max-width: 85% !important;
+  width: fit-content !important;
+}
+
+/* Assistant message - full width, clean styling */
+.container :global(.copilotKitAssistantMessage) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* ============================================================================
+   Input Area
+   ============================================================================ */
+
+.container :global([class*="copilotKitInput"]) {
+  border-top: 1px solid var(--copilot-kit-separator-color) !important;
+  padding: 8px !important;
+  background: var(--copilot-kit-background-color) !important;
+}
+
+/* Input wrapper styling */
+.container :global([class*="copilotKitInput"]) > div {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: var(--copilot-kit-secondary-color) !important;
+  border: 1px solid var(--copilot-kit-separator-color) !important;
+  border-radius: 8px !important;
+  padding: 8px 10px 8px 12px !important;
+  transition: border-color 0.15s ease-out !important;
+}
+
+.container :global([class*="copilotKitInput"]) > div:focus-within {
+  border-color: var(--copilot-kit-primary-color) !important;
+}
+
+/* Input textbox */
+.container :global([class*="copilotKitInput"]) textarea,
+.container :global([class*="copilotKitInput"]) input {
+  flex: 1 !important;
+  min-height: 28px !important;
+  max-height: 80px !important;
+  resize: none !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 0 !important;
+  color: var(--copilot-kit-secondary-contrast-color) !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  outline: none !important;
+}
+
+.container :global([class*="copilotKitInput"]) textarea::placeholder,
+.container :global([class*="copilotKitInput"]) input::placeholder {
+  color: var(--copilot-kit-muted-color) !important;
+}
+
+/* Send button */
+.container :global([class*="copilotKitInput"]) button {
+  flex-shrink: 0 !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  background: var(--copilot-kit-primary-color) !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s ease !important;
+}
+
+.container :global([class*="copilotKitInput"]) button:hover:not(:disabled) {
+  background: #cc0000 !important;
+}
+
+.container :global([class*="copilotKitInput"]) button:disabled {
+  background: var(--copilot-kit-separator-color) !important;
+  cursor: default !important;
+}
+
+.container :global([class*="copilotKitInput"]) button svg {
+  width: 16px !important;
+  height: 16px !important;
+  color: white !important;
+  transform: rotate(90deg) !important;
+}
+
+/* ============================================================================
+   Layout Components
+   ============================================================================ */
+
+/* Mobile overlay */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease-out;
+}
+
+.overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Main wrapper */
+.wrapper {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out, visibility 0.2s;
+  width: 400px;
+  max-width: 100vw;
+}
+
+.wrapper.closed {
+  transform: translateX(100%);
+  opacity: 0;
+  visibility: hidden;
+}
+
+.wrapper.closed * {
+  pointer-events: none !important;
+}
+
+.wrapper.open {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Full screen mode */
+.wrapper.sizeFull {
+  left: 0;
+  width: 100vw !important;
+}
+
+/* Resize handle */
+.resizeHandle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  z-index: 200;
+}
+
+.resizeHandle:hover,
+.resizeHandle.active {
+  background: var(--copilot-kit-primary-color);
+}
+
+.wrapper.sizeFull .resizeHandle {
+  display: none;
+}
+
+/* Chat panel container */
+.container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--copilot-kit-background-color);
+  border-left: 1px solid var(--copilot-kit-separator-color);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+/* ============================================================================
+   FAB Button
+   ============================================================================ */
+
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #cc0000 0%, #990000 100%);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(204, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease-out;
+}
+
+.fab:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(204, 0, 0, 0.5);
+}
+
+.fab:active {
+  transform: scale(0.98);
+}
+
+/* ============================================================================
+   Notification Banner
+   ============================================================================ */
+
+.notification {
+  padding: 8px 12px;
+  background: rgba(245, 158, 11, 0.15);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ============================================================================
+   Mobile Responsive
+   ============================================================================ */
+
+@media (max-width: 767px) {
+  .wrapper {
+    width: 100% !important;
+  }
+
+  .resizeHandle {
+    display: none;
+  }
+
+  .fab {
+    right: 16px;
+    bottom: 16px;
+    width: 52px;
+    height: 52px;
+  }
+}
+
+/* ============================================================================
+   Thread List Dropdown
+   ============================================================================ */
+
+.threadDropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  background: var(--copilot-kit-secondary-color);
+  border-bottom: 1px solid var(--copilot-kit-separator-color);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 110;
+  max-height: 192px; /* 48px * 4 items */
+  overflow-y: auto;
+}
+
+.threadItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin: 2px 4px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.threadItem:hover {
+  border-color: var(--copilot-kit-primary-color);
+  background: var(--copilot-kit-background-color);
+}
+
+.threadItem.active {
+  background: rgba(255, 0, 0, 0.1);
+  border-color: var(--copilot-kit-primary-color);
+}
+
+.threadIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--copilot-kit-muted-color);
+  transition: color 0.15s;
+}
+
+.threadItem:hover .threadIcon,
+.threadItem.active .threadIcon {
+  color: var(--copilot-kit-primary-color);
+}
+
+.threadInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.threadTitle {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--copilot-kit-secondary-contrast-color);
+}
+
+.threadItem.active .threadTitle {
+  color: var(--copilot-kit-primary-color);
+  font-weight: 500;
+}
+
+.threadMeta {
+  font-size: 11px;
+  color: var(--copilot-kit-muted-color);
+}
+
+.threadDeleteBtn {
+  padding: 4px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--copilot-kit-muted-color);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.threadItem:hover .threadDeleteBtn {
+  opacity: 1;
+}
+
+.threadDeleteBtn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}

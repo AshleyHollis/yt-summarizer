@@ -97,27 +97,55 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **Terraform**: `.terraform/`, `*.tfstate*`, `*.tfvars`, `.terraform.lock.hcl`
    - **Kubernetes/k8s**: `*.secret.yaml`, `secrets/`, `.kube/`, `kubeconfig*`, `*.key`, `*.crt`
 
-5. Parse tasks.md structure and extract:
+5. **⚠️ CRITICAL: Development Environment Setup**:
+   
+   When running services for testing or development, **NEVER** use blocking terminal commands. All services MUST be started as background processes.
+
+   **Starting .NET Aspire (REQUIRED for E2E tests)**:
+   ```powershell
+   # ✅ CORRECT: Start Aspire as background process
+   Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WindowStyle Hidden
+   Start-Sleep -Seconds 30  # Wait for services to initialize
+   ```
+   
+   **🚫 NEVER DO THIS**:
+   ```powershell
+   # ❌ WRONG: These block the terminal and get killed on next command
+   aspire run
+   dotnet run --project services\aspire\AppHost\AppHost.csproj
+   cd services/aspire/AppHost && dotnet run
+   ```
+   
+   **Starting Frontend Dev Server**:
+   ```powershell
+   # ✅ CORRECT: Start as background process
+   Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "apps\web" -WindowStyle Hidden
+   Start-Sleep -Seconds 10
+   ```
+   
+   **Fixed ports**: API runs on `http://localhost:8000`, Web runs on `http://localhost:3000`.
+
+6. Parse tasks.md structure and extract:
    - **Task phases**: Setup, Tests, Core, Integration, Polish
    - **Task dependencies**: Sequential vs parallel execution rules
    - **Task details**: ID, description, file paths, parallel markers [P]
    - **Execution flow**: Order and dependency requirements
 
-6. Execute implementation following the task plan:
+7. Execute implementation following the task plan:
    - **Phase-by-phase execution**: Complete each phase before moving to the next
    - **Respect dependencies**: Run sequential tasks in order, parallel tasks [P] can run together  
    - **Follow TDD approach**: Execute test tasks before their corresponding implementation tasks
    - **File-based coordination**: Tasks affecting the same files must run sequentially
    - **Validation checkpoints**: Verify each phase completion before proceeding
 
-7. Implementation execution rules:
+8. Implementation execution rules:
    - **Setup first**: Initialize project structure, dependencies, configuration
    - **Tests before code**: If you need to write tests for contracts, entities, and integration scenarios
    - **Core development**: Implement models, services, CLI commands, endpoints
    - **Integration work**: Database connections, middleware, logging, external services
    - **Polish and validation**: Unit tests, performance optimization, documentation
 
-8. Progress tracking and error handling:
+9. Progress tracking and error handling:
    - Report progress after each completed task
    - Halt execution if any non-parallel task fails
    - For parallel tasks [P], continue with successful tasks, report failed ones
@@ -125,11 +153,52 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Suggest next steps if implementation cannot proceed
    - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
 
-9. Completion validation:
+10. **🚨 MANDATORY: Test Verification Gate** (BEFORE marking any task [X]):
+   - **DO NOT mark any task as complete until ALL automated tests pass**
+   - **NO MANUAL TESTING REQUIRED** - all verification is automated
+   - Run ALL test suites after completing a phase:
+   
+   **API Tests:**
+   ```powershell
+   cd services/api && python -m pytest tests/ -v -p no:asyncio
+   ```
+   
+   **Worker Tests (including Message Contracts):**
+   ```powershell
+   cd services/workers && python -m pytest tests/ -v -p no:asyncio
+   ```
+   
+   **Shared Package Tests:**
+   ```powershell
+   cd services/shared && python -m pytest tests/ -v -p no:asyncio
+   ```
+   
+   **Frontend Tests:**
+   ```powershell
+   cd apps/web && npm run test:run
+   ```
+   
+   **E2E Tests:**
+   ```powershell
+   cd apps/web && $env:USE_EXTERNAL_SERVER = "true"; npx playwright test
+   ```
+   
+   - **If any test fails**: 
+     - Fix the failing test or implementation
+     - Re-run tests until all pass
+     - Only THEN mark the task as [X]
+   - **Update verification checklist** in `FEATURE_DIR/checklists/verification.md`:
+     - Record test counts and pass/fail status
+     - Mark verification items as [X] when confirmed working
+
+11. Completion validation:
    - Verify all required tasks are completed
    - Check that implemented features match the original specification
-   - Validate that tests pass and coverage meets requirements
+   - **RUN FULL TEST SUITE and confirm 100% pass rate**
    - Confirm the implementation follows the technical plan
-   - Report final status with summary of completed work
+   - Report final status with summary of completed work including:
+     - Total tests run (API + Workers + Shared + Frontend + E2E)
+     - Pass rate (must be 100%)
+     - Test coverage categories verified (Unit, Integration, Message Contracts, E2E)
 
 Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running `/speckit.tasks` first to regenerate the task list.

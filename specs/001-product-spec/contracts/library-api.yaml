@@ -1,0 +1,597 @@
+openapi: 3.0.3
+info:
+  title: YT Summarizer - Library API
+  description: API for browsing and viewing the video library
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API base path
+
+paths:
+  /library/videos:
+    get:
+      operationId: listVideos
+      summary: Browse video library with filters
+      tags:
+        - Library
+      parameters:
+        - name: channelId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by channel
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter by publish date (from)
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter by publish date (to)
+        - name: facets
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by facet/tag IDs
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, completed, failed]
+          description: Filter by processing status
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Text search in title/description
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [publishDate, title, createdAt]
+            default: publishDate
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Video list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoListResponse'
+
+  /library/videos/{videoId}:
+    get:
+      operationId: getVideo
+      summary: Get video details
+      tags:
+        - Library
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Video details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoDetailResponse'
+        '404':
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /library/videos/{videoId}/segments:
+    get:
+      operationId: getVideoSegments
+      summary: Get segments for a video
+      tags:
+        - Library
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Segment list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SegmentListResponse'
+        '404':
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /library/videos/{videoId}/relationships:
+    get:
+      operationId: getVideoRelationships
+      summary: Get related videos
+      tags:
+        - Library
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [series, progression, same_topic, references, related]
+          description: Filter by relationship type
+      responses:
+        '200':
+          description: Related videos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipListResponse'
+        '404':
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /library/channels:
+    get:
+      operationId: listChannels
+      summary: List all channels with ingested videos
+      tags:
+        - Library
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Channel list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelListResponse'
+
+  /library/channels/{channelId}:
+    get:
+      operationId: getChannel
+      summary: Get channel details
+      tags:
+        - Library
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Channel details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelDetailResponse'
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /library/facets:
+    get:
+      operationId: listFacets
+      summary: List available facets/tags
+      tags:
+        - Library
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [topic, format, level, language, tool, concept]
+          description: Filter by facet type
+        - name: channelId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter to facets used in a specific channel
+      responses:
+        '200':
+          description: Facet list with counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacetListResponse'
+
+  /library/stats:
+    get:
+      operationId: getLibraryStats
+      summary: Get library statistics
+      tags:
+        - Library
+      responses:
+        '200':
+          description: Library statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryStatsResponse'
+
+components:
+  schemas:
+    VideoListResponse:
+      type: object
+      properties:
+        videos:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoCard'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalCount:
+          type: integer
+
+    VideoCard:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        youTubeVideoId:
+          type: string
+        title:
+          type: string
+        channelId:
+          type: string
+          format: uuid
+        channelName:
+          type: string
+        duration:
+          type: integer
+          description: Duration in seconds
+        publishDate:
+          type: string
+          format: date-time
+        thumbnailUrl:
+          type: string
+          format: uri
+        processingStatus:
+          type: string
+          enum: [pending, processing, completed, failed]
+        segmentCount:
+          type: integer
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetTag'
+
+    VideoDetailResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        youTubeVideoId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        channel:
+          $ref: '#/components/schemas/ChannelSummary'
+        duration:
+          type: integer
+        publishDate:
+          type: string
+          format: date-time
+        thumbnailUrl:
+          type: string
+          format: uri
+        youTubeUrl:
+          type: string
+          format: uri
+        processingStatus:
+          type: string
+          enum: [pending, processing, completed, failed]
+        summary:
+          type: string
+          description: AI-generated summary
+        summaryArtifact:
+          $ref: '#/components/schemas/ArtifactInfo'
+        transcriptArtifact:
+          $ref: '#/components/schemas/ArtifactInfo'
+        segmentCount:
+          type: integer
+        relationshipCount:
+          type: integer
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetTag'
+        createdAt:
+          type: string
+          format: date-time
+
+    ChannelSummary:
+      type: object
+      properties:
+        channelId:
+          type: string
+          format: uuid
+        youTubeChannelId:
+          type: string
+        name:
+          type: string
+        thumbnailUrl:
+          type: string
+          format: uri
+
+    ArtifactInfo:
+      type: object
+      properties:
+        artifactId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [transcript, summary]
+        contentLength:
+          type: integer
+        modelName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SegmentListResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Segment'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalCount:
+          type: integer
+
+    Segment:
+      type: object
+      properties:
+        segmentId:
+          type: string
+          format: uuid
+        sequenceNumber:
+          type: integer
+        startTime:
+          type: number
+          description: Start time in seconds
+        endTime:
+          type: number
+          description: End time in seconds
+        text:
+          type: string
+        youTubeUrl:
+          type: string
+          format: uri
+          description: YouTube URL with timestamp
+
+    RelationshipListResponse:
+      type: object
+      properties:
+        sourceVideoId:
+          type: string
+          format: uuid
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+
+    Relationship:
+      type: object
+      properties:
+        relationshipId:
+          type: string
+          format: uuid
+        relationshipType:
+          type: string
+          enum: [series, progression, same_topic, references, related]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        rationale:
+          type: string
+        evidenceText:
+          type: string
+        targetVideo:
+          $ref: '#/components/schemas/VideoCard'
+
+    ChannelListResponse:
+      type: object
+      properties:
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelCard'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalCount:
+          type: integer
+
+    ChannelCard:
+      type: object
+      properties:
+        channelId:
+          type: string
+          format: uuid
+        youTubeChannelId:
+          type: string
+        name:
+          type: string
+        thumbnailUrl:
+          type: string
+          format: uri
+        videoCount:
+          type: integer
+        lastSyncedAt:
+          type: string
+          format: date-time
+
+    ChannelDetailResponse:
+      type: object
+      properties:
+        channelId:
+          type: string
+          format: uuid
+        youTubeChannelId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        thumbnailUrl:
+          type: string
+          format: uri
+        youTubeUrl:
+          type: string
+          format: uri
+        videoCount:
+          type: integer
+        completedVideoCount:
+          type: integer
+        lastSyncedAt:
+          type: string
+          format: date-time
+        topFacets:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetCount'
+
+    FacetListResponse:
+      type: object
+      properties:
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetCount'
+
+    FacetTag:
+      type: object
+      properties:
+        facetId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+
+    FacetCount:
+      type: object
+      properties:
+        facetId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        videoCount:
+          type: integer
+
+    LibraryStatsResponse:
+      type: object
+      properties:
+        totalChannels:
+          type: integer
+        totalVideos:
+          type: integer
+        completedVideos:
+          type: integer
+        totalSegments:
+          type: integer
+        totalRelationships:
+          type: integer
+        totalFacets:
+          type: integer
+        lastUpdatedAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string

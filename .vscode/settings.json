@@ -9,6 +9,56 @@
     "chat.tools.terminal.autoApprove": {
         ".specify/scripts/bash/": true,
         ".specify/scripts/powershell/": true
+    },
+    "terminal.integrated.env.windows": {
+        "PATH": "${workspaceFolder}\\tools;${env:PATH}"
+    },
+
+    // ─── Memory Optimization Settings ───────────────────────────────────────────
+
+    // Limit open editor tabs to reduce memory
+    "workbench.editor.limit.enabled": true,
+    "workbench.editor.limit.value": 10,
+    "workbench.editor.limit.perEditorGroup": true,
+
+    // Exclude large folders from file watching (reduces memory & CPU)
+    "files.watcherExclude": {
+        "**/node_modules/**": true,
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/dist/**": true,
+        "**/.venv/**": true,
+        "**/test-results/**": true,
+        "**/playwright-report/**": true,
+        "**/__pycache__/**": true,
+        "**/bin/**": true,
+        "**/obj/**": true
+    },
+
+    // Exclude from search indexing
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/.venv": true,
+        "**/test-results": true,
+        "**/playwright-report": true,
+        "**/__pycache__": true,
+        "**/bin": true,
+        "**/obj": true
+    },
+
+    // Limit TypeScript server memory
+    "typescript.tsserver.maxTsServerMemory": 3072,
+
+    // GitHub Copilot - exclude large folders from workspace indexing
+    "github.copilot.chat.search.exclude": {
+        "**/node_modules": true,
+        "**/.venv": true,
+        "**/test-results": true,
+        "**/playwright-report": true,
+        "**/__pycache__": true,
+        "**/bin": true,
+        "**/obj": true
     }
 }
 
