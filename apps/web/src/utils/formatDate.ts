@@ -44,6 +44,37 @@ export function formatDateTime(dateString: string | null): string {
 }
 
 /**
+ * Format ISO datetime string to just time (for compact display)
+ */
+export function formatTime(isoString: string | null): string {
+  if (!isoString) return '-';
+  const date = new Date(isoString);
+  return date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+/**
+ * Format ISO datetime string to short time (hour:minute only, no seconds)
+ * Handles both UTC and local time strings.
+ */
+export function formatTimeShort(isoString: string): string {
+  const dateStr = isoString.endsWith('Z') ? isoString : isoString + 'Z';
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Format current date to simple locale date string (e.g., "1/7/2026")
+ * Useful for auto-generated names like batch names.
+ */
+export function formatDateShort(date: Date = new Date()): string {
+  return date.toLocaleDateString();
+}
+
+/**
  * Format timestamp to relative time (e.g., "Today", "Yesterday", "3d ago")
  */
 export function formatRelativeDate(timestamp: number): string {

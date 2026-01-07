@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { jobApi, VideoJobsProgress, JobType, JobStatus, JobStage, ETAInfo } from '@/services/api';
+import { formatTimeShort } from '@/utils/formatDate';
 
 /**
  * Props for JobProgress
@@ -166,13 +167,6 @@ const formatDuration = (seconds: number): string => {
  * remaining time, avoiding timer resets on refresh/polling
  */
 const ETADisplay = ({ eta, currentStageName }: { eta: ETAInfo; currentStageName: string | null }) => {
-  // Format ready time for display
-  const formatReadyAt = useCallback((isoString: string) => {
-    const dateStr = isoString.endsWith('Z') ? isoString : isoString + 'Z';
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }, []);
-
   // Calculate target end time from server data
   const calculateTargetEndTime = useCallback(() => {
     if (eta.processing_started_at) {
@@ -246,7 +240,7 @@ const ETADisplay = ({ eta, currentStageName }: { eta: ETAInfo; currentStageName:
 
           {/* Ready at time */}
           <p className="text-sm text-blue-600 dark:text-blue-400 mb-2">
-            Ready at approximately <span className="font-mono font-medium">{formatReadyAt(eta.estimated_ready_at)}</span>
+            Ready at approximately <span className="font-mono font-medium">{formatTimeShort(eta.estimated_ready_at)}</span>
           </p>
 
           {/* Current stage */}

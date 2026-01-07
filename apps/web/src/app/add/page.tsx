@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SmartUrlInput } from '@/components/SmartUrlInput';
 import { ChannelVideoList } from '@/components/ChannelVideoList';
+import { formatDateShort } from '@/utils/formatDate';
 import {
   ChannelVideosResponse,
   batchApi,
@@ -35,7 +36,7 @@ export default function AddPage() {
     setChannelUrl(url);
     setSelectedVideoIds([]);
     // Auto-generate batch name
-    setBatchName(`${response.channel_name} - ${new Date().toLocaleDateString()}`);
+    setBatchName(`${response.channel_name} - ${formatDateShort()}`);
   };
 
   /**

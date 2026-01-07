@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { jobApi, VideoProcessingHistory, StageHistoryItem } from '@/services/api';
+import { formatDateTime, formatTime } from '@/utils/formatDate';
 import { formatElapsedTime } from '@/utils/formatDuration';
 
 /**
@@ -12,34 +13,6 @@ export interface ProcessingHistoryProps {
   videoId: string;
   /** Custom class name */
   className?: string;
-}
-
-/**
- * Format ISO datetime string to human-readable format
-function formatDuration(seconds: number | null, placeholder: string = '-'): string {
-  if (seconds === null) return placeholder;
-  if (!isoString) return '-';
-  const date = new Date(isoString);
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
-
-/**
- * Format ISO datetime string to just time (for compact display)
- */
-function formatTime(isoString: string | null): string {
-  if (!isoString) return '-';
-  const date = new Date(isoString);
-  return date.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
 }
 
 /**
