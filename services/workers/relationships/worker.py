@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 # Default settings
 DEFAULT_SIMILARITY_THRESHOLD = 0.7
 DEFAULT_MAX_RELATED = 10
+DEFAULT_BATCH_SIZE = 100  # Process videos in batches to limit memory usage
 
 
 @dataclass
@@ -186,10 +187,10 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
     ) -> list[tuple[str, float]]:
         """Find related videos based on embedding similarity.
 
+        Uses batch processing to limit memory usage for large libraries.
         Returns list of (video_id, similarity_score) tuples.
         """
         import json
-        from uuid import UUID
 
         settings = get_settings()
         similarity_threshold = getattr(
@@ -205,55 +206,110 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
 
         db = get_db()
         async with db.session() as session:
-            # Get all other videos with their embeddings
-            # Use CAST to convert VECTOR to VARCHAR for reliable retrieval
-            result = await session.execute(
+            # First, get distinct video IDs (excluding current video)
+            video_ids_result = await session.execute(
                 sa.text("""
-                    SELECT video_id, CAST(Embedding AS VARCHAR(MAX)) FROM Segments 
+                    SELECT DISTINCT video_id FROM Segments 
                     WHERE video_id != :current_video_id 
                     AND Embedding IS NOT NULL
                 """),
                 {"current_video_id": str(current_video_id)}
             )
+            all_video_ids = [str(row[0]) for row in video_ids_result.fetchall()]
 
-            # Group embeddings by video
-            video_embeddings: dict[str, list[list[float]]] = {}
-            for row in result.fetchall():
-                vid = str(row[0])
-                if row[1]:  # If embedding exists
-                    embedding_str = row[1]
-                    # VECTOR type returns as JSON array string like "[0.123, -0.456, ...]"
-                    if isinstance(embedding_str, str):
-                        embedding = json.loads(embedding_str)
-                    elif isinstance(embedding_str, bytes):
-                        # Fallback for binary format (legacy)
-                        num_floats = len(embedding_str) // 4
-                        embedding = list(struct.unpack(f'{num_floats}f', embedding_str))
-                    else:
-                        continue
-                    if vid not in video_embeddings:
-                        video_embeddings[vid] = []
-                    video_embeddings[vid].append(embedding)
+            logger.debug(
+                "Finding related videos",
+                current_video_id=current_video_id,
+                candidate_count=len(all_video_ids),
+            )
 
-            # Calculate similarity for each video
-            similarities = []
+            # Process videos in batches to limit memory usage
+            similarities: list[tuple[str, float]] = []
             current_arr = np.array(current_embedding)
 
-            for vid, embeddings in video_embeddings.items():
-                avg_embedding = self._average_embeddings(embeddings)
-                if not avg_embedding:
-                    continue
-
-                # Cosine similarity (embeddings are normalized)
-                other_arr = np.array(avg_embedding)
-                similarity = float(np.dot(current_arr, other_arr))
-
-                if similarity >= similarity_threshold:
-                    similarities.append((vid, similarity))
+            for batch_start in range(0, len(all_video_ids), DEFAULT_BATCH_SIZE):
+                batch_video_ids = all_video_ids[batch_start:batch_start + DEFAULT_BATCH_SIZE]
+                
+                # Fetch embeddings for this batch of videos
+                batch_similarities = await self._process_video_batch(
+                    session,
+                    batch_video_ids,
+                    current_arr,
+                    similarity_threshold,
+                )
+                similarities.extend(batch_similarities)
 
             # Sort by similarity (descending) and limit
             similarities.sort(key=lambda x: x[1], reverse=True)
             return similarities[:max_related]
+
+    async def _process_video_batch(
+        self,
+        session,
+        video_ids: list[str],
+        current_arr: np.ndarray,
+        similarity_threshold: float,
+    ) -> list[tuple[str, float]]:
+        """Process a batch of videos and compute similarities.
+        
+        Args:
+            session: Database session
+            video_ids: List of video IDs to process
+            current_arr: Current video's average embedding as numpy array
+            similarity_threshold: Minimum similarity score to include
+            
+        Returns:
+            List of (video_id, similarity_score) tuples above threshold
+        """
+        import json
+
+        # Create placeholders for the IN clause
+        placeholders = ", ".join(f":vid_{i}" for i in range(len(video_ids)))
+        params = {f"vid_{i}": vid for i, vid in enumerate(video_ids)}
+
+        result = await session.execute(
+            sa.text(f"""
+                SELECT video_id, CAST(Embedding AS VARCHAR(MAX)) FROM Segments 
+                WHERE video_id IN ({placeholders})
+                AND Embedding IS NOT NULL
+            """),
+            params
+        )
+
+        # Group embeddings by video
+        video_embeddings: dict[str, list[list[float]]] = {}
+        for row in result.fetchall():
+            vid = str(row[0])
+            if row[1]:  # If embedding exists
+                embedding_str = row[1]
+                # VECTOR type returns as JSON array string like "[0.123, -0.456, ...]"
+                if isinstance(embedding_str, str):
+                    embedding = json.loads(embedding_str)
+                elif isinstance(embedding_str, bytes):
+                    # Fallback for binary format (legacy)
+                    num_floats = len(embedding_str) // 4
+                    embedding = list(struct.unpack(f'{num_floats}f', embedding_str))
+                else:
+                    continue
+                if vid not in video_embeddings:
+                    video_embeddings[vid] = []
+                video_embeddings[vid].append(embedding)
+
+        # Calculate similarity for each video in batch
+        batch_similarities: list[tuple[str, float]] = []
+        for vid, embeddings in video_embeddings.items():
+            avg_embedding = self._average_embeddings(embeddings)
+            if not avg_embedding:
+                continue
+
+            # Cosine similarity (embeddings are normalized)
+            other_arr = np.array(avg_embedding)
+            similarity = float(np.dot(current_arr, other_arr))
+
+            if similarity >= similarity_threshold:
+                batch_similarities.append((vid, similarity))
+
+        return batch_similarities
 
     async def _store_relationships(
         self,
