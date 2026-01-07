@@ -39,6 +39,8 @@ echo set "ASPNETCORE_ENVIRONMENT=Development" >> "%TEMPSCRIPT%"
 REM Enable anonymous access to the Aspire dashboard (no login token required)
 echo set "ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true" >> "%TEMPSCRIPT%"
 echo "!REAL_ASPIRE!" %* >> "%TEMPSCRIPT%"
+REM Ensure the temporary script cleans itself up after execution
+echo del "%%~f0" >> "%TEMPSCRIPT%"
 
 REM Launch the temp script minimized
 start "Aspire" /MIN "%TEMPSCRIPT%"
