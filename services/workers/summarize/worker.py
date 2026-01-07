@@ -325,14 +325,33 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
                 model = settings.openai.model
 
             # Truncate transcript if too long (GPT-4o-mini has 128k context)
+            # Use tiktoken for accurate token counting instead of character count
             max_tokens = 100000  # Leave room for system prompt and response
-            if len(transcript) > max_tokens:
-                transcript = transcript[:max_tokens] + "..."
-                logger.warning(
-                    "Transcript truncated",
-                    original_length=len(transcript),
-                    max_tokens=max_tokens,
-                )
+            try:
+                import tiktoken
+                encoding = tiktoken.encoding_for_model(model)
+                tokens = encoding.encode(transcript)
+                if len(tokens) > max_tokens:
+                    original_token_count = len(tokens)
+                    tokens = tokens[:max_tokens]
+                    transcript = encoding.decode(tokens) + "..."
+                    logger.warning(
+                        "Transcript truncated",
+                        original_tokens=original_token_count,
+                        max_tokens=max_tokens,
+                    )
+            except Exception as e:
+                # Fallback to conservative character-based truncation if tiktoken fails
+                # Assume ~4 characters per token as a conservative estimate
+                max_chars = max_tokens * 4
+                if len(transcript) > max_chars:
+                    logger.warning(
+                        "Transcript truncated (fallback char-based, tiktoken error: %s)",
+                        str(e),
+                        original_length=len(transcript),
+                        max_chars=max_chars,
+                    )
+                    transcript = transcript[:max_chars] + "..."
 
             # Build request parameters - newer models use max_completion_tokens instead of max_tokens
             request_params = {
