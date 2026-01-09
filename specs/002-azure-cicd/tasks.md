@@ -225,13 +225,30 @@
 - [X] T087 [P] Verify RBAC least-privilege for AKS service account
 - [X] T088 [P] Verify External Secrets are properly scoped to namespace
 
-### Validation Tests
+### Validation Tests (POST-MERGE)
+
+> **Note**: These tasks require the CI/CD infrastructure to be merged to main first.
+> After merging PR #2, create branch `002-azure-cicd-validation` and run `/speckit.implement` to continue.
 
 - [ ] T089 Validate full CI workflow with intentional test failure
+  - Create a PR with a failing test, verify CI blocks merge
+  - Fix the test, verify CI passes
 - [ ] T090 Validate PR preview deploy end-to-end (open PR → preview URL works)
+  - Open a PR with code changes
+  - Verify Preview workflow builds images and creates overlay
+  - Verify Argo CD deploys the preview
+  - Access the preview URL
 - [ ] T091 Validate PR preview cleanup (close PR → namespace deleted)
+  - Close or merge the test PR
+  - Verify preview-cleanup workflow runs
+  - Verify Argo CD prunes the preview application
 - [ ] T092 Validate merge-to-prod auto-deploy (merge → production updated)
+  - Merge a PR to main
+  - Verify deploy-prod workflow triggers
+  - Verify production is updated with new images
 - [ ] T093 Validate GitOps rollback via git revert on prod overlay
+  - Create a commit reverting changes in `k8s/overlays/prod/`
+  - Verify Argo CD syncs and rolls back the deployment
 - [X] T094 Run existing test suite to verify no regressions: `.\scripts\run-tests.ps1`
 
 ---
