@@ -32,6 +32,10 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
+            # Explicitly set API_PORT to prevent collision with Kubernetes service env vars
+            # K8s auto-creates API_PORT=tcp://... which breaks pydantic int parsing
+            - name: API_PORT
+              value: "8000"
             - name: ENVIRONMENT
               valueFrom:
                 configMapKeyRef:

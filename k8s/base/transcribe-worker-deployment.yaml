@@ -28,6 +28,9 @@ spec:
           image: ACR_LOGIN_SERVER/yt-summarizer-workers:latest
           imagePullPolicy: Always
           env:
+            # Prevent K8s service env var collision (API_PORT=tcp://...)
+            - name: API_PORT
+              value: "8000"
             - name: WORKER_TYPE
               value: transcribe
             - name: ENVIRONMENT
