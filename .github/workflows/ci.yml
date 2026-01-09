@@ -215,20 +215,12 @@ jobs:
         with:
           terraform_version: "1.5"
 
-      - name: Terraform Init (staging)
-        working-directory: infra/terraform/environments/staging
+      - name: Terraform Init (prod)
+        working-directory: infra/terraform/environments/prod
         run: terraform init -backend=false
 
-      - name: Terraform Validate (staging)
-        working-directory: infra/terraform/environments/staging
-        run: terraform validate
-
-      - name: Terraform Init (production)
-        working-directory: infra/terraform/environments/production
-        run: terraform init -backend=false
-
-      - name: Terraform Validate (production)
-        working-directory: infra/terraform/environments/production
+      - name: Terraform Validate (prod)
+        working-directory: infra/terraform/environments/prod
         run: terraform validate
 
   validate-kustomize:
@@ -244,11 +236,8 @@ jobs:
       - name: Validate base manifests
         run: kustomize build k8s/base > /dev/null
 
-      - name: Validate staging overlay
-        run: kustomize build k8s/overlays/staging > /dev/null
-
-      - name: Validate production overlay
-        run: kustomize build k8s/overlays/production > /dev/null
+      - name: Validate prod overlay
+        run: kustomize build k8s/overlays/prod > /dev/null
 
   # ---------------------------------------------------------------------------
   # Security Scanning
