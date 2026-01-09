@@ -68,16 +68,17 @@ patches:
       kind: SecretStore
       metadata:
         name: azure-keyvault
-  # Delete ServiceAccount (preview uses production SA via ClusterSecretStore)
+  # Strip federated identity annotations from ServiceAccount
+  # (Preview uses ClusterSecretStore with production SA for Key Vault access,
+  # but we still need the SA for pods to run)
   - target:
       kind: ServiceAccount
       name: yt-summarizer-sa
     patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: ServiceAccount
-      metadata:
-        name: yt-summarizer-sa
+      - op: remove
+        path: /metadata/annotations/azure.workload.identity~1client-id
+      - op: remove
+        path: /metadata/annotations/azure.workload.identity~1tenant-id
 
 images:
   - name: yt-summarizer-api
