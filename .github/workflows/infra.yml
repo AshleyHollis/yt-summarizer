@@ -104,9 +104,11 @@ jobs:
       - name: Post Plan to PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        env:
+          PLAN_OUTPUT: ${{ steps.plan.outputs.plan_output }}
         with:
           script: |
-            const planOutput = `${{ steps.plan.outputs.plan_output }}`;
+            const planOutput = process.env.PLAN_OUTPUT || 'No plan output available';
             const truncatedPlan = planOutput.length > 60000 
               ? planOutput.substring(0, 60000) + '\n\n... (truncated)'
               : planOutput;
