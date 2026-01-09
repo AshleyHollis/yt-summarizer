@@ -2,7 +2,7 @@
 ===============================================================================
 SYNC IMPACT REPORT
 ===============================================================================
-Version: 1.0.1 (Development environment clarification)
+Version: 1.0.2 (Architecture alignment: AKS + Argo CD GitOps)
 
 Core capabilities this constitution supports:
   - Cross-video and cross-channel queries
@@ -15,10 +15,16 @@ Principles:
   I.   Product & UX (cross-content queries, citations, graceful degradation)
   II.  AI/Copilot Boundaries (read-only, grounded, library-scoped)
   III. Data & Provenance (SQL as source of truth, relationships, traceability)
-  IV.  Reliability & Operations (async processing, observability)
+  IV.  Reliability & Operations (async processing, observability, GitOps)
   V.   Security (no secrets, least-privilege)
   VI.  Engineering Quality (simplicity, testing, migrations)
   VII. Change Management (amendments, compliance, pre-merge checks)
+
+Changes in 1.0.2:
+  - Aligned Architecture Constraints to AKS + Argo CD GitOps (single-node, cost-optimized)
+  - Added Delivery layer (Argo CD + Kustomize) to architecture table
+  - Clarified VI.4: Aspire is for local/dev orchestration; production uses AKS + Argo CD
+  - Added GitOps deployment guidance to IV. Reliability & Operations
 
 Changes in 1.0.1:
   - Clarified VI.4 to explicitly warn against 'aspire run' in addition to 'dotnet run'
@@ -39,7 +45,8 @@ Changes in 1.0.1:
 | Layer | Technology | Notes |
 |-------|-----------|-------|
 | Frontend | Next.js | Deployed to Azure Static Web Apps |
-| Backend | Azure Container Apps | .NET Aspire for orchestration (dev + deploy composition) |
+| Backend | AKS (Kubernetes) | Single-node, cost-optimized cluster |
+| Delivery | Argo CD + Kustomize | GitOps: Argo syncs from `k8s/overlays/*` |
 | Services | Python (API + Workers) | Unified Python backend for code sharing |
 | Database | Azure SQL (serverless) | Entities, relationships, and vector embeddings |
 | Storage | Azure Blob Storage | Large artifacts (transcripts, media references) |
@@ -131,6 +138,10 @@ Changes in 1.0.1:
    
    Metrics (request counts, latencies, queue depth) are recommended but not required initially.
 
+4. **GitOps deployments**:
+   - Production deployments are driven by commits to `k8s/overlays/*`; Argo CD syncs to the AKS cluster.
+   - Preview/ephemeral environments (namespaces) are allowed for testing but MUST be cleaned up automatically to control cost on the single-node cluster.
+
 **Rationale**: Async processing across multiple services is painful to debug without end-to-end tracing. Invest in observability early.
 
 ---
@@ -160,6 +171,8 @@ Changes in 1.0.1:
 3. **Cost-aware defaults**: Prefer serverless tiers with auto-pause, batched processing over real-time where latency tolerance exists, and cached results over recomputation.
 
 4. **Development environment**:
+   - **.NET Aspire is for local/dev orchestration only**. It MUST NOT be used for production deployments.
+   - **Production deployments** are performed via AKS + Argo CD GitOps (see IV.4).
    - **.NET Aspire MUST run as a detached background process** when running tests or subsequent terminal commands. Launching Aspire as a blocking foreground process will cause it to exit when the next terminal command is entered.
    - **PowerShell pattern for background Aspire**:
      ```powershell
@@ -227,4 +240,4 @@ Changes in 1.0.1:
 
 ---
 
-**Version**: 1.0.1 | **Ratified**: 2025-12-13 | **Last Amended**: 2025-12-14
+**Version**: 1.0.2 | **Ratified**: 2025-12-13 | **Last Amended**: 2026-01-09

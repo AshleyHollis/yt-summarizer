@@ -2,6 +2,7 @@
 
 **Feature Branch**: `002-azure-cicd`  
 **Created**: 2026-01-08  
+**Updated**: 2026-01-09  
 **Status**: Draft  
 **Input**: User description: "I want to create CI/CD pipelines in GitHub to deploy to Azure."
 
@@ -23,39 +24,41 @@ As a developer, I want all tests to run automatically when I create or update a 
 
 ---
 
-### User Story 2 - Build and Deploy to Staging on Merge (Priority: P2)
+### User Story 2 - Deploy PR Preview Environment (Priority: P1)
 
-As a team lead, I want the application to automatically deploy to a staging environment when code is merged to main, so that we can validate changes in an Azure-like environment before production.
+As a developer, I want a live preview environment deployed for each pull request, so that reviewers can validate changes in a real Azure environment before merging.
 
-**Why this priority**: Staging deployment enables validation of changes in an environment that mirrors production, catching environment-specific issues before they impact users.
+**Why this priority**: PR previews are the primary validation surface. They enable reviewers to verify functionality in a production-like environment, catching integration issues before they reach production.
 
-**Independent Test**: Can be fully tested by merging a small change to main and verifying all services are deployed and accessible in the staging environment.
-
-**Acceptance Scenarios**:
-
-1. **Given** a PR is merged to main, **When** the merge completes, **Then** the pipeline builds all components (web, API, workers)
-2. **Given** builds complete successfully, **When** deployment starts, **Then** all services are deployed to the Azure staging environment
-3. **Given** deployment completes, **When** accessing the staging URL, **Then** the application is functional and running the latest changes
-
----
-
-### User Story 3 - Manual Production Deployment with Approval (Priority: P3)
-
-As an operations engineer, I want to manually trigger production deployments with approval gates, so that we have control over what goes to production and when.
-
-**Why this priority**: Production deployments require human oversight to ensure business readiness, coordinate with stakeholders, and minimize risk.
-
-**Independent Test**: Can be fully tested by triggering a production deployment and verifying the approval workflow executes before deployment proceeds.
+**Independent Test**: Can be fully tested by opening a PR and verifying a unique preview URL is created, accessible, and shows the PR changes.
 
 **Acceptance Scenarios**:
 
-1. **Given** a successful staging deployment, **When** an authorized user triggers production deployment, **Then** an approval request is created
-2. **Given** an approval request exists, **When** an authorized approver approves it, **Then** the deployment proceeds to production
-3. **Given** an approval request exists, **When** an authorized approver rejects it, **Then** the deployment is cancelled with a recorded reason
+1. **Given** a developer opens or updates a pull request, **When** CI tests pass, **Then** a PR-scoped preview environment is deployed to AKS with a unique namespace
+2. **Given** a preview deployment is in progress, **When** the developer views the PR, **Then** they see status updates (deploying/ready/failed) with a preview URL when ready
+3. **Given** a preview environment is deployed, **When** a reviewer accesses the preview URL, **Then** they can interact with the full application (API, workers, frontend)
+4. **Given** a pull request is closed or merged, **When** the PR lifecycle ends, **Then** the preview environment is automatically torn down and resources reclaimed
 
 ---
 
-### User Story 4 - Infrastructure as Code Deployment (Priority: P4)
+### User Story 3 - Automatic Production Deployment on Merge (Priority: P1)
+
+As a team lead, I want the application to automatically deploy to production when a PR is merged to main, so that validated changes reach users quickly without manual intervention.
+
+**Why this priority**: Automatic production deployment eliminates deployment delays and human error. The PR preview has already validated the changes, making manual approval redundant.
+
+**Independent Test**: Can be fully tested by merging a PR and verifying the same artifacts deployed to preview are automatically promoted to production.
+
+**Acceptance Scenarios**:
+
+1. **Given** a PR is merged to main, **When** the merge completes, **Then** the production deployment automatically starts using the same image digests validated in the preview
+2. **Given** a production deployment succeeds, **When** accessing the production URL, **Then** the application is functional and running the merged changes
+3. **Given** a production deployment fails, **When** health checks do not pass, **Then** Argo CD automatically rolls back to the previous healthy version
+4. **Given** a bad deployment reaches production, **When** a developer reverts the merge commit, **Then** production automatically redeploys the previous version
+
+---
+
+### User Story 4 - Infrastructure as Code Deployment (Priority: P3)
 
 As a DevOps engineer, I want infrastructure changes to be deployed through the same pipeline, so that infrastructure and application code stay in sync.
 
@@ -72,10 +75,12 @@ As a DevOps engineer, I want infrastructure changes to be deployed through the s
 
 ### Edge Cases
 
-- **Partial deployment failure**: Pipeline uses fail-fast strategy; if any service fails, remaining deployments stop and completed services automatically rollback to previous version
-- **Concurrent pipeline runs**: Multiple PRs can run CI in parallel; CD deployments are serialized to prevent conflicts
-- **Unhealthy staging after deployment**: Health checks fail the pipeline, triggering automatic rollback
-- **Secrets management**: All secrets stored in GitHub Secrets or Azure Key Vault, never in code or logs
+- **Multiple PR previews in parallel**: Each PR gets its own isolated namespace in AKS; namespaces are prefixed with PR number to prevent conflicts
+- **Single-node AKS resource contention**: Preview environments have resource quotas/limits enforced so production namespace remains stable; max 3 concurrent previews
+- **Preview deployment failure**: A failed preview blocks merge for that PR (required status check) but does not block other PRs
+- **Production deployment failure**: Health checks fail → Argo CD automatically syncs to previous healthy revision; developers can also revert the merge commit
+- **Concurrent production deployments**: Argo CD serializes syncs to production; only one deployment active at a time
+- **Secrets management**: All secrets stored in GitHub Secrets or Azure Key Vault, never in code or logs; workload identity used for Azure authentication
 
 ## Requirements *(mandatory)*
 
@@ -88,79 +93,85 @@ As a DevOps engineer, I want infrastructure changes to be deployed through the s
 - **FR-004**: System MUST cache dependencies (npm, pip, uv) to reduce pipeline execution time
 - **FR-005**: System MUST run linting and code quality checks before tests
 
-#### Continuous Deployment (CD) - Staging
-- **FR-006**: System MUST automatically deploy to staging environment when code is merged to main
+#### Continuous Deployment (CD) - PR Preview
+- **FR-006**: System MUST deploy a preview environment for each pull request after CI tests pass
 - **FR-007**: System MUST build Docker images: 1 API image + 1 unified Workers image (runs all 4 workers: transcribe, summarize, embed, relationships)
-- **FR-008**: System MUST build and deploy the Next.js frontend
-- **FR-009**: System MUST run database migrations as part of deployment
-- **FR-009a**: System MUST use fail-fast strategy: stop remaining deployments if any service fails
-- **FR-009b**: System MUST automatically rollback completed services when a deployment fails
-- **FR-010**: System MUST perform health checks after deployment to verify service availability
+- **FR-008**: System MUST deploy preview to a PR-scoped namespace in AKS (e.g., `preview-pr-123`)
+- **FR-009**: System MUST post preview URL and deployment status (deploying/ready/failed) as a PR comment or status check
+- **FR-010**: System MUST enforce resource quotas on preview namespaces to protect production stability (max 3 concurrent previews)
+- **FR-011**: System MUST automatically delete preview namespace when PR is closed or merged
+- **FR-012**: System MUST perform health checks after preview deployment to verify service availability
 
 #### Continuous Deployment (CD) - Production
-- **FR-011**: System MUST require manual trigger for production deployments
-- **FR-012**: System MUST require approval from designated approvers before production deployment
-- **FR-013**: System MUST deploy the same artifacts that were validated in staging
-- **FR-014**: System MUST support rollback to previous version if deployment fails
+- **FR-013**: System MUST automatically deploy to production when a PR is merged to main
+- **FR-014**: System MUST promote the same image digests validated in the preview (no rebuild)
+- **FR-015**: System MUST update Kustomize overlay with image digest and commit to trigger Argo CD sync
+- **FR-016**: System MUST support rollback via Argo CD sync to previous revision or merge commit revert
+- **FR-017**: System MUST perform health checks after production deployment
 
 #### Security & Secrets
-- **FR-015**: System MUST store all secrets (API keys, connection strings) in GitHub Secrets or Azure Key Vault
-- **FR-016**: System MUST never expose secrets in logs or artifacts
-- **FR-017**: System MUST use managed identities or service principals for Azure authentication
+- **FR-018**: System MUST store all secrets (API keys, connection strings) in GitHub Secrets or Azure Key Vault
+- **FR-019**: System MUST never expose secrets in logs or artifacts
+- **FR-020**: System MUST use workload identity or managed identity for Azure authentication (prefer over service principals)
 
 #### Notifications & Observability
-- **FR-018**: System MUST notify on deployment success or failure → *Covered by GitHub Actions built-in (VS Code extension, Actions tab, email)*
-- **FR-019**: System MUST provide links to deployment logs and Azure portal resources
-- **FR-020**: System MUST tag deployed resources with commit SHA for traceability
+- **FR-021**: System MUST notify on deployment success or failure → *Covered by GitHub Actions built-in (VS Code extension, Actions tab, email)*
+- **FR-022**: System MUST provide links to Argo CD sync status and deployment logs
+- **FR-023**: System MUST tag deployed resources with commit SHA for traceability
 
 ### Key Entities
 
 - **Pipeline**: A GitHub Actions workflow that orchestrates build, test, and deploy steps
-- **Environment**: A target deployment destination (staging, production) with its own configuration
-- **Artifact**: Built application components (Docker images, static assets) ready for deployment
+- **Preview Environment**: An ephemeral PR-scoped deployment in AKS for validation before merge
+- **Production Environment**: The live deployment serving end users
+- **Artifact**: Built application components (Docker images with pinned digests) ready for deployment
 - **Secret**: Sensitive configuration values stored securely and injected at runtime
-- **Approval Gate**: A checkpoint requiring human authorization before proceeding
+- **Argo CD Application**: GitOps resource that syncs Kubernetes manifests to the cluster
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
 - **SC-001**: Pull request test feedback is available within 15 minutes of PR creation/update
-- **SC-002**: Staging deployments complete within 20 minutes of merge to main
-- **SC-003**: Zero secrets are exposed in pipeline logs or build artifacts
-- **SC-004**: 100% of production deployments require and receive approval before execution
-- **SC-005**: Team is notified of deployment status within 2 minutes of completion
-- **SC-006**: Developers can identify which commit is deployed to each environment within 30 seconds
-- **SC-007**: Failed deployments can be rolled back within 10 minutes
-- **SC-008**: Pipeline configuration changes are version-controlled and reviewable through PRs
+- **SC-002**: PR preview environments are deployed within 10 minutes of CI passing
+- **SC-003**: Production deployments complete within 10 minutes of merge to main
+- **SC-004**: 100% of merges to main automatically trigger production deployment (no manual steps)
+- **SC-005**: Zero secrets are exposed in pipeline logs or build artifacts
+- **SC-006**: Team is notified of deployment status within 2 minutes of completion
+- **SC-007**: Developers can identify which commit is deployed to each environment within 30 seconds (commit SHA tagging)
+- **SC-008**: Failed deployments trigger automatic rollback within 5 minutes
+- **SC-009**: Preview environments are cleaned up within 5 minutes of PR close/merge
+- **SC-010**: Pipeline configuration changes are version-controlled and reviewable through PRs
 
 ## Clarifications
 
 ### Session 2026-01-08
-- Q: Which Azure hosting service should be used for the containerized API and Workers? → A: ~~Azure Container Apps (ACA)~~ → Revised: AKS single-node cluster (cost-effective for hobby project)
+- Q: Which Azure hosting service should be used for the containerized API and Workers? → A: AKS single-node cluster (cost-effective for hobby project)
 - Q: Where should the Next.js frontend be hosted? → A: Azure Static Web Apps (free tier)
 - Q: What Infrastructure as Code (IaC) tool should provision and manage Azure resources? → A: Terraform
 - Q: Where should Terraform state be stored? → A: Azure Storage Account (with state locking)
-- Q: How should deployment failures be handled when one service fails but others succeed? → A: Fail-fast with automatic rollback
 
-### Session 2026-01-08 (Revision)
-- Q: Cost concern - ACA could get expensive with multiple apps. Alternative? → A: AKS single-node (~$30/month fixed) with GitOps
-- Q: Which GitOps tool? → A: Argo CD (better UI, easier debugging)
-- Q: Which K8s manifest format? → A: Kustomize (simpler, built into kubectl)
-- Q: Keep SWA for frontend? → A: Yes, free tier with CDN/SSL
-- Q: Local dev approach? → A: Keep Aspire + Docker (unchanged); K8s only for Azure
+### Session 2026-01-09 (Updated Strategy)
+- Q: Is a long-lived staging environment required? → A: No. PR preview environments are the primary validation surface. Staging is removed.
+- Q: How should production deployments be triggered? → A: Automatically on merge to main. No manual trigger or approval gates.
+- Q: How do we ensure production matches what was previewed? → A: Same Docker image digests are promoted (no rebuild). Kustomize overlay updated with pinned digests.
+- Q: How should deployment failures be handled? → A: Argo CD automatically rolls back to previous healthy revision; developers can also revert the merge commit.
+- Q: How should multiple PR previews be isolated? → A: Each PR gets its own Kubernetes namespace (e.g., `preview-pr-123`).
+- Q: Resource constraints for single-node AKS? → A: Max 3 concurrent previews with resource quotas; production namespace protected.
 
 ## Assumptions
 
 - Azure subscription with appropriate permissions is available for creating resources
 - GitHub repository has Actions enabled and appropriate permissions configured
-- Azure Container Registry will be used for Docker image storage
-- AKS single-node cluster (~$30/month) will host API and Workers via GitOps
+- Azure Container Registry (ACR) will be used for Docker image storage with digest-based tagging
+- AKS single-node cluster (~$30/month) will host API, Workers, and PR preview environments
 - Argo CD will be installed on AKS for GitOps-based deployments
-- Kustomize will be used for Kubernetes manifest management
+- Kustomize overlays will manage environment-specific configurations (preview, production)
 - Azure Static Web Apps (free tier) will be used for the Next.js frontend
 - Terraform will provision AKS cluster and Azure infrastructure
 - Local development continues using Aspire + Docker (unchanged)
 - Database migrations use Alembic (existing in the project)
 - Azure SQL uses serverless tier (auto-pause, ~$5/month) matching constitution cost-aware defaults
-- E2E tests can run in CI without Aspire (Docker Compose for CI)
+- E2E tests run in CI without Aspire (Docker Compose for CI)
+- PR preview environments are ephemeral and automatically cleaned up
+- No long-lived staging environment exists; PR previews serve as the validation surface

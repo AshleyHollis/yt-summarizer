@@ -1,31 +1,40 @@
 # Quickstart: Azure CI/CD Pipelines (AKS + GitOps)
 
 **Feature**: 002-azure-cicd  
-**Date**: 2026-01-08  
+**Date**: 2026-01-08 (Updated 2026-01-09)  
 **Purpose**: Step-by-step guide to set up and use the CI/CD pipelines
 
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  GitOps Flow                                                            │
+│  GitOps Flow: PR Preview + Auto-Production                              │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│   PR → CI Tests → Merge → Build Images → Update k8s/ → Argo CD Syncs   │
-│                              │                                          │
-│                              ▼                                          │
-│                    ┌─────────────────┐                                  │
-│                    │  Azure ACR      │                                  │
-│                    │  (images)       │                                  │
-│                    └────────┬────────┘                                  │
-│                             │ pulls                                     │
-│                             ▼                                           │
-│   ┌────────────────────────────────────────────────────────┐            │
-│   │  AKS Single-Node Cluster (~$30/month)                  │            │
-│   │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐  │            │
-│   │  │ API Pod  │ │ Workers  │ │  Redis   │ │ Argo CD   │  │            │
-│   │  └──────────┘ └──────────┘ └──────────┘ └───────────┘  │            │
-│   └────────────────────────────────────────────────────────┘            │
+│  ┌─── Pull Request ───┐      ┌─── Merge to main ───┐                    │
+│  │                    │      │                     │                    │
+│  │  1. CI Tests       │      │  1. Update prod     │                    │
+│  │  2. Build Images   │      │     overlay with    │                    │
+│  │  3. Push to ACR    │      │     image digests   │                    │
+│  │  4. Create preview │      │  2. Argo CD syncs   │                    │
+│  │     overlay        │      │     production      │                    │
+│  │  5. Argo CD syncs  │      │                     │                    │
+│  │     preview env    │      └─────────────────────┘                    │
+│  │  6. Post URL to PR │                                                 │
+│  └────────────────────┘                                                 │
+│                                                                         │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │  AKS Single-Node Cluster (~$30/month)                          │    │
+│   │  ┌──────────────────────────┐  ┌─────────────────────────────┐ │    │
+│   │  │  Production Namespace    │  │  Preview Namespaces (1-3)   │ │    │
+│   │  │  ┌─────┐ ┌───────┐       │  │  preview-pr-123/            │ │    │
+│   │  │  │ API │ │Workers│       │  │  preview-pr-456/            │ │    │
+│   │  │  └─────┘ └───────┘       │  │  (ephemeral, auto-cleaned)  │ │    │
+│   │  └──────────────────────────┘  └─────────────────────────────┘ │    │
+│   │  ┌───────────────┐                                              │    │
+│   │  │   Argo CD     │ ← Syncs from k8s/overlays/prod/ + previews/  │    │
+│   │  └───────────────┘                                              │    │
+│   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 │   ┌────────────────────────────────────────────────────────┐            │
 │   │  Azure Static Web Apps (free tier)                     │            │
@@ -34,6 +43,11 @@
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Key Design Points**:
+- **No permanent staging environment** — PR previews are the validation surface
+- **Auto-production deploy** — Merges to `main` automatically deploy to production
+- **Max 3 concurrent previews** — Resource quotas protect production namespace
 
 **Estimated Monthly Cost**: ~$35/month
 - AKS cluster: ~$30/month (single Standard_B2s node)
@@ -123,10 +137,10 @@ az ad app federated-credential create `
    | `AZURE_TENANT_ID` | Azure AD tenant ID | `az account show --query tenantId` |
    | `AZURE_SUBSCRIPTION_ID` | Subscription ID | `az account show --query id` |
 
-2. **Create GitHub Environments** (Settings → Environments):
+2. **Create GitHub Environment** (Settings → Environments):
 
-   - **staging**: No protection rules (auto-deploy on merge)
-   - **production**: Add required reviewers for approval gate
+   - **production**: No approval gate (auto-deploy on merge to main)
+   - Preview environments are ephemeral namespaces in AKS (no GitHub Environment needed)
 
 3. **Enable GitHub Actions** (Settings → Actions → General):
    - Allow all actions and reusable workflows
@@ -140,7 +154,7 @@ After Terraform modules are created, deploy the infrastructure:
 
 ```powershell
 # Navigate to infrastructure directory
-cd infra/environments/staging
+cd infra/terraform/environments/prod
 
 # Initialize Terraform
 terraform init
@@ -157,8 +171,8 @@ terraform apply
 ```powershell
 # Get AKS credentials
 az aks get-credentials `
-  --resource-group rg-ytsummarizer-staging `
-  --name aks-ytsummarizer-staging
+  --resource-group rg-ytsummarizer-prod `
+  --name aks-ytsummarizer-prod
 
 # Create Argo CD namespace
 kubectl create namespace argocd
@@ -183,62 +197,88 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 # Then visit: https://localhost:8080
 ```
 
-### Register Application with Argo CD
+### Register Applications with Argo CD
 
 ```powershell
-# Apply the Argo CD Application manifest
-kubectl apply -f k8s/argocd/application.yaml
+# Apply the Production Application manifest
+kubectl apply -f k8s/argocd/prod-app.yaml
+
+# Apply the Preview ApplicationSet (discovers PR overlays automatically)
+kubectl apply -f k8s/argocd/preview-appset.yaml
+
+# Apply the repo secret (for private repo access)
+kubectl apply -f k8s/argocd/repo-secret.yaml
 ```
 
 ---
 
 ## Usage
 
-### Pull Request Testing
+### Pull Request: CI Testing
 
 When you create or update a PR:
-1. CI workflow triggers automatically
+1. **ci.yml** triggers automatically
 2. All tests run (shared, workers, API, frontend, E2E)
 3. Results appear as PR check status
 4. Merge is blocked if any test fails
 
 **View results**: Click "Details" on the PR check or go to Actions tab
 
-### Deploy to Staging (GitOps Flow)
+### Pull Request: Preview Environment
 
-When you merge to `main`:
-1. **build-push.yml** triggers:
+After CI passes, a preview environment is deployed:
+1. **preview.yml** triggers:
    - Builds Docker images for API and Workers
-   - Pushes to Azure Container Registry with SHA tag
-   - Updates `k8s/overlays/staging/kustomization.yaml` with new image tags
-   - Commits change back to repository
+   - Pushes to ACR with commit SHA tag and digest
+   - Generates `k8s/overlays/previews/pr-<number>/` overlay
+   - Commits overlay to repository
+2. **Argo CD ApplicationSet** detects the new overlay:
+   - Creates `preview-pr-<number>` Application
+   - Deploys to `preview-pr-<number>` namespace
+   - Performs health checks
+3. **preview.yml** posts status to PR:
+   - Deploy status (deploying/ready/failed)
+   - Preview URL
+   - Link to Argo CD sync status
+
+**View preview**: 
+- URL posted as PR comment (e.g., `https://pr-123.preview.ytsummarizer.dev`)
+- Argo CD: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
+
+### Pull Request: Cleanup
+
+When a PR is closed or merged:
+1. **preview-cleanup.yml** triggers
+2. Deletes `k8s/overlays/previews/pr-<number>/` directory
+3. Commits deletion to repository
+4. Argo CD detects removal and prunes:
+   - Deletes `preview-pr-<number>` Application
+   - Deletes namespace and all resources
+
+**Timeline**: Preview is cleaned up within 5 minutes of PR close
+
+### Merge to Main: Auto-Production Deploy
+
+When you merge a PR to `main`:
+1. **deploy-prod.yml** triggers automatically:
+   - Retrieves image digests from the merged commit
+   - Updates `k8s/overlays/prod/kustomization.yaml` with pinned digests
+   - Commits change to repository
 2. **Argo CD** detects the commit and syncs:
-   - Pulls new manifests from `k8s/overlays/staging/`
-   - Applies changes to AKS cluster
+   - Pulls new manifests from `k8s/overlays/prod/`
+   - Applies changes to production namespace
    - Performs health checks on pods
 3. **SWA Deploy** runs in parallel:
    - Builds Next.js frontend
-   - Deploys to Azure Static Web Apps
+   - Deploys to Azure Static Web Apps production
 
-**View staging**: 
-- App: `https://ytsummarizer-staging.azurestaticapps.net`
+**View production**: 
+- App: `https://ytsummarizer.azurestaticapps.net`
 - Argo CD: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
 
-### Deploy to Production
+**Key benefit**: Same image digests validated in preview are promoted (no rebuild)
 
-Production requires manual trigger with approval:
-
-1. Go to **Actions** → **CD Production** workflow
-2. Click **Run workflow**
-3. Select the commit/tag to deploy
-4. Approvers receive notification
-5. Once approved:
-   - Updates `k8s/overlays/production/kustomization.yaml`
-   - Argo CD syncs production environment
-
-**View production**: `https://ytsummarizer.azurestaticapps.net`
-
-### Rollback
+### Production Rollback
 
 GitOps makes rollback simple - just revert to a previous commit:
 
@@ -249,11 +289,24 @@ git push origin main
 # Argo CD will sync the reverted state automatically
 
 # Option 2: Argo CD rollback (immediate)
-# In Argo CD UI: Applications → yt-summarizer → History → Rollback
+# In Argo CD UI: Applications → yt-summarizer-prod → History → Rollback
 
 # Option 3: kubectl rollback (emergency)
 kubectl rollout undo deployment/api -n yt-summarizer
 kubectl rollout undo deployment/workers -n yt-summarizer
+```
+
+### Preview Rollback
+
+To redeploy a preview environment:
+
+```powershell
+# Push a new commit to the PR branch
+git commit --allow-empty -m "Redeploy preview"
+git push origin <branch-name>
+# CI will rebuild and redeploy the preview
+
+# Or close and reopen the PR to force a fresh preview
 ```
 
 ---
@@ -267,17 +320,30 @@ k8s/
 │   ├── namespace.yaml
 │   ├── api-deployment.yaml
 │   ├── api-service.yaml
-│   ├── workers-deployment.yaml
-│   └── redis-deployment.yaml
+│   ├── api-ingress.yaml
+│   ├── *-worker-deployment.yaml
+│   ├── configmap.yaml
+│   ├── externalsecret-*.yaml
+│   └── migration-job.yaml
 ├── overlays/
-│   ├── staging/               # Staging-specific patches
-│   │   ├── kustomization.yaml # Image tags updated by CI
+│   ├── prod/                  # Production overlay (pinned digests)
+│   │   ├── kustomization.yaml # Image digests updated by deploy-prod.yml
 │   │   └── patches/
-│   └── production/            # Production-specific patches
-│       ├── kustomization.yaml
-│       └── patches/
+│   └── previews/              # Ephemeral PR overlays (auto-generated)
+│       └── pr-<number>/       # Created by preview.yml, deleted by preview-cleanup.yml
+│           ├── kustomization.yaml
+│           ├── namespace.yaml
+│           └── patches/
 └── argocd/
-    └── application.yaml       # Argo CD Application CRD
+    ├── prod-app.yaml          # Production Argo Application
+    ├── preview-appset.yaml    # ApplicationSet for preview discovery
+    └── repo-secret.yaml       # Git credentials (sealed)
+
+.github/workflows/
+├── ci.yml                     # PR: Run all tests
+├── preview.yml                # PR: Build images, create preview overlay
+├── deploy-prod.yml            # Merge: Pin prod overlay to image digests
+└── preview-cleanup.yml        # PR closed: Delete preview overlay
 ```
 
 ---
@@ -302,7 +368,9 @@ k8s/
 2. **Check sync status**:
    ```powershell
    kubectl get applications -n argocd
-   kubectl describe application yt-summarizer -n argocd
+   kubectl describe application yt-summarizer-prod -n argocd
+   # For previews:
+   kubectl get applications -n argocd -l app.kubernetes.io/instance=yt-summarizer-previews
    ```
 3. **Common issues**:
    - Image not found: Check ACR push succeeded
@@ -371,7 +439,19 @@ If you need more capacity:
 ```powershell
 # Add a second node (increases cost to ~$60/month)
 az aks scale `
-  --resource-group rg-ytsummarizer-staging `
-  --name aks-ytsummarizer-staging `
+  --resource-group rg-ytsummarizer-prod `
+  --name aks-ytsummarizer-prod `
   --node-count 2
+```
+
+### Preview Environment Limits
+
+Max 3 concurrent preview environments are allowed to protect production resources:
+
+```powershell
+# Check current preview count
+kubectl get namespaces | grep preview-pr
+
+# If limit reached, close old PRs or wait for cleanup
+# Previews are auto-cleaned within 5 minutes of PR close
 ```
