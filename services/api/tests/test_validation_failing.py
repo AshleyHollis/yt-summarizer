@@ -1,11 +1,12 @@
 """
-Intentional failing test to validate CI blocks merge on test failure.
+Test file to validate CI workflow - originally contained failing test.
+The failing test was fixed to demonstrate CI passes after fix.
 This file should be deleted after T089 validation is complete.
 """
 
 import pytest
 
 
-def test_intentional_failure_for_ci_validation():
-    """This test intentionally fails to verify CI blocks merge."""
-    assert False, "INTENTIONAL FAILURE: This test validates CI blocks merge when tests fail"
+def test_ci_validation_now_passes():
+    """This test now passes - CI should allow merge."""
+    assert True, "Test passes - CI validation complete"
