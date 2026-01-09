@@ -103,7 +103,7 @@ jobs:
       - name: Install shared package
         run: |
           cd services/shared
-          pip install -e .
+          pip install -e ".[dev]"
 
       - name: Run API tests
         working-directory: services/api
@@ -126,7 +126,7 @@ jobs:
       - name: Install shared package
         run: |
           cd services/shared
-          pip install -e .
+          pip install -e ".[dev]"
 
       - name: Run workers tests
         working-directory: services/workers
