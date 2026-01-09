@@ -1,0 +1,23 @@
+# =============================================================================
+# Production SecretStore Overlay
+# =============================================================================
+# Patches the base secretstore with production Workload Identity configuration
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: yt-summarizer
+
+resources:
+  - ../../base/secretstore.yaml
+
+patches:
+  - target:
+      kind: ServiceAccount
+      name: yt-summarizer-sa
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/azure.workload.identity~1client-id
+        value: "fd0bd4f3-4a8a-4003-b509-9622605c6087"
+      - op: add
+        path: /metadata/annotations/azure.workload.identity~1tenant-id
+        value: "c2d723a2-474e-44d2-a37c-9b4e9cb823d4"

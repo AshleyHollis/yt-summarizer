@@ -141,7 +141,40 @@ module "aks" {
   # ACR integration
   acr_id = module.acr.id
 
+  # Enable Workload Identity for External Secrets
+  enable_workload_identity = true
+
   tags = local.common_tags
+}
+
+# -----------------------------------------------------------------------------
+# Workload Identity for External Secrets Operator
+# Creates a User-Assigned Managed Identity that External Secrets uses to
+# access Azure Key Vault via Workload Identity federation
+# -----------------------------------------------------------------------------
+
+resource "azurerm_user_assigned_identity" "external_secrets" {
+  name                = "id-${local.name_prefix}-eso"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  tags                = local.common_tags
+}
+
+# Federated credential linking K8s ServiceAccount to Azure Identity
+resource "azurerm_federated_identity_credential" "external_secrets" {
+  name                = "fedcred-${local.name_prefix}-eso"
+  resource_group_name = azurerm_resource_group.main.name
+  parent_id           = azurerm_user_assigned_identity.external_secrets.id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = module.aks.oidc_issuer_url
+  subject             = "system:serviceaccount:yt-summarizer:yt-summarizer-sa"
+}
+
+# Grant the managed identity access to read secrets from Key Vault
+resource "azurerm_role_assignment" "external_secrets_kv_reader" {
+  scope                = module.key_vault.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.external_secrets.principal_id
 }
 
 # -----------------------------------------------------------------------------
@@ -211,6 +244,21 @@ output "swa_api_key" {
 
 output "key_vault_uri" {
   value = module.key_vault.vault_uri
+}
+
+output "key_vault_tenant_id" {
+  description = "Tenant ID for Key Vault (needed for Workload Identity)"
+  value       = module.key_vault.tenant_id
+}
+
+output "workload_identity_client_id" {
+  description = "Client ID for External Secrets Workload Identity"
+  value       = azurerm_user_assigned_identity.external_secrets.client_id
+}
+
+output "aks_oidc_issuer_url" {
+  description = "OIDC issuer URL for Workload Identity"
+  value       = module.aks.oidc_issuer_url
 }
 
 output "sql_server_fqdn" {

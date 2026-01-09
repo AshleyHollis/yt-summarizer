@@ -124,6 +124,7 @@ spec:
 # SecretStore for Azure Key Vault
 # Configures External Secrets to connect to Azure Key Vault
 # Note: Requires AKS Workload Identity to be configured
+# The ServiceAccount must have the correct azure.workload.identity annotations
 # -----------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -140,9 +141,8 @@ spec:
   source:
     repoURL: https://github.com/AshleyHollis/yt-summarizer
     targetRevision: main
-    path: k8s/base
-    directory:
-      include: "secretstore.yaml"
+    path: k8s/overlays/prod-secretstore
+    # Use Kustomize to apply Workload Identity patches
   destination:
     server: https://kubernetes.default.svc
     namespace: yt-summarizer

@@ -79,6 +79,12 @@ variable "attach_acr" {
   default     = false
 }
 
+variable "enable_workload_identity" {
+  description = "Enable Workload Identity for pod-managed Azure access"
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)
@@ -95,6 +101,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   resource_group_name = var.resource_group_name
   dns_prefix          = var.dns_prefix
   kubernetes_version  = var.kubernetes_version
+
+  # Enable OIDC issuer for Workload Identity
+  oidc_issuer_enabled       = var.enable_workload_identity
+  workload_identity_enabled = var.enable_workload_identity
 
   # Single-node pool for cost optimization
   default_node_pool {
@@ -184,4 +194,9 @@ output "kubelet_identity_object_id" {
 output "identity_principal_id" {
   description = "Principal ID of the cluster managed identity"
   value       = azurerm_kubernetes_cluster.aks.identity[0].principal_id
+}
+
+output "oidc_issuer_url" {
+  description = "OIDC issuer URL for Workload Identity federation"
+  value       = azurerm_kubernetes_cluster.aks.oidc_issuer_url
 }
