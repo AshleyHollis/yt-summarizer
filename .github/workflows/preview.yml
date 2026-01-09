@@ -196,40 +196,111 @@ jobs:
           fi
           
           # Update image tags in kustomization.yaml
-          cat > "$OVERLAY_FILE" << EOF
-          # Preview overlay - updated by GitHub Actions
-          # PR: #${PR_NUMBER}
-          # Image Tag: ${IMAGE_TAG}
-          # Updated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          apiVersion: kustomize.config.k8s.io/v1beta1
-          kind: Kustomization
+          # Write template first, then substitute variables
+          cat > "${OVERLAY_FILE}.template" << 'TEMPLATE_EOF'
+# Preview overlay - updated by GitHub Actions
+# PR: #__PR_NUMBER__
+# Image Tag: __IMAGE_TAG__
+# Updated: __TIMESTAMP__
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 
-          namespace: preview-pr-${PR_NUMBER}
+namespace: preview-pr-__PR_NUMBER__
 
-          resources:
-            - ../../base
-            - resource-quota.yaml
-            - limit-range.yaml
+resources:
+  - ../../base
+  - resource-quota.yaml
+  - limit-range.yaml
+  # Note: SecretStore and ServiceAccount from base are replaced by patches
+  # Preview uses ClusterSecretStore which references production namespace's SA
 
-          patches:
-            - path: patches/configmap-patch.yaml
-            - path: patches/ingress-patch.yaml
-            - path: patches/resources-patch.yaml
-            - path: patches/replicas-patch.yaml
+patches:
+  - path: patches/configmap-patch.yaml
+  - path: patches/ingress-patch.yaml
+  - path: patches/resources-patch.yaml
+  - path: patches/replicas-patch.yaml
+  # Patch ExternalSecrets to use ClusterSecretStore
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: ExternalSecret
+      name: db-credentials
+    patch: |-
+      - op: replace
+        path: /spec/secretStoreRef/kind
+        value: ClusterSecretStore
+      - op: replace
+        path: /spec/secretStoreRef/name
+        value: azure-keyvault-cluster
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: ExternalSecret
+      name: openai-credentials
+    patch: |-
+      - op: replace
+        path: /spec/secretStoreRef/kind
+        value: ClusterSecretStore
+      - op: replace
+        path: /spec/secretStoreRef/name
+        value: azure-keyvault-cluster
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: ExternalSecret
+      name: storage-credentials
+    patch: |-
+      - op: replace
+        path: /spec/secretStoreRef/kind
+        value: ClusterSecretStore
+      - op: replace
+        path: /spec/secretStoreRef/name
+        value: azure-keyvault-cluster
+  # Delete SecretStore (preview uses ClusterSecretStore)
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: SecretStore
+      name: azure-keyvault
+    patch: |-
+      $patch: delete
+      apiVersion: external-secrets.io/v1beta1
+      kind: SecretStore
+      metadata:
+        name: azure-keyvault
+  # Delete ServiceAccount (preview uses production SA via ClusterSecretStore)
+  - target:
+      kind: ServiceAccount
+      name: yt-summarizer-sa
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: yt-summarizer-sa
 
-          images:
-            - name: yt-summarizer-api
-              newName: ${ACR_SERVER}/yt-summarizer-api
-              newTag: "${IMAGE_TAG}"
-            - name: yt-summarizer-workers
-              newName: ${ACR_SERVER}/yt-summarizer-workers
-              newTag: "${IMAGE_TAG}"
+images:
+  - name: yt-summarizer-api
+    newName: __ACR_SERVER__/yt-summarizer-api
+    newTag: "__IMAGE_TAG__"
+  - name: yt-summarizer-workers
+    newName: __ACR_SERVER__/yt-summarizer-workers
+    newTag: "__IMAGE_TAG__"
 
-          labels:
-            - pairs:
-                app.kubernetes.io/part-of: yt-summarizer-preview
-                preview.pr-number: "${PR_NUMBER}"
-          EOF
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: yt-summarizer-preview
+      preview.pr-number: "__PR_NUMBER__"
+TEMPLATE_EOF
+          
+          # Substitute placeholders with actual values
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          sed -e "s/__PR_NUMBER__/${PR_NUMBER}/g" \
+              -e "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
+              -e "s/__ACR_SERVER__/${ACR_SERVER}/g" \
+              -e "s/__TIMESTAMP__/${TIMESTAMP}/g" \
+              "${OVERLAY_FILE}.template" > "$OVERLAY_FILE"
+          rm "${OVERLAY_FILE}.template"
           
           # Generate preview URL from configured variable or leave empty
           # If PREVIEW_API_URL is set in repo variables, use it

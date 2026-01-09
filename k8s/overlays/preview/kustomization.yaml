@@ -11,12 +11,73 @@ resources:
   - ../../base
   - resource-quota.yaml
   - limit-range.yaml
+  # Note: SecretStore and ServiceAccount from base are replaced by patches
+  # Preview uses ClusterSecretStore which references production namespace's SA
 
 patches:
   - path: patches/configmap-patch.yaml
   - path: patches/ingress-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
+  # Patch ExternalSecrets to use ClusterSecretStore
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: ExternalSecret
+      name: db-credentials
+    patch: |-
+      - op: replace
+        path: /spec/secretStoreRef/kind
+        value: ClusterSecretStore
+      - op: replace
+        path: /spec/secretStoreRef/name
+        value: azure-keyvault-cluster
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: ExternalSecret
+      name: openai-credentials
+    patch: |-
+      - op: replace
+        path: /spec/secretStoreRef/kind
+        value: ClusterSecretStore
+      - op: replace
+        path: /spec/secretStoreRef/name
+        value: azure-keyvault-cluster
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: ExternalSecret
+      name: storage-credentials
+    patch: |-
+      - op: replace
+        path: /spec/secretStoreRef/kind
+        value: ClusterSecretStore
+      - op: replace
+        path: /spec/secretStoreRef/name
+        value: azure-keyvault-cluster
+  # Delete SecretStore (preview uses ClusterSecretStore)
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: SecretStore
+      name: azure-keyvault
+    patch: |-
+      $patch: delete
+      apiVersion: external-secrets.io/v1beta1
+      kind: SecretStore
+      metadata:
+        name: azure-keyvault
+  # Delete ServiceAccount (preview uses production SA via ClusterSecretStore)
+  - target:
+      kind: ServiceAccount
+      name: yt-summarizer-sa
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: yt-summarizer-sa
 
 images:
   - name: yt-summarizer-api
