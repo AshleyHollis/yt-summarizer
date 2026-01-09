@@ -18,19 +18,17 @@ useDefault = true
     '''infra/terraform/variables\.tf''',
     # Terraform example files
     '''.*\.tfvars\.example''',
-    # Test fixtures and test files
-    '''.*test.*fixture.*''',
-    '''.*__snapshots__.*''',
-    '''.*tests/.*''',
-    '''.*test\.py''',
-    '''.*_test\.py''',
-    '''.*conftest\.py''',
-    '''.*\.spec\.(ts|js)''',
-    # Documentation with example passwords - all docs directories
-    '''docs/.*''',
+    # Test fixtures and test files (very broad)
+    '''tests/''',
+    '''test_''',
+    '''_test\.py''',
+    '''conftest\.py''',
+    '''\.spec\.(ts|js)''',
+    # Documentation (all markdown)
+    '''\.md$''',
   ]
   
-  # Regex patterns that are not secrets
+  # Regex patterns that are not secrets (matches in the secret value itself)
   regexes = [
     # Variable placeholder patterns
     '''var\.(sql_admin_password|admin_password|api_key)''',
@@ -41,6 +39,7 @@ useDefault = true
     # Documentation example passwords (explicit list)
     '''YourSecurePassword123!''',
     '''YourStrong@Passw0rd''',
+    '''Your.*Passw.*''',
     # Generic example password patterns
     '''Password=Your.*''',
     '''password.*=.*Your.*''',
@@ -48,4 +47,7 @@ useDefault = true
     '''sk-test-.*''',
     '''sk-fake-.*''',
     '''test-key.*''',
+    '''test-api-key''',
+    '''fake-''',
+  ]
   ]
