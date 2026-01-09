@@ -1,8 +1,9 @@
 # =============================================================================
 # Argo CD ApplicationSet - Preview Environments
 # =============================================================================
-# Dynamically discovers and creates Applications for PR preview overlays
-# Uses git directory generator to watch k8s/overlays/previews/pr-*
+# Uses Pull Request Generator to automatically create preview apps for open PRs
+# Overlay files live in the PR branch itself (k8s/overlays/preview/)
+# No need to push to main - Argo CD reads directly from PR branch
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -13,28 +14,32 @@ metadata:
     app.kubernetes.io/component: preview
     app.kubernetes.io/part-of: yt-summarizer
 spec:
-  # Git directory generator discovers preview overlays
+  # Pull Request Generator discovers open PRs targeting main
   generators:
-    - git:
-        repoURL: https://github.com/AshleyHollis/yt-summarizer.git
-        revision: main
-        directories:
-          - path: k8s/overlays/previews/pr-*
-        # Exclude the template directory
-        # Template dir starts with _ so won't match pr-* pattern
+    - pullRequest:
+        github:
+          owner: AshleyHollis
+          repo: yt-summarizer
+          # Optional: filter by labels
+          # labels:
+          #   - preview
+        requeueAfterSeconds: 60
 
-  # Template for each discovered preview
+  # Template for each discovered PR
   template:
     metadata:
-      # Application name matches the overlay directory name
-      name: 'preview-{{path.basename}}'
+      name: 'preview-pr-{{number}}'
       namespace: argocd
       labels:
         app.kubernetes.io/name: yt-summarizer
-        app.kubernetes.io/instance: '{{path.basename}}'
+        app.kubernetes.io/instance: 'pr-{{number}}'
         app.kubernetes.io/component: preview
         app.kubernetes.io/part-of: yt-summarizer
-      # Finalizer ensures resources are cleaned up when Application is deleted
+      annotations:
+        # Track which PR this preview is for
+        preview.yt-summarizer/pr-number: '{{number}}'
+        preview.yt-summarizer/pr-branch: '{{branch}}'
+        preview.yt-summarizer/pr-head-sha: '{{head_sha}}'
       finalizers:
         - resources-finalizer.argocd.argoproj.io
     spec:
@@ -42,16 +47,16 @@ spec:
 
       source:
         repoURL: https://github.com/AshleyHollis/yt-summarizer.git
-        targetRevision: main
-        path: '{{path}}'
+        # Use the PR's head SHA for the preview
+        targetRevision: '{{head_sha}}'
+        # Preview overlay lives in the PR branch
+        path: k8s/overlays/preview
 
       destination:
         server: https://kubernetes.default.svc
-        # Namespace matches the preview naming convention
-        namespace: 'preview-{{path.basename}}'
+        namespace: 'preview-pr-{{number}}'
 
       syncPolicy:
-        # Auto-sync and auto-prune for ephemeral environments
         automated:
           prune: true
           selfHeal: true
@@ -67,10 +72,7 @@ spec:
             factor: 2
             maxDuration: 1m
 
-      # Keep minimal history for previews
       revisionHistoryLimit: 3
 
-  # Sync policy for the ApplicationSet itself
   syncPolicy:
-    # Preserve resources on delete for safety (can be changed to Delete)
     preserveResourcesOnDeletion: false

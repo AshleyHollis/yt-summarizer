@@ -232,14 +232,15 @@
 > **Note**: These tasks require the CI/CD infrastructure to be merged to main first.
 > After merging PR #2, create branch `002-azure-cicd-validation` and run `/speckit.implement` to continue.
 
-- [ ] T089 Validate full CI workflow with intentional test failure
-  - Create a PR with a failing test, verify CI blocks merge
-  - Fix the test, verify CI passes
+- [X] T089 Validate full CI workflow with intentional test failure
+  - ✅ Created a PR with a failing test, CI blocked merge (runs 20850663682, 20850687881)
+  - ✅ Fixed the test, CI passed (run 20850765998)
 - [ ] T090 Validate PR preview deploy end-to-end (open PR → preview URL works)
-  - Open a PR with code changes
-  - Verify Preview workflow builds images and creates overlay
-  - Verify Argo CD deploys the preview
-  - Access the preview URL
+  - ⚠️ **Refactored**: Changed from push-to-main to Pull Request Generator approach
+  - Architecture: Preview overlays now live in PR branch (`k8s/overlays/preview/`)
+  - Argo CD ApplicationSet uses Pull Request Generator to discover open PRs
+  - Waiting for CI to pass on new architecture before merging
+  - After merge: Open a new PR with code changes to test full flow
 - [ ] T091 Validate PR preview cleanup (close PR → namespace deleted)
   - Close or merge the test PR
   - Verify preview-cleanup workflow runs

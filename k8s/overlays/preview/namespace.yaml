@@ -1,15 +1,15 @@
 # =============================================================================
 # Preview Namespace
 # =============================================================================
-# Ephemeral namespace for PR preview environment
+# Placeholder - Argo CD ApplicationSet creates the actual namespace
+# Name pattern: preview-pr-<number>
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: preview-pr-{{PR_NUMBER}}
+  # This is a placeholder - ApplicationSet overrides with preview-pr-{{number}}
+  name: preview-placeholder
   labels:
     environment: preview
-    preview-pr: "{{PR_NUMBER}}"
     app.kubernetes.io/part-of: yt-summarizer
   annotations:
-    preview.yt-summarizer.dev/pr: "{{PR_NUMBER}}"
-    preview.yt-summarizer.dev/created-by: github-actions
+    preview.yt-summarizer.dev/created-by: argocd-applicationset
