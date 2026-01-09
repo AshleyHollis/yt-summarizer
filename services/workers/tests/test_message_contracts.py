@@ -21,6 +21,7 @@ import pytest
 # Check if numpy is available (required for relationships worker)
 try:
     import numpy
+
     HAS_NUMPY = True
 except ImportError:
     HAS_NUMPY = False
@@ -28,6 +29,7 @@ except ImportError:
 # Check if api module is available (for cross-service consistency tests)
 try:
     from api.models.job import JobStage, JobStatus, JobType
+
     HAS_API = True
 except ImportError:
     HAS_API = False
@@ -36,7 +38,9 @@ except ImportError:
 requires_numpy = pytest.mark.skipif(not HAS_NUMPY, reason="numpy not installed")
 
 # Skip API consistency tests if api module not available
-requires_api = pytest.mark.skipif(not HAS_API, reason="api module not installed - cross-service tests require api package")
+requires_api = pytest.mark.skipif(
+    not HAS_API, reason="api module not installed - cross-service tests require api package"
+)
 
 
 # ============================================================================
@@ -192,8 +196,9 @@ class TestWorkerMessageRequiredFields:
             field_names = {f.name for f in fields(message_class)}
 
             for required in self.REQUIRED_FIELDS:
-                assert required in field_names, \
+                assert required in field_names, (
                     f"{message_class.__name__} missing required field: {required}"
+                )
 
 
 # ============================================================================
@@ -222,29 +227,37 @@ class TestWorkerMessageOptionalFields:
 
         assert message.batch_id == complete_api_message["batch_id"]
 
-    def test_transcribe_worker_handles_missing_correlation_id(self, sample_job_id, sample_video_id, sample_youtube_video_id):
+    def test_transcribe_worker_handles_missing_correlation_id(
+        self, sample_job_id, sample_video_id, sample_youtube_video_id
+    ):
         """Test TranscribeWorker defaults correlation_id to 'unknown'."""
         from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
-        message = worker.parse_message({
-            "job_id": sample_job_id,
-            "video_id": sample_video_id,
-            "youtube_video_id": sample_youtube_video_id,
-        })
+        message = worker.parse_message(
+            {
+                "job_id": sample_job_id,
+                "video_id": sample_video_id,
+                "youtube_video_id": sample_youtube_video_id,
+            }
+        )
 
         assert message.correlation_id == "unknown"
 
-    def test_transcribe_worker_handles_missing_channel_name(self, sample_job_id, sample_video_id, sample_youtube_video_id):
+    def test_transcribe_worker_handles_missing_channel_name(
+        self, sample_job_id, sample_video_id, sample_youtube_video_id
+    ):
         """Test TranscribeWorker defaults channel_name to 'unknown-channel'."""
         from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
-        message = worker.parse_message({
-            "job_id": sample_job_id,
-            "video_id": sample_video_id,
-            "youtube_video_id": sample_youtube_video_id,
-        })
+        message = worker.parse_message(
+            {
+                "job_id": sample_job_id,
+                "video_id": sample_video_id,
+                "youtube_video_id": sample_youtube_video_id,
+            }
+        )
 
         assert message.channel_name == "unknown-channel"
 
@@ -264,8 +277,9 @@ class TestWorkerMessageOptionalFields:
 
         for worker in workers:
             message = worker.parse_message(minimal_api_message)
-            assert message.retry_count == 0, \
+            assert message.retry_count == 0, (
                 f"{type(worker).__name__} has wrong default retry_count"
+            )
 
 
 # ============================================================================
@@ -283,10 +297,12 @@ class TestWorkerMessageMissingRequiredFields:
         worker = TranscribeWorker()
 
         with pytest.raises(KeyError):
-            worker.parse_message({
-                "video_id": sample_video_id,
-                "youtube_video_id": sample_youtube_video_id,
-            })
+            worker.parse_message(
+                {
+                    "video_id": sample_video_id,
+                    "youtube_video_id": sample_youtube_video_id,
+                }
+            )
 
     def test_transcribe_worker_fails_without_video_id(self, sample_job_id, sample_youtube_video_id):
         """Test TranscribeWorker raises error without video_id."""
@@ -295,10 +311,12 @@ class TestWorkerMessageMissingRequiredFields:
         worker = TranscribeWorker()
 
         with pytest.raises(KeyError):
-            worker.parse_message({
-                "job_id": sample_job_id,
-                "youtube_video_id": sample_youtube_video_id,
-            })
+            worker.parse_message(
+                {
+                    "job_id": sample_job_id,
+                    "youtube_video_id": sample_youtube_video_id,
+                }
+            )
 
     def test_transcribe_worker_fails_without_youtube_video_id(self, sample_job_id, sample_video_id):
         """Test TranscribeWorker raises error without youtube_video_id."""
@@ -307,10 +325,12 @@ class TestWorkerMessageMissingRequiredFields:
         worker = TranscribeWorker()
 
         with pytest.raises(KeyError):
-            worker.parse_message({
-                "job_id": sample_job_id,
-                "video_id": sample_video_id,
-            })
+            worker.parse_message(
+                {
+                    "job_id": sample_job_id,
+                    "video_id": sample_video_id,
+                }
+            )
 
 
 # ============================================================================
@@ -337,10 +357,12 @@ class TestBatchIdPropagation:
 
         for worker in workers:
             message = worker.parse_message(complete_api_message)
-            assert hasattr(message, "batch_id"), \
+            assert hasattr(message, "batch_id"), (
                 f"{type(worker).__name__} message missing batch_id field"
-            assert message.batch_id == complete_api_message["batch_id"], \
+            )
+            assert message.batch_id == complete_api_message["batch_id"], (
                 f"{type(worker).__name__} has wrong batch_id value"
+            )
 
     def test_batch_id_is_optional_in_all_workers(self, minimal_api_message):
         """Test all workers handle None batch_id."""
@@ -358,8 +380,7 @@ class TestBatchIdPropagation:
 
         for worker in workers:
             message = worker.parse_message(minimal_api_message)
-            assert message.batch_id is None, \
-                f"{type(worker).__name__} should have None batch_id"
+            assert message.batch_id is None, f"{type(worker).__name__} should have None batch_id"
 
 
 # ============================================================================
@@ -391,8 +412,7 @@ class TestJobTypeConsistency:
 
         # Verify all job types have corresponding queues
         for job_type, expected_queue in expected_mapping.items():
-            assert expected_queue is not None, \
-                f"No queue defined for {job_type.value}"
+            assert expected_queue is not None, f"No queue defined for {job_type.value}"
 
     def test_job_types_valid_values(self):
         """Test JobType enum has expected values."""
@@ -401,8 +421,9 @@ class TestJobTypeConsistency:
         expected_values = {"transcribe", "summarize", "embed", "build_relationships"}
         actual_values = {jt.value for jt in JobType}
 
-        assert actual_values == expected_values, \
+        assert actual_values == expected_values, (
             f"JobType mismatch. Expected: {expected_values}, Got: {actual_values}"
+        )
 
 
 @requires_api
@@ -416,18 +437,27 @@ class TestJobStatusConsistency:
         expected_values = {"pending", "running", "succeeded", "failed"}
         actual_values = {js.value for js in JobStatus}
 
-        assert actual_values == expected_values, \
+        assert actual_values == expected_values, (
             f"JobStatus mismatch. Expected: {expected_values}, Got: {actual_values}"
+        )
 
     def test_job_stage_values(self):
         """Test JobStage enum has expected values."""
         from api.models.job import JobStage
 
-        expected_values = {"queued", "running", "completed", "failed", "dead_lettered", "rate_limited"}
+        expected_values = {
+            "queued",
+            "running",
+            "completed",
+            "failed",
+            "dead_lettered",
+            "rate_limited",
+        }
         actual_values = {js.value for js in JobStage}
 
-        assert actual_values == expected_values, \
+        assert actual_values == expected_values, (
             f"JobStage mismatch. Expected: {expected_values}, Got: {actual_values}"
+        )
 
     def test_worker_status_strings_match_api_enum(self):
         """Test that workers use valid status strings."""
@@ -471,9 +501,10 @@ class TestQueueNameConsistency:
         ]
 
         for worker, expected_queue in workers_and_queues:
-            assert worker.queue_name == expected_queue, \
-                f"{type(worker).__name__}.queue_name mismatch. " \
+            assert worker.queue_name == expected_queue, (
+                f"{type(worker).__name__}.queue_name mismatch. "
                 f"Expected: {expected_queue}, Got: {worker.queue_name}"
+            )
 
     def test_queue_name_format(self):
         """Test queue names follow expected naming convention."""
@@ -488,8 +519,9 @@ class TestQueueNameConsistency:
 
         for queue in queues:
             # Queue names should end with "-jobs" or similar pattern
-            assert queue.endswith("-jobs") or "-" in queue, \
+            assert queue.endswith("-jobs") or "-" in queue, (
                 f"Queue name '{queue}' doesn't follow naming convention"
+            )
 
 
 # ============================================================================
@@ -764,9 +796,10 @@ class TestMessageContractRegressions:
 
         for message_class in message_classes:
             field_names = {f.name for f in fields(message_class)}
-            assert "batch_id" in field_names, \
-                f"Regression: {message_class.__name__} missing batch_id field. " \
+            assert "batch_id" in field_names, (
+                f"Regression: {message_class.__name__} missing batch_id field. "
                 f"This was added to fix batch progress tracking."
+            )
 
     def test_api_batch_message_includes_batch_id(self):
         """Regression: API batch service must include batch_id in queue messages."""
@@ -812,8 +845,10 @@ class TestMessageContractRegressions:
         # 'ready' was incorrectly used in the UI - should be 'completed'
         valid_statuses = [js.value for js in JobStatus]
 
-        assert "ready" not in valid_statuses, \
+        assert "ready" not in valid_statuses, (
             "Regression: 'ready' is not a valid status. Use 'completed' instead."
-        assert "completed" not in valid_statuses, \
+        )
+        assert "completed" not in valid_statuses, (
             "JobStatus uses 'succeeded', not 'completed' (video status uses 'completed')"
+        )
         assert "succeeded" in valid_statuses

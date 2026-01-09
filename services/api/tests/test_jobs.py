@@ -55,12 +55,15 @@ class TestListJobs:
         )
         assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    @pytest.mark.parametrize("job_type", [
-        "transcribe",
-        "summarize",
-        "embed",
-        "build_relationships",
-    ])
+    @pytest.mark.parametrize(
+        "job_type",
+        [
+            "transcribe",
+            "summarize",
+            "embed",
+            "build_relationships",
+        ],
+    )
     def test_list_jobs_accepts_valid_job_types(self, client, headers, job_type):
         """Test that all valid job types are accepted."""
         response = client.get(
@@ -69,12 +72,15 @@ class TestListJobs:
         )
         assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    @pytest.mark.parametrize("status_value", [
-        "pending",
-        "running",
-        "succeeded",
-        "failed",
-    ])
+    @pytest.mark.parametrize(
+        "status_value",
+        [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+        ],
+    )
     def test_list_jobs_accepts_valid_statuses(self, client, headers, status_value):
         """Test that all valid statuses are accepted."""
         response = client.get(

@@ -20,6 +20,7 @@ import httpx
 try:
     from agent_framework import BaseChatClient, ChatAgent, ai_function
     from agent_framework.openai import OpenAIChatClient
+
     AGENT_FRAMEWORK_AVAILABLE = True
 except ImportError:
     ChatAgent = None  # type: ignore
@@ -33,6 +34,7 @@ try:
     from shared.logging.config import get_logger
 except ImportError:
     import logging
+
     def get_logger(name: str) -> logging.Logger:
         return logging.getLogger(name)
 
@@ -111,6 +113,7 @@ DEFAULT_TIMEOUT = 30.0
 # HTTP Client Management
 # =============================================================================
 
+
 def get_api_base_url() -> str:
     """Get the API base URL for internal tool calls."""
     return os.getenv("API_BASE_URL", "http://localhost:8000")
@@ -119,7 +122,7 @@ def get_api_base_url() -> str:
 @asynccontextmanager
 async def get_http_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Get an async HTTP client for API calls.
-    
+
     Uses a context manager to ensure proper cleanup.
     """
     async with httpx.AsyncClient(
@@ -138,13 +141,13 @@ async def safe_api_call(
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Make a safe API call with error handling.
-    
+
     Args:
         method: HTTP method (GET, POST, etc.)
         path: API endpoint path
         json: Optional JSON body for POST requests
         params: Optional query parameters
-        
+
     Returns:
         API response as dict, or error dict on failure
     """
@@ -176,31 +179,37 @@ async def safe_api_call(
 if ai_function is not None:
     # Import the context accessor for AI settings
     from .agui_endpoint import get_current_ai_settings
-    
+
     @ai_function
     async def query_library(
         query: Annotated[str, "The question to ask about the video library"],
         video_id: Annotated[str | None, "Optional video ID to focus the search on"] = None,
         channel_id: Annotated[str | None, "Optional channel ID to filter by"] = None,
-        use_video_context: Annotated[bool, "Whether to search the video library for context (default: true)"] = True,
-        use_llm_knowledge: Annotated[bool, "Whether to include AI's general knowledge in the answer (default: true)"] = True,
-        use_web_search: Annotated[bool, "Whether to search the web for current information (default: false)"] = False,
+        use_video_context: Annotated[
+            bool, "Whether to search the video library for context (default: true)"
+        ] = True,
+        use_llm_knowledge: Annotated[
+            bool, "Whether to include AI's general knowledge in the answer (default: true)"
+        ] = True,
+        use_web_search: Annotated[
+            bool, "Whether to search the web for current information (default: false)"
+        ] = False,
     ) -> dict[str, Any]:
         """Ask a question about the video library and get a rich answer with citations.
-        
+
         This is the PRIMARY tool for answering user questions about video content.
-        
+
         Knowledge source control:
         - use_video_context: Search transcripts & summaries from the library
         - use_llm_knowledge: Allow AI to use its general trained knowledge
         - use_web_search: Search the web for current information (not yet implemented)
-        
+
         Returns:
         - answer: A conversational answer to the question
         - videoCards: Relevant videos with explanations
         - evidence: Specific transcript segments that support the answer
         - followups: Suggested follow-up questions
-        
+
         The frontend will render this as a rich UI with video cards and citations.
         Do NOT add additional text after calling this tool.
         """
@@ -210,13 +219,13 @@ if ai_function is not None:
         actual_use_video_context = context_settings.get("useVideoContext", use_video_context)
         actual_use_llm_knowledge = context_settings.get("useLLMKnowledge", use_llm_knowledge)
         actual_use_web_search = context_settings.get("useWebSearch", use_web_search)
-        
+
         logger.info(
             f"query_library using AI settings - video_context={actual_use_video_context}, "
             f"llm_knowledge={actual_use_llm_knowledge}, web_search={actual_use_web_search} "
             f"(context: {context_settings})"
         )
-        
+
         body: dict[str, Any] = {
             "query": query,
             "scope": {},
@@ -230,14 +239,15 @@ if ai_function is not None:
             body["scope"]["video_ids"] = [video_id]
         if channel_id:
             body["scope"]["channel_id"] = channel_id
-        
+
         result = await safe_api_call("POST", "/api/v1/copilot/query", json=body)
         if "error" not in result:
             video_count = len(result.get("videoCards", []))
             evidence_count = len(result.get("evidence", []))
-            logger.info(f"query_library: {video_count} videos, {evidence_count} evidence for '{query}'")
+            logger.info(
+                f"query_library: {video_count} videos, {evidence_count} evidence for '{query}'"
+            )
         return result
-
 
     @ai_function
     async def search_videos(
@@ -246,7 +256,7 @@ if ai_function is not None:
         limit: Annotated[int, "Maximum number of results to return (1-20)"] = 5,
     ) -> dict[str, Any]:
         """Search for videos in the library by title, description, or content.
-        
+
         Use this to find videos that match a topic or keyword.
         Returns a list of videos with their metadata and relevance scores.
         """
@@ -256,21 +266,24 @@ if ai_function is not None:
         }
         if channel_filter:
             body["channel_filter"] = channel_filter
-        
+
         result = await safe_api_call("POST", "/api/v1/copilot/search/videos", json=body)
         if "error" not in result:
-            logger.info(f"search_videos found {len(result.get('videos', []))} results for '{query}'")
+            logger.info(
+                f"search_videos found {len(result.get('videos', []))} results for '{query}'"
+            )
         return result
-
 
     @ai_function
     async def search_segments(
         query: Annotated[str, "The search query to find transcript segments"],
-        video_ids: Annotated[list[str] | None, "Optional list of video IDs to search within"] = None,
+        video_ids: Annotated[
+            list[str] | None, "Optional list of video IDs to search within"
+        ] = None,
         limit: Annotated[int, "Maximum number of segments to return (1-20)"] = 10,
     ) -> dict[str, Any]:
         """Search for specific transcript segments across videos.
-        
+
         Use this to find exact quotes or specific moments in videos.
         Returns segments with timestamps and video context.
         """
@@ -280,19 +293,20 @@ if ai_function is not None:
         }
         if video_ids:
             body["scope"] = {"video_ids": video_ids}
-        
+
         result = await safe_api_call("POST", "/api/v1/copilot/search/segments", json=body)
         if "error" not in result:
-            logger.info(f"search_segments found {len(result.get('segments', []))} results for '{query}'")
+            logger.info(
+                f"search_segments found {len(result.get('segments', []))} results for '{query}'"
+            )
         return result
-
 
     @ai_function
     async def get_video_summary(
         video_id: Annotated[str, "The UUID of the video to get the summary for"],
     ) -> dict[str, Any]:
         """Get the summary and key points for a specific video.
-        
+
         Use this when you need detailed information about a particular video,
         including its summary, key points, and metadata.
         """
@@ -301,13 +315,12 @@ if ai_function is not None:
             logger.info(f"get_video_summary retrieved summary for video {video_id}")
         return result
 
-
     @ai_function
     async def get_library_coverage(
         channel_id: Annotated[str | None, "Optional channel ID to get coverage for"] = None,
     ) -> dict[str, Any]:
         """Get statistics about the video library coverage.
-        
+
         Returns counts of videos, channels, segments, and topics in the library.
         Use this to understand what content is available before searching.
         """
@@ -319,13 +332,12 @@ if ai_function is not None:
             logger.info(f"get_library_coverage: {result.get('videoCount', 0)} videos")
         return result
 
-
     @ai_function
     async def get_topics_for_channel(
         channel_id: Annotated[str | None, "Optional UUID of the channel to get topics for"] = None,
     ) -> dict[str, Any]:
         """Get the topics covered by the library or a specific channel.
-        
+
         Use this to understand what subjects are covered,
         helping users discover relevant content.
         """
@@ -337,23 +349,25 @@ if ai_function is not None:
             logger.info(f"get_topics_for_channel: {len(result.get('topics', []))} topics")
         return result
 
-
     @ai_function
     async def synthesize_learning_path(
-        query: Annotated[str, "Description of the learning path to create (e.g., 'beginner to advanced push-ups')"],
+        query: Annotated[
+            str,
+            "Description of the learning path to create (e.g., 'beginner to advanced push-ups')",
+        ],
         max_items: Annotated[int, "Maximum number of videos to include (1-20)"] = 10,
         channel_id: Annotated[str | None, "Optional channel ID to restrict to"] = None,
     ) -> dict[str, Any]:
         """Create a learning path from videos in the library.
-        
+
         Synthesizes an ordered sequence of videos for progressive learning.
         The learning path orders videos from beginner to advanced based on content analysis.
-        
+
         Returns:
         - learningPath: Ordered list of videos with rationale, prerequisites, and evidence
         - insufficientContent: True if not enough videos available
         - insufficientMessage: Explanation if content is insufficient
-        
+
         Use this when users ask for:
         - "Create a learning path for..."
         - "What order should I watch..."
@@ -367,7 +381,7 @@ if ai_function is not None:
         }
         if channel_id:
             body["scope"] = {"channels": [channel_id]}
-        
+
         result = await safe_api_call("POST", "/api/v1/copilot/synthesize", json=body)
         if "error" not in result:
             if result.get("insufficientContent"):
@@ -377,23 +391,24 @@ if ai_function is not None:
                 logger.info(f"synthesize_learning_path: {item_count} items for '{query}'")
         return result
 
-
     @ai_function
     async def synthesize_watch_list(
-        query: Annotated[str, "Description of what videos to recommend (e.g., 'fitness for beginners')"],
+        query: Annotated[
+            str, "Description of what videos to recommend (e.g., 'fitness for beginners')"
+        ],
         max_items: Annotated[int, "Maximum number of videos to include (1-20)"] = 10,
         channel_id: Annotated[str | None, "Optional channel ID to restrict to"] = None,
     ) -> dict[str, Any]:
         """Create a prioritized watch list from videos in the library.
-        
+
         Synthesizes a prioritized collection of recommended videos based on user interests.
         Videos are assigned high/medium/low priority with reasons for inclusion.
-        
+
         Returns:
         - watchList: Prioritized list of videos with reasons, tags, and priority levels
         - insufficientContent: True if no videos available
         - insufficientMessage: Explanation if content is insufficient
-        
+
         Use this when users ask for:
         - "What should I watch about..."
         - "Recommend videos for..."
@@ -407,7 +422,7 @@ if ai_function is not None:
         }
         if channel_id:
             body["scope"] = {"channels": [channel_id]}
-        
+
         result = await safe_api_call("POST", "/api/v1/copilot/synthesize", json=body)
         if "error" not in result:
             if result.get("insufficientContent"):
@@ -422,11 +437,12 @@ if ai_function is not None:
 # OpenAI Client Factory
 # =============================================================================
 
+
 def create_openai_chat_client() -> BaseChatClient | None:
     """Create an OpenAI-compatible chat client.
-    
+
     Supports Azure AI Foundry, Azure OpenAI, and standard OpenAI based on environment variables.
-    
+
     Environment Variables:
         Azure AI Foundry / Azure OpenAI:
             - AZURE_OPENAI_ENDPOINT: The Azure endpoint URL
@@ -434,36 +450,36 @@ def create_openai_chat_client() -> BaseChatClient | None:
               - OpenAI format: https://<resource>.openai.azure.com
             - AZURE_OPENAI_API_KEY: The API key
             - AZURE_OPENAI_DEPLOYMENT: The deployment/model name (default: gpt-4o)
-            
+
         Standard OpenAI:
             - OPENAI_API_KEY: The OpenAI API key
             - OPENAI_MODEL: The model to use (default: gpt-4o)
-    
+
     Returns:
         Configured chat client or None if not configured.
     """
     if OpenAIChatClient is None:
         logger.warning("agent_framework not available - chat client cannot be created")
         return None
-    
+
     # Check for Azure OpenAI / Azure AI Foundry configuration
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
     azure_api_key = os.getenv("AZURE_OPENAI_API_KEY")
     azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
-    
+
     if azure_endpoint and azure_api_key:
         # Detect endpoint type and construct appropriate base_url
         base_url = _build_azure_openai_base_url(azure_endpoint, azure_deployment)
-        
+
         logger.info(f"Using Azure OpenAI - deployment: {azure_deployment}, base_url: {base_url}")
-        
+
         return OpenAIChatClient(
             model_id=azure_deployment,
             api_key=azure_api_key,
             base_url=base_url,
             default_headers={"api-version": "2024-12-01-preview"},
         )
-    
+
     # Fall back to standard OpenAI
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if openai_api_key:
@@ -473,7 +489,7 @@ def create_openai_chat_client() -> BaseChatClient | None:
             model_id=model,
             api_key=openai_api_key,
         )
-    
+
     logger.warning(
         "No LLM configuration found. Set one of:\n"
         "  - AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY\n"
@@ -484,24 +500,24 @@ def create_openai_chat_client() -> BaseChatClient | None:
 
 def _build_azure_openai_base_url(endpoint: str, deployment: str) -> str:
     """Build the correct base URL for Azure OpenAI or Azure AI Foundry endpoints.
-    
+
     Azure AI Foundry endpoints (services.ai.azure.com):
         Input:  https://<resource>.services.ai.azure.com/api/projects/<project>
         Output: https://<resource>.services.ai.azure.com/models
-        
+
     Standard Azure OpenAI endpoints (openai.azure.com):
         Input:  https://<resource>.openai.azure.com
         Output: https://<resource>.openai.azure.com/openai/deployments/<deployment>
-    
+
     Args:
         endpoint: The Azure endpoint URL
         deployment: The deployment/model name
-        
+
     Returns:
         The correctly formatted base URL for OpenAI client.
     """
-    endpoint = endpoint.rstrip('/')
-    
+    endpoint = endpoint.rstrip("/")
+
     # Check if this is an Azure AI Foundry endpoint
     if "services.ai.azure.com" in endpoint:
         # Azure AI Foundry uses the /models endpoint for OpenAI-compatible inference
@@ -512,7 +528,7 @@ def _build_azure_openai_base_url(endpoint: str, deployment: str) -> str:
             return f"{base}/models"
         else:
             return f"{endpoint}/models"
-    
+
     # Standard Azure OpenAI endpoint
     # Format: https://<resource>.openai.azure.com/openai/deployments/<deployment>
     return f"{endpoint}/openai/deployments/{deployment}"
@@ -522,14 +538,15 @@ def _build_azure_openai_base_url(endpoint: str, deployment: str) -> str:
 # Agent Factory
 # =============================================================================
 
+
 def get_agent_tools() -> list:
     """Get the list of available agent tools.
-    
+
     Returns an empty list if agent_framework is not available.
     """
     if not AGENT_FRAMEWORK_AVAILABLE:
         return []
-    
+
     return [
         query_library,  # PRIMARY tool for user questions
         search_videos,
@@ -538,31 +555,31 @@ def get_agent_tools() -> list:
         get_library_coverage,
         get_topics_for_channel,
         synthesize_learning_path,  # US6: Structured output tools
-        synthesize_watch_list,     # US6: Structured output tools
+        synthesize_watch_list,  # US6: Structured output tools
     ]
 
 
 def create_yt_summarizer_agent() -> ChatAgent | None:
     """Create the YT Summarizer agent with tools.
-    
+
     Creates a ChatAgent configured with:
     - System instructions for the YT Summarizer use case
     - Tools for searching videos, segments, and getting summaries
     - Appropriate temperature settings
-    
+
     Returns:
         Configured ChatAgent or None if dependencies not available.
     """
     if not AGENT_FRAMEWORK_AVAILABLE:
         logger.warning("agent_framework not installed - agent cannot be created")
         return None
-    
+
     chat_client = create_openai_chat_client()
     if chat_client is None:
         return None
-    
+
     tools = get_agent_tools()
-    
+
     # Create the agent
     # Note: Reasoning models (o1, o3, gpt-5-mini, etc.) only support:
     # - temperature=1 (the only allowed value)
@@ -576,11 +593,8 @@ def create_yt_summarizer_agent() -> ChatAgent | None:
         tools=tools,
         temperature=1,  # Only value supported by reasoning models
     )
-    
+
     # Get tool names - AIFunction objects use .name, not __name__
-    tool_names = [getattr(t, 'name', getattr(t, '__name__', str(t))) for t in tools]
-    logger.info(
-        f"Created YT Summarizer agent with {len(tools)} tools: "
-        f"{', '.join(tool_names)}"
-    )
+    tool_names = [getattr(t, "name", getattr(t, "__name__", str(t))) for t in tools]
+    logger.info(f"Created YT Summarizer agent with {len(tools)} tools: {', '.join(tool_names)}")
     return agent

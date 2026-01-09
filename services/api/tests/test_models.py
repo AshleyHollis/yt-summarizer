@@ -25,26 +25,32 @@ from api.models.video import (
 class TestExtractYoutubeVideoId:
     """Tests for YouTube video ID extraction."""
 
-    @pytest.mark.parametrize("url,expected_id", [
-        ("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
-        ("https://youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
-        ("http://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
-        ("https://youtu.be/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
-        ("https://www.youtube.com/embed/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
-        ("https://www.youtube.com/v/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
-        ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s", "dQw4w9WgXcQ"),
-        ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLtest", "dQw4w9WgXcQ"),
-    ])
+    @pytest.mark.parametrize(
+        "url,expected_id",
+        [
+            ("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("https://youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("http://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("https://youtu.be/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("https://www.youtube.com/embed/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("https://www.youtube.com/v/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s", "dQw4w9WgXcQ"),
+            ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLtest", "dQw4w9WgXcQ"),
+        ],
+    )
     def test_extract_valid_video_ids(self, url: str, expected_id: str):
         """Test extracting video ID from various valid YouTube URL formats."""
         assert extract_youtube_video_id(url) == expected_id
 
-    @pytest.mark.parametrize("url", [
-        "https://example.com",
-        "https://vimeo.com/12345678",
-        "not-a-url",
-        "https://youtube.com/watch",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://example.com",
+            "https://vimeo.com/12345678",
+            "not-a-url",
+            "https://youtube.com/watch",
+        ],
+    )
     def test_extract_returns_none_for_invalid_urls(self, url: str):
         """Test that None is returned for invalid URLs."""
         assert extract_youtube_video_id(url) is None
@@ -163,7 +169,7 @@ class TestVideoJobsProgress:
     def test_valid_progress(self):
         """Test creating valid video jobs progress."""
         video_id = uuid4()
-        
+
         jobs = [
             JobSummaryResponse(
                 job_id=uuid4(),
@@ -204,7 +210,7 @@ class TestVideoJobsProgress:
     def test_is_complete_property(self):
         """Test the is_complete property."""
         video_id = uuid4()
-        
+
         # All jobs completed
         jobs = [
             JobSummaryResponse(
@@ -235,7 +241,7 @@ class TestVideoJobsProgress:
     def test_has_failed_property(self):
         """Test the has_failed property."""
         video_id = uuid4()
-        
+
         # One job failed
         jobs = [
             JobSummaryResponse(

@@ -43,12 +43,12 @@ def mock_blob_client():
     client = MagicMock()
     client.upload_blob = MagicMock()
     client.download_blob = MagicMock()
-    
+
     # Mock download_blob to return content
     mock_download = MagicMock()
     mock_download.readall = MagicMock(return_value=b"Mock content")
     client.download_blob.return_value = mock_download
-    
+
     return client
 
 
@@ -66,15 +66,15 @@ def mock_queue_client():
 def mock_openai_client():
     """Create a mock OpenAI client."""
     client = MagicMock()
-    
+
     # Mock chat completion
     mock_completion = MagicMock()
     mock_completion.choices = [MagicMock(message=MagicMock(content="Mock summary"))]
     client.chat.completions.create = MagicMock(return_value=mock_completion)
-    
+
     # Mock embeddings
     mock_embedding = MagicMock()
     mock_embedding.data = [MagicMock(embedding=[0.1] * 1536)]
     client.embeddings.create = MagicMock(return_value=mock_embedding)
-    
+
     return client

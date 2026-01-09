@@ -20,16 +20,16 @@ except ImportError:
     # Fallback for development
     async def get_session():
         raise NotImplementedError("Database session not available")
-    
+
     def get_blob_client():
         raise NotImplementedError("Blob client not available")
-    
+
     def get_transcript_blob_path(channel_name: str, youtube_video_id: str) -> str:
         raise NotImplementedError("Blob path helper not available")
-    
+
     def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
         raise NotImplementedError("Blob path helper not available")
-    
+
     TRANSCRIPTS_CONTAINER = "transcripts"
     SUMMARIES_CONTAINER = "summaries"
 
@@ -86,6 +86,7 @@ async def submit_video(
         )
     except Exception as e:
         import traceback
+
         error_detail = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -183,7 +184,7 @@ async def get_video_transcript(
     service: VideoService = Depends(get_video_service),
 ) -> PlainTextResponse:
     """Get transcript content for a video.
-    
+
     Returns the transcript as plain text.
     """
     # First verify the video exists
@@ -193,10 +194,10 @@ async def get_video_transcript(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Video not found",
         )
-    
+
     # Get channel name for blob path lookup
     channel_name = video.channel.name if video.channel else "unknown-channel"
-    
+
     # Try to fetch transcript from blob storage using channel-based path
     try:
         blob_client = get_blob_client()
@@ -221,7 +222,7 @@ async def get_video_summary(
     service: VideoService = Depends(get_video_service),
 ) -> PlainTextResponse:
     """Get summary content for a video.
-    
+
     Returns the summary as markdown text.
     """
     # First verify the video exists
@@ -231,10 +232,10 @@ async def get_video_summary(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Video not found",
         )
-    
+
     # Get channel name for blob path lookup
     channel_name = video.channel.name if video.channel else "unknown-channel"
-    
+
     # Try to fetch summary from blob storage using channel-based path
     try:
         blob_client = get_blob_client()
@@ -278,6 +279,7 @@ async def refresh_video_metadata(
         )
     except Exception as e:
         import traceback
+
         error_detail = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

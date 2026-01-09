@@ -7,6 +7,7 @@ from typing import Any
 # Fix SSL certificate verification on Windows by using certifi's CA bundle
 try:
     import certifi
+
     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 except ImportError:
     pass  # certifi not installed, use system defaults
@@ -215,7 +216,7 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
         youtube_video_id: str,
     ) -> str | None:
         """Fetch transcript from blob storage.
-        
+
         Uses channel-based blob path organization:
         {sanitized_channel_name}/{youtube_video_id}/transcript.txt
         """
@@ -236,13 +237,13 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
 
     async def _generate_summary(self, transcript: str) -> tuple[str | None, str | None]:
         """Generate summary using OpenAI API.
-        
+
         Returns:
             Tuple of (summary, error_message). If successful, summary is set and error is None.
             If failed, summary is None and error_message contains the failure reason.
         """
         settings = get_settings()
-        
+
         # DEBUG: Log the API key check
         logger.info(
             "DEBUG: _generate_summary API key check",
@@ -252,18 +253,18 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
             azure_openai_base_url=settings.openai.azure_openai_base_url,
             effective_api_key_set=bool(settings.openai.effective_api_key),
         )
-        
+
         # Check if any OpenAI configuration is available (Azure or standard)
-        has_valid_config = (
-            settings.openai.is_azure_configured or 
-            (settings.openai.api_key and settings.openai.api_key != "not-configured")
+        has_valid_config = settings.openai.is_azure_configured or (
+            settings.openai.api_key and settings.openai.api_key != "not-configured"
         )
-        
+
         if not has_valid_config:
             logger.warning("OpenAI API key not configured - generating mock summary for testing")
             # Provide a mock summary for testing without API key
             preview = transcript[:500] + "..." if len(transcript) > 500 else transcript
-            return (f"""# Video Summary (Mock)
+            return (
+                f"""# Video Summary (Mock)
 
 **Note**: This is a mock summary generated because no OpenAI API key is configured.
 
@@ -280,18 +281,20 @@ This video discusses topics covered in the transcript.
 
 ## Summary
 This is a placeholder summary for testing purposes. Configure an OpenAI API key to generate real AI-powered summaries.
-""", None)
-        
+""",
+                None,
+            )
+
         try:
             # Use Azure OpenAI if configured, otherwise use standard OpenAI
             if settings.openai.is_azure_configured:
                 base_url = settings.openai.azure_openai_base_url
                 model = settings.openai.azure_deployment or "gpt-4o-mini"
-                
+
                 # Azure AI Foundry uses OpenAI-compatible API with /models endpoint
                 if settings.openai.is_azure_ai_foundry:
                     from openai import AsyncOpenAI
-                    
+
                     client = AsyncOpenAI(
                         api_key=settings.openai.effective_api_key,
                         base_url=base_url,
@@ -306,7 +309,7 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
                 else:
                     # Standard Azure OpenAI
                     from openai import AsyncAzureOpenAI
-                    
+
                     client = AsyncAzureOpenAI(
                         api_key=settings.openai.effective_api_key,
                         azure_endpoint=base_url,
@@ -320,7 +323,7 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
                     )
             else:
                 from openai import AsyncOpenAI
-                
+
                 client = AsyncOpenAI(api_key=settings.openai.api_key)
                 model = settings.openai.model
 
@@ -329,6 +332,7 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
             max_tokens = 100000  # Leave room for system prompt and response
             try:
                 import tiktoken
+
                 encoding = tiktoken.encoding_for_model(model)
                 tokens = encoding.encode(transcript)
                 if len(tokens) > max_tokens:
@@ -367,7 +371,7 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
                     },
                 ],
             }
-            
+
             # Azure AI Foundry models (like gpt-5) use max_completion_tokens
             # Standard models use max_tokens
             if settings.openai.is_azure_ai_foundry:
@@ -383,6 +387,7 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
 
         except Exception as e:
             import traceback
+
             error_details = f"{type(e).__name__}: {str(e)}"
             full_traceback = traceback.format_exc()
             logger.error(
@@ -400,7 +405,7 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
         summary: str,
     ) -> str:
         """Store summary in blob storage.
-        
+
         Uses channel-based blob path organization:
         {sanitized_channel_name}/{youtube_video_id}/summary.md
         """
@@ -478,16 +483,18 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
 
             # Queue the job
             queue_client = get_queue_client()
-            queue_message = inject_trace_context({
-                "job_id": str(job.job_id),
-                "video_id": message.video_id,
-                "youtube_video_id": message.youtube_video_id,
-                "channel_name": message.channel_name,
-                "correlation_id": correlation_id,
-            })
+            queue_message = inject_trace_context(
+                {
+                    "job_id": str(job.job_id),
+                    "video_id": message.video_id,
+                    "youtube_video_id": message.youtube_video_id,
+                    "channel_name": message.channel_name,
+                    "correlation_id": correlation_id,
+                }
+            )
             if message.batch_id:
                 queue_message["batch_id"] = message.batch_id
-            
+
             queue_client.send_message(EMBED_QUEUE, queue_message)
 
             logger.info("Queued embed job", job_id=str(job.job_id))

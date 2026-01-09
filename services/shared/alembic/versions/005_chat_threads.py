@@ -50,7 +50,7 @@ def upgrade() -> None:
             server_default=sa.text("SYSUTCDATETIME()"),
         ),
     )
-    
+
     # Indexes for common queries
     op.create_index("ix_chat_threads_agent", "ChatThreads", ["agent_name"])
     op.create_index("ix_chat_threads_updated", "ChatThreads", ["updated_at"])

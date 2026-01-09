@@ -70,9 +70,7 @@ class BatchItem(BaseResponse):
     youtube_video_id: str = Field(description="YouTube video ID")
     title: str = Field(description="Video title")
     status: BatchItemStatus = Field(description="Item processing status")
-    error_message: str | None = Field(
-        default=None, description="Error message if failed"
-    )
+    error_message: str | None = Field(default=None, description="Error message if failed")
     created_at: datetime = Field(description="When item was added")
     updated_at: datetime = Field(description="Last status update")
 
@@ -96,9 +94,7 @@ class BatchResponse(BaseResponse):
 class BatchDetailResponse(BatchResponse):
     """Detailed batch response including items."""
 
-    items: list[BatchItem] = Field(
-        default_factory=list, description="All items in the batch"
-    )
+    items: list[BatchItem] = Field(default_factory=list, description="All items in the batch")
 
 
 class BatchListResponse(BaseResponse):

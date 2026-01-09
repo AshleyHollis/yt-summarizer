@@ -140,4 +140,3 @@ __all__ = [
     "VideoSummaryResponse",
     "extract_youtube_video_id",
 ]
-

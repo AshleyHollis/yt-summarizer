@@ -22,6 +22,7 @@ try:
     from shared.logging.config import get_logger
 except ImportError as e:
     import logging
+
     logging.warning(f"Failed to import shared modules: {e}")
     # Fallback for development
     from typing import Any
@@ -84,20 +85,21 @@ class LibraryService:
         Returns:
             SQLAlchemy select query.
         """
-        query = (
-            select(Video)
-            .options(selectinload(Video.channel))
-        )
+        query = select(Video).options(selectinload(Video.channel))
 
         # Apply filters
         if filters.channel_id:
             query = query.where(Video.channel_id == filters.channel_id)
 
         if filters.from_date:
-            query = query.where(Video.publish_date >= datetime.combine(filters.from_date, datetime.min.time()))
+            query = query.where(
+                Video.publish_date >= datetime.combine(filters.from_date, datetime.min.time())
+            )
 
         if filters.to_date:
-            query = query.where(Video.publish_date <= datetime.combine(filters.to_date, datetime.max.time()))
+            query = query.where(
+                Video.publish_date <= datetime.combine(filters.to_date, datetime.max.time())
+            )
 
         if filters.status:
             query = query.where(Video.processing_status == filters.status.value)
@@ -107,9 +109,7 @@ class LibraryService:
             # Search in title, description, AND transcript segments
             # Use a subquery to find videos with matching segment text
             segment_match_subquery = (
-                select(Segment.video_id)
-                .where(Segment.text.ilike(search_pattern))
-                .distinct()
+                select(Segment.video_id).where(Segment.text.ilike(search_pattern)).distinct()
             )
             query = query.where(
                 or_(
@@ -263,7 +263,9 @@ class LibraryService:
                 # We need to extract: {video_id}/{youtube_video_id}_summary.md (everything after container name)
                 if artifact.blob_uri:
                     parts = artifact.blob_uri.split(f"/{SUMMARIES_CONTAINER}/")
-                    summary_blob_name = parts[1] if len(parts) > 1 else artifact.blob_uri.split("/")[-1]
+                    summary_blob_name = (
+                        parts[1] if len(parts) > 1 else artifact.blob_uri.split("/")[-1]
+                    )
                 else:
                     summary_blob_name = None
             elif artifact.artifact_type == "transcript":
@@ -429,9 +431,7 @@ class LibraryService:
         Returns:
             Channel detail response or None if not found.
         """
-        result = await self.session.execute(
-            select(Channel).where(Channel.channel_id == channel_id)
-        )
+        result = await self.session.execute(select(Channel).where(Channel.channel_id == channel_id))
         channel = result.scalar_one_or_none()
 
         if not channel:
@@ -547,9 +547,7 @@ class LibraryService:
         total_facets = facet_count.scalar() or 0
 
         # Last updated
-        last_updated_result = await self.session.execute(
-            select(func.max(Video.updated_at))
-        )
+        last_updated_result = await self.session.execute(select(func.max(Video.updated_at)))
         last_updated_at = last_updated_result.scalar()
 
         return LibraryStatsResponse(

@@ -48,6 +48,7 @@ def sample_job_id():
 def sanitized_channel_name(sample_channel_name):
     """Expected sanitized channel name."""
     from shared.blob.client import sanitize_channel_name
+
     return sanitize_channel_name(sample_channel_name)
 
 
@@ -59,7 +60,9 @@ def sanitized_channel_name(sample_channel_name):
 class TestBlobPathHelpers:
     """Test that blob path helpers produce consistent paths."""
 
-    def test_get_transcript_blob_path_format(self, sample_channel_name, sample_youtube_video_id, sanitized_channel_name):
+    def test_get_transcript_blob_path_format(
+        self, sample_channel_name, sample_youtube_video_id, sanitized_channel_name
+    ):
         """Test transcript blob path follows channel-based format."""
         from shared.blob.client import get_transcript_blob_path
 
@@ -67,7 +70,9 @@ class TestBlobPathHelpers:
 
         assert path == f"{sanitized_channel_name}/{sample_youtube_video_id}/transcript.txt"
 
-    def test_get_segments_blob_path_format(self, sample_channel_name, sample_youtube_video_id, sanitized_channel_name):
+    def test_get_segments_blob_path_format(
+        self, sample_channel_name, sample_youtube_video_id, sanitized_channel_name
+    ):
         """Test segments blob path follows channel-based format."""
         from shared.blob.client import get_segments_blob_path
 
@@ -75,7 +80,9 @@ class TestBlobPathHelpers:
 
         assert path == f"{sanitized_channel_name}/{sample_youtube_video_id}/segments.json"
 
-    def test_get_summary_blob_path_format(self, sample_channel_name, sample_youtube_video_id, sanitized_channel_name):
+    def test_get_summary_blob_path_format(
+        self, sample_channel_name, sample_youtube_video_id, sanitized_channel_name
+    ):
         """Test summary blob path follows channel-based format."""
         from shared.blob.client import get_summary_blob_path
 
@@ -83,7 +90,9 @@ class TestBlobPathHelpers:
 
         assert path == f"{sanitized_channel_name}/{sample_youtube_video_id}/summary.md"
 
-    def test_all_blob_paths_use_same_channel_sanitization(self, sample_channel_name, sample_youtube_video_id):
+    def test_all_blob_paths_use_same_channel_sanitization(
+        self, sample_channel_name, sample_youtube_video_id
+    ):
         """Test all path helpers use the same channel sanitization."""
         from shared.blob.client import (
             get_segments_blob_path,
@@ -100,8 +109,9 @@ class TestBlobPathHelpers:
         segments_prefix = segments_path.split("/")[0]
         summary_prefix = summary_path.split("/")[0]
 
-        assert transcript_prefix == segments_prefix == summary_prefix, \
+        assert transcript_prefix == segments_prefix == summary_prefix, (
             "All blob paths must use the same sanitized channel name prefix"
+        )
 
 
 # ============================================================================
@@ -245,8 +255,9 @@ class TestChannelNamePropagation:
 
         for worker in workers:
             message = worker.parse_message(raw_message)
-            assert message.channel_name == "My Test Channel", \
+            assert message.channel_name == "My Test Channel", (
                 f"{type(worker).__name__} failed to parse channel_name"
+            )
 
     def test_all_workers_default_channel_name_when_missing(self):
         """Test all workers default to 'unknown-channel' when channel_name is missing."""
@@ -272,8 +283,9 @@ class TestChannelNamePropagation:
 
         for worker in workers:
             message = worker.parse_message(raw_message)
-            assert message.channel_name == "unknown-channel", \
+            assert message.channel_name == "unknown-channel", (
                 f"{type(worker).__name__} failed to default channel_name"
+            )
 
 
 # ============================================================================
@@ -283,7 +295,7 @@ class TestChannelNamePropagation:
 
 class TestWorkersUseBlobPathHelpers:
     """Test that workers use the shared blob path helpers, not hardcoded paths.
-    
+
     This is a regression test for the bug where:
     - Transcribe stored at: hybrid-calisthenics/0GsVJsS6474/transcript.txt
     - Summarize looked at: {uuid}/0GsVJsS6474_transcript.txt (WRONG!)
@@ -321,17 +333,22 @@ class TestWorkersUseBlobPathHelpers:
         sample_youtube_video_id,
     ):
         """Test that transcribe's storage path matches summarize's fetch path.
-        
+
         This is the core regression test for the bug where paths didn't match.
         """
         from shared.blob.client import get_transcript_blob_path
 
         # Both workers should use the SAME path for the same video
-        transcribe_storage_path = get_transcript_blob_path(sample_channel_name, sample_youtube_video_id)
-        summarize_fetch_path = get_transcript_blob_path(sample_channel_name, sample_youtube_video_id)
+        transcribe_storage_path = get_transcript_blob_path(
+            sample_channel_name, sample_youtube_video_id
+        )
+        summarize_fetch_path = get_transcript_blob_path(
+            sample_channel_name, sample_youtube_video_id
+        )
 
-        assert transcribe_storage_path == summarize_fetch_path, \
+        assert transcribe_storage_path == summarize_fetch_path, (
             "Transcribe storage path must match summarize fetch path!"
+        )
 
     def test_blob_paths_match_between_summarize_and_embed(
         self,
@@ -345,8 +362,9 @@ class TestWorkersUseBlobPathHelpers:
         summarize_storage_path = get_summary_blob_path(sample_channel_name, sample_youtube_video_id)
         embed_fetch_path = get_summary_blob_path(sample_channel_name, sample_youtube_video_id)
 
-        assert summarize_storage_path == embed_fetch_path, \
+        assert summarize_storage_path == embed_fetch_path, (
             "Summarize storage path must match embed fetch path!"
+        )
 
 
 # ============================================================================
@@ -378,9 +396,17 @@ class TestEndToEndPathConsistency:
         expected_summary = f"{sanitized}/{sample_youtube_video_id}/summary.md"
 
         # Verify all helpers produce the expected format
-        assert get_transcript_blob_path(sample_channel_name, sample_youtube_video_id) == expected_transcript
-        assert get_segments_blob_path(sample_channel_name, sample_youtube_video_id) == expected_segments
-        assert get_summary_blob_path(sample_channel_name, sample_youtube_video_id) == expected_summary
+        assert (
+            get_transcript_blob_path(sample_channel_name, sample_youtube_video_id)
+            == expected_transcript
+        )
+        assert (
+            get_segments_blob_path(sample_channel_name, sample_youtube_video_id)
+            == expected_segments
+        )
+        assert (
+            get_summary_blob_path(sample_channel_name, sample_youtube_video_id) == expected_summary
+        )
 
     def test_paths_are_unique_per_video(self, sample_channel_name):
         """Test that different videos get different paths."""

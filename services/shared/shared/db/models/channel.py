@@ -48,9 +48,7 @@ class Channel(Base, TimestampMixin):
         lazy="selectin",
     )
 
-    __table_args__ = (
-        Index("ix_channels_youtube_id", "youtube_channel_id"),
-    )
+    __table_args__ = (Index("ix_channels_youtube_id", "youtube_channel_id"),)
 
 
 class Video(Base, TimestampMixin):

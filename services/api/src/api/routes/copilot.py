@@ -16,10 +16,12 @@ try:
     from shared.db.connection import get_session
     from shared.logging.config import get_logger
 except ImportError:
+
     async def get_session():
         raise NotImplementedError("Database session not available")
-    
+
     import logging
+
     def get_logger(name):
         return logging.getLogger(name)
 
@@ -85,11 +87,11 @@ async def query(
     service: CopilotService = Depends(get_copilot_service),
 ) -> CopilotQueryResponse:
     """Execute a copilot query.
-    
+
     Searches the library and returns an answer with citations.
     """
     correlation_id = get_correlation_id(request_)
-    
+
     # Inject correlation ID if not provided
     if not body.correlation_id:
         body = CopilotQueryRequest(
@@ -99,13 +101,13 @@ async def query(
             conversation_id=body.conversation_id,
             correlation_id=correlation_id,
         )
-    
+
     try:
         result = await service.query(body)
         return result
     except Exception as e:
         logger.error(f"Query failed: {e}", correlation_id=correlation_id)
-        
+
         # Check for database warming up
         error_str = str(e).lower()
         if "connection" in error_str or "timeout" in error_str:
@@ -117,7 +119,7 @@ async def query(
                     correlation_id=correlation_id,
                 ).model_dump(),
             )
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
@@ -137,7 +139,7 @@ async def search_segments(
 ) -> SegmentSearchResponse:
     """Search for segments using vector similarity."""
     correlation_id = get_correlation_id(request_)
-    
+
     try:
         # Try to get embedding for the query
         llm_service = get_llm_service()
@@ -152,7 +154,7 @@ async def search_segments(
                 correlation_id=correlation_id,
             )
             result = await service.fallback_text_search_segments(body)
-        
+
         return result
     except Exception as e:
         logger.error(f"Segment search failed: {e}", correlation_id=correlation_id)
@@ -175,7 +177,7 @@ async def search_videos(
 ) -> VideoSearchResponse:
     """Search for videos by title, description, or summary."""
     correlation_id = get_correlation_id(request_)
-    
+
     try:
         result = await service.search_videos(body)
         return result
@@ -271,7 +273,7 @@ async def explain_recommendation(
     session: AsyncSession = Depends(get_session),
 ) -> ExplainResponse:
     """Explain why a video was recommended.
-    
+
     Note: Full implementation is in US5. This provides basic functionality.
     """
     # Import models
@@ -284,31 +286,28 @@ async def explain_recommendation(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Explanation service not available",
         )
-    
+
     # Get video details
-    video_query = (
-        select(Video)
-        .where(Video.video_id == video_id)
-    )
+    video_query = select(Video).where(Video.video_id == video_id)
     result = await session.execute(video_query)
     video = result.scalar_one_or_none()
-    
+
     if not video:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Video not found",
         )
-    
+
     # Get similarity evidence (top segments if query provided)
     similarity_basis = []
     if body.query_text:
         try:
             llm_service = get_llm_service()
             query_embedding = await llm_service.get_embedding(body.query_text)
-            
+
             search_service = SearchService(session)
             from ..models.copilot import SegmentSearchRequest, SimilarityEvidence
-            
+
             segment_request = SegmentSearchRequest(
                 query_text=body.query_text,
                 scope=body.scope,
@@ -318,24 +317,26 @@ async def explain_recommendation(
                 segment_request,
                 query_embedding,
             )
-            
+
             for seg in segment_results.segments:
                 if seg.video_id == video_id:
-                    similarity_basis.append(SimilarityEvidence(
-                        segment_id=seg.segment_id,
-                        segment_text=seg.text,
-                        start_time=seg.start_time,
-                        end_time=seg.end_time,
-                        score=seg.score,
-                    ))
+                    similarity_basis.append(
+                        SimilarityEvidence(
+                            segment_id=seg.segment_id,
+                            segment_text=seg.text,
+                            start_time=seg.start_time,
+                            end_time=seg.end_time,
+                            score=seg.score,
+                        )
+                    )
         except Exception as e:
             logger.warning(f"Failed to get similarity evidence: {e}")
-    
+
     # Get relationship evidence
     relationship_basis = []
     try:
         from ..models.copilot import RelationshipEvidence
-        
+
         rel_query = (
             select(Relationship, Video)
             .join(Video, Relationship.target_video_id == Video.video_id)
@@ -343,29 +344,33 @@ async def explain_recommendation(
             .limit(5)
         )
         rel_result = await session.execute(rel_query)
-        
+
         for rel, target_video in rel_result.fetchall():
-            relationship_basis.append(RelationshipEvidence(
-                relationship_type=rel.relationship_type,
-                related_video_id=target_video.video_id,
-                related_video_title=target_video.title,
-                confidence=rel.confidence or 0.5,
-                rationale=rel.rationale,
-            ))
+            relationship_basis.append(
+                RelationshipEvidence(
+                    relationship_type=rel.relationship_type,
+                    related_video_id=target_video.video_id,
+                    related_video_title=target_video.title,
+                    confidence=rel.confidence or 0.5,
+                    rationale=rel.rationale,
+                )
+            )
     except Exception as e:
         logger.warning(f"Failed to get relationship evidence: {e}")
-    
+
     # Calculate overall confidence
     confidence_scores = [s.score for s in similarity_basis] if similarity_basis else []
     if relationship_basis:
         confidence_scores.extend([r.confidence for r in relationship_basis])
-    
+
     overall_confidence = 0.5
     if confidence_scores:
         # For similarity, lower score = higher confidence (cosine distance)
         # For relationships, higher confidence = higher confidence
-        overall_confidence = min(1.0, sum(1 - s if s < 1 else s for s in confidence_scores) / len(confidence_scores))
-    
+        overall_confidence = min(
+            1.0, sum(1 - s if s < 1 else s for s in confidence_scores) / len(confidence_scores)
+        )
+
     return ExplainResponse(
         video_id=video_id,
         video_title=video.title,
@@ -410,11 +415,11 @@ async def synthesize(
     session: AsyncSession = Depends(get_session),
 ) -> SynthesizeResponse:
     """Synthesize a structured output from library content.
-    
+
     Creates learning paths or watch lists from indexed videos.
     """
     correlation_id = get_correlation_id(request_)
-    
+
     # Inject correlation ID if not provided
     if not body.correlation_id:
         body = SynthesizeRequest(
@@ -424,21 +429,21 @@ async def synthesize(
             max_items=body.max_items,
             correlation_id=correlation_id,
         )
-    
+
     # Validate query is not empty
     if not body.query or not body.query.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Query cannot be empty",
         )
-    
+
     try:
         service = SynthesisService(session)
         result = await service.synthesize(body)
         return result
     except Exception as e:
         logger.error(f"Synthesis failed: {e}", correlation_id=correlation_id)
-        
+
         # Check for database warming up
         error_str = str(e).lower()
         if "connection" in error_str or "timeout" in error_str:
@@ -450,7 +455,7 @@ async def synthesize(
                     correlation_id=correlation_id,
                 ).model_dump(),
             )
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

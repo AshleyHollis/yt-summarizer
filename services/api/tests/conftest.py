@@ -31,12 +31,12 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 @pytest.fixture
 def mock_session():
     """Create a mock database session for testing.
-    
+
     Sets up a mock that returns proper SQLAlchemy-like result objects
     for common query patterns.
     """
     session = AsyncMock()
-    
+
     # Create a mock result that mimics SQLAlchemy Result
     mock_result = MagicMock()
     mock_scalars = MagicMock()
@@ -47,7 +47,7 @@ def mock_session():
     mock_result.scalar_one_or_none.return_value = None
     mock_result.fetchone.return_value = None
     mock_result.fetchall.return_value = []
-    
+
     session.execute = AsyncMock(return_value=mock_result)
     session.add = MagicMock()
     session.flush = AsyncMock()
@@ -60,7 +60,7 @@ def mock_session():
 @pytest.fixture
 def app(mock_session):
     """Create a FastAPI test application with mocked dependencies.
-    
+
     Creates a minimal FastAPI app without the full lifespan initialization
     to avoid database connection attempts during testing.
     """
@@ -72,7 +72,7 @@ def app(mock_session):
 
     from api.middleware import CorrelationIdMiddleware
     from api.routes import batches, channels, copilot, health, jobs, library, threads, videos
-    
+
     @asynccontextmanager
     async def mock_lifespan(app: FastAPI):
         """Mock lifespan that skips database initialization."""
@@ -80,7 +80,7 @@ def app(mock_session):
         app.state.db_initialized = False
         app.state.db_error = "Mocked - database not initialized in tests"
         yield
-    
+
     # Create a minimal app for testing
     application = FastAPI(
         title="YT Summarizer API",
@@ -88,7 +88,7 @@ def app(mock_session):
         version="0.1.0",
         lifespan=mock_lifespan,
     )
-    
+
     # Add middleware
     application.add_middleware(
         CORSMiddleware,
@@ -98,8 +98,8 @@ def app(mock_session):
         allow_headers=["*"],
     )
     application.add_middleware(CorrelationIdMiddleware)
-    
-    # Include routers 
+
+    # Include routers
     # health router has no prefix, others have their prefixes defined in the router
     application.include_router(health.router)
     application.include_router(videos.router)
@@ -109,11 +109,11 @@ def app(mock_session):
     application.include_router(batches.router)
     application.include_router(copilot.router)
     application.include_router(threads.router)
-    
+
     # Override the database session dependency
     async def mock_get_session():
         yield mock_session
-    
+
     application.dependency_overrides[get_session] = mock_get_session
     return application
 
@@ -144,7 +144,11 @@ async def async_client(app) -> AsyncGenerator[AsyncClient, None]:
 def mock_db(mock_session):
     """Create a mock database connection manager."""
     db = MagicMock()
-    db.session = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_session), __aexit__=AsyncMock()))
+    db.session = MagicMock(
+        return_value=AsyncMock(
+            __aenter__=AsyncMock(return_value=mock_session), __aexit__=AsyncMock()
+        )
+    )
     return db
 
 
@@ -214,7 +218,9 @@ def sample_channel_data() -> dict[str, Any]:
 
 
 @pytest.fixture
-def sample_video_data(sample_video_id, sample_youtube_video_id, sample_channel_data) -> dict[str, Any]:
+def sample_video_data(
+    sample_video_id, sample_youtube_video_id, sample_channel_data
+) -> dict[str, Any]:
     """Sample video data."""
     return {
         "video_id": sample_video_id,
@@ -272,7 +278,7 @@ def headers(correlation_id) -> dict[str, str]:
 @pytest.fixture
 def azure_openai_env(monkeypatch):
     """Configure Azure OpenAI environment variables for agent tests.
-    
+
     Use this fixture when testing agent creation or AG-UI endpoints
     that require LLM configuration.
     """
@@ -310,14 +316,14 @@ def no_llm_env(monkeypatch):
 @pytest.fixture
 def agui_app(azure_openai_env):
     """Create a FastAPI app with AG-UI endpoint configured.
-    
+
     Use this fixture to test AG-UI endpoint behavior without
     starting the full application.
     """
     from fastapi import FastAPI
 
     from api.agents import setup_agui_endpoint
-    
+
     app = FastAPI()
     setup_agui_endpoint(app)
     return app

@@ -134,9 +134,7 @@ class ChannelService:
             return set()
 
         result = await self.session.execute(
-            select(Video.youtube_video_id).where(
-                Video.youtube_video_id.in_(youtube_video_ids)
-            )
+            select(Video.youtube_video_id).where(Video.youtube_video_id.in_(youtube_video_ids))
         )
         return {row[0] for row in result.fetchall()}
 
@@ -185,7 +183,5 @@ class ChannelService:
         Returns:
             Channel model or None.
         """
-        result = await self.session.execute(
-            select(Channel).where(Channel.channel_id == channel_id)
-        )
+        result = await self.session.execute(select(Channel).where(Channel.channel_id == channel_id))
         return result.scalar_one_or_none()

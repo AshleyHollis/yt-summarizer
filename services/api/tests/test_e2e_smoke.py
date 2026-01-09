@@ -6,7 +6,7 @@ These tests verify critical user flows work correctly. They run in two modes:
    - Fast, no external dependencies required
    - Validates API contracts and routing
    - Marked with @pytest.mark.integration
-   
+
 2. **Live mode**: Uses httpx against a running API
    - Set E2E_TESTS_ENABLED=true and API_BASE_URL=<url>
    - Tests full stack integration
@@ -16,10 +16,10 @@ These tests verify critical user flows work correctly. They run in two modes:
 Usage:
     # Run all tests (unit + integration, excluding live)
     pytest
-    
+
     # Run including live E2E tests (requires running API)
     E2E_TESTS_ENABLED=true pytest -m ""
-    
+
     # Run only live tests
     E2E_TESTS_ENABLED=true pytest -m "live"
 """
@@ -314,7 +314,7 @@ class TestLiveE2EVideoFlow:
             json={"url": test_video_url},
             headers=e2e_headers,
         )
-        
+
         if response.status_code in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
             data = response.json()
             assert "video_id" in data
@@ -328,18 +328,20 @@ class TestLiveE2EVideoFlow:
             json={"url": test_video_url},
             headers=e2e_headers,
         )
-        
+
         if submit_response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
-            pytest.fail(f"Could not submit video: {submit_response.status_code} - {submit_response.text[:500]}")
-        
+            pytest.fail(
+                f"Could not submit video: {submit_response.status_code} - {submit_response.text[:500]}"
+            )
+
         video_id = submit_response.json()["video_id"]
-        
+
         # Retrieve video
         get_response = live_client.get(
             f"/api/v1/videos/{video_id}",
             headers=e2e_headers,
         )
-        
+
         assert get_response.status_code == status.HTTP_200_OK
         data = get_response.json()
         assert data["video_id"] == video_id
@@ -352,18 +354,20 @@ class TestLiveE2EVideoFlow:
             json={"url": test_video_url},
             headers=e2e_headers,
         )
-        
+
         if submit_response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
-            pytest.fail(f"Could not submit video: {submit_response.status_code} - {submit_response.text[:500]}")
-        
+            pytest.fail(
+                f"Could not submit video: {submit_response.status_code} - {submit_response.text[:500]}"
+            )
+
         video_id = submit_response.json()["video_id"]
-        
+
         # Check for jobs
         jobs_response = live_client.get(
             f"/api/v1/jobs?video_id={video_id}",
             headers=e2e_headers,
         )
-        
+
         if jobs_response.status_code == status.HTTP_200_OK:
             data = jobs_response.json()
             # Should have at least one job (transcription)
@@ -371,7 +375,7 @@ class TestLiveE2EVideoFlow:
 
 
 @pytest.mark.live
-@pytest.mark.skipif(not E2E_ENABLED, reason="Live E2E tests disabled. Set E2E_TESTS_ENABLED=true")  
+@pytest.mark.skipif(not E2E_ENABLED, reason="Live E2E tests disabled. Set E2E_TESTS_ENABLED=true")
 class TestLiveE2EJobProgress:
     """Live E2E tests for job progress tracking."""
 
@@ -388,18 +392,20 @@ class TestLiveE2EJobProgress:
             json={"url": test_video_url},
             headers=e2e_headers,
         )
-        
+
         if submit_response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
-            pytest.fail(f"Could not submit video: {submit_response.status_code} - {submit_response.text[:500]}")
-        
+            pytest.fail(
+                f"Could not submit video: {submit_response.status_code} - {submit_response.text[:500]}"
+            )
+
         video_id = submit_response.json()["video_id"]
-        
+
         # Check progress
         progress_response = live_client.get(
             f"/api/v1/jobs/video/{video_id}/progress",
             headers=e2e_headers,
         )
-        
+
         if progress_response.status_code == status.HTTP_200_OK:
             data = progress_response.json()
             assert "video_id" in data
@@ -411,7 +417,7 @@ class TestLiveE2EJobProgress:
 @pytest.mark.skipif(not E2E_ENABLED, reason="Live E2E tests disabled. Set E2E_TESTS_ENABLED=true")
 class TestLiveE2EErrorHandling:
     """Live E2E tests for error handling.
-    
+
     Note: These tests validate proper error responses. If the API returns
     500 errors instead of expected 4xx errors, it indicates that error
     handling or database connectivity issues need to be addressed.
@@ -429,7 +435,7 @@ class TestLiveE2EErrorHandling:
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ], f"Expected 422 or 500, got {response.status_code}"
-        
+
         # Log the response for debugging if 500
         if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
             pytest.fail(f"API returned 500 - database may not be configured: {response.text[:200]}")
@@ -446,7 +452,7 @@ class TestLiveE2EErrorHandling:
             status.HTTP_404_NOT_FOUND,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ], f"Expected 404 or 500, got {response.status_code}"
-        
+
         if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
             pytest.fail(f"API returned 500 - database may not be configured: {response.text[:200]}")
 
@@ -462,7 +468,7 @@ class TestLiveE2EErrorHandling:
             status.HTTP_404_NOT_FOUND,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ], f"Expected 404 or 500, got {response.status_code}"
-        
+
         if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
             pytest.fail(f"API returned 500 - database may not be configured: {response.text[:200]}")
 
@@ -473,6 +479,6 @@ class TestLiveE2EErrorHandling:
             f"/api/v1/videos/{fake_id}",
             headers=e2e_headers,
         )
-        
+
         # Correlation ID should be in headers
         assert "x-correlation-id" in response.headers

@@ -35,9 +35,7 @@ async def update_job_status(
     """
     db = get_db()
     async with db.session() as session:
-        result = await session.execute(
-            select(Job).where(Job.job_id == UUID(job_id))
-        )
+        result = await session.execute(select(Job).where(Job.job_id == UUID(job_id)))
         job = result.scalar_one_or_none()
 
         if not job:
@@ -73,10 +71,10 @@ async def update_job_status(
         if job.batch_id and old_status != status:
             # Determine the batch item status based on job type and new status
             # - "running": when first job starts running
-            # - "succeeded": only when final job (build_relationships) succeeds  
+            # - "succeeded": only when final job (build_relationships) succeeds
             # - "failed": when any job fails
             batch_item_status = None
-            
+
             if status == "running" and old_status == "pending":
                 # First job starting - mark as running
                 batch_item_status = "running"
@@ -86,9 +84,9 @@ async def update_job_status(
             elif status == "succeeded" and job_type == "build_relationships":
                 # Final job succeeded - mark as succeeded
                 batch_item_status = "succeeded"
-            # For intermediate job successes (transcribe, summarize, embed), 
+            # For intermediate job successes (transcribe, summarize, embed),
             # don't update batch item status - it stays "running"
-            
+
             if batch_item_status:
                 await _update_batch_item_status(
                     session, job.batch_id, job.video_id, batch_item_status, error_message
@@ -158,25 +156,19 @@ async def _update_batch_item_status(
 
     # Also update video error message if failed
     if new_status == "failed" and error_message:
-        video_result = await session.execute(
-            select(Video).where(Video.video_id == video_id)
-        )
+        video_result = await session.execute(select(Video).where(Video.video_id == video_id))
         video = video_result.scalar_one_or_none()
         if video:
             video.error_message = error_message
             video.processing_status = "failed"
     elif new_status == "succeeded":
-        video_result = await session.execute(
-            select(Video).where(Video.video_id == video_id)
-        )
+        video_result = await session.execute(select(Video).where(Video.video_id == video_id))
         video = video_result.scalar_one_or_none()
         if video:
             video.processing_status = "completed"
 
     # Update batch counts
-    batch_result = await session.execute(
-        select(Batch).where(Batch.batch_id == batch_id)
-    )
+    batch_result = await session.execute(select(Batch).where(Batch.batch_id == batch_id))
     batch = batch_result.scalar_one_or_none()
 
     if not batch:
@@ -243,7 +235,7 @@ async def mark_job_completed(job_id: str) -> None:
         job_id: The job ID to update.
     """
     await update_job_status(job_id, status="succeeded", stage="completed", progress=100)
-    
+
     # Record in job history for ETA calculations
     await _record_job_history(job_id, success=True)
 
@@ -260,7 +252,7 @@ async def mark_job_failed(job_id: str, error_message: str) -> None:
 
 async def mark_job_rate_limited(job_id: str, video_id: str, retry_delay_seconds: int) -> None:
     """Mark a job as rate limited.
-    
+
     Updates the job stage to 'rate_limited' and also updates the
     video's processing_status so the UI can display the rate limit state.
 
@@ -271,13 +263,11 @@ async def mark_job_rate_limited(job_id: str, video_id: str, retry_delay_seconds:
     """
     # Calculate next retry time
     next_retry_at = datetime.utcnow() + timedelta(seconds=retry_delay_seconds)
-    
+
     # Update job stage and next_retry_at
     db = get_db()
     async with db.session() as session:
-        result = await session.execute(
-            select(Job).where(Job.job_id == UUID(job_id))
-        )
+        result = await session.execute(select(Job).where(Job.job_id == UUID(job_id)))
         job = result.scalar_one_or_none()
         if job:
             job.stage = "rate_limited"
@@ -293,12 +283,10 @@ async def mark_job_rate_limited(job_id: str, video_id: str, retry_delay_seconds:
             )
         else:
             logger.warning("Job not found for rate limited update", job_id=job_id)
-    
+
     # Also update video processing_status directly so UI shows it
     async with db.session() as session:
-        result = await session.execute(
-            select(Video).where(Video.video_id == UUID(video_id))
-        )
+        result = await session.execute(select(Video).where(Video.video_id == UUID(video_id)))
         video = result.scalar_one_or_none()
         if video:
             video.processing_status = "rate_limited"
@@ -319,9 +307,7 @@ async def _record_job_history(job_id: str, success: bool) -> None:
     db = get_db()
     async with db.session() as session:
         # Get the job details
-        result = await session.execute(
-            select(Job).where(Job.job_id == UUID(job_id))
-        )
+        result = await session.execute(select(Job).where(Job.job_id == UUID(job_id)))
         job = result.scalar_one_or_none()
 
         if not job:
@@ -338,9 +324,7 @@ async def _record_job_history(job_id: str, success: bool) -> None:
             return
 
         # Get the video duration if available
-        video_result = await session.execute(
-            select(Video).where(Video.video_id == job.video_id)
-        )
+        video_result = await session.execute(select(Video).where(Video.video_id == job.video_id))
         video = video_result.scalar_one_or_none()
         video_duration = video.duration if video else None
 

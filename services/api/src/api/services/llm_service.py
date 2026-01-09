@@ -27,7 +27,7 @@ try:
 except ImportError:
     import logging
     import os
-    
+
     def get_settings():
         class MockOpenAI:
             api_key = os.environ.get("OPENAI_API_KEY", "")
@@ -36,28 +36,43 @@ except ImportError:
             temperature = 0.3
             azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
             azure_api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
-        
+
         class MockSettings:
             openai = MockOpenAI()
-        
+
         return MockSettings()
-    
+
     def get_logger(name):
         return logging.getLogger(name)
-    
+
     def get_tracer(name):
         class NoOpSpan:
-            def __enter__(self): return self
-            def __exit__(self, *args): pass
-            def set_attribute(self, k, v): pass
-            def add_event(self, name, attributes=None): pass
-            def record_exception(self, e, attributes=None): pass
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+            def set_attribute(self, k, v):
+                pass
+
+            def add_event(self, name, attributes=None):
+                pass
+
+            def record_exception(self, e, attributes=None):
+                pass
+
         class NoOpTracer:
-            def start_as_current_span(self, name, **kwargs): return NoOpSpan()
+            def start_as_current_span(self, name, **kwargs):
+                return NoOpSpan()
+
         return NoOpTracer()
-    
-    def add_span_event(span, name, attributes=None): pass
-    def record_exception_on_span(span, e, attributes=None): pass
+
+    def add_span_event(span, name, attributes=None):
+        pass
+
+    def record_exception_on_span(span, e, attributes=None):
+        pass
 
 
 logger = get_logger(__name__)
@@ -74,20 +89,20 @@ JITTER_FACTOR = 0.1  # ±10% jitter (small since we're using real Retry-After va
 
 class AdaptiveRateLimiter:
     """Adaptive rate limiter that learns from API responses.
-    
+
     Uses rate limit headers from the API to intelligently throttle requests:
     - x-ratelimit-remaining-requests: requests left in window
-    - x-ratelimit-remaining-tokens: tokens left in window  
+    - x-ratelimit-remaining-tokens: tokens left in window
     - x-ratelimit-reset-requests: when request quota resets
     - retry-after: exact seconds to wait after 429
     """
-    
+
     def __init__(self):
         self._lock = asyncio.Lock()
         self._next_request_time: float = 0  # Timestamp when next request is allowed
         self._requests_remaining: int | None = None
         self._reset_time: float | None = None
-    
+
     async def wait_if_needed(self) -> None:
         """Wait if we need to respect rate limits."""
         async with self._lock:
@@ -96,36 +111,36 @@ class AdaptiveRateLimiter:
                 wait_time = self._next_request_time - now
                 logger.debug(f"Rate limiter waiting {wait_time:.2f}s before next request")
                 await asyncio.sleep(wait_time)
-    
+
     def update_from_headers(self, headers: dict) -> None:
         """Update rate limit state from response headers."""
         # Parse remaining requests
-        remaining = headers.get('x-ratelimit-remaining-requests')
+        remaining = headers.get("x-ratelimit-remaining-requests")
         if remaining is not None:
             try:
                 self._requests_remaining = int(remaining)
             except ValueError:
                 pass
-        
+
         # Parse reset time (could be seconds or timestamp)
-        reset = headers.get('x-ratelimit-reset-requests')
+        reset = headers.get("x-ratelimit-reset-requests")
         if reset is not None:
             try:
                 # Azure uses relative seconds like "0.5s" or "1m0s"
-                if reset.endswith('s') and 'm' not in reset:
+                if reset.endswith("s") and "m" not in reset:
                     self._reset_time = time.monotonic() + float(reset[:-1])
-                elif 'm' in reset:
+                elif "m" in reset:
                     # Parse "1m30s" format
-                    parts = reset.replace('m', ' ').replace('s', '').split()
+                    parts = reset.replace("m", " ").replace("s", "").split()
                     seconds = int(parts[0]) * 60 + (int(parts[1]) if len(parts) > 1 else 0)
                     self._reset_time = time.monotonic() + seconds
             except (ValueError, IndexError):
                 pass
-    
+
     def update_from_error(self, error: RateLimitError) -> float:
         """Extract wait time from rate limit error. Returns seconds to wait."""
         # OpenAI/Azure includes retry_after in the exception
-        retry_after = getattr(error, 'retry_after', None)
+        retry_after = getattr(error, "retry_after", None)
         if retry_after is not None:
             try:
                 wait_time = float(retry_after)
@@ -134,12 +149,12 @@ class AdaptiveRateLimiter:
                 return wait_time
             except (ValueError, TypeError):
                 pass
-        
+
         # Try to parse from response headers in the error
-        response = getattr(error, 'response', None)
+        response = getattr(error, "response", None)
         if response is not None:
-            headers = getattr(response, 'headers', {})
-            retry_header = headers.get('retry-after') or headers.get('Retry-After')
+            headers = getattr(response, "headers", {})
+            retry_header = headers.get("retry-after") or headers.get("Retry-After")
             if retry_header:
                 try:
                     wait_time = float(retry_header)
@@ -148,13 +163,14 @@ class AdaptiveRateLimiter:
                     return wait_time
                 except ValueError:
                     pass
-        
+
         # Try to extract from error message (Azure often puts it in the message)
         message = str(error)
-        if 'retry after' in message.lower():
+        if "retry after" in message.lower():
             import re
+
             # Look for patterns like "retry after 10 seconds" or "retry after 10.5s"
-            match = re.search(r'retry after (\d+\.?\d*)\s*(?:seconds?|s)?', message.lower())
+            match = re.search(r"retry after (\d+\.?\d*)\s*(?:seconds?|s)?", message.lower())
             if match:
                 try:
                     wait_time = float(match.group(1))
@@ -163,7 +179,7 @@ class AdaptiveRateLimiter:
                     return wait_time
                 except ValueError:
                     pass
-        
+
         # Fallback - no retry info available
         return 0
 
@@ -195,27 +211,27 @@ async def retry_with_backoff(
     **kwargs,
 ):
     """Execute an async function with smart retry on rate limits.
-    
+
     Uses the Retry-After header from 429 responses to know exactly when
     to retry, rather than guessing with exponential backoff.
-    
+
     Args:
         func: Async function to call
         max_retries: Maximum number of retry attempts
         initial_backoff: Fallback wait time if no Retry-After header
         max_backoff: Maximum wait time in seconds
         *args, **kwargs: Arguments to pass to the function
-        
+
     Returns:
         Result of the function call
-        
+
     Raises:
         The last exception if all retries fail
     """
     rate_limiter = _get_rate_limiter()
     fallback_backoff = initial_backoff
     last_exception = None
-    
+
     for attempt in range(max_retries + 1):
         try:
             # Check if rate limiter says we should wait
@@ -226,16 +242,16 @@ async def retry_with_backoff(
             if attempt < max_retries:
                 # Get wait time from the error (Retry-After header)
                 wait_time = rate_limiter.update_from_error(e)
-                
+
                 # Fallback to exponential backoff if no Retry-After
                 if wait_time == 0:
                     wait_time = fallback_backoff
                     fallback_backoff = min(fallback_backoff * 2, max_backoff)
-                
+
                 # Cap and add small jitter
                 wait_time = min(wait_time, max_backoff)
                 wait_time = _add_jitter(wait_time)
-                
+
                 logger.warning(
                     f"Rate limited, waiting {wait_time:.1f}s (from {'API' if wait_time > 1 else 'fallback'})",
                     attempt=attempt + 1,
@@ -260,7 +276,7 @@ async def retry_with_backoff(
             else:
                 logger.error(f"API connection failed after {max_retries} retries")
                 raise
-    
+
     raise last_exception
 
 
@@ -311,23 +327,23 @@ You can only search and analyze content that has already been ingested into the 
 
 def _build_azure_openai_base_url(endpoint: str) -> str:
     """Build the correct base URL for Azure OpenAI or Azure AI Foundry endpoints.
-    
+
     Azure AI Foundry endpoints (services.ai.azure.com):
         Input:  https://<resource>.services.ai.azure.com/api/projects/<project>
         Output: https://<resource>.services.ai.azure.com/openai
-        
+
     Standard Azure OpenAI endpoints (openai.azure.com):
         Input:  https://<resource>.openai.azure.com
         Output: https://<resource>.openai.azure.com (unchanged)
-    
+
     Args:
         endpoint: The Azure endpoint URL
-        
+
     Returns:
         The correctly formatted base URL for OpenAI client.
     """
-    endpoint = endpoint.rstrip('/')
-    
+    endpoint = endpoint.rstrip("/")
+
     # Check if this is an Azure AI Foundry endpoint
     if "services.ai.azure.com" in endpoint:
         # Azure AI Foundry - strip off any /api/projects/<project> suffix
@@ -337,29 +353,29 @@ def _build_azure_openai_base_url(endpoint: str) -> str:
             return f"{base}/openai"
         else:
             return f"{endpoint}/openai"
-    
+
     # Standard Azure OpenAI endpoint - return as-is
     return endpoint
 
 
 class LLMService:
     """Service for LLM chat completions."""
-    
+
     def __init__(self):
         """Initialize the LLM service."""
         self.settings = get_settings()
         self._client: AsyncOpenAI | AsyncAzureOpenAI | None = None
-    
+
     @property
     def client(self) -> AsyncOpenAI | AsyncAzureOpenAI:
         """Get or create the OpenAI client."""
         if self._client is None:
             openai_settings = self.settings.openai
-            
+
             # Check for Azure OpenAI configuration
             if openai_settings.is_azure_configured:
                 base_url = openai_settings.azure_openai_base_url
-                
+
                 # Azure AI Foundry uses OpenAI-compatible API with /models endpoint
                 if openai_settings.is_azure_ai_foundry:
                     logger.info(
@@ -391,20 +407,20 @@ class LLMService:
                 self._client = AsyncOpenAI(
                     api_key=openai_settings.effective_api_key,
                 )
-        
+
         return self._client
-    
+
     async def get_embedding(self, text: str) -> list[float]:
         """Get embedding vector for text.
-        
+
         Args:
             text: The text to embed.
-            
+
         Returns:
             Embedding vector (1536 dimensions for text-embedding-3-small).
         """
         model = self.settings.openai.effective_embedding_model
-        
+
         with _tracer.start_as_current_span(
             "gen_ai.embeddings",
             attributes={
@@ -417,44 +433,50 @@ class LLMService:
         ) as span:
             try:
                 start_time = time.monotonic()
-                
+
                 # Use retry with backoff for rate limiting
                 response = await retry_with_backoff(
                     self.client.embeddings.create,
                     model=model,
                     input=text,
                 )
-                
+
                 elapsed_ms = (time.monotonic() - start_time) * 1000
-                
+
                 # Record Gen AI response attributes
                 span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
-                span.set_attribute("gen_ai.usage.input_tokens", getattr(response.usage, "prompt_tokens", 0))
-                span.set_attribute("gen_ai.usage.total_tokens", getattr(response.usage, "total_tokens", 0))
-                span.set_attribute("gen_ai.response.embedding_dimensions", len(response.data[0].embedding))
+                span.set_attribute(
+                    "gen_ai.usage.input_tokens", getattr(response.usage, "prompt_tokens", 0)
+                )
+                span.set_attribute(
+                    "gen_ai.usage.total_tokens", getattr(response.usage, "total_tokens", 0)
+                )
+                span.set_attribute(
+                    "gen_ai.response.embedding_dimensions", len(response.data[0].embedding)
+                )
                 span.set_attribute("duration_ms", elapsed_ms)
-                
+
                 return response.data[0].embedding
             except Exception as e:
                 record_exception_on_span(span, e)
                 logger.error(f"Failed to get embedding: {e}")
                 raise
-    
+
     async def expand_query(self, query: str) -> list[str]:
         """Expand a query with semantically related search terms.
-        
+
         Uses LLM to generate alternative phrasings and related concepts
         that might appear in video transcripts. This helps surface content
         that uses different vocabulary than the user's query.
-        
+
         Args:
             query: The user's original question.
-            
+
         Returns:
             List of expanded query strings (including the original).
         """
         model = self.settings.openai.effective_model
-        
+
         with _tracer.start_as_current_span(
             "gen_ai.chat",
             attributes={
@@ -482,31 +504,38 @@ Return ONLY the JSON array, no other text."""
 
             try:
                 start_time = time.monotonic()
-                
+
                 response = await retry_with_backoff(
                     self.client.chat.completions.create,
                     model=model,
-                    messages=[
-                        {"role": "user", "content": expansion_prompt.format(query=query)}
-                    ],
+                    messages=[{"role": "user", "content": expansion_prompt.format(query=query)}],
                     max_tokens=150,
                     temperature=0.3,
                 )
-                
+
                 elapsed_ms = (time.monotonic() - start_time) * 1000
-                
+
                 # Record Gen AI response attributes
                 usage = getattr(response, "usage", None)
                 if usage:
-                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
-                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
-                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                    span.set_attribute(
+                        "gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0)
+                    )
                 span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
-                span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason if response.choices else "unknown")
+                span.set_attribute(
+                    "gen_ai.response.finish_reason",
+                    response.choices[0].finish_reason if response.choices else "unknown",
+                )
                 span.set_attribute("duration_ms", elapsed_ms)
-                
+
                 content = response.choices[0].message.content.strip()
-                
+
                 # Parse JSON array
                 # Handle potential markdown code blocks
                 if content.startswith("```"):
@@ -514,25 +543,25 @@ Return ONLY the JSON array, no other text."""
                     if content.startswith("json"):
                         content = content[4:]
                     content = content.strip()
-                
+
                 expanded_queries = json.loads(content)
-                
+
                 if isinstance(expanded_queries, list):
                     # Return original query plus expansions
                     result = [query] + [str(q) for q in expanded_queries[:3]]
                     span.set_attribute("output.expanded_query_count", len(result))
                     logger.debug(f"Query expanded: {query!r} → {result}")
                     return result
-                    
+
             except Exception as e:
                 add_span_event(span, "query_expansion_failed", {"error": str(e)})
                 logger.warning(f"Query expansion failed, using original: {e}")
-            
+
             # Fallback to original query only
             span.set_attribute("output.expanded_query_count", 1)
             span.set_attribute("output.fallback", True)
             return [query]
-    
+
     async def generate_answer(
         self,
         query: str,
@@ -542,21 +571,21 @@ Return ONLY the JSON array, no other text."""
         use_llm_knowledge: bool = True,
     ) -> dict[str, Any]:
         """Generate an answer based on the query and evidence.
-        
+
         Args:
             query: The user's question.
             evidence: List of evidence segments with text, video info, timestamps.
             video_context: Optional list of relevant videos with summaries.
             conversation_history: Optional previous messages in the conversation.
             use_llm_knowledge: Whether to allow supplementing with AI's general knowledge.
-            
+
         Returns:
             Dict with answer, citations, follow-ups, and uncertainty.
         """
         model = self.settings.openai.effective_model
         max_tokens = self.settings.openai.max_tokens
         temperature = self.settings.openai.temperature
-        
+
         with _tracer.start_as_current_span(
             "gen_ai.chat",
             attributes={
@@ -574,16 +603,16 @@ Return ONLY the JSON array, no other text."""
             # Build context from evidence
             evidence_text = self._format_evidence(evidence)
             video_context_text = self._format_video_context(video_context) if video_context else ""
-            
+
             # Build messages
             messages = [
                 {"role": "system", "content": COPILOT_SYSTEM_PROMPT},
             ]
-            
+
             # Add conversation history if provided
             if conversation_history:
                 messages.extend(conversation_history[-6:])  # Keep last 3 exchanges
-            
+
             # Build instructions based on whether AI knowledge is allowed
             if use_llm_knowledge:
                 instructions = """INSTRUCTIONS:
@@ -670,22 +699,22 @@ BAD follow-ups:
 - "Would you like more details on this topic?"
 - "Do you want to know about the gun buyback or hate speech measures?"
 - "Should I explain more about Minns's announcement?\""""
-            
+
             messages.append({"role": "user", "content": user_message})
-            
+
             # Record message count for tracing
             span.set_attribute("gen_ai.request.message_count", len(messages))
-            
+
             try:
                 start_time = time.monotonic()
-                
+
                 # Build kwargs for chat completion
                 completion_kwargs = {
                     "model": model,
                     "messages": messages,
                     "response_format": {"type": "json_object"},
                 }
-                
+
                 # Use max_completion_tokens for newer models (gpt-4o, gpt-5, o1, DeepSeek, etc.)
                 # Use max_tokens for older models (gpt-3.5, gpt-4)
                 # Some models don't support temperature parameter
@@ -699,33 +728,41 @@ BAD follow-ups:
                 else:
                     completion_kwargs["max_tokens"] = max_tokens
                     completion_kwargs["temperature"] = temperature
-                
+
                 # Use retry with backoff for rate limiting
                 response = await retry_with_backoff(
-                    self.client.chat.completions.create,
-                    **completion_kwargs
+                    self.client.chat.completions.create, **completion_kwargs
                 )
-                
+
                 elapsed_ms = (time.monotonic() - start_time) * 1000
-                
+
                 # Record Gen AI response attributes
                 usage = getattr(response, "usage", None)
                 if usage:
-                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
-                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
-                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                    span.set_attribute(
+                        "gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0)
+                    )
                 span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
-                span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason if response.choices else "unknown")
+                span.set_attribute(
+                    "gen_ai.response.finish_reason",
+                    response.choices[0].finish_reason if response.choices else "unknown",
+                )
                 span.set_attribute("duration_ms", elapsed_ms)
-                
+
                 content = response.choices[0].message.content
                 result = json.loads(content)
-                
+
                 # Handle LLM returning literal "null" string instead of JSON null
                 uncertainty_value = result.get("uncertainty")
                 if uncertainty_value == "null" or uncertainty_value == "":
                     uncertainty_value = None
-                
+
                 # Record response quality metrics
                 confidence = result.get("confidence", "low")
                 span.set_attribute("output.confidence", confidence)
@@ -733,7 +770,7 @@ BAD follow-ups:
                 span.set_attribute("output.follow_up_count", len(result.get("follow_ups", [])))
                 span.set_attribute("output.has_uncertainty", uncertainty_value is not None)
                 span.set_attribute("output.answer_length", len(result.get("answer", "")))
-                
+
                 return {
                     "answer": result.get("answer", "I couldn't generate an answer."),
                     "confidence": confidence,
@@ -747,7 +784,9 @@ BAD follow-ups:
                 logger.warning(f"Failed to parse LLM response as JSON: {e}")
                 # Return the raw content as answer
                 return {
-                    "answer": response.choices[0].message.content if response else "Failed to generate answer",
+                    "answer": response.choices[0].message.content
+                    if response
+                    else "Failed to generate answer",
                     "confidence": "low",
                     "cited_videos": [],
                     "follow_ups": [],
@@ -758,7 +797,7 @@ BAD follow-ups:
                 record_exception_on_span(span, e)
                 logger.error(f"Failed to generate answer: {e}")
                 raise
-    
+
     async def generate_follow_ups(
         self,
         query: str,
@@ -766,17 +805,17 @@ BAD follow-ups:
         available_topics: list[str] | None = None,
     ) -> list[str]:
         """Generate follow-up question suggestions.
-        
+
         Args:
             query: The original query.
             answer: The answer that was provided.
             available_topics: Topics available in the current scope.
-            
+
         Returns:
             List of suggested follow-up questions.
         """
         model = self.settings.openai.model
-        
+
         with _tracer.start_as_current_span(
             "gen_ai.chat",
             attributes={
@@ -791,8 +830,10 @@ BAD follow-ups:
         ) as span:
             topics_context = ""
             if available_topics:
-                topics_context = f"\nAvailable topics in the library: {', '.join(available_topics[:20])}"
-            
+                topics_context = (
+                    f"\nAvailable topics in the library: {', '.join(available_topics[:20])}"
+                )
+
             prompt = f"""Given this Q&A exchange, suggest 3 natural follow-up questions.
 
 IMPORTANT: Write questions from the USER'S perspective (first person), as if they are asking the question themselves.
@@ -805,38 +846,47 @@ Answer: {answer}
 
 Return a JSON array of 3 follow-up questions (first-person, user perspective):
 ["How do I...", "What should I...", "Can I..."]"""
-            
+
             try:
                 start_time = time.monotonic()
-                
+
                 # Use retry with backoff for rate limiting
                 response = await retry_with_backoff(
                     self.client.chat.completions.create,
                     model=model,
                     messages=[
-                        {"role": "system", "content": "You suggest helpful follow-up questions written from the user's perspective (first person, e.g. 'How do I...' not 'How to...')."},
+                        {
+                            "role": "system",
+                            "content": "You suggest helpful follow-up questions written from the user's perspective (first person, e.g. 'How do I...' not 'How to...').",
+                        },
                         {"role": "user", "content": prompt},
                     ],
                     max_tokens=256,
                     temperature=0.7,
                     response_format={"type": "json_object"},
                 )
-                
+
                 elapsed_ms = (time.monotonic() - start_time) * 1000
-                
+
                 # Record Gen AI response attributes
                 usage = getattr(response, "usage", None)
                 if usage:
-                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
-                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
-                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                    span.set_attribute(
+                        "gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0)
+                    )
                 span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
                 span.set_attribute("duration_ms", elapsed_ms)
-                
+
                 content = response.choices[0].message.content
                 # Parse JSON - might be wrapped in an object
                 parsed = json.loads(content)
-                
+
                 if isinstance(parsed, list):
                     span.set_attribute("output.follow_up_count", len(parsed[:3]))
                     return parsed[:3]
@@ -846,28 +896,28 @@ Return a JSON array of 3 follow-up questions (first-person, user perspective):
                         if isinstance(value, list):
                             span.set_attribute("output.follow_up_count", len(value[:3]))
                             return value[:3]
-                
+
                 span.set_attribute("output.follow_up_count", 0)
                 return []
             except Exception as e:
                 add_span_event(span, "follow_up_generation_failed", {"error": str(e)})
                 logger.warning(f"Failed to generate follow-ups: {e}")
                 return []
-    
+
     async def generate_answer_without_evidence(
         self,
         query: str,
         allow_general_knowledge: bool = True,
     ) -> dict[str, Any]:
         """Generate an answer using only LLM knowledge (no video library context).
-        
+
         Used when the user has disabled video library search but still wants
         the AI to answer using its general trained knowledge.
-        
+
         Args:
             query: The user's question.
             allow_general_knowledge: Whether to allow general knowledge in answers.
-            
+
         Returns:
             Dict with answer and follow-ups.
         """
@@ -876,11 +926,11 @@ Return a JSON array of 3 follow-up questions (first-person, user perspective):
                 "answer": "I cannot answer this question because AI knowledge is disabled. Please enable at least one knowledge source.",
                 "follow_ups": ["Enable 'AI Knowledge' to get answers"],
             }
-        
+
         model = self.settings.openai.effective_model
         max_tokens = self.settings.openai.max_tokens
         temperature = self.settings.openai.temperature
-        
+
         with _tracer.start_as_current_span(
             "gen_ai.chat",
             attributes={
@@ -905,10 +955,10 @@ Respond in JSON:
     "answer": "Your helpful answer based on general knowledge",
     "follow_ups": ["Suggested follow-up question 1", "Suggested follow-up question 2"]
 }"""
-            
+
             try:
                 start_time = time.monotonic()
-                
+
                 # Build completion kwargs based on model type
                 model_lower = model.lower()
                 completion_kwargs = {
@@ -918,7 +968,7 @@ Respond in JSON:
                         {"role": "user", "content": query},
                     ],
                 }
-                
+
                 # Use max_completion_tokens for newer models, max_tokens for older ones
                 if any(m in model_lower for m in ["gpt-5", "o1", "o3", "deepseek"]):
                     completion_kwargs["max_completion_tokens"] = max_tokens
@@ -928,38 +978,46 @@ Respond in JSON:
                 else:
                     completion_kwargs["max_tokens"] = max_tokens
                     completion_kwargs["temperature"] = temperature
-                
+
                 response = await retry_with_backoff(
-                    self.client.chat.completions.create,
-                    **completion_kwargs
+                    self.client.chat.completions.create, **completion_kwargs
                 )
-                
+
                 elapsed_ms = (time.monotonic() - start_time) * 1000
-                
+
                 # Record Gen AI response attributes
                 usage = getattr(response, "usage", None)
                 if usage:
-                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
-                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
-                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                    span.set_attribute(
+                        "gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0)
+                    )
                 span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
-                span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason if response.choices else "unknown")
+                span.set_attribute(
+                    "gen_ai.response.finish_reason",
+                    response.choices[0].finish_reason if response.choices else "unknown",
+                )
                 span.set_attribute("duration_ms", elapsed_ms)
-                
+
                 content = response.choices[0].message.content.strip()
-                
+
                 # Handle markdown code blocks
                 if content.startswith("```"):
                     content = content.split("```")[1]
                     if content.startswith("json"):
                         content = content[4:]
                     content = content.strip()
-                
+
                 result = json.loads(content)
                 span.set_attribute("output.answer_length", len(result.get("answer", "")))
                 span.set_attribute("output.follow_up_count", len(result.get("follow_ups", [])))
                 return result
-                
+
             except Exception as e:
                 record_exception_on_span(span, e)
                 logger.error(f"Failed to generate answer without evidence: {e}")
@@ -967,74 +1025,74 @@ Respond in JSON:
                     "answer": "I encountered an error while processing your question. Please try again.",
                     "follow_ups": ["Try rephrasing your question"],
                 }
-    
+
     def _format_evidence(self, evidence: list[dict[str, Any]]) -> str:
         """Format evidence segments for the LLM prompt.
-        
+
         Args:
             evidence: List of evidence dicts.
-            
+
         Returns:
             Formatted evidence text.
         """
         if not evidence:
             return "No relevant evidence found in the library."
-        
+
         formatted = []
         for i, ev in enumerate(evidence[:10], 1):  # Limit to 10 pieces of evidence
             video_title = ev.get("video_title", "Unknown Video")
             start_time = ev.get("start_time", 0)
             text = ev.get("text", ev.get("segment_text", ""))
-            
+
             # Format timestamp
             minutes = int(start_time // 60)
             seconds = int(start_time % 60)
             timestamp = f"{minutes}:{seconds:02d}"
-            
-            formatted.append(f"[{i}] {video_title} at {timestamp}:\n\"{text}\"")
-        
+
+            formatted.append(f'[{i}] {video_title} at {timestamp}:\n"{text}"')
+
         return "\n\n".join(formatted)
-    
+
     def _format_video_context(self, videos: list[dict[str, Any]]) -> str:
         """Format video context for the LLM prompt.
-        
+
         Args:
             videos: List of video dicts with summaries.
-            
+
         Returns:
             Formatted video context.
         """
         if not videos:
             return ""
-        
+
         formatted = []
         for video in videos[:5]:  # Limit to 5 videos
             title = video.get("title", "Unknown")
             summary = video.get("summary", "No summary available")
             formatted.append(f"- {title}: {summary[:500]}")
-        
+
         return "\n".join(formatted)
-    
+
     async def generate_structured_output(
         self,
         system_prompt: str,
         user_prompt: str,
     ) -> dict[str, Any]:
         """Generate a structured JSON output from the LLM.
-        
+
         Used for synthesis operations like learning paths and watch lists.
-        
+
         Args:
             system_prompt: The system prompt with instructions.
             user_prompt: The user's request.
-            
+
         Returns:
             Parsed JSON response from LLM.
         """
         model = self.settings.openai.effective_model
         max_tokens = self.settings.openai.max_tokens
         temperature = self.settings.openai.temperature
-        
+
         with _tracer.start_as_current_span(
             "gen_ai.chat",
             attributes={
@@ -1048,7 +1106,7 @@ Respond in JSON:
         ) as span:
             try:
                 start_time = time.monotonic()
-                
+
                 # Build completion kwargs based on model type
                 model_lower = model.lower()
                 completion_kwargs = {
@@ -1058,7 +1116,7 @@ Respond in JSON:
                         {"role": "user", "content": user_prompt},
                     ],
                 }
-                
+
                 # Use max_completion_tokens for newer models, max_tokens for older ones
                 if any(m in model_lower for m in ["gpt-5", "o1", "o3", "deepseek"]):
                     completion_kwargs["max_completion_tokens"] = max_tokens
@@ -1068,37 +1126,45 @@ Respond in JSON:
                 else:
                     completion_kwargs["max_tokens"] = max_tokens
                     completion_kwargs["temperature"] = temperature
-                
+
                 response = await retry_with_backoff(
-                    self.client.chat.completions.create,
-                    **completion_kwargs
+                    self.client.chat.completions.create, **completion_kwargs
                 )
-                
+
                 elapsed_ms = (time.monotonic() - start_time) * 1000
-                
+
                 # Record Gen AI response attributes
                 usage = getattr(response, "usage", None)
                 if usage:
-                    span.set_attribute("gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0))
-                    span.set_attribute("gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0))
-                    span.set_attribute("gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0))
+                    span.set_attribute(
+                        "gen_ai.usage.input_tokens", getattr(usage, "prompt_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.output_tokens", getattr(usage, "completion_tokens", 0)
+                    )
+                    span.set_attribute(
+                        "gen_ai.usage.total_tokens", getattr(usage, "total_tokens", 0)
+                    )
                 span.set_attribute("gen_ai.response.model", getattr(response, "model", model))
-                span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason if response.choices else "unknown")
+                span.set_attribute(
+                    "gen_ai.response.finish_reason",
+                    response.choices[0].finish_reason if response.choices else "unknown",
+                )
                 span.set_attribute("duration_ms", elapsed_ms)
-                
+
                 content = response.choices[0].message.content.strip()
-                
+
                 # Handle markdown code blocks
                 if content.startswith("```"):
                     content = content.split("```")[1]
                     if content.startswith("json"):
                         content = content[4:]
                     content = content.strip()
-                
+
                 result = json.loads(content)
                 span.set_attribute("output.item_count", len(result.get("items", [])))
                 return result
-                
+
             except json.JSONDecodeError as e:
                 add_span_event(span, "json_parse_failed", {"error": str(e)})
                 logger.warning(f"Failed to parse LLM structured output as JSON: {e}")
@@ -1121,7 +1187,7 @@ _llm_service: LLMService | None = None
 
 def get_llm_service() -> LLMService:
     """Get or create the LLM service singleton.
-    
+
     Returns:
         The LLM service instance.
     """

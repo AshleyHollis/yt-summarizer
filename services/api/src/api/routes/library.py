@@ -48,8 +48,12 @@ async def list_videos(
     from_date: date | None = Query(default=None, description="Filter by publish date (from)"),
     to_date: date | None = Query(default=None, description="Filter by publish date (to)"),
     facets: list[UUID] | None = Query(default=None, description="Filter by facet IDs"),
-    status: ProcessingStatusFilter | None = Query(default=None, description="Filter by processing status"),
-    search: str | None = Query(default=None, max_length=200, description="Search in title/description"),
+    status: ProcessingStatusFilter | None = Query(
+        default=None, description="Filter by processing status"
+    ),
+    search: str | None = Query(
+        default=None, max_length=200, description="Search in title/description"
+    ),
     sort_by: SortField = Query(default=SortField.PUBLISH_DATE, description="Sort field"),
     sort_order: SortOrder = Query(default=SortOrder.DESC, description="Sort order"),
     page: int = Query(default=1, ge=1, description="Page number"),

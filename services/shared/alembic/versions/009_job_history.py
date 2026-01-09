@@ -10,6 +10,7 @@ Revises: 008
 Create Date: 2026-01-05
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -92,7 +93,7 @@ def upgrade() -> None:
             server_default=sa.text("SYSUTCDATETIME()"),
         ),
     )
-    
+
     # Indexes for efficient querying
     op.create_index(
         "ix_jobhistory_job_type",

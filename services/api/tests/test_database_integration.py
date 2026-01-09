@@ -32,7 +32,7 @@ class TestDatabaseConnectionStartup:
         """Verify readiness endpoint includes database status checks."""
         response = client.get("/health/ready")
         data = response.json()
-        
+
         # The checks dict should include database-related keys
         checks = data.get("checks", {})
         assert "api" in checks
@@ -46,7 +46,7 @@ class TestDatabaseHealthCheck:
         """Verify debug endpoint exposes connection diagnostic info."""
         response = client.get("/health/debug")
         data = response.json()
-        
+
         assert "connection_strings" in data
         assert "database" in data
         assert "status" in data["database"]
@@ -55,7 +55,7 @@ class TestDatabaseHealthCheck:
         """Verify debug endpoint masks sensitive password data."""
         response = client.get("/health/debug")
         data = response.json()
-        
+
         # Any URL shown should be truncated/masked
         db_url = data.get("database", {}).get("url", "")
         if db_url:
@@ -70,49 +70,51 @@ class TestDatabaseRetryLogic:
     async def test_database_connect_has_retry(self):
         """Verify DatabaseConnection.connect() uses retry logic."""
         from shared.db.connection import DatabaseConnection
-        
+
         # Create a connection with invalid URL to trigger retries
-        db = DatabaseConnection(url="mssql+aioodbc://invalid:invalid@localhost:9999/invalid?driver=ODBC+Driver+18+for+SQL+Server")
-        
+        db = DatabaseConnection(
+            url="mssql+aioodbc://invalid:invalid@localhost:9999/invalid?driver=ODBC+Driver+18+for+SQL+Server"
+        )
+
         # The connect method should use tenacity retry decorator
         # Verify it has the retry attribute
         assert hasattr(db.connect, "retry")
 
-    @pytest.mark.asyncio  
+    @pytest.mark.asyncio
     async def test_startup_retries_on_failure(self, monkeypatch):
         """Verify startup retries database connection on failure."""
         # Set low retry count for faster test
         monkeypatch.setenv("DB_STARTUP_RETRIES", "2")
         monkeypatch.setenv("DB_STARTUP_RETRY_DELAY", "0")
-        
+
         # Track retry attempts
         attempts = []
-        
+
         class MockDB:
             async def connect(self):
                 attempts.append(1)
                 if len(attempts) < 2:
                     raise ConnectionError("Database not ready")
-            
+
             async def create_tables(self):
                 pass
-            
+
             async def close(self):
                 pass
-        
+
         mock_db = MockDB()
-        
+
         # Import after setting env vars
         with patch("api.main.get_db", return_value=mock_db):
             from fastapi import FastAPI
 
             from api.main import lifespan
-            
+
             app = FastAPI()
-            
+
             async with lifespan(app):
                 pass
-            
+
             # Should have attempted twice (first failure + retry success)
             assert len(attempts) >= 1
 
@@ -124,7 +126,7 @@ class TestDatabaseTableCreation:
         """Verify debug endpoint reports table creation status."""
         response = client.get("/health/debug")
         data = response.json()
-        
+
         # The database section should indicate table creation status
         db_info = data.get("database", {})
         # tables_created may be True/False or not present (if connection failed)
@@ -143,21 +145,21 @@ class TestReadinessWithDatabase:
         from fastapi.testclient import TestClient
 
         from api.routes import health
-        
+
         @asynccontextmanager
         async def mock_lifespan(app: FastAPI):
             # Simulate failed database initialization
             app.state.db_initialized = False
             app.state.db_error = "Connection refused"
             yield
-        
+
         app = FastAPI(lifespan=mock_lifespan)
         app.include_router(health.router)
-        
+
         with TestClient(app) as client:
             response = client.get("/health/ready")
             data = response.json()
-            
+
             # Should report not ready
             assert data["ready"] is False
             assert data["checks"]["database_init"] is False
@@ -171,26 +173,26 @@ class TestReadinessWithDatabase:
         from fastapi.testclient import TestClient
 
         from api.routes import health
-        
+
         @asynccontextmanager
         async def mock_lifespan(app: FastAPI):
             # Simulate successful database initialization
             app.state.db_initialized = True
             app.state.db_error = None
             yield
-        
+
         app = FastAPI(lifespan=mock_lifespan)
         app.include_router(health.router)
-        
+
         # Mock the database connection check in readiness
         mock_db = MagicMock()
         mock_db.connect = AsyncMock()
-        
+
         with patch("shared.db.connection.get_db", return_value=mock_db):
             with TestClient(app) as client:
                 response = client.get("/health/ready")
                 data = response.json()
-                
+
                 # Should report ready
                 assert data["ready"] is True
                 assert data["checks"]["database_init"] is True
@@ -201,13 +203,14 @@ class TestReadinessWithDatabase:
 # Live Integration Tests (require actual database)
 # =============================================================================
 
+
 @pytest.mark.skipif(
     not os.environ.get("DATABASE_URL") and not os.environ.get("ConnectionStrings__ytsummarizer"),
-    reason="No database connection string available"
+    reason="No database connection string available",
 )
 class TestLiveDatabaseIntegration:
     """Live integration tests that require an actual database.
-    
+
     These tests are skipped if no database connection is configured.
     Run with Aspire or set DATABASE_URL to execute.
     """
@@ -216,7 +219,7 @@ class TestLiveDatabaseIntegration:
     async def test_can_connect_to_database(self):
         """Verify we can actually connect to the configured database."""
         from shared.db.connection import get_db
-        
+
         db = get_db()
         await db.connect()
         # If we get here without exception, connection succeeded
@@ -225,7 +228,7 @@ class TestLiveDatabaseIntegration:
     async def test_can_create_tables(self):
         """Verify tables can be created in the database."""
         from shared.db.connection import get_db
-        
+
         db = get_db()
         await db.connect()
         await db.create_tables()
@@ -236,7 +239,7 @@ class TestLiveDatabaseIntegration:
         """Verify the Videos table exists and is queryable."""
         from shared.db.connection import get_db
         from sqlalchemy import text
-        
+
         db = get_db()
         async with db.session() as session:
             result = await session.execute(text("SELECT COUNT(*) FROM Videos"))

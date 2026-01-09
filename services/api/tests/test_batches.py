@@ -129,9 +129,7 @@ class TestCreateBatch:
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ]
 
-    def test_create_batch_with_ingest_all_flag(
-        self, client, headers, sample_youtube_channel_id
-    ):
+    def test_create_batch_with_ingest_all_flag(self, client, headers, sample_youtube_channel_id):
         """Test batch creation with ingest_all flag."""
         response = client.post(
             "/api/v1/batches",
@@ -179,7 +177,7 @@ class TestListBatches:
     def test_list_batches_returns_paginated_response(self, client, headers):
         """Test that list batches returns paginated structure."""
         response = client.get("/api/v1/batches", headers=headers)
-        
+
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
             assert "batches" in data
@@ -191,7 +189,7 @@ class TestListBatches:
     def test_list_batches_default_pagination(self, client, headers):
         """Test default pagination parameters."""
         response = client.get("/api/v1/batches", headers=headers)
-        
+
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
             assert data["page"] == 1
@@ -203,7 +201,7 @@ class TestListBatches:
             "/api/v1/batches?page=2&page_size=10",
             headers=headers,
         )
-        
+
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
             assert data["page"] == 2
@@ -359,7 +357,7 @@ class TestBatchStatusValues:
     def test_batch_status_enum_values(self):
         """Test that BatchStatus has expected values."""
         from api.models.batch import BatchStatus
-        
+
         expected_values = {"pending", "running", "completed", "failed"}
         actual_values = {s.value for s in BatchStatus}
         assert actual_values == expected_values
@@ -367,7 +365,7 @@ class TestBatchStatusValues:
     def test_batch_item_status_enum_values(self):
         """Test that BatchItemStatus has expected values."""
         from api.models.batch import BatchItemStatus
-        
+
         expected_values = {"pending", "running", "succeeded", "failed"}
         actual_values = {s.value for s in BatchItemStatus}
         assert actual_values == expected_values
@@ -384,12 +382,12 @@ class TestBatchModels:
     def test_create_batch_request_model(self):
         """Test CreateBatchRequest model."""
         from api.models.batch import CreateBatchRequest
-        
+
         request = CreateBatchRequest(
             name="Test Batch",
             video_ids=["dQw4w9WgXcQ", "9bZkp7q19f0"],
         )
-        
+
         assert request.name == "Test Batch"
         assert len(request.video_ids) == 2
         assert request.ingest_all is False
@@ -398,7 +396,7 @@ class TestBatchModels:
     def test_batch_response_model(self):
         """Test BatchResponse model."""
         from api.models.batch import BatchResponse, BatchStatus
-        
+
         batch = BatchResponse(
             id=uuid4(),
             name="Test Batch",
@@ -411,14 +409,14 @@ class TestBatchModels:
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
-        
+
         assert batch.status == BatchStatus.PENDING
         assert batch.total_count == 5
 
     def test_batch_detail_response_includes_items(self):
         """Test BatchDetailResponse includes items list."""
         from api.models.batch import BatchDetailResponse, BatchStatus
-        
+
         batch = BatchDetailResponse(
             id=uuid4(),
             name="Test Batch",
@@ -432,19 +430,19 @@ class TestBatchModels:
             updated_at=datetime.utcnow(),
             items=[],
         )
-        
+
         assert hasattr(batch, "items")
         assert isinstance(batch.items, list)
 
     def test_batch_retry_response_model(self):
         """Test BatchRetryResponse model."""
         from api.models.batch import BatchRetryResponse
-        
+
         response = BatchRetryResponse(
             batch_id=uuid4(),
             retried_count=3,
             message="3 items queued for retry",
         )
-        
+
         assert response.retried_count == 3
         assert "retry" in response.message.lower()

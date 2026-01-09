@@ -162,7 +162,7 @@ class TestListVideos:
 
     def test_list_videos_filter_by_all_valid_status_values(self, client, headers):
         """Test that all valid status enum values are accepted.
-        
+
         Valid values: pending, processing, completed, failed
         """
         valid_statuses = ["pending", "processing", "completed", "failed"]
@@ -171,12 +171,13 @@ class TestListVideos:
                 f"/api/v1/library/videos?status={valid_status}",
                 headers=headers,
             )
-            assert response.status_code == status.HTTP_200_OK, \
+            assert response.status_code == status.HTTP_200_OK, (
                 f"Status '{valid_status}' should be valid but got {response.status_code}"
+            )
 
     def test_list_videos_filter_by_invalid_status_ready(self, client, headers):
         """Test that 'ready' is NOT a valid status value.
-        
+
         CRITICAL: This test prevents the bug where 'ready' was used instead of 'completed'.
         The frontend was incorrectly using '/library?status=ready' which caused errors.
         """
@@ -195,8 +196,9 @@ class TestListVideos:
                 f"/api/v1/library/videos?status={invalid_status}",
                 headers=headers,
             )
-            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY, \
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY, (
                 f"Status '{invalid_status}' should be invalid but got {response.status_code}"
+            )
 
     def test_list_videos_filter_by_channel(self, client, headers):
         """Test filtering by channel ID."""
@@ -281,7 +283,7 @@ class TestListSegments:
 
     def test_list_segments_not_found(self, client, headers):
         """Test empty result for non-existent video.
-        
+
         Note: With the default mock returning None for one_or_none,
         this could return 404, but the mock returns empty data instead.
         The endpoint is reachable and returns valid response structure.

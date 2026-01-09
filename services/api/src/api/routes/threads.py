@@ -15,10 +15,12 @@ try:
     from shared.db.connection import get_session
     from shared.logging.config import get_logger
 except ImportError:
+
     async def get_session():
         raise NotImplementedError("Database session not available")
-    
+
     import logging
+
     def get_logger(name):
         return logging.getLogger(name)
 
@@ -32,6 +34,7 @@ logger = get_logger(__name__)
 # Response models
 class ThreadSummary(BaseModel):
     """Summary of a chat thread (without full messages)."""
+
     thread_id: str
     title: str | None
     agent_name: str
@@ -42,12 +45,14 @@ class ThreadSummary(BaseModel):
 
 class ThreadListResponse(BaseModel):
     """Response containing list of threads."""
+
     threads: list[ThreadSummary]
     total: int
 
 
 class ThreadDetailResponse(BaseModel):
     """Full thread details including messages."""
+
     thread_id: str
     title: str | None
     messages: list[dict]
@@ -62,18 +67,21 @@ class ThreadDetailResponse(BaseModel):
 
 class DeleteThreadResponse(BaseModel):
     """Response for thread deletion."""
+
     deleted: bool
     thread_id: str
 
 
 class CreateThreadRequest(BaseModel):
     """Request to create a new thread."""
+
     thread_id: str
     title: str | None = None
 
 
 class UpdateThreadMessagesRequest(BaseModel):
     """Request to update thread messages."""
+
     messages: list[dict]
     title: str | None = None
     scope: dict | None = None
@@ -82,6 +90,7 @@ class UpdateThreadMessagesRequest(BaseModel):
 
 class UpdateThreadMessagesResponse(BaseModel):
     """Response for thread update."""
+
     thread_id: str
     message_count: int
     updated_at: str | None
@@ -89,12 +98,14 @@ class UpdateThreadMessagesResponse(BaseModel):
 
 class UpdateThreadSettingsRequest(BaseModel):
     """Request to update thread scope and AI settings."""
+
     scope: dict | None = None
     aiSettings: dict | None = None
 
 
 class UpdateThreadSettingsResponse(BaseModel):
     """Response for thread settings update."""
+
     thread_id: str
     scope: dict | None = None
     aiSettings: dict | None = None
@@ -102,6 +113,7 @@ class UpdateThreadSettingsResponse(BaseModel):
 
 class CreateThreadWithMessagesRequest(BaseModel):
     """Request to atomically create a thread with messages."""
+
     messages: list[dict]
     title: str | None = None
     scope: dict | None = None
@@ -110,6 +122,7 @@ class CreateThreadWithMessagesRequest(BaseModel):
 
 class CreateThreadWithMessagesResponse(BaseModel):
     """Response for atomic thread creation with messages."""
+
     thread_id: str
     title: str | None
     message_count: int
@@ -121,6 +134,7 @@ class CreateThreadWithMessagesResponse(BaseModel):
 
 class CreateThreadResponse(BaseModel):
     """Response for thread creation."""
+
     thread_id: str
     title: str | None
     message_count: int
@@ -139,23 +153,25 @@ async def create_thread(
     thread_service: ThreadService = Depends(get_thread_service),
 ) -> CreateThreadResponse:
     """Create a new empty chat thread.
-    
+
     If the thread already exists, returns the existing thread (idempotent).
-    
+
     Args:
         request: Thread creation request with thread_id and optional title.
-        
+
     Returns:
         The created or existing thread.
     """
-    logger.info(f"[THREAD CREATE EMPTY] Received request to create thread: {request.thread_id}, title: {request.title}")
+    logger.info(
+        f"[THREAD CREATE EMPTY] Received request to create thread: {request.thread_id}, title: {request.title}"
+    )
     try:
         thread = await thread_service.create_thread(
             thread_id=request.thread_id,
             title=request.title,
         )
         logger.info(f"[THREAD CREATE EMPTY] Created/returned thread: {thread['thread_id']}")
-        
+
         return CreateThreadResponse(
             thread_id=thread["thread_id"],
             title=thread["title"],
@@ -171,24 +187,30 @@ async def create_thread(
         )
 
 
-@router.post("/messages", response_model=CreateThreadWithMessagesResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/messages",
+    response_model=CreateThreadWithMessagesResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_thread_with_messages(
     request: CreateThreadWithMessagesRequest,
     thread_service: ThreadService = Depends(get_thread_service),
 ) -> CreateThreadWithMessagesResponse:
     """Atomically create a new thread with messages.
-    
+
     This is the preferred endpoint for creating a new thread when the first
     message is sent. It generates a new thread_id and saves the messages
     in a single atomic operation, avoiding race conditions.
-    
+
     Args:
         request: Messages to save and optional title.
-        
+
     Returns:
         The created thread including the generated thread_id.
     """
-    logger.info(f"[THREAD CREATE] Received request to create thread with {len(request.messages)} messages, title: {request.title}")
+    logger.info(
+        f"[THREAD CREATE] Received request to create thread with {len(request.messages)} messages, title: {request.title}"
+    )
     try:
         thread = await thread_service.create_thread_with_messages(
             messages=request.messages,
@@ -197,7 +219,7 @@ async def create_thread_with_messages(
             ai_settings=request.aiSettings,
         )
         logger.info(f"[THREAD CREATE] Created thread: {thread['thread_id']}")
-        
+
         return CreateThreadWithMessagesResponse(
             thread_id=thread["thread_id"],
             title=thread["title"],
@@ -223,12 +245,12 @@ async def list_threads(
     thread_service: ThreadService = Depends(get_thread_service),
 ) -> ThreadListResponse:
     """List chat threads.
-    
+
     Args:
         agent_name: Optional filter by agent name.
         limit: Maximum number of threads to return.
         offset: Number of threads to skip.
-        
+
     Returns:
         List of thread summaries.
     """
@@ -238,7 +260,7 @@ async def list_threads(
             limit=limit,
             offset=offset,
         )
-        
+
         return ThreadListResponse(
             threads=[ThreadSummary(**t) for t in threads],
             total=len(threads),
@@ -257,22 +279,22 @@ async def get_thread(
     thread_service: ThreadService = Depends(get_thread_service),
 ) -> ThreadDetailResponse:
     """Get a specific thread with full messages.
-    
+
     Args:
         thread_id: The thread identifier.
-        
+
     Returns:
         Full thread details including messages.
     """
     try:
         thread = await thread_service.get_thread(thread_id)
-        
+
         if thread is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Thread {thread_id} not found",
             )
-        
+
         return ThreadDetailResponse(**thread)
     except HTTPException:
         raise
@@ -291,14 +313,14 @@ async def update_thread_messages(
     thread_service: ThreadService = Depends(get_thread_service),
 ) -> UpdateThreadMessagesResponse:
     """Update thread messages (for frontend tool result persistence).
-    
+
     This endpoint is called by the frontend to save the complete message history
     including tool results from frontend-executed tools.
-    
+
     Args:
         thread_id: The thread identifier.
         request: The messages to save.
-        
+
     Returns:
         Confirmation with updated message count.
     """
@@ -310,7 +332,7 @@ async def update_thread_messages(
             scope=request.scope,
             ai_settings=request.aiSettings,
         )
-        
+
         return UpdateThreadMessagesResponse(
             thread_id=thread_id,
             message_count=result.get("message_count", len(request.messages)),
@@ -331,14 +353,14 @@ async def update_thread_settings(
     thread_service: ThreadService = Depends(get_thread_service),
 ) -> UpdateThreadSettingsResponse:
     """Update thread scope and AI knowledge settings.
-    
+
     Called when the user changes settings mid-conversation.
     This allows persisting the new context so it's restored when reloading the thread.
-    
+
     Args:
         thread_id: The thread identifier.
         request: The scope and/or AI settings to update.
-        
+
     Returns:
         Confirmation with updated settings.
     """
@@ -348,13 +370,13 @@ async def update_thread_settings(
             scope=request.scope,
             ai_settings=request.aiSettings,
         )
-        
+
         if result is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Thread {thread_id} not found",
             )
-        
+
         return UpdateThreadSettingsResponse(
             thread_id=thread_id,
             scope=result.get("scope"),
@@ -376,16 +398,16 @@ async def delete_thread(
     thread_service: ThreadService = Depends(get_thread_service),
 ) -> DeleteThreadResponse:
     """Delete a chat thread.
-    
+
     Args:
         thread_id: The thread identifier.
-        
+
     Returns:
         Confirmation of deletion.
     """
     try:
         deleted = await thread_service.delete_thread(thread_id)
-        
+
         return DeleteThreadResponse(
             deleted=deleted,
             thread_id=thread_id,

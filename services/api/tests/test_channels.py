@@ -84,7 +84,9 @@ class TestFetchChannelVideos:
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ]
 
-    def test_fetch_channel_accepts_channel_id_format(self, client, headers, sample_youtube_channel_id):
+    def test_fetch_channel_accepts_channel_id_format(
+        self, client, headers, sample_youtube_channel_id
+    ):
         """Test that /channel/ format URLs are accepted."""
         response = client.post(
             "/api/v1/channels",
@@ -98,7 +100,9 @@ class TestFetchChannelVideos:
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ]
 
-    def test_fetch_channel_accepts_cursor_parameter(self, client, headers, sample_youtube_channel_url):
+    def test_fetch_channel_accepts_cursor_parameter(
+        self, client, headers, sample_youtube_channel_url
+    ):
         """Test that cursor parameter for pagination is accepted."""
         response = client.post(
             "/api/v1/channels",
@@ -115,7 +119,9 @@ class TestFetchChannelVideos:
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ]
 
-    def test_fetch_channel_accepts_limit_parameter(self, client, headers, sample_youtube_channel_url):
+    def test_fetch_channel_accepts_limit_parameter(
+        self, client, headers, sample_youtube_channel_url
+    ):
         """Test that limit parameter is accepted."""
         response = client.post(
             "/api/v1/channels",
@@ -132,7 +138,9 @@ class TestFetchChannelVideos:
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ]
 
-    def test_fetch_channel_limit_must_be_positive(self, client, headers, sample_youtube_channel_url):
+    def test_fetch_channel_limit_must_be_positive(
+        self, client, headers, sample_youtube_channel_url
+    ):
         """Test that limit must be >= 1."""
         response = client.post(
             "/api/v1/channels",
@@ -181,11 +189,11 @@ class TestChannelModels:
     def test_fetch_channel_request_model(self):
         """Test FetchChannelRequest model."""
         from api.models.channel import FetchChannelRequest
-        
+
         request = FetchChannelRequest(
             channel_url="https://www.youtube.com/@MarkWildman",
         )
-        
+
         assert request.channel_url == "https://www.youtube.com/@MarkWildman"
         assert request.cursor is None
         assert request.limit == 100  # Default value
@@ -193,20 +201,20 @@ class TestChannelModels:
     def test_fetch_channel_request_with_cursor(self):
         """Test FetchChannelRequest with cursor."""
         from api.models.channel import FetchChannelRequest
-        
+
         request = FetchChannelRequest(
             channel_url="https://www.youtube.com/@MarkWildman",
             cursor="next_page_token",
             limit=50,
         )
-        
+
         assert request.cursor == "next_page_token"
         assert request.limit == 50
 
     def test_channel_video_model(self):
         """Test ChannelVideo model."""
         from api.models.channel import ChannelVideo
-        
+
         video = ChannelVideo(
             youtube_video_id="dQw4w9WgXcQ",
             title="Test Video",
@@ -215,7 +223,7 @@ class TestChannelModels:
             thumbnail_url="https://example.com/thumb.jpg",
             already_ingested=False,
         )
-        
+
         assert video.youtube_video_id == "dQw4w9WgXcQ"
         assert video.duration == 180
         assert video.already_ingested is False
@@ -223,7 +231,7 @@ class TestChannelModels:
     def test_channel_videos_response_model(self):
         """Test ChannelVideosResponse model."""
         from api.models.channel import ChannelVideo, ChannelVideosResponse
-        
+
         response = ChannelVideosResponse(
             youtube_channel_id="UCfOQzBDXWXmP1qrL1u-XjUw",
             channel_name="Mark Wildman",
@@ -240,7 +248,7 @@ class TestChannelModels:
             next_cursor="next_page_token",
             has_more=True,
         )
-        
+
         assert response.youtube_channel_id == "UCfOQzBDXWXmP1qrL1u-XjUw"
         assert response.channel_name == "Mark Wildman"
         assert response.returned_count == 50
@@ -250,14 +258,14 @@ class TestChannelModels:
     def test_channel_card_model(self):
         """Test ChannelCard model."""
         from api.models.channel import ChannelCard
-        
+
         card = ChannelCard(
             channel_id=uuid4(),
             youtube_channel_id="UCfOQzBDXWXmP1qrL1u-XjUw",
             name="Mark Wildman",
             video_count=50,
         )
-        
+
         assert card.name == "Mark Wildman"
         assert card.video_count == 50
         assert "youtube.com/channel" in card.youtube_url
@@ -271,13 +279,16 @@ class TestChannelModels:
 class TestChannelUrlValidation:
     """Tests for channel URL format validation."""
 
-    @pytest.mark.parametrize("url", [
-        "https://www.youtube.com/@MarkWildman",
-        "https://youtube.com/@darciisabella",
-        "https://www.youtube.com/channel/UCfOQzBDXWXmP1qrL1u-XjUw",
-        "https://www.youtube.com/c/ChannelName",
-        "https://www.youtube.com/user/username",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://www.youtube.com/@MarkWildman",
+            "https://youtube.com/@darciisabella",
+            "https://www.youtube.com/channel/UCfOQzBDXWXmP1qrL1u-XjUw",
+            "https://www.youtube.com/c/ChannelName",
+            "https://www.youtube.com/user/username",
+        ],
+    )
     def test_valid_channel_url_formats(self, client, headers, url):
         """Test that various valid channel URL formats are accepted."""
         response = client.post(
@@ -287,13 +298,19 @@ class TestChannelUrlValidation:
         )
         # Should not be a validation error (422)
         # May be 400 (yt-dlp error) or 500 (mocked) but not 422
-        assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY or \
-               "limit" in response.text or "channel_url" not in response.text
+        assert (
+            response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY
+            or "limit" in response.text
+            or "channel_url" not in response.text
+        )
 
-    @pytest.mark.parametrize("url", [
-        "",
-        "   ",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "",
+            "   ",
+        ],
+    )
     def test_empty_channel_url_rejected(self, client, headers, url):
         """Test that empty/whitespace URLs are rejected."""
         response = client.post(
@@ -319,7 +336,7 @@ class TestChannelList:
     def test_channel_list_response_model(self):
         """Test ChannelListResponse model."""
         from api.models.channel import ChannelCard, ChannelListResponse
-        
+
         response = ChannelListResponse(
             channels=[
                 ChannelCard(
@@ -333,7 +350,7 @@ class TestChannelList:
             page_size=20,
             total_count=1,
         )
-        
+
         assert len(response.channels) == 1
         assert response.total_count == 1
         assert response.page == 1

@@ -99,7 +99,7 @@ class TestSubmitVideo:
 
     def test_submit_video_rejects_nonexistent_youtube_video(self, client, headers):
         """Test that non-existent YouTube videos are rejected with 404.
-        
+
         Uses a fabricated video ID that doesn't exist on YouTube.
         The API should verify the video exists before creating a record.
         """
@@ -183,16 +183,19 @@ class TestReprocessVideo:
 class TestVideoValidation:
     """Tests for video input validation."""
 
-    @pytest.mark.parametrize("url", [
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        "https://youtube.com/watch?v=dQw4w9WgXcQ",
-        "http://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        "https://youtu.be/dQw4w9WgXcQ",
-        "https://www.youtube.com/embed/dQw4w9WgXcQ",
-        "https://www.youtube.com/v/dQw4w9WgXcQ",
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s",
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtube.com/watch?v=dQw4w9WgXcQ",
+            "http://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://www.youtube.com/embed/dQw4w9WgXcQ",
+            "https://www.youtube.com/v/dQw4w9WgXcQ",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+        ],
+    )
     def test_valid_youtube_urls_accepted(self, client, headers, url):
         """Test that various valid YouTube URL formats are accepted."""
         response = client.post(
@@ -201,17 +204,21 @@ class TestVideoValidation:
             headers=headers,
         )
         # Should pass validation (might fail on service layer)
-        assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY or \
-               "url" not in str(response.json())
+        assert response.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY or "url" not in str(
+            response.json()
+        )
 
-    @pytest.mark.parametrize("url", [
-        "https://example.com",
-        "https://vimeo.com/12345678",
-        "not-a-url",
-        "ftp://youtube.com/watch?v=dQw4w9WgXcQ",
-        "https://youtube.com/watch",  # Missing video ID
-        "https://youtube.com/watch?v=",  # Empty video ID
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://example.com",
+            "https://vimeo.com/12345678",
+            "not-a-url",
+            "ftp://youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtube.com/watch",  # Missing video ID
+            "https://youtube.com/watch?v=",  # Empty video ID
+        ],
+    )
     def test_invalid_urls_rejected(self, client, headers, url):
         """Test that invalid URLs are rejected."""
         response = client.post(
@@ -225,7 +232,9 @@ class TestVideoValidation:
 class TestVideoResponseFormat:
     """Tests for video response format validation."""
 
-    def test_submit_video_response_contains_required_fields(self, client, headers, sample_youtube_url):
+    def test_submit_video_response_contains_required_fields(
+        self, client, headers, sample_youtube_url
+    ):
         """Test that successful submission returns required fields."""
         # This test would need mocking to fully verify
         # For now, we just verify the endpoint exists and accepts input
@@ -323,7 +332,7 @@ class TestVideoContentUrls:
         from datetime import datetime
 
         from api.models.video import ProcessingStatus, VideoResponse
-        
+
         # Create a completed video response
         video_data = VideoResponse(
             video_id=str(uuid4()),
@@ -339,7 +348,7 @@ class TestVideoContentUrls:
             created_at=datetime.now(),
             updated_at=datetime.now(),
         )
-        
+
         # Verify the model includes the URLs
         assert video_data.transcript_url == "/api/v1/videos/123/transcript"
         assert video_data.summary_url == "/api/v1/videos/123/summary"
@@ -349,7 +358,7 @@ class TestVideoContentUrls:
         from datetime import datetime
 
         from api.models.video import ProcessingStatus, VideoResponse
-        
+
         # Create a pending video response
         video_data = VideoResponse(
             video_id=str(uuid4()),
@@ -365,7 +374,7 @@ class TestVideoContentUrls:
             created_at=datetime.now(),
             updated_at=datetime.now(),
         )
-        
+
         # Verify the model has null URLs for pending videos
         assert video_data.transcript_url is None
         assert video_data.summary_url is None
@@ -377,9 +386,9 @@ class TestVideoNotFoundError:
     def test_video_not_found_error_has_correct_attributes(self):
         """Test that VideoNotFoundError contains the video ID and reason."""
         from api.services.video_service import VideoNotFoundError
-        
+
         error = VideoNotFoundError("dQw4w9WgXcQ", "Video is private")
-        
+
         assert error.youtube_video_id == "dQw4w9WgXcQ"
         assert error.reason == "Video is private"
         assert "dQw4w9WgXcQ" in str(error)
@@ -388,9 +397,9 @@ class TestVideoNotFoundError:
     def test_video_not_found_error_default_reason(self):
         """Test that VideoNotFoundError has a sensible default reason."""
         from api.services.video_service import VideoNotFoundError
-        
+
         error = VideoNotFoundError("XXXXXXXXXXX")
-        
+
         assert error.youtube_video_id == "XXXXXXXXXXX"
         assert "not found" in error.reason.lower()
 
@@ -398,7 +407,7 @@ class TestVideoNotFoundError:
     async def test_fetch_video_metadata_raises_for_unavailable_video(self):
         """Test that _fetch_video_metadata raises VideoNotFoundError for unavailable videos."""
         from api.services.video_service import VideoNotFoundError, VideoService
-        
+
         # Mock yt-dlp to simulate "Video unavailable" error
         with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
             mock_ydl = MagicMock()
@@ -406,42 +415,47 @@ class TestVideoNotFoundError:
             mock_ydl.__exit__ = MagicMock(return_value=False)
             mock_ydl.extract_info.side_effect = Exception("ERROR: Video unavailable")
             mock_ydl_class.return_value = mock_ydl
-            
+
             service = VideoService(AsyncMock())
-            
+
             with pytest.raises(VideoNotFoundError) as exc_info:
                 await service._fetch_video_metadata("XXXXXXXXXXX")
-            
+
             assert exc_info.value.youtube_video_id == "XXXXXXXXXXX"
-            assert "unavailable" in str(exc_info.value).lower() or "not found" in str(exc_info.value).lower()
+            assert (
+                "unavailable" in str(exc_info.value).lower()
+                or "not found" in str(exc_info.value).lower()
+            )
 
     @pytest.mark.asyncio
     async def test_fetch_video_metadata_raises_for_private_video(self):
         """Test that _fetch_video_metadata raises VideoNotFoundError for private videos."""
         from api.services.video_service import VideoNotFoundError, VideoService
-        
+
         # Mock yt-dlp to simulate "Private video" error
         with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
             mock_ydl = MagicMock()
             mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
             mock_ydl.__exit__ = MagicMock(return_value=False)
-            mock_ydl.extract_info.side_effect = Exception("ERROR: Private video. Sign in if you've been granted access")
+            mock_ydl.extract_info.side_effect = Exception(
+                "ERROR: Private video. Sign in if you've been granted access"
+            )
             mock_ydl_class.return_value = mock_ydl
-            
+
             service = VideoService(AsyncMock())
-            
+
             with pytest.raises(VideoNotFoundError) as exc_info:
                 await service._fetch_video_metadata("PRIVATE1234")
-            
+
             assert exc_info.value.youtube_video_id == "PRIVATE1234"
 
 
 class TestBlobPathConsistency:
     """Tests to ensure API uses same blob paths as workers.
-    
+
     This addresses the bug where the API was looking for transcripts/summaries
     at the wrong blob path, causing "Failed to load transcript" errors.
-    
+
     Workers store at: {channel_name}/{youtube_video_id}/transcript.txt
     API must read from the same path, not: {video_id}/{youtube_video_id}_transcript.txt
     """
@@ -450,13 +464,13 @@ class TestBlobPathConsistency:
         """Test that transcript endpoint uses get_transcript_blob_path helper."""
         # Verify the import exists and is accessible
         from api.routes.videos import get_transcript_blob_path
-        
+
         # Verify the helper produces correct path format
         channel_name = "Test Channel"
         youtube_video_id = "abc123XYZ"
-        
+
         path = get_transcript_blob_path(channel_name, youtube_video_id)
-        
+
         # Should use channel-based path, not video_id-based
         assert "test-channel" in path.lower(), "Path should contain sanitized channel name"
         assert youtube_video_id in path, "Path should contain youtube video id"
@@ -467,12 +481,12 @@ class TestBlobPathConsistency:
     def test_summary_endpoint_uses_channel_based_path(self):
         """Test that summary endpoint uses get_summary_blob_path helper."""
         from api.routes.videos import get_summary_blob_path
-        
+
         channel_name = "Test Channel"
         youtube_video_id = "abc123XYZ"
-        
+
         path = get_summary_blob_path(channel_name, youtube_video_id)
-        
+
         # Should use channel-based path
         assert "test-channel" in path.lower(), "Path should contain sanitized channel name"
         assert youtube_video_id in path, "Path should contain youtube video id"
@@ -485,18 +499,18 @@ class TestBlobPathConsistency:
         from shared.blob.client import get_transcript_blob_path as worker_helper
 
         from api.routes.videos import get_transcript_blob_path as api_helper
-        
+
         test_cases = [
             ("Simple Channel", "dQw4w9WgXcQ"),
             ("Channel With Spaces", "abc123XYZ"),
             ("Channel-With-Dashes", "xyz789ABC"),
             ("CamelCaseChannel", "TEST12345"),
         ]
-        
+
         for channel_name, youtube_video_id in test_cases:
             api_path = api_helper(channel_name, youtube_video_id)
             worker_path = worker_helper(channel_name, youtube_video_id)
-            
+
             assert api_path == worker_path, (
                 f"API and worker paths must match for channel='{channel_name}', "
                 f"video='{youtube_video_id}': API={api_path}, Worker={worker_path}"
@@ -507,18 +521,18 @@ class TestBlobPathConsistency:
         from shared.blob.client import get_summary_blob_path as worker_helper
 
         from api.routes.videos import get_summary_blob_path as api_helper
-        
+
         test_cases = [
             ("Simple Channel", "dQw4w9WgXcQ"),
             ("Channel With Spaces", "abc123XYZ"),
             ("Channel-With-Dashes", "xyz789ABC"),
             ("CamelCaseChannel", "TEST12345"),
         ]
-        
+
         for channel_name, youtube_video_id in test_cases:
             api_path = api_helper(channel_name, youtube_video_id)
             worker_path = worker_helper(channel_name, youtube_video_id)
-            
+
             assert api_path == worker_path, (
                 f"API and worker paths must match for channel='{channel_name}', "
                 f"video='{youtube_video_id}': API={api_path}, Worker={worker_path}"
