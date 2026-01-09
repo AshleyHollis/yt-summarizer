@@ -7,8 +7,8 @@
 
 This plan implements CI/CD pipelines for the YT Summarizer application with the following flow:
 
-1. **CI on Pull Request**: Run all test suites (shared, workers, API, frontend, E2E) on every PR
-2. **PR Preview Environments**: Deploy ephemeral preview environments to AKS for each PR after CI passes
+1. **CI on Pull Request**: Run unit tests (shared, workers, API, frontend), linting, and validation on every PR
+2. **PR Preview Environments**: Deploy ephemeral preview environments to AKS for each PR after CI passes; E2E tests run against preview URL
 3. **Automatic Production Deployment**: On merge to `main`, update production Kustomize overlay with validated image digests; Argo CD syncs automatically
 
 **Key Design Decisions**:
@@ -82,8 +82,8 @@ specs/002-azure-cicd/
 ```text
 .github/
 └── workflows/
-    ├── ci.yml               # PR: Run all tests (shared, workers, API, frontend, E2E)
-    ├── preview.yml          # PR: Build images, generate preview overlay, post status
+    ├── ci.yml               # PR: Run unit tests, linting, validation (no E2E)
+    ├── preview.yml          # PR: Build images, deploy preview, E2E tests against preview URL
     ├── deploy-prod.yml      # Push to main: Pin prod overlay to merged image digests
     └── preview-cleanup.yml  # PR closed: Delete preview overlay (triggers Argo prune)
 

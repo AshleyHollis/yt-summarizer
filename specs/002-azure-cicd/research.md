@@ -208,24 +208,26 @@ terraform {
 
 ---
 
-### 6. E2E Tests in CI (Without Aspire)
+### 6. E2E Tests Strategy
 
-**Question**: How to run Playwright E2E tests in GitHub Actions without .NET Aspire?
+**Question**: How to run Playwright E2E tests in the CI/CD pipeline?
 
-**Decision**: Use Docker Compose for test environment, Playwright in container
+**Decision**: Run E2E tests against PR preview environments (not in CI workflow)
 
 **Rationale**:
-- Aspire is a dev orchestrator; CI needs containerized approach
-- Create `docker-compose.ci.yml` with API, 4 Workers (transcribe, summarize, embed, relationships), MS SQL Server 2025, Azurite
-- Uses same database as local dev: `mcr.microsoft.com/mssql/server:2025-latest` (native VECTOR support)
-- Workers run from unified Docker image with different entrypoints, matching Aspire AppHost configuration
-- Playwright tests run against containerized services
-- Use `mcr.microsoft.com/playwright:v1.40.0-jammy` for Playwright container
-- Health checks ensure services are ready before tests run
+- E2E tests validate the full deployed stack, which is available in PR preview environments
+- CI workflow runs fast unit tests, linting, and validation (~5-8 min)
+- Preview workflow deploys to AKS, then E2E tests run against the live preview URL
+- This approach tests the actual deployment (containers, networking, ingress) not a simulated environment
+- `docker-compose.ci.yml` exists but is used for reference/local testing, not in the CI workflow
+
+**E2E Test Locations**:
+- **Local development**: Run with Aspire (`npm run e2e` from `apps/web/`)
+- **PR validation**: Preview workflow deploys to AKS, E2E runs against preview URL
+- **Production**: Optional smoke tests in `deploy-prod.yml`
 
 **Alternatives Considered**:
-- Skip E2E in CI - Rejected: AGENTS.md mandates E2E for completion
-- Mock external services - Rejected: loses integration value
+- Docker Compose in CI - Rejected: Adds 5-10 min to CI, duplicates preview testing
 - Run Aspire in CI - Rejected: .NET SDK overhead, complexity
 
 ---
@@ -387,7 +389,7 @@ spec:
 | Cluster bootstrap | Script + Argo CD Applications for ingress-nginx, external-secrets |
 | Terraform state | Azure Storage with OIDC auth |
 | Azure auth | OIDC federation (no secrets) |
-| E2E in CI | Docker Compose test environment |
+| E2E tests | Run against PR preview environments (not in CI) |
 | Database | MS SQL Server 2025 (dev/CI) → Azure SQL serverless (prod) |
 | Migrations | Alembic as K8s Job (PreSync hook) |
 | Secrets | GitHub Secrets (CI) + Azure Key Vault → K8s External Secrets |
@@ -397,11 +399,11 @@ spec:
 
 ## Open Items for Implementation
 
-1. **Docker Compose CI file**: Need to create `docker-compose.ci.yml` for E2E tests
-2. **Azure AD setup**: Manual step to create app registration with federated credentials
-3. **Terraform state bootstrap**: Manual one-time creation of state storage account
-4. **Existing Dockerfiles**: Need to verify Dockerfiles work with docker buildx (multi-platform)
-5. **Argo CD bootstrap script**: `scripts/bootstrap-argocd.ps1` to install Argo CD on AKS
-6. **Argo CD infra apps**: `k8s/argocd/infra-apps.yaml` for ingress-nginx and external-secrets
-7. **Kustomize base manifests**: Create K8s Deployments, Services, ConfigMaps
-8. **SecretStore for ESO**: Configure Azure Key Vault integration after ESO is installed
+1. **Docker Compose CI file**: `docker-compose.ci.yml` created for local/reference testing (not used in CI workflow)
+2. **Azure AD setup**: Manual step to create app registration with federated credentials ✅
+3. **Terraform state bootstrap**: Manual one-time creation of state storage account ✅
+4. **Existing Dockerfiles**: Verified Dockerfiles work with docker buildx (multi-platform) ✅
+5. **Argo CD bootstrap script**: `scripts/bootstrap-argocd.ps1` to install Argo CD on AKS ✅
+6. **Argo CD infra apps**: `k8s/argocd/infra-apps.yaml` for ingress-nginx and external-secrets ✅
+7. **Kustomize base manifests**: Created K8s Deployments, Services, ConfigMaps ✅
+8. **SecretStore for ESO**: Configure Azure Key Vault integration after ESO is installed ✅

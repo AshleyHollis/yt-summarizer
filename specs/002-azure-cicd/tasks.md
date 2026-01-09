@@ -82,9 +82,11 @@
 
 **Independent Test**: Create a PR with a failing test, verify pipeline fails; fix test, verify pipeline passes
 
-### Docker Compose CI Environment
+### Docker Compose Reference File (Local Testing)
 
-- [X] T027 [US1] Create Docker Compose CI file in `docker-compose.ci.yml`
+> **Note**: `docker-compose.ci.yml` is available for local testing but E2E tests run against PR preview environments, not in the CI workflow.
+
+- [X] T027 [US1] Create Docker Compose reference file in `docker-compose.ci.yml`
 - [X] T028 [US1] [P] Add MS SQL Server 2025 service to `docker-compose.ci.yml`
 - [X] T029 [US1] [P] Add Azurite service to `docker-compose.ci.yml`
 - [X] T030 [US1] [P] Add API and worker services to `docker-compose.ci.yml`
@@ -97,7 +99,7 @@
 - [X] T034 [US1] Add Node.js test jobs (frontend Vitest) to CI workflow
 - [X] T035 [US1] Configure dependency caching (uv, npm) in CI workflow
 - [X] T036 [US1] Add linting jobs (ruff, eslint) to CI workflow
-- [X] T037 [US1] Add E2E test job using Docker Compose CI environment
+- [X] T037 [US1] **UPDATED**: E2E tests run against PR preview environments (see Phase 4)
 - [X] T038 [US1] Add Terraform validation step to CI
 - [X] T039 [US1] Add Kustomize validation step to CI
 - [X] T040 [US1] Add secret scanning (gitleaks) to CI workflow

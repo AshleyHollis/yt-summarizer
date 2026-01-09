@@ -172,6 +172,6 @@ As a DevOps engineer, I want infrastructure changes to be deployed through the s
 - Local development continues using Aspire + Docker (unchanged)
 - Database migrations use Alembic (existing in the project)
 - Azure SQL uses serverless tier (auto-pause, ~$5/month) matching constitution cost-aware defaults
-- E2E tests run in CI without Aspire (Docker Compose for CI)
+- E2E tests run against PR preview environments (not in CI workflow)
 - PR preview environments are ephemeral and automatically cleaned up
 - No long-lived staging environment exists; PR previews serve as the validation surface
