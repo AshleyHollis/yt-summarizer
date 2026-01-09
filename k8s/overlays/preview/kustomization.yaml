@@ -1,29 +1,30 @@
 # =============================================================================
-# Preview Overlay Template - Kustomization
+# Preview Overlay - Kustomization
 # =============================================================================
-# Template for ephemeral PR preview environments
-# The preview.yml workflow copies this template to pr-<number>/
-# Placeholders: {{PR_NUMBER}}, {{IMAGE_TAG}}, {{ACR_LOGIN_SERVER}}
+# Used for PR preview environments
+# Lives in the PR branch - Argo CD PR Generator reads from here
+# The preview.yml workflow updates IMAGE_TAG in this file
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Namespace is created per-preview
-namespace: preview-pr-{{PR_NUMBER}}
+# Namespace is set dynamically by Argo CD ApplicationSet (preview-pr-<number>)
+# We reference base without namespace override - ApplicationSet handles it
 
 resources:
-  - ../../../base
+  - ../../base
   - namespace.yaml
   - resource-quota.yaml
   - limit-range.yaml
 
-# Image tags - set by preview.yml workflow
+# Image tags - updated by preview.yml workflow
+# Placeholder values - workflow replaces with actual PR-specific tags
 images:
   - name: yt-summarizer-api
-    newName: {{ACR_LOGIN_SERVER}}/yt-summarizer-api
-    newTag: {{IMAGE_TAG}}
+    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newTag: latest
   - name: yt-summarizer-workers
-    newName: {{ACR_LOGIN_SERVER}}/yt-summarizer-workers
-    newTag: {{IMAGE_TAG}}
+    newName: acrytsummprd.azurecr.io/yt-summarizer-workers
+    newTag: latest
 
 # Preview-specific patches
 patches:
@@ -35,9 +36,7 @@ patches:
 labels:
   - pairs:
       environment: preview
-      preview-pr: "{{PR_NUMBER}}"
       app.kubernetes.io/part-of: yt-summarizer
 
 commonAnnotations:
   deployment.kubernetes.io/environment: preview
-  preview.yt-summarizer.dev/pr: "{{PR_NUMBER}}"

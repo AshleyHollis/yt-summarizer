@@ -1,21 +1,22 @@
 # =============================================================================
 # Preview Ingress Patch
 # =============================================================================
-# Routes traffic via subdomain: pr-<number>.preview.yt-summarizer.example.com
+# Routes traffic via path-based routing (no dynamic subdomain needed)
+# Preview URL: https://preview.yt-summarizer.example.com/api
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-ingress
-  namespace: preview-pr-{{PR_NUMBER}}
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   rules:
-    - host: pr-{{PR_NUMBER}}.preview.yt-summarizer.example.com
+    - host: preview.yt-summarizer.example.com
       http:
         paths:
-          - path: /
-            pathType: Prefix
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: api

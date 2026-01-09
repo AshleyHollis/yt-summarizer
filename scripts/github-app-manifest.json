@@ -1,0 +1,14 @@
+{
+  "name": "yt-summarizer-deploy",
+  "url": "https://github.com/AshleyHollis/yt-summarizer",
+  "hook_attributes": {
+    "active": false
+  },
+  "redirect_url": "https://github.com/AshleyHollis/yt-summarizer",
+  "public": false,
+  "default_permissions": {
+    "contents": "write",
+    "metadata": "read"
+  },
+  "default_events": []
+}

@@ -1,8 +1,10 @@
 # =============================================================================
 # Preview Cleanup Workflow
 # =============================================================================
-# Deletes preview overlay when PR is closed (merged or abandoned)
-# Argo CD ApplicationSet will automatically prune the preview resources
+# Posts cleanup status when PR is closed (merged or abandoned)
+# Argo CD ApplicationSet with Pull Request Generator handles actual cleanup
+# - No overlay files need to be deleted (they were in PR branch, not main)
+# - Argo CD automatically deletes Application when PR closes
 
 name: Preview Cleanup
 
@@ -12,7 +14,7 @@ on:
     types: [closed]
 
 permissions:
-  contents: write
+  id-token: write
   pull-requests: write
 
 jobs:
@@ -20,71 +22,16 @@ jobs:
     name: Cleanup Preview
     runs-on: ubuntu-latest
     steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          ref: main
-
-      - name: Delete preview overlay
-        id: cleanup
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          PREVIEW_DIR="k8s/overlays/previews/pr-${PR_NUMBER}"
-          
-          if [ -d "${PREVIEW_DIR}" ]; then
-            echo "Deleting preview overlay: ${PREVIEW_DIR}"
-            rm -rf "${PREVIEW_DIR}"
-            echo "deleted=true" >> $GITHUB_OUTPUT
-          else
-            echo "Preview overlay not found: ${PREVIEW_DIR}"
-            echo "deleted=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Commit and push deletion
-        if: steps.cleanup.outputs.deleted == 'true'
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          MERGED=${{ github.event.pull_request.merged }}
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git add -A k8s/overlays/previews/
-          
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            if [ "$MERGED" = "true" ]; then
-              ACTION="merged"
-            else
-              ACTION="closed"
-            fi
-            
-            git commit -m "chore(preview): cleanup overlay for PR #${PR_NUMBER}
-            
-            PR was ${ACTION}
-            Argo CD will prune preview-pr-${PR_NUMBER} namespace
-            
-            [skip ci]"
-            
-            git push origin main
-          fi
-
       - name: Post cleanup status
-        if: steps.cleanup.outputs.deleted == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const merged = ${{ github.event.pull_request.merged }};
+            const prNumber = ${{ github.event.pull_request.number }};
             const status = merged ? 'merged ✅' : 'closed ❌';
+            const actionNote = merged 
+              ? 'Code has been merged to main and will be deployed to production.'
+              : 'PR was closed without merging.';
             
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -92,14 +39,17 @@ jobs:
               repo: context.repo.repo,
               body: `## 🗑️ Preview Cleanup
 
-            The preview environment for this PR has been scheduled for deletion.
+            The preview environment for this PR is being automatically removed.
 
             | Property | Value |
             |----------|-------|
             | **PR Status** | ${status} |
-            | **Preview** | \`preview-pr-${{ github.event.pull_request.number }}\` |
-            | **Action** | Overlay deleted, Argo CD will prune namespace |
+            | **Preview Application** | \`preview-pr-${prNumber}\` |
+            | **Preview Namespace** | \`preview-pr-${prNumber}\` |
 
+            ${actionNote}
+
+            > Argo CD ApplicationSet with Pull Request Generator handles cleanup automatically.
             > The preview namespace and all resources will be removed within ~5 minutes.`
             });
 
@@ -111,10 +61,61 @@ jobs:
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **PR** | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Merged** | ${{ github.event.pull_request.merged }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Overlay Deleted** | ${{ steps.cleanup.outputs.deleted }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.cleanup.outputs.deleted }}" = "true" ]; then
-            echo "✅ Preview overlay deleted. Argo CD will prune the namespace automatically." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ℹ️ No preview overlay found to delete." >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "### ℹ️ Automatic Cleanup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "With Argo CD ApplicationSet using Pull Request Generator:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Application deleted automatically when PR closes" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Namespace pruned automatically" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ No overlay files to delete (they lived in PR branch)" >> $GITHUB_STEP_SUMMARY
+
+  # ---------------------------------------------------------------------------
+  # Optional: Clean up ACR images for the PR
+  # ---------------------------------------------------------------------------
+  cleanup-images:
+    name: Cleanup Images (Optional)
+    runs-on: ubuntu-latest
+    # Only run if we want to clean up images (can be disabled to save costs)
+    if: false  # Set to true to enable image cleanup
+    steps:
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Delete PR images from ACR
+        env:
+          ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "Cleaning up images for PR #${PR_NUMBER}..."
+          
+          # Delete API images with pr-N- prefix
+          az acr repository show-tags \
+            --name $ACR_NAME \
+            --repository yt-summarizer-api \
+            --query "[?starts_with(@, 'pr-${PR_NUMBER}-')]" \
+            --output tsv | while read tag; do
+              echo "Deleting yt-summarizer-api:${tag}"
+              az acr repository delete \
+                --name $ACR_NAME \
+                --image yt-summarizer-api:${tag} \
+                --yes
+            done
+          
+          # Delete Workers images with pr-N- prefix
+          az acr repository show-tags \
+            --name $ACR_NAME \
+            --repository yt-summarizer-workers \
+            --query "[?starts_with(@, 'pr-${PR_NUMBER}-')]" \
+            --output tsv | while read tag; do
+              echo "Deleting yt-summarizer-workers:${tag}"
+              az acr repository delete \
+                --name $ACR_NAME \
+                --image yt-summarizer-workers:${tag} \
+                --yes
+            done
+          
+          echo "Image cleanup complete"
