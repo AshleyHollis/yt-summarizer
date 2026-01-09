@@ -5,12 +5,15 @@
 
 **Architecture**: AKS single-node + Argo CD + Kustomize + SWA (frontend)
 
-**Key Changes from Previous Plan**:
+**Key Architecture Decisions** (Updated 2026-01-09):
 - ❌ No long-lived staging environment
 - ❌ No manual production approval gates
-- ✅ PR Preview environments via Argo CD ApplicationSet
-- ✅ Auto-deploy to production on merge to main
+- ✅ PR Preview environments via Argo CD ApplicationSet **with Pull Request Generator**
+- ✅ Auto-deploy to production on merge to main (waits for CI to pass)
 - ✅ Single `prod` overlay (replaces `staging` + `production`)
+- ✅ Preview overlay lives in PR branch (`k8s/overlays/preview/`), not main
+- ✅ Frontend previews via Azure SWA staging environments
+- ✅ CI includes `npm run build` to catch TypeScript errors
 
 ## Format: `[ID] [P?] [Story?] Description`
 
@@ -293,11 +296,11 @@ Phase 2: Foundational ─────────────┼──► Phase 
                                    Phase 7: Polish
 ```
 
-### GitOps Flow (Updated)
+### GitOps Flow (Updated 2026-01-09 - Pull Request Generator)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  PR PREVIEW FLOW                                                         │
+│  PR PREVIEW FLOW (Pull Request Generator Approach)                       │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  Developer opens PR                                                      │
@@ -305,61 +308,70 @@ Phase 2: Foundational ─────────────┼──► Phase 
 │         ▼                                                                │
 │  GitHub Actions (ci.yml)                                                 │
 │  ├── Run all tests (shared, workers, API, frontend, E2E)                 │
+│  ├── Build frontend (npm run build) - catches TypeScript errors         │
 │  └── Pass? ──► GitHub Actions (preview.yml)                              │
 │                 ├── Build API + Workers images → Push to ACR             │
-│                 ├── Generate k8s/overlays/previews/pr-<num>/             │
-│                 └── Commit & push overlay                                │
+│                 ├── Create k8s/overlays/preview/ in PR branch (NOT main) │
+│                 ├── Commit & push to PR branch                           │
+│                 └── Build & deploy frontend to SWA staging environment   │
 │                           │                                              │
 │                           ▼                                              │
-│  Argo CD (ApplicationSet detects new preview overlay)                    │
-│  └── Creates Application: preview-pr-<num>                               │
-│  └── Syncs to namespace: preview-pr-<num>                                │
+│  Argo CD (ApplicationSet with Pull Request Generator)                    │
+│  └── Detects open PR via GitHub API                                      │
+│  └── Creates Application: yt-summarizer-pr-<num>                         │
+│  └── Points to PR branch (head_sha), k8s/overlays/preview/               │
 │         │                                                                │
 │         ▼                                                                │
-│  Preview URL ready: pr-<num>.preview.ytsummarizer.dev                    │
-│  (Posted as PR comment)                                                  │
+│  Preview URLs ready:                                                     │
+│  ├── Backend API: pr-<num>.preview.ytsummarizer.dev                      │
+│  └── Frontend: SWA staging URL (posted as PR comment)                    │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  PRODUCTION DEPLOY FLOW                                                  │
+│  PRODUCTION DEPLOY FLOW (waits for CI to pass)                           │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  PR merged to main                                                       │
 │         │                                                                │
 │         ▼                                                                │
+│  GitHub Actions (ci.yml) - runs on push to main                          │
+│  └── Pass? ──► triggers workflow_run event                               │
+│                   │                                                      │
+│                   ▼                                                      │
 │  GitHub Actions (deploy-prod.yml)                                        │
-│  ├── Get image digests from merged commit                                │
-│  ├── Update k8s/overlays/prod/kustomization.yaml with digests            │
-│  └── Commit & push                                                       │
+│  ├── Triggered by: workflow_run(ci.yml completed on main)                │
+│  ├── Gate: only proceeds if CI conclusion == 'success'                   │
+│  ├── Build API + Workers images with :prod-<sha> tags                    │
+│  ├── Push to ACR                                                         │
+│  ├── (Optional) Update k8s/overlays/prod/ via GitHub App                 │
+│  └── Deploy frontend to SWA production slot                              │
 │         │                                                                │
 │         ▼                                                                │
 │  Argo CD (prod-app detects manifest change)                              │
 │  └── Syncs: applies new Deployments to AKS (yt-summarizer namespace)     │
 │         │                                                                │
 │         ▼                                                                │
-│  Production updated ✅ (automatic, no approval gate)                     │
+│  Production updated ✅ (automatic, waits for CI, no manual approval)     │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  CLEANUP FLOW                                                            │
+│  CLEANUP FLOW (Automatic via Pull Request Generator)                     │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  PR closed/merged                                                        │
+│  PR closed or merged                                                     │
 │         │                                                                │
 │         ▼                                                                │
-│  GitHub Actions (preview-cleanup.yml)                                    │
-│  ├── Delete k8s/overlays/previews/pr-<num>/                              │
-│  └── Commit & push                                                       │
+│  Argo CD ApplicationSet (Pull Request Generator polls GitHub)            │
+│  └── Detects PR is no longer open                                        │
+│  └── Automatically deletes Application: yt-summarizer-pr-<num>           │
+│  └── Prunes resources from namespace (preview cleaned up)                │
 │         │                                                                │
 │         ▼                                                                │
-│  Argo CD (ApplicationSet detects overlay deleted)                        │
-│  └── Deletes Application: preview-pr-<num>                               │
-│  └── Prunes namespace: preview-pr-<num>                                  │
-│         │                                                                │
-│         ▼                                                                │
-│  Preview resources cleaned up ✅                                         │
+│  Preview resources cleaned up ✅ (automatic, no workflow needed)         │
+│                                                                          │
+│  Note: No preview-cleanup.yml workflow required with PR Generator!       │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 
@@ -404,30 +416,42 @@ Phase 2: Foundational ─────────────┼──► Phase 
 
 ---
 
-## Key Artifacts to Create/Update
+## Key Artifacts Created/Updated (Final State)
 
-### New Workflows
-- `.github/workflows/preview.yml` - PR preview deployment
-- `.github/workflows/preview-cleanup.yml` - PR preview cleanup
-- `.github/workflows/deploy-prod.yml` - Production auto-deploy on merge
+### Workflows (Current State)
+- `.github/workflows/ci.yml` - All tests + linting + **build-frontend** (catches TypeScript errors)
+- `.github/workflows/preview.yml` - PR preview deployment (backend to AKS, frontend to SWA staging)
+- `.github/workflows/deploy-prod.yml` - Production auto-deploy (triggered by `workflow_run` after CI passes)
+- `.github/workflows/infra.yml` - Terraform plan/apply
 
-### Workflows to Delete
+### Workflows Deleted
 - `.github/workflows/build-push.yml` - Replaced by preview.yml + deploy-prod.yml
 - `.github/workflows/cd-production.yml` - Replaced by deploy-prod.yml (auto, no approval)
+- `.github/workflows/preview-cleanup.yml` - **NOT NEEDED** (Pull Request Generator auto-prunes)
 
-### New K8s Manifests
+### K8s Manifests (Current State)
+- `k8s/base/` - Base manifests (deployments, services, ingress, etc.)
 - `k8s/overlays/prod/` - Single production overlay
-- `k8s/overlays/previews/_template/` - Preview overlay templates
+- `k8s/overlays/preview/` - Template for PR previews (lives in PR branch)
 - `k8s/argocd/prod-app.yaml` - Production Argo Application
-- `k8s/argocd/preview-appset.yaml` - Preview ApplicationSet
+- `k8s/argocd/preview-appset.yaml` - ApplicationSet with **Pull Request Generator**
 
-### K8s Manifests to Delete
-- `k8s/overlays/staging/` - No longer needed
+### K8s Manifests Deleted
+- `k8s/overlays/staging/` - No long-lived staging environment
 - `k8s/overlays/production/` - Replaced by `prod/`
+- `k8s/overlays/previews/_template/` - Template approach replaced by PR Generator
 - `k8s/argocd/staging-app.yaml` - No staging environment
 - `k8s/argocd/production-app.yaml` - Replaced by `prod-app.yaml`
 
-### Terraform Changes
-- `infra/terraform/environments/prod/` - Consolidated environment
-- Delete `infra/terraform/environments/staging/`
-- Delete `infra/terraform/environments/production/`
+### Terraform State
+- `infra/terraform/environments/prod/` - Single environment (Azure resources only)
+- Deleted: `infra/terraform/environments/staging/`, `infra/terraform/environments/production/`
+- Deleted modules: `nginx-ingress/`, `external-secrets/`, `argocd/` (now managed by Argo CD)
+
+### Key Architecture Notes
+1. **Pull Request Generator** (not template-based): Argo CD polls GitHub API to discover open PRs
+2. **Preview overlays in PR branch**: `k8s/overlays/preview/` lives in the PR branch, not main
+3. **Automatic cleanup**: When PR closes, Argo CD auto-prunes (no cleanup workflow needed)
+4. **CI gating**: deploy-prod.yml uses `workflow_run` event to wait for CI to pass
+5. **Frontend previews**: SWA staging environments created automatically for each PR
+6. **Build verification**: CI runs `npm run build` to catch TypeScript errors before merge
