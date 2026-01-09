@@ -28,10 +28,12 @@ RUN pip install uv
 
 # Copy shared package first (for layer caching)
 COPY services/shared/pyproject.toml /app/shared/
+COPY services/shared/README.md /app/shared/
 COPY services/shared/shared/ /app/shared/shared/
 
 # Copy workers dependency files
 COPY services/workers/pyproject.toml ./
+COPY services/workers/README.md ./
 
 # Create virtual environment and install dependencies
 RUN uv venv /app/.venv
@@ -69,6 +71,8 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
+COPY services/shared/pyproject.toml /app/shared/
+COPY services/shared/README.md /app/shared/
 COPY services/shared/shared/ /app/shared/shared/
 COPY services/workers/transcribe/ ./transcribe/
 COPY services/workers/summarize/ ./summarize/

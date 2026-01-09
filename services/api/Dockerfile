@@ -26,10 +26,12 @@ RUN pip install uv
 
 # Copy shared package first (for layer caching)
 COPY services/shared/pyproject.toml /app/shared/
+COPY services/shared/README.md /app/shared/
 COPY services/shared/shared/ /app/shared/shared/
 
 # Copy API dependency files
 COPY services/api/pyproject.toml ./
+COPY services/api/README.md ./
 
 # Create virtual environment and install dependencies
 RUN uv venv /app/.venv
