@@ -47,19 +47,19 @@
 - [X] T012 [P] Create Azure Storage module (blob + queue) in `infra/terraform/modules/storage/main.tf`
 - [X] T013 [P] Create Azure SQL Database module in `infra/terraform/modules/sql-database/main.tf`
 - [X] T014 [P] Create Azure Key Vault module in `infra/terraform/modules/key-vault/main.tf`
-- [ ] T015 **REMOVED** ~~Create nginx-ingress controller module~~ → Now managed by Argo CD
-- [ ] T016 **REMOVED** ~~Create External Secrets Operator module~~ → Now managed by Argo CD
-- [ ] T017 **REMOVED** ~~Add ESO SecretStore for Azure Key Vault~~ → Now K8s manifest applied by Argo CD
+- [X] T015 **REMOVED** ~~Create nginx-ingress controller module~~ → Now managed by Argo CD
+- [X] T016 **REMOVED** ~~Create External Secrets Operator module~~ → Now managed by Argo CD
+- [X] T017 **REMOVED** ~~Add ESO SecretStore for Azure Key Vault~~ → Now K8s manifest applied by Argo CD
 - [X] T018 Consolidate staging+production environments to single `infra/terraform/environments/prod/main.tf` (delete `staging/`)
-- [ ] T018a **NEW** Remove Helm/Kubernetes providers from `infra/terraform/environments/prod/providers.tf`
-- [ ] T018b **NEW** Delete obsolete Terraform modules: `nginx-ingress/`, `external-secrets/`, `argocd/`
-- [ ] T018c **NEW** Update `infra/terraform/environments/prod/main.tf` to remove Helm module references
+- [X] T018a Remove Helm/Kubernetes providers from `infra/terraform/environments/prod/providers.tf`
+- [X] T018b Delete obsolete Terraform modules: `nginx-ingress/`, `external-secrets/`, `argocd/`
+- [X] T018c Update `infra/terraform/environments/prod/main.tf` to remove Helm module references
 
 ### Cluster Bootstrap (Argo CD Managed)
 
-- [ ] T018d **NEW** Create Argo CD bootstrap script `scripts/bootstrap-argocd.ps1`
-- [ ] T018e **NEW** Create Argo CD infrastructure apps manifest `k8s/argocd/infra-apps.yaml` (ingress-nginx, external-secrets)
-- [ ] T018f **NEW** Create SecretStore manifest for ESO → Azure Key Vault in `k8s/base/secretstore.yaml`
+- [X] T018d Create Argo CD bootstrap script `scripts/bootstrap-argocd.ps1`
+- [X] T018e Create Argo CD infrastructure apps manifest `k8s/argocd/infra-apps.yaml` (ingress-nginx, external-secrets)
+- [X] T018f Create SecretStore manifest for ESO → Azure Key Vault in `k8s/base/secretstore.yaml`
 
 ### K8s Base Manifests (unchanged)
 
@@ -199,8 +199,8 @@
 - [X] T076 [US4] Create infrastructure workflow in `.github/workflows/infra.yml`
 - [X] T077 [US4] Add Terraform plan output as PR comment
 - [X] T078 [US4] Create infrastructure deployment script in `scripts/deploy-infra.ps1`
-- [ ] T079 [US4] **REMOVED** ~~Add Argo CD Helm installation to Terraform AKS module~~ → Now bootstrap script
-- [ ] T079a [US4] **NEW** Create Argo CD bootstrap script in `scripts/bootstrap-argocd.ps1`
+- [X] T079 **REMOVED** ~~Add Argo CD Helm installation to Terraform AKS module~~ → Now bootstrap script
+- [X] T079a Create Argo CD bootstrap script in `scripts/bootstrap-argocd.ps1`
 - [X] T080 [US4] Configure Argo CD GitHub OIDC app credentials in Terraform
 - [X] T081 [US4] Create Argo CD project configuration for yt-summarizer
 
