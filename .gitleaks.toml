@@ -21,6 +21,10 @@ useDefault = true
     # Test fixtures
     '''.*test.*fixture.*''',
     '''.*__snapshots__.*''',
+    # Documentation with example passwords
+    '''docs/.*\.md''',
+    # Runbooks with example values
+    '''docs/runbooks/.*\.md''',
   ]
   
   # Regex patterns that are not secrets
@@ -31,4 +35,6 @@ useDefault = true
     '''\$\{var\..*password.*\}''',
     # Example/placeholder values
     '''CHANGE_ME|REPLACE_ME|your-.*-here|example-.*''',
+    # Documentation example passwords
+    '''YourSecurePassword123!''',
   ]
