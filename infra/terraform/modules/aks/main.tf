@@ -46,7 +46,7 @@ variable "kubernetes_version" {
 variable "node_pool_name" {
   description = "Name of the default node pool"
   type        = string
-  default     = "default"
+  default     = "system2"
 }
 
 variable "node_count" {
@@ -58,13 +58,19 @@ variable "node_count" {
 variable "node_vm_size" {
   description = "VM size for nodes"
   type        = string
-  default     = "Standard_B2s"
+  default     = "Standard_B4als_v2"  # 4 vCPUs, 8GB RAM, ~$97/month
 }
 
 variable "os_disk_size_gb" {
   description = "OS disk size in GB"
   type        = number
   default     = 30
+}
+
+variable "max_pods" {
+  description = "Maximum number of pods per node"
+  type        = number
+  default     = 100
 }
 
 variable "acr_id" {
@@ -112,6 +118,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
     node_count           = var.node_count
     vm_size              = var.node_vm_size
     os_disk_size_gb      = var.os_disk_size_gb
+    max_pods             = var.max_pods
     auto_scaling_enabled = false  # Renamed from enable_auto_scaling in azurerm 4.x
   }
 

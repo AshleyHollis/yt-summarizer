@@ -134,9 +134,10 @@ module "aks" {
   dns_prefix          = local.name_prefix
   kubernetes_version  = var.kubernetes_version
 
-  # Single-node for cost savings (~$30/month)
-  node_count   = 1
-  node_vm_size = var.aks_node_size
+  # Single-node for cost savings (~$97/month)
+  node_count     = 1
+  node_vm_size   = var.aks_node_size
+  node_pool_name = "system2"
 
   # ACR integration
   acr_id = module.acr.id
