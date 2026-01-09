@@ -1,0 +1,122 @@
+# =============================================================================
+# E2E Tests against Preview Environments
+# =============================================================================
+# Runs Playwright E2E tests against a deployed preview environment.
+# Triggered after Argo CD deploys a PR preview environment.
+
+name: E2E Preview
+
+on:
+  # Triggered by deployment workflow or manually
+  workflow_dispatch:
+    inputs:
+      environment_url:
+        description: 'Base URL of the preview environment (e.g., https://pr-123.preview.ytsumm.dev)'
+        required: true
+        type: string
+      api_url:
+        description: 'API URL of the preview environment (e.g., https://api-pr-123.preview.ytsumm.dev)'
+        required: true
+        type: string
+      pr_number:
+        description: 'PR number for status reporting'
+        required: false
+        type: string
+
+  # Can also be called by other workflows
+  workflow_call:
+    inputs:
+      environment_url:
+        description: 'Base URL of the preview environment'
+        required: true
+        type: string
+      api_url:
+        description: 'API URL of the preview environment'
+        required: true
+        type: string
+      pr_number:
+        description: 'PR number for status reporting'
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for environment to be ready
+        run: |
+          echo "Waiting for preview environment to be ready..."
+          for i in {1..30}; do
+            if curl -sf "${{ inputs.environment_url }}" > /dev/null 2>&1; then
+              echo "✓ Frontend is ready"
+              break
+            fi
+            echo "  Attempt $i/30 - Frontend not ready, waiting 10s..."
+            sleep 10
+          done
+          
+          for i in {1..30}; do
+            if curl -sf "${{ inputs.api_url }}/health/live" > /dev/null 2>&1; then
+              echo "✓ API is ready"
+              break
+            fi
+            echo "  Attempt $i/30 - API not ready, waiting 10s..."
+            sleep 10
+          done
+
+      - name: Run E2E tests
+        working-directory: apps/web
+        env:
+          USE_EXTERNAL_SERVER: "true"
+          BASE_URL: ${{ inputs.environment_url }}
+          NEXT_PUBLIC_API_URL: ${{ inputs.api_url }}
+          API_URL: ${{ inputs.api_url }}
+        run: npx playwright test --reporter=html
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-pr-${{ inputs.pr_number || 'manual' }}
+          path: apps/web/playwright-report/
+          retention-days: 7
+
+      - name: Comment on PR with results
+        if: inputs.pr_number && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
+            const reportUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt('${{ inputs.pr_number }}'),
+              body: `## E2E Test Results ${status}\n\n` +
+                    `**Environment:** ${{ inputs.environment_url }}\n` +
+                    `**Status:** ${{ job.status }}\n\n` +
+                    `[View Playwright Report](${reportUrl})`
+            });

@@ -133,7 +133,10 @@ class TestApiVersioning:
         # Videos endpoint should exist under v1
         response = client.get("/api/v1/videos/00000000-0000-0000-0000-000000000000")
         # 404 is expected for non-existent video, but route should exist
-        assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_422_UNPROCESSABLE_ENTITY]
+        assert response.status_code in [
+            status.HTTP_404_NOT_FOUND,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ]
 
     def test_root_redirects_or_returns_info(self, client):
         """Test that root endpoint returns info or redirects."""
@@ -175,6 +178,7 @@ class TestHealthEndpointComprehensiveChecks:
     def test_health_endpoint_performance(self, client):
         """Test that /health endpoint responds quickly (under 1 second)."""
         import time
+
         start = time.time()
         response = client.get("/health")
         elapsed = time.time() - start
@@ -225,41 +229,40 @@ class TestHealthUptimeCalculation:
     def test_health_uptime_increases_over_time(self, client):
         """Test that uptime increases between requests."""
         import time
-        
+
         response1 = client.get("/health")
         data1 = response1.json()
         uptime1 = data1.get("uptime_seconds")
-        
+
         # Skip test if uptime is not available (test environment)
         if uptime1 is None:
             pytest.skip("uptime_seconds not available in test environment")
-        
+
         # Wait a bit
         time.sleep(0.1)
-        
+
         response2 = client.get("/health")
         data2 = response2.json()
         uptime2 = data2.get("uptime_seconds")
-        
+
         assert uptime2 is not None
         assert uptime2 >= uptime1, "Uptime should increase over time"
 
     def test_health_started_at_is_valid_iso_datetime(self, client):
         """Test that started_at is a valid ISO datetime string."""
         from datetime import datetime
-        
+
         response = client.get("/health")
         data = response.json()
         started_at = data.get("started_at")
-        
+
         # Skip test if started_at is not available (test environment)
         if started_at is None:
             pytest.skip("started_at not available in test environment")
-        
+
         # Should be parseable as ISO datetime
         try:
             parsed = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
             assert parsed is not None
         except ValueError as e:
             pytest.fail(f"started_at is not a valid ISO datetime: {e}")
-

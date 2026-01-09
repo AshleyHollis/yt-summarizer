@@ -1,0 +1,154 @@
+# =============================================================================
+# Argo CD Infrastructure Applications
+# =============================================================================
+# These applications manage cluster-level infrastructure components.
+# Apply AFTER bootstrapping Argo CD with: ./scripts/bootstrap-argocd.ps1
+#
+# Usage:
+#   kubectl apply -f k8s/argocd/infra-apps.yaml
+# =============================================================================
+
+---
+# -----------------------------------------------------------------------------
+# Ingress NGINX Controller
+# Provides external access to services via Ingress resources
+# -----------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: 4.9.1
+    helm:
+      valuesObject:
+        controller:
+          replicaCount: 1
+          # Cost-optimized resource limits for single-node cluster
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # LoadBalancer for Azure external IP
+          service:
+            type: LoadBalancer
+            annotations:
+              service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /healthz
+          # Enable metrics for observability
+          metrics:
+            enabled: true
+          # Admission webhooks for Ingress validation
+          admissionWebhooks:
+            enabled: true
+        # Default backend for 404 responses
+        defaultBackend:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+---
+# -----------------------------------------------------------------------------
+# External Secrets Operator
+# Syncs secrets from Azure Key Vault to Kubernetes Secrets
+# -----------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: 0.9.13
+    helm:
+      valuesObject:
+        installCRDs: true
+        # Cost-optimized resource limits
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        webhook:
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+        certController:
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+---
+# -----------------------------------------------------------------------------
+# SecretStore for Azure Key Vault
+# Configures External Secrets to connect to Azure Key Vault
+# Note: Requires AKS Workload Identity to be configured
+# -----------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: eso-secretstore
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Wait for ESO CRDs to be installed first
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    targetRevision: main
+    path: k8s/base
+    directory:
+      include: "secretstore.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yt-summarizer
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

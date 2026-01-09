@@ -10,9 +10,9 @@ import sqlalchemy as sa
 from shared.config import get_settings
 from shared.db.connection import get_db
 from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_running
-from shared.db.models import Job, Relationship, Segment, Video
+from shared.db.models import Relationship, Video
 from shared.logging.config import get_logger
-from shared.queue.client import RELATIONSHIPS_QUEUE, get_queue_client
+from shared.queue.client import RELATIONSHIPS_QUEUE
 from shared.worker.base_worker import BaseWorker, WorkerResult, run_worker
 
 logger = get_logger(__name__)
@@ -132,7 +132,6 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
     async def _get_video_embeddings(self, video_id: str) -> list[list[float]]:
         """Get all embeddings for a video."""
         import json
-        from uuid import UUID
 
         db = get_db()
         async with db.session() as session:
@@ -145,7 +144,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
                     AND Embedding IS NOT NULL
                     ORDER BY sequence_number
                 """),
-                {"video_id": str(video_id)}
+                {"video_id": str(video_id)},
             )
 
             embeddings = []
@@ -160,9 +159,9 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
                     elif isinstance(embedding_str, bytes):
                         # Fallback for binary format (legacy)
                         num_floats = len(embedding_str) // 4
-                        embedding = list(struct.unpack(f'{num_floats}f', embedding_str))
+                        embedding = list(struct.unpack(f"{num_floats}f", embedding_str))
                         embeddings.append(embedding)
-            
+
             return embeddings
 
     def _average_embeddings(self, embeddings: list[list[float]]) -> list[float]:
@@ -190,7 +189,6 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
         Uses batch processing to limit memory usage for large libraries.
         Returns list of (video_id, similarity_score) tuples.
         """
-        import json
 
         settings = get_settings()
         similarity_threshold = getattr(
@@ -213,7 +211,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
                     WHERE video_id != :current_video_id 
                     AND Embedding IS NOT NULL
                 """),
-                {"current_video_id": str(current_video_id)}
+                {"current_video_id": str(current_video_id)},
             )
             all_video_ids = [str(row[0]) for row in video_ids_result.fetchall()]
 
@@ -228,8 +226,8 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
             current_arr = np.array(current_embedding)
 
             for batch_start in range(0, len(all_video_ids), DEFAULT_BATCH_SIZE):
-                batch_video_ids = all_video_ids[batch_start:batch_start + DEFAULT_BATCH_SIZE]
-                
+                batch_video_ids = all_video_ids[batch_start : batch_start + DEFAULT_BATCH_SIZE]
+
                 # Fetch embeddings for this batch of videos
                 batch_similarities = await self._process_video_batch(
                     session,
@@ -251,13 +249,13 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
         similarity_threshold: float,
     ) -> list[tuple[str, float]]:
         """Process a batch of videos and compute similarities.
-        
+
         Args:
             session: Database session
             video_ids: List of video IDs to process
             current_arr: Current video's average embedding as numpy array
             similarity_threshold: Minimum similarity score to include
-            
+
         Returns:
             List of (video_id, similarity_score) tuples above threshold
         """
@@ -273,7 +271,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
                 WHERE video_id IN ({placeholders})
                 AND Embedding IS NOT NULL
             """),
-            params
+            params,
         )
 
         # Group embeddings by video
@@ -288,7 +286,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
                 elif isinstance(embedding_str, bytes):
                     # Fallback for binary format (legacy)
                     num_floats = len(embedding_str) // 4
-                    embedding = list(struct.unpack(f'{num_floats}f', embedding_str))
+                    embedding = list(struct.unpack(f"{num_floats}f", embedding_str))
                 else:
                     continue
                 if vid not in video_embeddings:
@@ -328,9 +326,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
 
             # Delete existing relationships for this video (as source)
             await session.execute(
-                delete(Relationship).where(
-                    Relationship.source_video_id == UUID(video_id)
-                )
+                delete(Relationship).where(Relationship.source_video_id == UUID(video_id))
             )
 
             # Create new relationships
@@ -364,9 +360,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
         async with db.session() as session:
             from sqlalchemy import select
 
-            result = await session.execute(
-                select(Video).where(Video.video_id == UUID(video_id))
-            )
+            result = await session.execute(select(Video).where(Video.video_id == UUID(video_id)))
             video = result.scalar_one_or_none()
 
             if video:

@@ -26,7 +26,7 @@ except ImportError:
 
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
-    
+
     def inject_trace_context(message):
         return message
 
@@ -72,9 +72,7 @@ class JobService:
         Returns:
             JobResponse or None if not found.
         """
-        result = await self.session.execute(
-            select(Job).where(Job.job_id == job_id)
-        )
+        result = await self.session.execute(select(Job).where(Job.job_id == job_id))
         job = result.scalar_one_or_none()
 
         if not job:
@@ -169,18 +167,14 @@ class JobService:
             VideoJobsProgress or None if video not found.
         """
         # Check video exists
-        video_result = await self.session.execute(
-            select(Video).where(Video.video_id == video_id)
-        )
+        video_result = await self.session.execute(select(Video).where(Video.video_id == video_id))
         video = video_result.scalar_one_or_none()
         if not video:
             return None
 
         # Get all jobs for this video
         result = await self.session.execute(
-            select(Job)
-            .where(Job.video_id == video_id)
-            .order_by(Job.created_at.asc())
+            select(Job).where(Job.video_id == video_id).order_by(Job.created_at.asc())
         )
         jobs = result.scalars().all()
 
@@ -226,16 +220,13 @@ class JobService:
         # Calculate ETA for in-progress videos
         eta_info = None
         current_stage_name = None
-        
+
         if overall_status in ("pending", "processing"):
             # Find the current running job
-            current_job = next(
-                (j for j in jobs if j.status == JobStatus.RUNNING.value),
-                None
-            )
+            current_job = next((j for j in jobs if j.status == JobStatus.RUNNING.value), None)
             current_job_type = current_job.job_type if current_job else None
             current_job_started = current_job.started_at if current_job else None
-            
+
             # Find the FIRST job's started_at for UI anchor (not current job)
             # This ensures the countdown doesn't reset when stages change
             first_job_started = None
@@ -243,7 +234,7 @@ class JobService:
                 if job.started_at:
                     if first_job_started is None or job.started_at < first_job_started:
                         first_job_started = job.started_at
-            
+
             # Human-readable stage names
             stage_names = {
                 "transcribe": "Extracting Transcript",
@@ -251,10 +242,10 @@ class JobService:
                 "embed": "Creating Embeddings",
                 "build_relationships": "Finding Related Videos",
             }
-            
+
             if current_job_type:
                 current_stage_name = stage_names.get(current_job_type, current_job_type)
-            
+
             try:
                 stats_service = StatsService(self.session)
                 eta_data = await stats_service.calculate_eta(
@@ -263,7 +254,7 @@ class JobService:
                     current_job_started_at=current_job_started,
                     first_job_started_at=first_job_started,
                 )
-                
+
                 eta_info = ETAInfo(
                     estimated_seconds_remaining=eta_data["estimated_seconds_remaining"],
                     estimated_total_seconds=eta_data["estimated_total_seconds"],
@@ -311,9 +302,7 @@ class JobService:
         Returns:
             RetryJobResponse or None if job not found.
         """
-        result = await self.session.execute(
-            select(Job).where(Job.job_id == job_id)
-        )
+        result = await self.session.execute(select(Job).where(Job.job_id == job_id))
         job = result.scalar_one_or_none()
 
         if not job:
@@ -352,13 +341,15 @@ class JobService:
 
             queue_client.send_message(
                 queue_name,
-                inject_trace_context({
-                    "job_id": str(job.job_id),
-                    "video_id": str(job.video_id),
-                    "youtube_video_id": video.youtube_video_id if video else "",
-                    "correlation_id": correlation_id,
-                    "retry_count": job.retry_count,
-                }),
+                inject_trace_context(
+                    {
+                        "job_id": str(job.job_id),
+                        "video_id": str(job.video_id),
+                        "youtube_video_id": video.youtube_video_id if video else "",
+                        "correlation_id": correlation_id,
+                        "retry_count": job.retry_count,
+                    }
+                ),
             )
             logger.info("Queued retry job", job_id=str(job.job_id))
         except Exception as e:
@@ -392,9 +383,7 @@ class JobService:
         Returns:
             Updated JobResponse or None if not found.
         """
-        result = await self.session.execute(
-            select(Job).where(Job.job_id == job_id)
-        )
+        result = await self.session.execute(select(Job).where(Job.job_id == job_id))
         job = result.scalar_one_or_none()
 
         if not job:
@@ -438,18 +427,14 @@ class JobService:
             VideoProcessingHistory or None if video not found.
         """
         # Get video
-        video_result = await self.session.execute(
-            select(Video).where(Video.video_id == video_id)
-        )
+        video_result = await self.session.execute(select(Video).where(Video.video_id == video_id))
         video = video_result.scalar_one_or_none()
         if not video:
             return None
 
         # Get jobs for this video
         jobs_result = await self.session.execute(
-            select(Job)
-            .where(Job.video_id == video_id)
-            .order_by(Job.created_at.asc())
+            select(Job).where(Job.video_id == video_id).order_by(Job.created_at.asc())
         )
         jobs = jobs_result.scalars().all()
 
@@ -458,7 +443,7 @@ class JobService:
         averages = await stats_service.get_all_average_processing_times(
             video_duration_seconds=video.duration
         )
-        
+
         # Get enforced delay estimates
         enforced_delays = await stats_service.get_average_enforced_delays()
 
@@ -493,7 +478,7 @@ class JobService:
 
             # Get estimated wait from the first job (transcribe) where queue wait applies
             estimated_wait_for_stage = None
-            if job_type == "transcribe" and hasattr(job, 'estimated_wait_seconds'):
+            if job_type == "transcribe" and hasattr(job, "estimated_wait_seconds"):
                 estimated_wait_for_stage = job.estimated_wait_seconds
                 if estimated_wait_for_stage:
                     total_estimated_wait = estimated_wait_for_stage

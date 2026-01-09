@@ -4,11 +4,10 @@ These tests verify that job status updates correctly propagate to
 BatchItem and Batch counts, which is critical for batch progress tracking.
 """
 
-import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
 
 # =============================================================================
 # Test Fixtures
@@ -103,7 +102,7 @@ def create_mock_video(video_id, processing_status="pending"):
 
 class TestBatchItemStatusTransitions:
     """Tests for BatchItem status transition logic.
-    
+
     These tests verify the core rules:
     - When first job starts running → batch item goes to "running"
     - When any job fails → batch item goes to "failed"
@@ -128,24 +127,22 @@ class TestBatchItemStatusTransitions:
         video = create_mock_video(sample_video_id)
 
         mock_session = AsyncMock()
-        
+
         # Setup mock query results
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
-        
+
         batch_item_result = MagicMock()
         batch_item_result.scalar_one_or_none.return_value = batch_item
-        
+
         batch_result = MagicMock()
         batch_result.scalar_one_or_none.return_value = batch
-        
+
         video_result = MagicMock()
         video_result.scalar_one_or_none.return_value = video
-        
+
         # Return different results for different queries
-        mock_session.execute = AsyncMock(
-            side_effect=[job_result, batch_item_result, batch_result]
-        )
+        mock_session.execute = AsyncMock(side_effect=[job_result, batch_item_result, batch_result])
 
         mock_db = MagicMock()
         mock_db.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
@@ -153,15 +150,15 @@ class TestBatchItemStatusTransitions:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import update_job_status
-            
+
             await update_job_status(str(sample_job_id), status="running")
 
         # Verify job was updated
         assert job.status == "running"
-        
+
         # Verify batch item was updated to running
         assert batch_item.status == "running"
-        
+
         # Verify batch counts were updated
         assert batch.pending_count == 9  # decremented
         assert batch.running_count == 1  # incremented
@@ -183,16 +180,16 @@ class TestBatchItemStatusTransitions:
         video = create_mock_video(sample_video_id, "processing")
 
         mock_session = AsyncMock()
-        
+
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
-        
+
         batch_item_result = MagicMock()
         batch_item_result.scalar_one_or_none.return_value = batch_item
-        
+
         video_result = MagicMock()
         video_result.scalar_one_or_none.return_value = video
-        
+
         batch_result = MagicMock()
         batch_result.scalar_one_or_none.return_value = batch
 
@@ -206,7 +203,7 @@ class TestBatchItemStatusTransitions:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import update_job_status
-            
+
             await update_job_status(
                 str(sample_job_id),
                 status="failed",
@@ -216,14 +213,14 @@ class TestBatchItemStatusTransitions:
         # Verify job was updated
         assert job.status == "failed"
         assert job.error_message == "Transcription failed"
-        
+
         # Verify batch item was updated to failed
         assert batch_item.status == "failed"
-        
+
         # Verify video was updated
         assert video.processing_status == "failed"
         assert video.error_message == "Transcription failed"
-        
+
         # Verify batch counts
         assert batch.running_count == 4  # decremented
         assert batch.failed_count == 1  # incremented
@@ -245,16 +242,16 @@ class TestBatchItemStatusTransitions:
         video = create_mock_video(sample_video_id, "processing")
 
         mock_session = AsyncMock()
-        
+
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
-        
+
         batch_item_result = MagicMock()
         batch_item_result.scalar_one_or_none.return_value = batch_item
-        
+
         video_result = MagicMock()
         video_result.scalar_one_or_none.return_value = video
-        
+
         batch_result = MagicMock()
         batch_result.scalar_one_or_none.return_value = batch
 
@@ -268,22 +265,22 @@ class TestBatchItemStatusTransitions:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import update_job_status
-            
+
             await update_job_status(str(sample_job_id), status="succeeded")
 
         # Verify job was updated
         assert job.status == "succeeded"
-        
+
         # Verify batch item was updated to succeeded
         assert batch_item.status == "succeeded"
-        
+
         # Verify video processing status was updated
         assert video.processing_status == "completed"
-        
+
         # Verify batch counts
         assert batch.running_count == 0  # decremented
         assert batch.succeeded_count == 1  # incremented
-        
+
         # Verify batch is marked complete (no pending or running)
         assert batch.completed_at is not None
 
@@ -304,7 +301,7 @@ class TestBatchItemStatusTransitions:
             batch = create_mock_batch(sample_batch_id, pending_count=0, running_count=5)
 
             mock_session = AsyncMock()
-            
+
             job_result = MagicMock()
             job_result.scalar_one_or_none.return_value = job
 
@@ -316,12 +313,12 @@ class TestBatchItemStatusTransitions:
 
             with patch("shared.db.job_service.get_db", return_value=mock_db):
                 from shared.db.job_service import update_job_status
-                
+
                 await update_job_status(str(sample_job_id), status="succeeded")
 
             # Verify job was updated
             assert job.status == "succeeded"
-            
+
             # Verify batch item was NOT updated (still running)
             # The status update should not be called for intermediate jobs
             assert batch_item.status == "running"
@@ -353,16 +350,16 @@ class TestBatchCountUpdates:
         video = create_mock_video(sample_video_id, "processing")
 
         mock_session = AsyncMock()
-        
+
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
-        
+
         batch_item_result = MagicMock()
         batch_item_result.scalar_one_or_none.return_value = batch_item
-        
+
         video_result = MagicMock()
         video_result.scalar_one_or_none.return_value = video
-        
+
         batch_result = MagicMock()
         batch_result.scalar_one_or_none.return_value = batch
 
@@ -376,7 +373,7 @@ class TestBatchCountUpdates:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import update_job_status
-            
+
             await update_job_status(str(sample_job_id), status="succeeded")
 
         # Verify batch is marked complete
@@ -407,16 +404,16 @@ class TestBatchCountUpdates:
         video = create_mock_video(sample_video_id, "processing")
 
         mock_session = AsyncMock()
-        
+
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
-        
+
         batch_item_result = MagicMock()
         batch_item_result.scalar_one_or_none.return_value = batch_item
-        
+
         video_result = MagicMock()
         video_result.scalar_one_or_none.return_value = video
-        
+
         batch_result = MagicMock()
         batch_result.scalar_one_or_none.return_value = batch
 
@@ -430,7 +427,7 @@ class TestBatchCountUpdates:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import update_job_status
-            
+
             await update_job_status(str(sample_job_id), status="succeeded")
 
         # Verify batch is NOT marked complete (still has pending)
@@ -441,9 +438,7 @@ class TestJobWithoutBatch:
     """Tests for jobs that are not part of a batch."""
 
     @pytest.mark.asyncio
-    async def test_job_without_batch_updates_only_job(
-        self, sample_video_id, sample_job_id
-    ):
+    async def test_job_without_batch_updates_only_job(self, sample_video_id, sample_job_id):
         """Jobs without batch_id should only update the job, not batch."""
         job = create_mock_job(
             sample_job_id,
@@ -454,7 +449,7 @@ class TestJobWithoutBatch:
         )
 
         mock_session = AsyncMock()
-        
+
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
 
@@ -466,12 +461,12 @@ class TestJobWithoutBatch:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import update_job_status
-            
+
             await update_job_status(str(sample_job_id), status="running")
 
         # Verify job was updated
         assert job.status == "running"
-        
+
         # Verify only one execute call (for the job query, no batch queries)
         assert mock_session.execute.call_count == 1
 
@@ -501,7 +496,7 @@ class TestHelperFunctions:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import mark_job_running
-            
+
             await mark_job_running(str(sample_job_id))
 
         assert job.status == "running"
@@ -529,7 +524,7 @@ class TestHelperFunctions:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import mark_job_completed
-            
+
             await mark_job_completed(str(sample_job_id))
 
         assert job.status == "succeeded"
@@ -558,7 +553,7 @@ class TestHelperFunctions:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import mark_job_failed
-            
+
             await mark_job_failed(str(sample_job_id), "Test error message")
 
         assert job.status == "failed"
@@ -586,16 +581,16 @@ class TestVideoProcessingStatusSync:
         video = create_mock_video(sample_video_id, "processing")
 
         mock_session = AsyncMock()
-        
+
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
-        
+
         batch_item_result = MagicMock()
         batch_item_result.scalar_one_or_none.return_value = batch_item
-        
+
         video_result = MagicMock()
         video_result.scalar_one_or_none.return_value = video
-        
+
         batch_result = MagicMock()
         batch_result.scalar_one_or_none.return_value = batch
 
@@ -609,7 +604,7 @@ class TestVideoProcessingStatusSync:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import update_job_status
-            
+
             await update_job_status(
                 str(sample_job_id),
                 status="failed",
@@ -637,16 +632,16 @@ class TestVideoProcessingStatusSync:
         video = create_mock_video(sample_video_id, "processing")
 
         mock_session = AsyncMock()
-        
+
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
-        
+
         batch_item_result = MagicMock()
         batch_item_result.scalar_one_or_none.return_value = batch_item
-        
+
         video_result = MagicMock()
         video_result.scalar_one_or_none.return_value = video
-        
+
         batch_result = MagicMock()
         batch_result.scalar_one_or_none.return_value = batch
 
@@ -660,7 +655,7 @@ class TestVideoProcessingStatusSync:
 
         with patch("shared.db.job_service.get_db", return_value=mock_db):
             from shared.db.job_service import update_job_status
-            
+
             await update_job_status(str(sample_job_id), status="succeeded")
 
         # Verify video was updated to completed

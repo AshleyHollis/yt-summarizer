@@ -160,10 +160,10 @@ class Job(Base, TimestampMixin):
 
 class JobHistory(Base):
     """Historical record of completed job processing times.
-    
+
     Used for:
     - ETA calculations based on rolling averages
-    - Queue position visibility  
+    - Queue position visibility
     - Processing time analytics correlated with video duration
     - Wait time analysis for queue optimization
     - Enforced delay tracking (e.g., yt-dlp subtitle sleep)

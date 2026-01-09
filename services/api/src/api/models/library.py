@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .base import BaseResponse, PaginatedResponse, TimestampMixin
+from .base import BaseResponse, TimestampMixin
 
 
 class ProcessingStatusFilter(str, Enum):
@@ -97,7 +97,9 @@ class VideoDetailResponse(BaseResponse, TimestampMixin):
     processing_status: str = Field(description="Current processing status")
     summary: str | None = Field(default=None, description="AI-generated summary")
     summary_artifact: ArtifactInfo | None = Field(default=None, description="Summary artifact info")
-    transcript_artifact: ArtifactInfo | None = Field(default=None, description="Transcript artifact info")
+    transcript_artifact: ArtifactInfo | None = Field(
+        default=None, description="Transcript artifact info"
+    )
     segment_count: int = Field(default=0, description="Number of transcript segments")
     relationship_count: int = Field(default=0, description="Number of related videos")
     facets: list[FacetTag] = Field(default_factory=list, description="Video facets/tags")
@@ -114,7 +116,9 @@ class VideoListResponse(BaseResponse):
     @property
     def total_pages(self) -> int:
         """Calculate total pages."""
-        return (self.total_count + self.page_size - 1) // self.page_size if self.page_size > 0 else 0
+        return (
+            (self.total_count + self.page_size - 1) // self.page_size if self.page_size > 0 else 0
+        )
 
     @property
     def has_next(self) -> bool:
@@ -155,7 +159,9 @@ class VideoFilterParams(BaseModel):
     from_date: date | None = Field(default=None, description="Filter by publish date (from)")
     to_date: date | None = Field(default=None, description="Filter by publish date (to)")
     facets: list[UUID] | None = Field(default=None, description="Filter by facet IDs")
-    status: ProcessingStatusFilter | None = Field(default=None, description="Filter by processing status")
+    status: ProcessingStatusFilter | None = Field(
+        default=None, description="Filter by processing status"
+    )
     search: str | None = Field(default=None, description="Text search in title/description")
     sort_by: SortField = Field(default=SortField.PUBLISH_DATE, description="Sort field")
     sort_order: SortOrder = Field(default=SortOrder.DESC, description="Sort order")

@@ -30,20 +30,22 @@ except ImportError:
 
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
-    
+
     def inject_trace_context(message):
         return message
 
 
 from ..models.batch import (
     BatchDetailResponse,
-    BatchItem as BatchItemResponse,
     BatchItemStatus,
     BatchListResponse,
     BatchResponse,
     BatchRetryResponse,
     BatchStatus,
     CreateBatchRequest,
+)
+from ..models.batch import (
+    BatchItem as BatchItemResponse,
 )
 from ..models.job import JobStage, JobStatus, JobType
 from .channel_service import ChannelService
@@ -95,9 +97,7 @@ class BatchService:
             logger.info("Fetching all channel videos for ingest_all")
             # Build channel URL from youtube_channel_id
             channel_url = f"https://www.youtube.com/channel/{request.youtube_channel_id}"
-            all_video_ids = await self.youtube_service.fetch_all_channel_video_ids(
-                channel_url
-            )
+            all_video_ids = await self.youtube_service.fetch_all_channel_video_ids(channel_url)
             video_ids_to_ingest = all_video_ids
             logger.info(
                 "Fetched all channel video IDs",
@@ -114,9 +114,7 @@ class BatchService:
         elif request.youtube_channel_id:
             # Try to find channel by YouTube ID
             result = await self.session.execute(
-                select(Channel).where(
-                    Channel.youtube_channel_id == request.youtube_channel_id
-                )
+                select(Channel).where(Channel.youtube_channel_id == request.youtube_channel_id)
             )
             channel = result.scalar_one_or_none()
 
@@ -257,14 +255,16 @@ class BatchService:
             queue_client = get_queue_client()
             queue_client.send_message(
                 TRANSCRIBE_QUEUE,
-                inject_trace_context({
-                    "job_id": str(job.job_id),
-                    "video_id": str(video.video_id),
-                    "youtube_video_id": youtube_video_id,
-                    "channel_name": channel.name,
-                    "batch_id": str(batch.batch_id),
-                    "correlation_id": correlation_id,
-                }),
+                inject_trace_context(
+                    {
+                        "job_id": str(job.job_id),
+                        "video_id": str(video.video_id),
+                        "youtube_video_id": youtube_video_id,
+                        "channel_name": channel.name,
+                        "batch_id": str(batch.batch_id),
+                        "correlation_id": correlation_id,
+                    }
+                ),
             )
         except Exception as e:
             logger.warning(
@@ -328,16 +328,10 @@ class BatchService:
                 thumbnail_url = sorted_thumbs[0].get("url") if sorted_thumbs else None
 
             if not thumbnail_url:
-                thumbnail_url = (
-                    f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg"
-                )
+                thumbnail_url = f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg"
 
-            channel_id = (
-                info.get("channel_id") or info.get("uploader_id") or "UC_unknown"
-            )
-            channel_name = (
-                info.get("channel") or info.get("uploader") or "Unknown Channel"
-            )
+            channel_id = info.get("channel_id") or info.get("uploader_id") or "UC_unknown"
+            channel_name = info.get("channel") or info.get("uploader") or "Unknown Channel"
 
             return {
                 "title": info.get("title") or f"Video {youtube_video_id}",
@@ -354,7 +348,7 @@ class BatchService:
 
         except Exception as e:
             error_str = str(e).lower()
-            
+
             # Check for specific error patterns that indicate video doesn't exist
             video_not_found_patterns = [
                 "video unavailable",
@@ -369,7 +363,7 @@ class BatchService:
                 "is not a valid url",
                 "no video formats found",
             ]
-            
+
             if any(pattern in error_str for pattern in video_not_found_patterns):
                 logger.warning(
                     "Video not found on YouTube",
@@ -377,7 +371,7 @@ class BatchService:
                     error=str(e),
                 )
                 raise ValueError(f"Video not found or unavailable on YouTube: {youtube_video_id}")
-            
+
             # For other errors, also raise to prevent creating bad data
             logger.warning(
                 "Failed to fetch video metadata",
@@ -494,9 +488,7 @@ class BatchService:
         result = await self.session.execute(
             select(Batch)
             .options(
-                selectinload(Batch.items)
-                .selectinload(BatchItem.video)
-                .selectinload(Video.channel),
+                selectinload(Batch.items).selectinload(BatchItem.video).selectinload(Video.channel),
                 selectinload(Batch.channel),
             )
             .where(Batch.batch_id == batch_id)
@@ -548,18 +540,20 @@ class BatchService:
                         channel_name = item.video.channel.name
                     elif batch.channel:
                         channel_name = batch.channel.name
-                    
+
                     queue_client = get_queue_client()
                     queue_client.send_message(
                         TRANSCRIBE_QUEUE,
-                        inject_trace_context({
-                            "job_id": str(job.job_id),
-                            "video_id": str(item.video_id),
-                            "youtube_video_id": item.video.youtube_video_id,
-                            "channel_name": channel_name,
-                            "batch_id": str(batch_id),
-                            "correlation_id": correlation_id,
-                        }),
+                        inject_trace_context(
+                            {
+                                "job_id": str(job.job_id),
+                                "video_id": str(item.video_id),
+                                "youtube_video_id": item.video.youtube_video_id,
+                                "channel_name": channel_name,
+                                "batch_id": str(batch_id),
+                                "correlation_id": correlation_id,
+                            }
+                        ),
                     )
                 except Exception as e:
                     logger.warning(
@@ -600,9 +594,7 @@ class BatchService:
         result = await self.session.execute(
             select(Batch)
             .options(
-                selectinload(Batch.items)
-                .selectinload(BatchItem.video)
-                .selectinload(Video.channel),
+                selectinload(Batch.items).selectinload(BatchItem.video).selectinload(Video.channel),
                 selectinload(Batch.channel),
             )
             .where(Batch.batch_id == batch_id)
@@ -658,18 +650,20 @@ class BatchService:
                     channel_name = item.video.channel.name
                 elif batch.channel:
                     channel_name = batch.channel.name
-                
+
                 queue_client = get_queue_client()
                 queue_client.send_message(
                     TRANSCRIBE_QUEUE,
-                    inject_trace_context({
-                        "job_id": str(job.job_id),
-                        "video_id": str(item.video_id),
-                        "youtube_video_id": item.video.youtube_video_id,
-                        "channel_name": channel_name,
-                        "batch_id": str(batch_id),
-                        "correlation_id": correlation_id,
-                    }),
+                    inject_trace_context(
+                        {
+                            "job_id": str(job.job_id),
+                            "video_id": str(item.video_id),
+                            "youtube_video_id": item.video.youtube_video_id,
+                            "channel_name": channel_name,
+                            "batch_id": str(batch_id),
+                            "correlation_id": correlation_id,
+                        }
+                    ),
                 )
             except Exception as e:
                 logger.warning(
@@ -708,7 +702,10 @@ class BatchService:
             return BatchStatus.PENDING
         elif batch.running_count > 0:
             return BatchStatus.RUNNING
-        elif batch.failed_count > 0 and batch.succeeded_count + batch.failed_count == batch.total_count:
+        elif (
+            batch.failed_count > 0
+            and batch.succeeded_count + batch.failed_count == batch.total_count
+        ):
             return BatchStatus.FAILED
         elif batch.succeeded_count == batch.total_count:
             return BatchStatus.COMPLETED

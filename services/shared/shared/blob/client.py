@@ -3,7 +3,6 @@
 import hashlib
 import os
 import re
-from io import BytesIO
 from typing import BinaryIO
 from urllib.parse import urlparse
 
@@ -20,59 +19,59 @@ SUMMARIES_CONTAINER = "summaries"
 
 def sanitize_channel_name(channel_name: str) -> str:
     """Sanitize channel name for use as a blob storage folder name.
-    
+
     Azure Blob Storage folder names must be valid and URL-safe.
     This function:
     - Converts to lowercase for consistency
     - Replaces spaces with hyphens
     - Removes or replaces special characters
     - Limits length to 63 characters (Azure limit for blob prefixes)
-    
+
     Args:
         channel_name: The channel name to sanitize.
-    
+
     Returns:
         A sanitized, URL-safe folder name.
     """
     if not channel_name:
         return "unknown-channel"
-    
+
     # Convert to lowercase
     name = channel_name.lower()
-    
+
     # Replace spaces and underscores with hyphens
     name = re.sub(r"[\s_]+", "-", name)
-    
+
     # Remove any characters that aren't alphanumeric or hyphens
     name = re.sub(r"[^a-z0-9-]", "", name)
-    
+
     # Remove consecutive hyphens
     name = re.sub(r"-+", "-", name)
-    
+
     # Remove leading/trailing hyphens
     name = name.strip("-")
-    
+
     # Ensure we have something left
     if not name:
         return "unknown-channel"
-    
+
     # Limit length (Azure blob prefix limit)
     if len(name) > 63:
         name = name[:63].rstrip("-")
-    
+
     return name
 
 
 def get_transcript_blob_path(channel_name: str, youtube_video_id: str) -> str:
     """Get the blob path for a transcript file.
-    
+
     Organizes transcripts by channel name for easy navigation in blob storage.
     Pattern: {sanitized_channel_name}/{youtube_video_id}/transcript.txt
-    
+
     Args:
         channel_name: The YouTube channel name.
         youtube_video_id: The YouTube video ID.
-    
+
     Returns:
         The blob path for the transcript file.
     """
@@ -82,14 +81,14 @@ def get_transcript_blob_path(channel_name: str, youtube_video_id: str) -> str:
 
 def get_segments_blob_path(channel_name: str, youtube_video_id: str) -> str:
     """Get the blob path for a segments file.
-    
+
     Organizes segments by channel name for easy navigation in blob storage.
     Pattern: {sanitized_channel_name}/{youtube_video_id}/segments.json
-    
+
     Args:
         channel_name: The YouTube channel name.
         youtube_video_id: The YouTube video ID.
-    
+
     Returns:
         The blob path for the segments file.
     """
@@ -99,14 +98,14 @@ def get_segments_blob_path(channel_name: str, youtube_video_id: str) -> str:
 
 def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
     """Get the blob path for a summary file.
-    
+
     Organizes summaries by channel name for easy navigation in blob storage.
     Pattern: {sanitized_channel_name}/{youtube_video_id}/summary.md
-    
+
     Args:
         channel_name: The YouTube channel name.
         youtube_video_id: The YouTube video ID.
-    
+
     Returns:
         The blob path for the summary file.
     """
@@ -116,14 +115,14 @@ def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
 
 def convert_uri_to_connection_string(uri: str, service: str = "blob") -> str:
     """Convert an Aspire-style URI to an Azurite connection string.
-    
+
     Aspire passes URIs like: http://127.0.0.1:32773/devstoreaccount1
     We need to convert to a full connection string for Azurite.
-    
+
     Args:
         uri: The URI from Aspire (e.g., http://127.0.0.1:32773/devstoreaccount1)
         service: The service type (blob, queue, table)
-    
+
     Returns:
         A full Azurite connection string.
     """
@@ -132,13 +131,15 @@ def convert_uri_to_connection_string(uri: str, service: str = "blob") -> str:
     port = parsed.port or 10000  # Default blob port
     account = parsed.path.strip("/") if parsed.path else "devstoreaccount1"
     protocol = parsed.scheme or "http"
-    
+
     # Azurite well-known account key
-    account_key = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
-    
+    account_key = (
+        "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+    )
+
     # Build the connection string with the blob endpoint
     blob_endpoint = f"{protocol}://{host}:{port}/{account}"
-    
+
     return (
         f"DefaultEndpointsProtocol={protocol};"
         f"AccountName={account};"
@@ -149,33 +150,33 @@ def convert_uri_to_connection_string(uri: str, service: str = "blob") -> str:
 
 def get_connection_string() -> str:
     """Get Azure Storage connection string from environment.
-    
+
     Supports multiple environment variable formats:
     1. AZURE_STORAGE_CONNECTION_STRING - Standard Azure SDK format
     2. ConnectionStrings__storage - .NET Aspire storage connection string
     3. ConnectionStrings__blobs - .NET Aspire blobs endpoint
-    
+
     Aspire may pass a URI (http://...) or a full connection string.
     If a URI is passed, we convert it to a proper Azurite connection string.
     """
     conn_str = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-    
+
     if not conn_str:
         conn_str = os.environ.get("ConnectionStrings__storage")
     if not conn_str:
         conn_str = os.environ.get("ConnectionStrings__blobs")
-    
+
     if not conn_str:
         raise ValueError(
             "Azure Storage connection string not found. Set one of: "
             "AZURE_STORAGE_CONNECTION_STRING, ConnectionStrings__storage, "
             "or ConnectionStrings__blobs"
         )
-    
+
     # Check if Aspire passed a URI instead of a connection string
     if conn_str.startswith("http://") or conn_str.startswith("https://"):
         conn_str = convert_uri_to_connection_string(conn_str)
-    
+
     return conn_str
 
 
@@ -185,12 +186,12 @@ def create_blob_service_client(
     account_url: str | None = None,
 ) -> BlobServiceClient:
     """Create a synchronous BlobServiceClient.
-    
+
     Args:
         connection_string: Azure Storage connection string.
         use_managed_identity: If True, use DefaultAzureCredential.
         account_url: Storage account URL (required if using managed identity).
-    
+
     Returns:
         BlobServiceClient instance.
     """
@@ -199,10 +200,10 @@ def create_blob_service_client(
             raise ValueError("account_url is required when using managed identity")
         credential = DefaultAzureCredential()
         return BlobServiceClient(account_url, credential=credential)
-    
+
     if connection_string is None:
         connection_string = get_connection_string()
-    
+
     return BlobServiceClient.from_connection_string(connection_string)
 
 
@@ -212,12 +213,12 @@ def create_async_blob_service_client(
     account_url: str | None = None,
 ) -> AsyncBlobServiceClient:
     """Create an async BlobServiceClient.
-    
+
     Args:
         connection_string: Azure Storage connection string.
         use_managed_identity: If True, use DefaultAzureCredential.
         account_url: Storage account URL (required if using managed identity).
-    
+
     Returns:
         AsyncBlobServiceClient instance.
     """
@@ -226,19 +227,19 @@ def create_async_blob_service_client(
             raise ValueError("account_url is required when using managed identity")
         credential = DefaultAzureCredential()
         return AsyncBlobServiceClient(account_url, credential=credential)
-    
+
     if connection_string is None:
         connection_string = get_connection_string()
-    
+
     return AsyncBlobServiceClient.from_connection_string(connection_string)
 
 
 def compute_content_hash(content: bytes) -> str:
     """Compute SHA-256 hash of content.
-    
+
     Args:
         content: The content to hash.
-    
+
     Returns:
         Hex-encoded SHA-256 hash.
     """
@@ -247,7 +248,7 @@ def compute_content_hash(content: bytes) -> str:
 
 class BlobClient:
     """Wrapper for Azure Blob Storage operations."""
-    
+
     def __init__(
         self,
         connection_string: str | None = None,
@@ -255,7 +256,7 @@ class BlobClient:
         account_url: str | None = None,
     ):
         """Initialize the blob client.
-        
+
         Args:
             connection_string: Azure Storage connection string.
             use_managed_identity: If True, use DefaultAzureCredential.
@@ -265,7 +266,7 @@ class BlobClient:
         self._use_managed_identity = use_managed_identity
         self._account_url = account_url
         self._client: BlobServiceClient | None = None
-    
+
     @property
     def client(self) -> BlobServiceClient:
         """Get or create the blob service client."""
@@ -276,10 +277,10 @@ class BlobClient:
                 account_url=self._account_url,
             )
         return self._client
-    
+
     def ensure_container(self, container_name: str) -> None:
         """Ensure a container exists, creating it if needed.
-        
+
         Args:
             container_name: Name of the container.
         """
@@ -288,7 +289,7 @@ class BlobClient:
             container_client.create_container()
         except ResourceExistsError:
             pass  # Container already exists
-    
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -303,22 +304,22 @@ class BlobClient:
         overwrite: bool = True,
     ) -> str:
         """Upload content to a blob.
-        
+
         Args:
             container_name: Name of the container.
             blob_name: Name of the blob.
             content: Content to upload (bytes or file-like object).
             content_type: MIME type of the content.
             overwrite: If True, overwrite existing blob.
-        
+
         Returns:
             The blob URI.
         """
         self.ensure_container(container_name)
-        
+
         blob_client = self.client.get_blob_client(container_name, blob_name)
         content_settings = ContentSettings(content_type=content_type)
-        
+
         if isinstance(content, bytes):
             blob_client.upload_blob(
                 content,
@@ -331,9 +332,9 @@ class BlobClient:
                 content_settings=content_settings,
                 overwrite=overwrite,
             )
-        
+
         return blob_client.url
-    
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -345,37 +346,37 @@ class BlobClient:
         blob_name: str,
     ) -> bytes:
         """Download blob content.
-        
+
         Args:
             container_name: Name of the container.
             blob_name: Name of the blob.
-        
+
         Returns:
             The blob content as bytes.
-        
+
         Raises:
             ResourceNotFoundError: If the blob doesn't exist.
         """
         blob_client = self.client.get_blob_client(container_name, blob_name)
         downloader = blob_client.download_blob()
         return downloader.readall()
-    
+
     def blob_exists(self, container_name: str, blob_name: str) -> bool:
         """Check if a blob exists.
-        
+
         Args:
             container_name: Name of the container.
             blob_name: Name of the blob.
-        
+
         Returns:
             True if the blob exists, False otherwise.
         """
         blob_client = self.client.get_blob_client(container_name, blob_name)
         return blob_client.exists()
-    
+
     def delete_blob(self, container_name: str, blob_name: str) -> None:
         """Delete a blob.
-        
+
         Args:
             container_name: Name of the container.
             blob_name: Name of the blob.
@@ -385,20 +386,20 @@ class BlobClient:
             blob_client.delete_blob()
         except ResourceNotFoundError:
             pass  # Blob doesn't exist
-    
+
     def get_blob_url(self, container_name: str, blob_name: str) -> str:
         """Get the URL for a blob.
-        
+
         Args:
             container_name: Name of the container.
             blob_name: Name of the blob.
-        
+
         Returns:
             The blob URL.
         """
         blob_client = self.client.get_blob_client(container_name, blob_name)
         return blob_client.url
-    
+
     def close(self) -> None:
         """Close the blob service client."""
         if self._client is not None:

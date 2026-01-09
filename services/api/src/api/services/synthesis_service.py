@@ -7,7 +7,6 @@ Orchestrates the creation of structured outputs from library content:
 Uses the existing search and copilot infrastructure.
 """
 
-from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -21,11 +20,11 @@ try:
 except ImportError:
     import logging
     from typing import Any as AnyType
-    
+
     Channel = AnyType
     Segment = AnyType
     Video = AnyType
-    
+
     def get_logger(name):
         return logging.getLogger(name)
 
@@ -59,14 +58,14 @@ MIN_DURATION_FOR_LEARNING_PATH = 60  # seconds
 
 class SynthesisService:
     """Service for synthesizing structured outputs from library content."""
-    
+
     def __init__(
-        self, 
+        self,
         session: AsyncSession,
         llm_service: LLMService | None = None,
     ):
         """Initialize the synthesis service.
-        
+
         Args:
             session: Database session.
             llm_service: Optional LLM service (uses singleton if not provided).
@@ -74,18 +73,18 @@ class SynthesisService:
         self.session = session
         self.search_service = SearchService(session)
         self.llm_service = llm_service or get_llm_service()
-    
+
     async def synthesize(self, request: SynthesizeRequest) -> SynthesizeResponse:
         """Synthesize a structured output from library content.
-        
+
         Args:
             request: The synthesis request with type, query, and optional scope.
-            
+
         Returns:
             SynthesizeResponse with either learning_path or watch_list.
         """
         correlation_id = request.correlation_id or "unknown"
-        
+
         logger.info(
             "Processing synthesis request",
             synthesis_type=request.synthesis_type.value,
@@ -93,7 +92,7 @@ class SynthesisService:
             max_items=request.max_items,
             correlation_id=correlation_id,
         )
-        
+
         # Find relevant videos using search
         videos = await self._find_relevant_videos(
             query=request.query,
@@ -101,14 +100,13 @@ class SynthesisService:
             max_items=request.max_items * 2,  # Get more than needed for ranking
             correlation_id=correlation_id,
         )
-        
+
         # For learning paths, filter out shorts (videos under MIN_DURATION_FOR_LEARNING_PATH)
         # Shorts lack sufficient content depth for meaningful pedagogical ordering
         if request.synthesis_type == SynthesisType.LEARNING_PATH:
             original_count = len(videos)
             videos = [
-                v for v in videos 
-                if (v.get("duration") or 0) >= MIN_DURATION_FOR_LEARNING_PATH
+                v for v in videos if (v.get("duration") or 0) >= MIN_DURATION_FOR_LEARNING_PATH
             ]
             filtered_count = original_count - len(videos)
             if filtered_count > 0:
@@ -116,21 +114,21 @@ class SynthesisService:
                     f"Filtered {filtered_count} short videos (< {MIN_DURATION_FOR_LEARNING_PATH}s) from learning path",
                     correlation_id=correlation_id,
                 )
-        
+
         # Check if we have enough content
         min_required = (
-            MIN_VIDEOS_FOR_LEARNING_PATH 
-            if request.synthesis_type == SynthesisType.LEARNING_PATH 
+            MIN_VIDEOS_FOR_LEARNING_PATH
+            if request.synthesis_type == SynthesisType.LEARNING_PATH
             else MIN_VIDEOS_FOR_WATCH_LIST
         )
-        
+
         if len(videos) < min_required:
             return self._create_insufficient_content_response(
                 synthesis_type=request.synthesis_type,
                 found_count=len(videos),
                 min_required=min_required,
             )
-        
+
         # Synthesize based on type
         if request.synthesis_type == SynthesisType.LEARNING_PATH:
             return await self._synthesize_learning_path(
@@ -146,7 +144,7 @@ class SynthesisService:
                 max_items=request.max_items,
                 correlation_id=correlation_id,
             )
-    
+
     async def _find_relevant_videos(
         self,
         query: str,
@@ -155,13 +153,13 @@ class SynthesisService:
         correlation_id: str,
     ) -> list[dict[str, Any]]:
         """Find videos relevant to the synthesis query.
-        
+
         Args:
             query: The user's synthesis query.
             scope: Optional scope filters.
             max_items: Maximum number of videos to return.
             correlation_id: Correlation ID for logging.
-            
+
         Returns:
             List of video dictionaries with metadata.
         """
@@ -172,13 +170,12 @@ class SynthesisService:
                 scope=scope,
                 top_k=max_items * 3,  # Get more segments to group by video
             )
-            
+
             # Try to get embedding for semantic search
             try:
                 query_embedding = await self.llm_service.get_embedding(query)
                 search_result = await self.search_service.search_segments(
-                    search_request, 
-                    query_embedding
+                    search_request, query_embedding
                 )
             except Exception as embed_error:
                 logger.warning(
@@ -189,7 +186,7 @@ class SynthesisService:
                 search_result = await self.search_service.fallback_text_search_segments(
                     search_request
                 )
-            
+
             # Group segments by video and rank videos
             video_scores: dict[UUID, dict] = {}
             for segment in search_result.segments:
@@ -203,58 +200,60 @@ class SynthesisService:
                         "segments": [],
                     }
                 video_scores[video_id]["score"] += segment.score
-                video_scores[video_id]["segments"].append({
-                    "segment_id": segment.segment_id,
-                    "text": segment.text,
-                    "start_time": segment.start_time,
-                    "end_time": segment.end_time,
-                    "youtube_url": segment.youtube_url,
-                })
-            
+                video_scores[video_id]["segments"].append(
+                    {
+                        "segment_id": segment.segment_id,
+                        "text": segment.text,
+                        "start_time": segment.start_time,
+                        "end_time": segment.end_time,
+                        "youtube_url": segment.youtube_url,
+                    }
+                )
+
             # Sort by aggregate score and limit
             sorted_videos = sorted(
                 video_scores.values(),
                 key=lambda v: v["score"],
                 reverse=True,
             )[:max_items]
-            
+
             # Fetch full video details
             enriched_videos = []
             for video_data in sorted_videos:
                 video_details = await self._get_video_details(video_data["video_id"])
                 if video_details:
-                    enriched_videos.append({
-                        **video_data,
-                        "youtube_video_id": video_details.get("youtube_video_id"),
-                        "thumbnail_url": video_details.get("thumbnail_url"),
-                        "duration": video_details.get("duration"),
-                        "description": video_details.get("description"),
-                    })
-            
+                    enriched_videos.append(
+                        {
+                            **video_data,
+                            "youtube_video_id": video_details.get("youtube_video_id"),
+                            "thumbnail_url": video_details.get("thumbnail_url"),
+                            "duration": video_details.get("duration"),
+                            "description": video_details.get("description"),
+                        }
+                    )
+
             return enriched_videos
-            
+
         except Exception as e:
             logger.error(
                 f"Failed to find relevant videos: {e}",
                 correlation_id=correlation_id,
             )
             return []
-    
+
     async def _get_video_details(self, video_id: UUID) -> dict[str, Any] | None:
         """Get full video details from database.
-        
+
         Args:
             video_id: The video ID.
-            
+
         Returns:
             Video details dictionary or None.
         """
         try:
-            result = await self.session.execute(
-                select(Video).where(Video.video_id == video_id)
-            )
+            result = await self.session.execute(select(Video).where(Video.video_id == video_id))
             video = result.scalar_one_or_none()
-            
+
             if video:
                 return {
                     "video_id": video.video_id,
@@ -268,7 +267,7 @@ class SynthesisService:
         except Exception as e:
             logger.warning(f"Failed to get video details: {e}")
             return None
-    
+
     async def _synthesize_learning_path(
         self,
         videos: list[dict[str, Any]],
@@ -277,27 +276,29 @@ class SynthesisService:
         correlation_id: str,
     ) -> SynthesizeResponse:
         """Synthesize a learning path from videos.
-        
+
         Uses LLM to determine optimal ordering based on:
         - Prerequisites and dependencies
         - Complexity progression
         - Topic flow
-        
+
         Args:
             videos: List of relevant videos with metadata.
             query: The user's original query.
             max_items: Maximum number of items to include.
             correlation_id: Correlation ID for logging.
-            
+
         Returns:
             SynthesizeResponse with learning_path populated.
         """
         # Build prompt for LLM to order and explain videos
-        video_descriptions = "\n".join([
-            f"Video {i+1}: {v['title']} - {v.get('description', 'No description')[:200]}"
-            for i, v in enumerate(videos[:max_items])
-        ])
-        
+        video_descriptions = "\n".join(
+            [
+                f"Video {i + 1}: {v['title']} - {v.get('description', 'No description')[:200]}"
+                for i, v in enumerate(videos[:max_items])
+            ]
+        )
+
         system_prompt = """You are a learning path curator. Given a set of videos, create an optimal learning sequence.
 Order videos from beginner to advanced. For each video, explain why it should be at that position.
 
@@ -330,7 +331,7 @@ Return a JSON object with:
   "coverage_summary": "Summary of what topics are covered",
   "gaps": ["Topics not covered that might be useful"]
 }"""
-        
+
         user_prompt = f"""Create a learning path for: "{query}"
 
 Available videos (numbered 1 to {len(videos[:max_items])}):
@@ -344,20 +345,20 @@ Remember: prerequisites must be integer order numbers only (e.g., [1] or [1, 2])
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
             )
-            
+
             # Parse LLM response and build learning path
             learning_path = self._parse_learning_path_response(
                 llm_response=llm_response,
                 videos=videos,
                 query=query,
             )
-            
+
             return SynthesizeResponse(
                 synthesis_type=SynthesisType.LEARNING_PATH,
                 learning_path=learning_path,
                 insufficient_content=False,
             )
-            
+
         except Exception as e:
             logger.error(
                 f"Failed to generate learning path with LLM: {e}",
@@ -368,7 +369,7 @@ Remember: prerequisites must be integer order numbers only (e.g., [1] or [1, 2])
                 videos=videos[:max_items],
                 query=query,
             )
-    
+
     async def _synthesize_watch_list(
         self,
         videos: list[dict[str, Any]],
@@ -377,24 +378,26 @@ Remember: prerequisites must be integer order numbers only (e.g., [1] or [1, 2])
         correlation_id: str,
     ) -> SynthesizeResponse:
         """Synthesize a watch list from videos.
-        
+
         Uses LLM to prioritize and explain recommendations.
-        
+
         Args:
             videos: List of relevant videos with metadata.
             query: The user's original query.
             max_items: Maximum number of items to include.
             correlation_id: Correlation ID for logging.
-            
+
         Returns:
             SynthesizeResponse with watch_list populated.
         """
         # Build prompt for LLM to prioritize and explain
-        video_descriptions = "\n".join([
-            f"Video {i+1}: {v['title']} - {v.get('description', 'No description')[:200]}"
-            for i, v in enumerate(videos[:max_items])
-        ])
-        
+        video_descriptions = "\n".join(
+            [
+                f"Video {i + 1}: {v['title']} - {v.get('description', 'No description')[:200]}"
+                for i, v in enumerate(videos[:max_items])
+            ]
+        )
+
         system_prompt = """You are a content curator. Given a set of videos, create a prioritized watch list.
 For each video, assign a priority (high/medium/low) and explain why it's recommended.
 Return a JSON object with:
@@ -412,7 +415,7 @@ Return a JSON object with:
   "criteria": "Criteria used to select these videos",
   "gaps": ["Topics not covered that might be useful"]
 }"""
-        
+
         user_prompt = f"""Create a watch list for: "{query}"
 
 Available videos:
@@ -425,20 +428,20 @@ Prioritize these videos based on relevance and importance."""
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
             )
-            
+
             # Parse LLM response and build watch list
             watch_list = self._parse_watch_list_response(
                 llm_response=llm_response,
                 videos=videos,
                 query=query,
             )
-            
+
             return SynthesizeResponse(
                 synthesis_type=SynthesisType.WATCH_LIST,
                 watch_list=watch_list,
                 insufficient_content=False,
             )
-            
+
         except Exception as e:
             logger.error(
                 f"Failed to generate watch list with LLM: {e}",
@@ -449,7 +452,7 @@ Prioritize these videos based on relevance and importance."""
                 videos=videos[:max_items],
                 query=query,
             )
-    
+
     def _parse_learning_path_response(
         self,
         llm_response: dict[str, Any],
@@ -457,35 +460,37 @@ Prioritize these videos based on relevance and importance."""
         query: str,
     ) -> LearningPath:
         """Parse LLM response into a LearningPath object.
-        
+
         Args:
             llm_response: JSON response from LLM.
             videos: Original video list.
             query: User's original query.
-            
+
         Returns:
             LearningPath object.
         """
         items = []
         total_duration = 0
-        
+
         for item_data in llm_response.get("items", []):
             video_index = item_data.get("video_index", 0)
             if video_index < len(videos):
                 video = videos[video_index]
                 duration = video.get("duration", 0) or 0
                 total_duration += duration
-                
+
                 # Build evidence from video segments
                 evidence = []
                 for seg in video.get("segments", [])[:3]:  # Limit to 3 evidence items
-                    evidence.append(LearningPathEvidence(
-                        video_id=video["video_id"],
-                        segment_id=seg.get("segment_id"),
-                        segment_text=seg.get("text", "")[:200],
-                        youtube_url=seg.get("youtube_url"),
-                    ))
-                
+                    evidence.append(
+                        LearningPathEvidence(
+                            video_id=video["video_id"],
+                            segment_id=seg.get("segment_id"),
+                            segment_text=seg.get("text", "")[:200],
+                            youtube_url=seg.get("youtube_url"),
+                        )
+                    )
+
                 # Parse prerequisites - handle both integers and strings gracefully
                 raw_prereqs = item_data.get("prerequisites", [])
                 parsed_prereqs = []
@@ -499,21 +504,23 @@ Prioritize these videos based on relevance and importance."""
                         except ValueError:
                             # Skip text-based prerequisites
                             pass
-                
-                items.append(LearningPathItem(
-                    order=item_data.get("order", len(items) + 1),
-                    video_id=video["video_id"],
-                    youtube_video_id=video.get("youtube_video_id", ""),
-                    title=video.get("title", "Unknown"),
-                    channel_name=video.get("channel_name", "Unknown"),
-                    thumbnail_url=video.get("thumbnail_url"),
-                    duration=duration,
-                    rationale=item_data.get("rationale", "Relevant to your query"),
-                    learning_objectives=item_data.get("learning_objectives", []),
-                    prerequisites=parsed_prereqs,
-                    evidence=evidence,
-                ))
-        
+
+                items.append(
+                    LearningPathItem(
+                        order=item_data.get("order", len(items) + 1),
+                        video_id=video["video_id"],
+                        youtube_video_id=video.get("youtube_video_id", ""),
+                        title=video.get("title", "Unknown"),
+                        channel_name=video.get("channel_name", "Unknown"),
+                        thumbnail_url=video.get("thumbnail_url"),
+                        duration=duration,
+                        rationale=item_data.get("rationale", "Relevant to your query"),
+                        learning_objectives=item_data.get("learning_objectives", []),
+                        prerequisites=parsed_prereqs,
+                        evidence=evidence,
+                    )
+                )
+
         return LearningPath(
             title=llm_response.get("title", f"Learning Path: {query[:50]}"),
             description=llm_response.get("description", f"A curated learning path for {query}"),
@@ -522,7 +529,7 @@ Prioritize these videos based on relevance and importance."""
             coverage_summary=llm_response.get("coverage_summary", ""),
             gaps=llm_response.get("gaps", []),
         )
-    
+
     def _parse_watch_list_response(
         self,
         llm_response: dict[str, Any],
@@ -530,44 +537,46 @@ Prioritize these videos based on relevance and importance."""
         query: str,
     ) -> WatchList:
         """Parse LLM response into a WatchList object.
-        
+
         Args:
             llm_response: JSON response from LLM.
             videos: Original video list.
             query: User's original query.
-            
+
         Returns:
             WatchList object.
         """
         items = []
         total_duration = 0
-        
+
         for item_data in llm_response.get("items", []):
             video_index = item_data.get("video_index", 0)
             if video_index < len(videos):
                 video = videos[video_index]
                 duration = video.get("duration", 0) or 0
                 total_duration += duration
-                
+
                 priority_str = item_data.get("priority", "medium").lower()
                 priority = {
                     "high": Priority.HIGH,
                     "medium": Priority.MEDIUM,
                     "low": Priority.LOW,
                 }.get(priority_str, Priority.MEDIUM)
-                
-                items.append(WatchListItem(
-                    video_id=video["video_id"],
-                    youtube_video_id=video.get("youtube_video_id", ""),
-                    title=video.get("title", "Unknown"),
-                    channel_name=video.get("channel_name", "Unknown"),
-                    thumbnail_url=video.get("thumbnail_url"),
-                    duration=duration,
-                    priority=priority,
-                    reason=item_data.get("reason", "Relevant to your interests"),
-                    tags=item_data.get("tags", []),
-                ))
-        
+
+                items.append(
+                    WatchListItem(
+                        video_id=video["video_id"],
+                        youtube_video_id=video.get("youtube_video_id", ""),
+                        title=video.get("title", "Unknown"),
+                        channel_name=video.get("channel_name", "Unknown"),
+                        thumbnail_url=video.get("thumbnail_url"),
+                        duration=duration,
+                        priority=priority,
+                        reason=item_data.get("reason", "Relevant to your interests"),
+                        tags=item_data.get("tags", []),
+                    )
+                )
+
         return WatchList(
             title=llm_response.get("title", f"Watch List: {query[:50]}"),
             description=llm_response.get("description", f"Curated videos for {query}"),
@@ -576,54 +585,58 @@ Prioritize these videos based on relevance and importance."""
             criteria=llm_response.get("criteria", "Videos selected based on relevance"),
             gaps=llm_response.get("gaps", []),
         )
-    
+
     def _create_simple_learning_path(
         self,
         videos: list[dict[str, Any]],
         query: str,
     ) -> SynthesizeResponse:
         """Create a simple learning path without LLM (fallback).
-        
+
         Orders videos by relevance score.
-        
+
         Args:
             videos: List of videos.
             query: User's query.
-            
+
         Returns:
             SynthesizeResponse with learning_path.
         """
         items = []
         total_duration = 0
-        
+
         for i, video in enumerate(videos):
             duration = video.get("duration", 0) or 0
             total_duration += duration
-            
+
             # Build evidence from video segments
             evidence = []
             for seg in video.get("segments", [])[:3]:
-                evidence.append(LearningPathEvidence(
+                evidence.append(
+                    LearningPathEvidence(
+                        video_id=video["video_id"],
+                        segment_id=seg.get("segment_id"),
+                        segment_text=seg.get("text", "")[:200],
+                        youtube_url=seg.get("youtube_url"),
+                    )
+                )
+
+            items.append(
+                LearningPathItem(
+                    order=i + 1,
                     video_id=video["video_id"],
-                    segment_id=seg.get("segment_id"),
-                    segment_text=seg.get("text", "")[:200],
-                    youtube_url=seg.get("youtube_url"),
-                ))
-            
-            items.append(LearningPathItem(
-                order=i + 1,
-                video_id=video["video_id"],
-                youtube_video_id=video.get("youtube_video_id", ""),
-                title=video.get("title", "Unknown"),
-                channel_name=video.get("channel_name", "Unknown"),
-                thumbnail_url=video.get("thumbnail_url"),
-                duration=duration,
-                rationale=f"Ranked #{i+1} by relevance to your query",
-                learning_objectives=[],
-                prerequisites=list(range(1, i + 1)) if i > 0 else [],
-                evidence=evidence,
-            ))
-        
+                    youtube_video_id=video.get("youtube_video_id", ""),
+                    title=video.get("title", "Unknown"),
+                    channel_name=video.get("channel_name", "Unknown"),
+                    thumbnail_url=video.get("thumbnail_url"),
+                    duration=duration,
+                    rationale=f"Ranked #{i + 1} by relevance to your query",
+                    learning_objectives=[],
+                    prerequisites=list(range(1, i + 1)) if i > 0 else [],
+                    evidence=evidence,
+                )
+            )
+
         return SynthesizeResponse(
             synthesis_type=SynthesisType.LEARNING_PATH,
             learning_path=LearningPath(
@@ -636,30 +649,30 @@ Prioritize these videos based on relevance and importance."""
             ),
             insufficient_content=False,
         )
-    
+
     def _create_simple_watch_list(
         self,
         videos: list[dict[str, Any]],
         query: str,
     ) -> SynthesizeResponse:
         """Create a simple watch list without LLM (fallback).
-        
+
         Prioritizes by relevance score.
-        
+
         Args:
             videos: List of videos.
             query: User's query.
-            
+
         Returns:
             SynthesizeResponse with watch_list.
         """
         items = []
         total_duration = 0
-        
+
         for i, video in enumerate(videos):
             duration = video.get("duration", 0) or 0
             total_duration += duration
-            
+
             # Assign priority based on position
             if i < len(videos) // 3:
                 priority = Priority.HIGH
@@ -667,19 +680,21 @@ Prioritize these videos based on relevance and importance."""
                 priority = Priority.MEDIUM
             else:
                 priority = Priority.LOW
-            
-            items.append(WatchListItem(
-                video_id=video["video_id"],
-                youtube_video_id=video.get("youtube_video_id", ""),
-                title=video.get("title", "Unknown"),
-                channel_name=video.get("channel_name", "Unknown"),
-                thumbnail_url=video.get("thumbnail_url"),
-                duration=duration,
-                priority=priority,
-                reason=f"Ranked #{i+1} by relevance to your interests",
-                tags=[],
-            ))
-        
+
+            items.append(
+                WatchListItem(
+                    video_id=video["video_id"],
+                    youtube_video_id=video.get("youtube_video_id", ""),
+                    title=video.get("title", "Unknown"),
+                    channel_name=video.get("channel_name", "Unknown"),
+                    thumbnail_url=video.get("thumbnail_url"),
+                    duration=duration,
+                    priority=priority,
+                    reason=f"Ranked #{i + 1} by relevance to your interests",
+                    tags=[],
+                )
+            )
+
         return SynthesizeResponse(
             synthesis_type=SynthesisType.WATCH_LIST,
             watch_list=WatchList(
@@ -692,7 +707,7 @@ Prioritize these videos based on relevance and importance."""
             ),
             insufficient_content=False,
         )
-    
+
     def _create_insufficient_content_response(
         self,
         synthesis_type: SynthesisType,
@@ -700,12 +715,12 @@ Prioritize these videos based on relevance and importance."""
         min_required: int,
     ) -> SynthesizeResponse:
         """Create a response for insufficient content.
-        
+
         Args:
             synthesis_type: The requested synthesis type.
             found_count: Number of videos found.
             min_required: Minimum required for synthesis.
-            
+
         Returns:
             SynthesizeResponse indicating insufficient content.
         """
@@ -720,7 +735,7 @@ Prioritize these videos based on relevance and importance."""
                 f"for a meaningful {synthesis_type.value.replace('_', ' ')}. "
                 "Try broadening your scope or ingesting more videos on this topic."
             )
-        
+
         return SynthesizeResponse(
             synthesis_type=synthesis_type,
             learning_path=None,

@@ -1,0 +1,25 @@
+# =============================================================================
+# Preview LimitRange
+# =============================================================================
+# Sets default resource limits for containers in preview namespace
+# Ensures no container can consume excessive resources
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: preview-limits
+  namespace: preview-pr-{{PR_NUMBER}}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "100m"
+        memory: "128Mi"
+      defaultRequest:
+        cpu: "50m"
+        memory: "64Mi"
+      max:
+        cpu: "500m"
+        memory: "512Mi"
+      min:
+        cpu: "10m"
+        memory: "16Mi"

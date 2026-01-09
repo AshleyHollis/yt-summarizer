@@ -45,9 +45,7 @@ class YouTubeService:
             return {"type": "handle", "value": match.group(1)}
 
         # Channel ID format: /channel/UC...
-        if match := re.match(
-            r"https?://(?:www\.)?youtube\.com/channel/(UC[\w-]+)", url
-        ):
+        if match := re.match(r"https?://(?:www\.)?youtube\.com/channel/(UC[\w-]+)", url):
             return {"type": "channel_id", "value": match.group(1)}
 
         # Custom URL format: /c/ChannelName
@@ -157,14 +155,10 @@ class YouTubeService:
 
             # Parse channel info
             channel_id = (
-                info.get("channel_id")
-                or info.get("uploader_id")
-                or info.get("id", "unknown")
+                info.get("channel_id") or info.get("uploader_id") or info.get("id", "unknown")
             )
             channel_name = (
-                info.get("channel")
-                or info.get("uploader")
-                or info.get("title", "Unknown Channel")
+                info.get("channel") or info.get("uploader") or info.get("title", "Unknown Channel")
             )
 
             # Get videos from entries
@@ -284,9 +278,7 @@ class YouTubeService:
                 raise ValueError("Failed to extract channel information")
 
             entries = info.get("entries", []) or []
-            video_ids = [
-                entry.get("id") for entry in entries if entry and entry.get("id")
-            ]
+            video_ids = [entry.get("id") for entry in entries if entry and entry.get("id")]
 
             logger.info(
                 "Fetched all channel video IDs",

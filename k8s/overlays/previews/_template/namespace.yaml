@@ -1,0 +1,15 @@
+# =============================================================================
+# Preview Namespace
+# =============================================================================
+# Ephemeral namespace for PR preview environment
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: preview-pr-{{PR_NUMBER}}
+  labels:
+    environment: preview
+    preview-pr: "{{PR_NUMBER}}"
+    app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    preview.yt-summarizer.dev/pr: "{{PR_NUMBER}}"
+    preview.yt-summarizer.dev/created-by: github-actions

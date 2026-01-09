@@ -1,0 +1,43 @@
+# =============================================================================
+# Preview Replicas Patch
+# =============================================================================
+# Minimal replicas for preview environments (1 replica each)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: preview-pr-{{PR_NUMBER}}
+spec:
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transcribe-worker
+  namespace: preview-pr-{{PR_NUMBER}}
+spec:
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: summarize-worker
+  namespace: preview-pr-{{PR_NUMBER}}
+spec:
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embed-worker
+  namespace: preview-pr-{{PR_NUMBER}}
+spec:
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relationships-worker
+  namespace: preview-pr-{{PR_NUMBER}}
+spec:
+  replicas: 1

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 try:
     from shared.db.connection import get_session
 except ImportError:
+
     async def get_session():
         raise NotImplementedError("Database session not available")
 
@@ -46,7 +47,9 @@ async def list_jobs(
     video_id: UUID | None = Query(default=None, description="Filter by video ID"),
     batch_id: UUID | None = Query(default=None, description="Filter by batch ID"),
     job_type: JobType | None = Query(default=None, description="Filter by job type"),
-    job_status: JobStatus | None = Query(default=None, alias="status", description="Filter by status"),
+    job_status: JobStatus | None = Query(
+        default=None, alias="status", description="Filter by status"
+    ),
     stage: JobStage | None = Query(default=None, description="Filter by stage"),
     page: int = Query(default=1, ge=1, description="Page number"),
     per_page: int = Query(default=20, ge=1, le=100, description="Items per page"),

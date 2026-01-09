@@ -1,0 +1,26 @@
+# =============================================================================
+# Preview ResourceQuota
+# =============================================================================
+# Limits total resources consumed by preview environment
+# Protects production namespace on shared single-node AKS cluster
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: preview-quota
+  namespace: preview-pr-{{PR_NUMBER}}
+spec:
+  hard:
+    # CPU limits
+    requests.cpu: "500m"
+    limits.cpu: "1"
+    # Memory limits  
+    requests.memory: "512Mi"
+    limits.memory: "1Gi"
+    # Pod count limit
+    pods: "10"
+    # Prevent excessive services
+    services: "5"
+    # Prevent excessive secrets
+    secrets: "10"
+    # Prevent excessive configmaps
+    configmaps: "10"

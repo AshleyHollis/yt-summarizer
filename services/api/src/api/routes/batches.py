@@ -146,13 +146,10 @@ async def stream_batch_progress(
                 yield f"data: {json.dumps(batch_data)}\n\n"
 
                 # Check if batch is complete
-                is_complete = (
-                    batch.status == "completed"
-                    or (
-                        batch.succeeded_count + batch.failed_count == batch.total_count
-                        and batch.pending_count == 0
-                        and batch.running_count == 0
-                    )
+                is_complete = batch.status == "completed" or (
+                    batch.succeeded_count + batch.failed_count == batch.total_count
+                    and batch.pending_count == 0
+                    and batch.running_count == 0
                 )
 
                 if is_complete:

@@ -5,10 +5,10 @@ enabling server-side thread persistence for CopilotKit's AG-UI integration.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, update, delete
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import shared modules
@@ -17,11 +17,13 @@ try:
     from shared.logging.config import get_logger
 except ImportError as e:
     import logging
+
     logging.warning(f"Failed to import shared modules: {e}")
     ChatThread = None
-    
+
     def get_logger(name):
         import logging
+
         return logging.getLogger(name)
 
 
@@ -53,49 +55,49 @@ class ThreadService:
                 select(ChatThread).where(ChatThread.thread_id == thread_id)
             )
             thread = result.scalar_one_or_none()
-            
+
             if thread is None:
                 logger.debug(f"Thread {thread_id} not found")
                 return None
-            
+
             # Parse JSON fields
             messages = []
             state = None
-            
+
             if thread.messages_json:
                 try:
                     messages = json.loads(thread.messages_json)
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to parse messages_json for thread {thread_id}")
                     messages = []
-            
+
             if thread.state_json:
                 try:
                     state = json.loads(thread.state_json)
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to parse state_json for thread {thread_id}")
                     state = None
-            
+
             logger.info(f"Loaded thread {thread_id} with {len(messages)} messages")
-            
+
             # Parse scope and ai_settings
             scope = None
             ai_settings = None
-            
+
             if thread.scope_json:
                 try:
                     scope = json.loads(thread.scope_json)
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to parse scope_json for thread {thread_id}")
                     scope = None
-            
+
             if thread.ai_settings_json:
                 try:
                     ai_settings = json.loads(thread.ai_settings_json)
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to parse ai_settings_json for thread {thread_id}")
                     ai_settings = None
-            
+
             return {
                 "thread_id": thread.thread_id,
                 "title": thread.title,
@@ -109,7 +111,7 @@ class ThreadService:
                 "created_at": thread.created_at.isoformat() if thread.created_at else None,
                 "updated_at": thread.updated_at.isoformat() if thread.updated_at else None,
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to load thread {thread_id}: {e}", exc_info=True)
             raise
@@ -149,20 +151,20 @@ class ThreadService:
                         # Truncate to reasonable title length
                         title = content[:100] + "..." if len(content) > 100 else content
                         break
-            
+
             # Serialize to JSON
             messages_json = json.dumps(messages)
             state_json = json.dumps(state) if state else None
             message_count = len(messages)
-            
+
             # Check if thread exists
             result = await self.session.execute(
                 select(ChatThread).where(ChatThread.thread_id == thread_id)
             )
             existing = result.scalar_one_or_none()
-            
-            now = datetime.now(timezone.utc)
-            
+
+            now = datetime.now(UTC)
+
             if existing:
                 # Update existing thread
                 update_values = {
@@ -179,23 +181,27 @@ class ThreadService:
                 if ai_settings is not None:
                     update_values["ai_settings_json"] = json.dumps(ai_settings)
                     update_values["last_run_id"] = last_run_id
-                    
+
                 await self.session.execute(
                     update(ChatThread)
                     .where(ChatThread.thread_id == thread_id)
                     .values(**update_values)
                 )
-                logger.info(f"[SAVE_THREAD] Updated existing thread {thread_id} with {message_count} messages")
+                logger.info(
+                    f"[SAVE_THREAD] Updated existing thread {thread_id} with {message_count} messages"
+                )
             else:
                 # Thread doesn't exist - DO NOT auto-create!
                 # Threads should be created explicitly via create_thread or create_thread_with_messages.
                 # CopilotKit may send requests with internally-generated thread IDs before
                 # the frontend has created the thread, so just log and skip.
-                logger.warning(f"[SAVE_THREAD] Thread {thread_id} does not exist, skipping save. "
-                              f"Threads must be created via explicit API calls, not implicitly.")
-            
+                logger.warning(
+                    f"[SAVE_THREAD] Thread {thread_id} does not exist, skipping save. "
+                    f"Threads must be created via explicit API calls, not implicitly."
+                )
+
             await self.session.commit()
-            
+
             return {
                 "thread_id": thread_id,
                 "title": title,
@@ -204,7 +210,7 @@ class ThreadService:
                 "agent_name": agent_name,
                 "message_count": message_count,
             }
-            
+
         except Exception as e:
             await self.session.rollback()
             logger.error(f"Failed to save thread {thread_id}: {e}", exc_info=True)
@@ -228,15 +234,15 @@ class ThreadService:
         """
         try:
             query = select(ChatThread).order_by(ChatThread.updated_at.desc())
-            
+
             if agent_name:
                 query = query.where(ChatThread.agent_name == agent_name)
-            
+
             query = query.limit(limit).offset(offset)
-            
+
             result = await self.session.execute(query)
             threads = result.scalars().all()
-            
+
             return [
                 {
                     "thread_id": t.thread_id,
@@ -248,7 +254,7 @@ class ThreadService:
                 }
                 for t in threads
             ]
-            
+
         except Exception as e:
             logger.error(f"Failed to list threads: {e}", exc_info=True)
             raise
@@ -279,7 +285,7 @@ class ThreadService:
                 select(ChatThread).where(ChatThread.thread_id == thread_id)
             )
             existing = result.scalar_one_or_none()
-            
+
             if existing:
                 # Thread already exists, return it
                 logger.debug(f"Thread {thread_id} already exists")
@@ -291,11 +297,13 @@ class ThreadService:
                     "agent_name": existing.agent_name,
                     "message_count": existing.message_count,
                     "scope": json.loads(existing.scope_json) if existing.scope_json else None,
-                    "aiSettings": json.loads(existing.ai_settings_json) if existing.ai_settings_json else None,
+                    "aiSettings": json.loads(existing.ai_settings_json)
+                    if existing.ai_settings_json
+                    else None,
                     "created_at": existing.created_at.isoformat() if existing.created_at else None,
                     "updated_at": existing.updated_at.isoformat() if existing.updated_at else None,
                 }
-            
+
             # Create new empty thread
             thread = ChatThread(
                 thread_id=thread_id,
@@ -309,9 +317,9 @@ class ThreadService:
             )
             self.session.add(thread)
             await self.session.commit()
-            
+
             logger.info(f"Created empty thread {thread_id}")
-            
+
             return {
                 "thread_id": thread_id,
                 "title": title or "New Chat",
@@ -324,7 +332,7 @@ class ThreadService:
                 "created_at": thread.created_at.isoformat() if thread.created_at else None,
                 "updated_at": thread.updated_at.isoformat() if thread.updated_at else None,
             }
-            
+
         except Exception as e:
             await self.session.rollback()
             logger.error(f"Failed to create thread {thread_id}: {e}", exc_info=True)
@@ -344,15 +352,15 @@ class ThreadService:
                 delete(ChatThread).where(ChatThread.thread_id == thread_id)
             )
             await self.session.commit()
-            
+
             deleted = result.rowcount > 0
             if deleted:
                 logger.info(f"Deleted thread {thread_id}")
             else:
                 logger.debug(f"Thread {thread_id} not found for deletion")
-            
+
             return deleted
-            
+
         except Exception as e:
             await self.session.rollback()
             logger.error(f"Failed to delete thread {thread_id}: {e}", exc_info=True)
@@ -367,9 +375,9 @@ class ThreadService:
         ai_settings: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Atomically create a new thread with messages.
-        
+
         This is the preferred method for creating threads with initial messages,
-        as it avoids race conditions by combining thread creation and message 
+        as it avoids race conditions by combining thread creation and message
         saving into a single atomic operation.
 
         Args:
@@ -383,10 +391,10 @@ class ThreadService:
             The created thread data including the generated thread_id.
         """
         import uuid
-        
+
         try:
             thread_id = str(uuid.uuid4())
-            
+
             # Auto-generate title from first user message if not provided
             if title is None and messages:
                 for msg in messages:
@@ -395,12 +403,12 @@ class ThreadService:
                         # Truncate to reasonable title length
                         title = content[:100] + "..." if len(content) > 100 else content
                         break
-            
+
             # Serialize to JSON
             messages_json = json.dumps(messages)
             message_count = len(messages)
-            now = datetime.now(timezone.utc)
-            
+            now = datetime.now(UTC)
+
             # Create new thread with messages
             thread = ChatThread(
                 thread_id=thread_id,
@@ -414,9 +422,9 @@ class ThreadService:
             )
             self.session.add(thread)
             await self.session.commit()
-            
+
             logger.info(f"Created thread {thread_id} with {message_count} messages atomically")
-            
+
             return {
                 "thread_id": thread_id,
                 "title": title or "New Chat",
@@ -429,11 +437,12 @@ class ThreadService:
                 "created_at": thread.created_at.isoformat() if thread.created_at else None,
                 "updated_at": thread.updated_at.isoformat() if thread.updated_at else None,
             }
-            
+
         except Exception as e:
             await self.session.rollback()
             logger.error(f"Failed to create thread with messages: {e}", exc_info=True)
             raise
+
     async def update_thread_settings(
         self,
         thread_id: str,
@@ -441,7 +450,7 @@ class ThreadService:
         ai_settings: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Update scope and AI settings for an existing thread.
-        
+
         Called when the user changes settings mid-conversation.
 
         Args:
@@ -457,33 +466,35 @@ class ThreadService:
                 select(ChatThread).where(ChatThread.thread_id == thread_id)
             )
             existing = result.scalar_one_or_none()
-            
+
             if not existing:
                 logger.debug(f"Thread {thread_id} not found for settings update")
                 return None
-            
-            update_values = {"updated_at": datetime.now(timezone.utc)}
-            
+
+            update_values = {"updated_at": datetime.now(UTC)}
+
             if scope is not None:
                 update_values["scope_json"] = json.dumps(scope)
             if ai_settings is not None:
                 update_values["ai_settings_json"] = json.dumps(ai_settings)
-            
+
             await self.session.execute(
-                update(ChatThread)
-                .where(ChatThread.thread_id == thread_id)
-                .values(**update_values)
+                update(ChatThread).where(ChatThread.thread_id == thread_id).values(**update_values)
             )
             await self.session.commit()
-            
+
             logger.info(f"Updated settings for thread {thread_id}")
-            
+
             return {
                 "thread_id": thread_id,
-                "scope": scope if scope is not None else (json.loads(existing.scope_json) if existing.scope_json else None),
-                "aiSettings": ai_settings if ai_settings is not None else (json.loads(existing.ai_settings_json) if existing.ai_settings_json else None),
+                "scope": scope
+                if scope is not None
+                else (json.loads(existing.scope_json) if existing.scope_json else None),
+                "aiSettings": ai_settings
+                if ai_settings is not None
+                else (json.loads(existing.ai_settings_json) if existing.ai_settings_json else None),
             }
-            
+
         except Exception as e:
             await self.session.rollback()
             logger.error(f"Failed to update thread settings {thread_id}: {e}", exc_info=True)

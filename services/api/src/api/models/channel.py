@@ -8,7 +8,6 @@ from pydantic import Field
 from .base import BaseResponse, TimestampMixin
 from .library import FacetTag
 
-
 # =============================================================================
 # Channel Ingestion Models (US2)
 # =============================================================================
@@ -64,9 +63,7 @@ class ChannelVideosResponse(BaseResponse):
     next_cursor: str | None = Field(
         default=None, description="Cursor for next page (null if no more videos)"
     )
-    has_more: bool = Field(
-        default=False, description="Whether more videos are available"
-    )
+    has_more: bool = Field(default=False, description="Whether more videos are available")
 
 
 # =============================================================================
@@ -111,4 +108,6 @@ class ChannelDetailResponse(BaseResponse, TimestampMixin):
     video_count: int = Field(description="Total videos from this channel")
     completed_video_count: int = Field(description="Number of completed videos")
     last_synced_at: datetime | None = Field(default=None, description="Last sync time")
-    top_facets: list[FacetTag] = Field(default_factory=list, description="Most common facets in this channel")
+    top_facets: list[FacetTag] = Field(
+        default_factory=list, description="Most common facets in this channel"
+    )

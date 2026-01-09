@@ -7,6 +7,7 @@ from typing import Any
 # Fix SSL certificate verification on Windows by using certifi's CA bundle
 try:
     import certifi
+
     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 except ImportError:
     pass  # certifi not installed, use system defaults
@@ -24,7 +25,7 @@ from shared.blob.client import (
 from shared.config import get_settings
 from shared.db.connection import get_db
 from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_running
-from shared.db.models import Job, Video, Segment
+from shared.db.models import Job, Segment
 from shared.logging.config import get_logger
 from shared.queue.client import EMBED_QUEUE, RELATIONSHIPS_QUEUE, get_queue_client
 from shared.telemetry.config import inject_trace_context
@@ -99,15 +100,18 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
 
             # Try to fetch timestamped segments first (preferred for semantic search)
             # Use channel-based blob path
-            segments_blob_path = get_segments_blob_path(message.channel_name, message.youtube_video_id)
+            segments_blob_path = get_segments_blob_path(
+                message.channel_name, message.youtube_video_id
+            )
             segments_json = await self._fetch_content(
                 TRANSCRIPTS_CONTAINER,
                 segments_blob_path,
             )
-            
+
             timestamped_segments = None
             if segments_json:
                 import json
+
                 try:
                     timestamped_segments = json.loads(segments_json)
                     logger.info(
@@ -116,18 +120,22 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                     )
                 except json.JSONDecodeError:
                     logger.warning("Failed to parse segments JSON, falling back to transcript")
-            
+
             chunk_timestamps: list[tuple[float, float]] | None = None
-            
+
             if timestamped_segments:
                 # Use timestamped segments - extract text for embedding
                 chunks = [seg["text"] for seg in timestamped_segments]
                 chunk_timestamps = [(seg["start"], seg["end"]) for seg in timestamped_segments]
             else:
                 # Fallback: Fetch transcript and summary (using channel-based blob paths)
-                transcript_blob_path = get_transcript_blob_path(message.channel_name, message.youtube_video_id)
-                summary_blob_path = get_summary_blob_path(message.channel_name, message.youtube_video_id)
-                
+                transcript_blob_path = get_transcript_blob_path(
+                    message.channel_name, message.youtube_video_id
+                )
+                summary_blob_path = get_summary_blob_path(
+                    message.channel_name, message.youtube_video_id
+                )
+
                 transcript = await self._fetch_content(
                     TRANSCRIPTS_CONTAINER,
                     transcript_blob_path,
@@ -136,7 +144,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                     SUMMARIES_CONTAINER,
                     summary_blob_path,
                 )
-                
+
                 if not transcript and not summary:
                     await mark_job_failed(message.job_id, "Could not find transcript or summary")
                     return WorkerResult.failed(
@@ -247,17 +255,19 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
 
         return chunks
 
-    async def _generate_embeddings(self, chunks: list[str]) -> tuple[list[list[float]] | None, str | None]:
+    async def _generate_embeddings(
+        self, chunks: list[str]
+    ) -> tuple[list[list[float]] | None, str | None]:
         """Generate embeddings using OpenAI API.
-        
+
         Returns:
             Tuple of (embeddings, error_message). If successful, embeddings is set and error is None.
             If failed, embeddings is None and error_message contains the failure reason.
         """
         import random
-        
+
         settings = get_settings()
-        
+
         # Log configuration for debugging
         logger.info(
             "DEBUG: _generate_embeddings config check",
@@ -266,19 +276,22 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             azure_openai_base_url=settings.openai.azure_openai_base_url,
             azure_embedding_deployment=settings.openai.azure_embedding_deployment,
         )
-        
+
         # Check if any OpenAI configuration is available (Azure or standard)
-        has_valid_config = (
-            settings.openai.is_azure_configured or 
-            (settings.openai.api_key and settings.openai.api_key != "not-configured")
+        has_valid_config = settings.openai.is_azure_configured or (
+            settings.openai.api_key and settings.openai.api_key != "not-configured"
         )
-        
+
         # For Azure AI Foundry, also check if embedding deployment is configured
         embedding_deployment = settings.openai.azure_embedding_deployment
-        if settings.openai.is_azure_ai_foundry and (not embedding_deployment or embedding_deployment == "not-configured"):
-            logger.warning("Azure AI Foundry embedding deployment not configured - generating mock embeddings")
+        if settings.openai.is_azure_ai_foundry and (
+            not embedding_deployment or embedding_deployment == "not-configured"
+        ):
+            logger.warning(
+                "Azure AI Foundry embedding deployment not configured - generating mock embeddings"
+            )
             has_valid_config = False
-        
+
         if not has_valid_config:
             logger.warning("OpenAI API key not configured - generating mock embeddings for testing")
             # Provide mock embeddings (1536 dimensions like text-embedding-3-small)
@@ -291,17 +304,19 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 embedding = [x / magnitude for x in embedding]
                 mock_embeddings.append(embedding)
             return (mock_embeddings, None)
-        
+
         try:
             # Use Azure OpenAI if configured, otherwise use standard OpenAI
             if settings.openai.is_azure_configured:
                 base_url = settings.openai.azure_openai_base_url
-                embedding_model = settings.openai.azure_embedding_deployment or "text-embedding-3-small"
-                
+                embedding_model = (
+                    settings.openai.azure_embedding_deployment or "text-embedding-3-small"
+                )
+
                 # Azure AI Foundry uses OpenAI-compatible API with /models endpoint
                 if settings.openai.is_azure_ai_foundry:
                     from openai import AsyncOpenAI
-                    
+
                     client = AsyncOpenAI(
                         api_key=settings.openai.effective_api_key,
                         base_url=base_url,
@@ -316,7 +331,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 else:
                     # Standard Azure OpenAI
                     from openai import AsyncAzureOpenAI
-                    
+
                     client = AsyncAzureOpenAI(
                         api_key=settings.openai.effective_api_key,
                         azure_endpoint=base_url,
@@ -330,7 +345,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                     )
             else:
                 from openai import AsyncOpenAI
-                
+
                 client = AsyncOpenAI(api_key=settings.openai.api_key)
                 embedding_model = settings.openai.embedding_model
 
@@ -359,6 +374,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
 
         except Exception as e:
             import traceback
+
             error_details = f"{type(e).__name__}: {str(e)}"
             full_traceback = traceback.format_exc()
             logger.error(
@@ -378,7 +394,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
         timestamps: list[tuple[float, float]] | None = None,
     ) -> None:
         """Store embeddings in database as Segments.
-        
+
         Args:
             video_id: Internal UUID for the video
             youtube_video_id: YouTube video ID for logging
@@ -387,13 +403,12 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             timestamps: Optional list of (start_time, end_time) tuples for each chunk
         """
         import hashlib
-        import struct
         from uuid import UUID
 
         db = get_db()
         async with db.session() as session:
             from sqlalchemy import delete
-            
+
             # Ensure Embedding column exists (handle case where migration didn't run the ALTER)
             try:
                 await session.execute(
@@ -413,23 +428,21 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 # Continue anyway - the column might exist
 
             # Delete existing segments for this video
-            await session.execute(
-                delete(Segment).where(Segment.video_id == UUID(video_id))
-            )
+            await session.execute(delete(Segment).where(Segment.video_id == UUID(video_id)))
 
             # Create new segments
             has_timestamps = timestamps and len(timestamps) == len(chunks)
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 # Convert embedding to JSON array format for VECTOR type
                 embedding_json = "[" + ",".join(str(x) for x in embedding) + "]"
-                
+
                 # Calculate content hash
                 content_hash = hashlib.sha256(chunk.encode()).hexdigest()
-                
+
                 # Use real timestamps if available, otherwise default to 0.0
                 start_time = timestamps[i][0] if has_timestamps else 0.0
                 end_time = timestamps[i][1] if has_timestamps else 0.0
-                
+
                 segment = Segment(
                     video_id=UUID(video_id),
                     sequence_number=i,
@@ -441,12 +454,14 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 )
                 session.add(segment)
                 await session.flush()
-                
+
                 # Store embedding as VECTOR - use literal SQL to avoid type conversion issues
                 # SQL Server 2025 VECTOR accepts JSON array format directly
                 await session.execute(
-                    sa.text(f"UPDATE Segments SET Embedding = CAST('{embedding_json}' AS VECTOR(1536)) WHERE segment_id = :segment_id"),
-                    {"segment_id": segment.segment_id}
+                    sa.text(
+                        f"UPDATE Segments SET Embedding = CAST('{embedding_json}' AS VECTOR(1536)) WHERE segment_id = :segment_id"
+                    ),
+                    {"segment_id": segment.segment_id},
                 )
 
             logger.info(
@@ -481,16 +496,18 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
 
             # Queue the job
             queue_client = get_queue_client()
-            queue_message = inject_trace_context({
-                "job_id": str(job.job_id),
-                "video_id": message.video_id,
-                "youtube_video_id": message.youtube_video_id,
-                "channel_name": message.channel_name,
-                "correlation_id": correlation_id,
-            })
+            queue_message = inject_trace_context(
+                {
+                    "job_id": str(job.job_id),
+                    "video_id": message.video_id,
+                    "youtube_video_id": message.youtube_video_id,
+                    "channel_name": message.channel_name,
+                    "correlation_id": correlation_id,
+                }
+            )
             if message.batch_id:
                 queue_message["batch_id"] = message.batch_id
-            
+
             queue_client.send_message(RELATIONSHIPS_QUEUE, queue_message)
 
             logger.info("Queued relationships job", job_id=str(job.job_id))

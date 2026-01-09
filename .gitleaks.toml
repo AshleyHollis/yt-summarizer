@@ -1,0 +1,54 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "yt-summarizer gitleaks config"
+
+[extend]
+# Extend the default gitleaks config
+useDefault = true
+
+# Allowlist rules for false positives
+[allowlist]
+  description = "Allowlist for false positives"
+  
+  # Terraform variable definitions (not actual secrets)
+  paths = [
+    '''infra/terraform/modules/.*/variables\.tf''',
+    '''infra/terraform/environments/.*/variables\.tf''',
+    '''infra/terraform/variables\.tf''',
+    # Terraform example files
+    '''.*\.tfvars\.example''',
+    # CI/test docker compose (only contains dummy values)
+    '''docker-compose\.ci\.yml''',
+    # Test fixtures and test files (very broad)
+    '''tests/''',
+    '''test_''',
+    '''_test\.py''',
+    '''conftest\.py''',
+    '''\.spec\.(ts|js)''',
+    # Documentation (all markdown)
+    '''\.md$''',
+  ]
+  
+  # Regex patterns that are not secrets (matches in the secret value itself)
+  regexes = [
+    # Variable placeholder patterns
+    '''var\.(sql_admin_password|admin_password|api_key)''',
+    # Terraform variable references
+    '''\$\{var\..*password.*\}''',
+    # Example/placeholder values
+    '''CHANGE_ME|REPLACE_ME|your-.*-here|example-.*''',
+    # Documentation example passwords (explicit list)
+    '''YourSecurePassword123!''',
+    '''YourStrong@Passw0rd''',
+    '''Your.*Passw.*''',
+    # Generic example password patterns
+    '''Password=Your.*''',
+    '''password.*=.*Your.*''',
+    # Test API keys (not real)
+    '''sk-test-.*''',
+    '''sk-fake-.*''',
+    '''test-key.*''',
+    '''test-api-key''',
+    '''fake-''',
+  ]

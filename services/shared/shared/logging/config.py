@@ -43,7 +43,7 @@ def add_trace_context(
     """Add OpenTelemetry trace context to log events (T188)."""
     try:
         from opentelemetry import trace
-        
+
         span = trace.get_current_span()
         if span is not None:
             context = span.get_span_context()
@@ -55,7 +55,7 @@ def add_trace_context(
         pass  # OpenTelemetry not available
     except Exception:
         pass  # Ignore any tracing errors
-    
+
     return event_dict
 
 
@@ -78,7 +78,7 @@ def configure_logging(
     service_name: str | None = None,
 ) -> None:
     """Configure structured logging for the application.
-    
+
     Args:
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
         json_format: If True, output JSON logs. If False, use console format.
@@ -87,10 +87,10 @@ def configure_logging(
     # Set service name in environment if provided
     if service_name:
         os.environ["SERVICE_NAME"] = service_name
-    
+
     # Configure log level from environment or parameter
     log_level = os.environ.get("LOG_LEVEL", level).upper()
-    
+
     # Common processors
     shared_processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
@@ -104,7 +104,7 @@ def configure_logging(
         add_trace_context,  # Add OpenTelemetry trace IDs (T188)
         add_service_info,
     ]
-    
+
     # Format-specific processors
     if json_format:
         # Production: JSON output
@@ -113,7 +113,7 @@ def configure_logging(
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
         ]
-        
+
         # Configure standard logging to use structlog
         logging.basicConfig(
             format="%(message)s",
@@ -126,14 +126,14 @@ def configure_logging(
             *shared_processors,
             structlog.dev.ConsoleRenderer(colors=True),
         ]
-        
+
         # Configure standard logging
         logging.basicConfig(
             format="%(message)s",
             stream=sys.stdout,
             level=getattr(logging, log_level),
         )
-    
+
     # Configure structlog
     structlog.configure(
         processors=processors,
@@ -146,10 +146,10 @@ def configure_logging(
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """Get a structured logger instance.
-    
+
     Args:
         name: Logger name (usually __name__).
-    
+
     Returns:
         A bound structlog logger.
     """
@@ -158,21 +158,21 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
 
 class LogContext:
     """Context manager for adding temporary log context."""
-    
+
     def __init__(self, **kwargs: Any):
         """Initialize with context values to add.
-        
+
         Args:
             **kwargs: Key-value pairs to add to log context.
         """
         self._context = kwargs
         self._token: Any = None
-    
+
     def __enter__(self) -> "LogContext":
         """Enter the context, binding values to structlog context."""
         self._token = structlog.contextvars.bind_contextvars(**self._context)
         return self
-    
+
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit the context, unbinding values."""
         structlog.contextvars.unbind_contextvars(*self._context.keys())
@@ -180,7 +180,7 @@ class LogContext:
 
 def bind_context(**kwargs: Any) -> None:
     """Bind values to the current logging context.
-    
+
     Args:
         **kwargs: Key-value pairs to add to log context.
     """
@@ -189,7 +189,7 @@ def bind_context(**kwargs: Any) -> None:
 
 def unbind_context(*keys: str) -> None:
     """Unbind values from the current logging context.
-    
+
     Args:
         *keys: Keys to remove from log context.
     """

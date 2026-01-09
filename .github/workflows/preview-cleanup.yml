@@ -1,0 +1,113 @@
+# =============================================================================
+# Preview Cleanup Workflow
+# =============================================================================
+# Deletes preview overlay when PR is closed (merged or abandoned)
+# Argo CD ApplicationSet will automatically prune the preview resources
+
+name: Preview Cleanup
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cleanup:
+    name: Cleanup Preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+
+      - name: Delete preview overlay
+        id: cleanup
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          PREVIEW_DIR="k8s/overlays/previews/pr-${PR_NUMBER}"
+          
+          if [ -d "${PREVIEW_DIR}" ]; then
+            echo "Deleting preview overlay: ${PREVIEW_DIR}"
+            rm -rf "${PREVIEW_DIR}"
+            echo "deleted=true" >> $GITHUB_OUTPUT
+          else
+            echo "Preview overlay not found: ${PREVIEW_DIR}"
+            echo "deleted=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push deletion
+        if: steps.cleanup.outputs.deleted == 'true'
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          MERGED=${{ github.event.pull_request.merged }}
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add -A k8s/overlays/previews/
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            if [ "$MERGED" = "true" ]; then
+              ACTION="merged"
+            else
+              ACTION="closed"
+            fi
+            
+            git commit -m "chore(preview): cleanup overlay for PR #${PR_NUMBER}
+            
+            PR was ${ACTION}
+            Argo CD will prune preview-pr-${PR_NUMBER} namespace
+            
+            [skip ci]"
+            
+            git push origin main
+          fi
+
+      - name: Post cleanup status
+        if: steps.cleanup.outputs.deleted == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const merged = ${{ github.event.pull_request.merged }};
+            const status = merged ? 'merged ✅' : 'closed ❌';
+            
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🗑️ Preview Cleanup
+
+            The preview environment for this PR has been scheduled for deletion.
+
+            | Property | Value |
+            |----------|-------|
+            | **PR Status** | ${status} |
+            | **Preview** | \`preview-pr-${{ github.event.pull_request.number }}\` |
+            | **Action** | Overlay deleted, Argo CD will prune namespace |
+
+            > The preview namespace and all resources will be removed within ~5 minutes.`
+            });
+
+      - name: Create cleanup summary
+        run: |
+          echo "## 🗑️ Preview Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **PR** | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Merged** | ${{ github.event.pull_request.merged }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Overlay Deleted** | ${{ steps.cleanup.outputs.deleted }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.cleanup.outputs.deleted }}" = "true" ]; then
+            echo "✅ Preview overlay deleted. Argo CD will prune the namespace automatically." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No preview overlay found to delete." >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,48 @@
+# =============================================================================
+# Argo CD Application - Production
+# =============================================================================
+# Single production application - auto-syncs on merge to main
+# Replaces the old staging-app.yaml and production-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: yt-summarizer-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/instance: prod
+    app.kubernetes.io/part-of: yt-summarizer
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+    targetRevision: main
+    path: k8s/overlays/prod
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yt-summarizer
+
+  syncPolicy:
+    # Auto-sync enabled - deploys automatically when overlay changes
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health check configuration
+  revisionHistoryLimit: 10

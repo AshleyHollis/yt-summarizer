@@ -43,18 +43,9 @@ from .library import (
     VideoCard,
     VideoDetailResponse,
     VideoFilterParams,
-    VideoListResponse as LibraryVideoListResponse,
 )
-from .video import (
-    ChannelSummary,
-    ProcessingStatus,
-    ReprocessVideoRequest,
-    SubmitVideoRequest,
-    SubmitVideoResponse,
-    VideoListResponse,
-    VideoResponse,
-    VideoSummaryResponse,
-    extract_youtube_video_id,
+from .library import (
+    VideoListResponse as LibraryVideoListResponse,
 )
 from .synthesis import (
     LearningPath,
@@ -66,6 +57,17 @@ from .synthesis import (
     SynthesizeResponse,
     WatchList,
     WatchListItem,
+)
+from .video import (
+    ChannelSummary,
+    ProcessingStatus,
+    ReprocessVideoRequest,
+    SubmitVideoRequest,
+    SubmitVideoResponse,
+    VideoListResponse,
+    VideoResponse,
+    VideoSummaryResponse,
+    extract_youtube_video_id,
 )
 
 __all__ = [
@@ -138,4 +140,3 @@ __all__ = [
     "VideoSummaryResponse",
     "extract_youtube_video_id",
 ]
-

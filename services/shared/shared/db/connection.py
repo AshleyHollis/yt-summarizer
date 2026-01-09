@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from sqlalchemy import event, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -25,7 +25,7 @@ DEFAULT_POOL_RECYCLE = 1800  # 30 minutes
 
 def get_database_url() -> str:
     """Get database URL from environment.
-    
+
     Supports multiple environment variable formats:
     1. DATABASE_URL - Standard SQLAlchemy-style URL
     2. ConnectionStrings__ytsummarizer - .NET Aspire-injected connection string
@@ -33,19 +33,19 @@ def get_database_url() -> str:
     """
     # Try standard DATABASE_URL first
     url = os.environ.get("DATABASE_URL")
-    
+
     # Try Aspire-injected connection strings
     if not url:
         url = os.environ.get("ConnectionStrings__ytsummarizer")
     if not url:
         url = os.environ.get("ConnectionStrings__sql")
-    
+
     if not url:
         raise ValueError(
             "Database connection string not found. Set one of: "
             "DATABASE_URL, ConnectionStrings__ytsummarizer, or ConnectionStrings__sql"
         )
-    
+
     # Handle ADO.NET style connection strings from Aspire
     # Example: "Server=localhost,1433;Database=ytsummarizer;User Id=sa;Password=...;TrustServerCertificate=True"
     if "Server=" in url and ";" in url:
@@ -55,14 +55,16 @@ def get_database_url() -> str:
         url = url.replace("mssql+pyodbc://", "mssql+aioodbc://")
     elif not url.startswith("mssql+aioodbc://"):
         # Assume it's a connection string without driver prefix
-        url = f"mssql+aioodbc://{url}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
-    
+        url = (
+            f"mssql+aioodbc://{url}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+        )
+
     return url
 
 
 def convert_ado_connection_string(ado_string: str) -> str:
     """Convert ADO.NET style connection string to SQLAlchemy URL.
-    
+
     Converts strings like:
         Server=localhost,1433;Database=ytsummarizer;User Id=sa;Password=xxx;TrustServerCertificate=True
     To:
@@ -73,13 +75,13 @@ def convert_ado_connection_string(ado_string: str) -> str:
         if "=" in part:
             key, value = part.split("=", 1)
             parts[key.strip().lower()] = value.strip()
-    
+
     # Extract components
     server = parts.get("server", parts.get("data source", "localhost"))
     database = parts.get("database", parts.get("initial catalog", ""))
     user = parts.get("user id", parts.get("uid", "sa"))
     password = parts.get("password", parts.get("pwd", ""))
-    
+
     # Handle port in server (e.g., "localhost,1433" or "localhost:1433")
     if "," in server:
         host, port = server.split(",", 1)
@@ -87,16 +89,17 @@ def convert_ado_connection_string(ado_string: str) -> str:
         host, port = server.split(":", 1)
     else:
         host, port = server, "1433"
-    
+
     # URL-encode the password in case it contains special characters
     from urllib.parse import quote_plus
+
     encoded_password = quote_plus(password)
-    
+
     # Build SQLAlchemy URL
     # Note: SQL Server ODBC uses comma for port (e.g., localhost,1433), not colon
     url = f"mssql+aioodbc://{user}:{encoded_password}@{host},{port}/{database}"
     url += "?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
-    
+
     return url
 
 
@@ -110,7 +113,7 @@ def create_engine(
     **kwargs: Any,
 ) -> AsyncEngine:
     """Create an async SQLAlchemy engine with connection pooling.
-    
+
     Args:
         url: Database URL. If None, reads from DATABASE_URL env var.
         pool_size: Number of connections to keep in the pool.
@@ -119,13 +122,13 @@ def create_engine(
         pool_recycle: Seconds before recycling a connection.
         echo: If True, log all SQL statements.
         **kwargs: Additional engine arguments.
-    
+
     Returns:
         Configured AsyncEngine instance.
     """
     if url is None:
         url = get_database_url()
-    
+
     engine = create_async_engine(
         url,
         pool_size=pool_size,
@@ -135,16 +138,16 @@ def create_engine(
         echo=echo,
         **kwargs,
     )
-    
+
     return engine
 
 
 def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     """Create an async session factory for the given engine.
-    
+
     Args:
         engine: The async engine to use for sessions.
-    
+
     Returns:
         Configured async_sessionmaker instance.
     """
@@ -159,7 +162,7 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 
 class DatabaseConnection:
     """Database connection manager with retry logic."""
-    
+
     def __init__(
         self,
         url: str | None = None,
@@ -168,7 +171,7 @@ class DatabaseConnection:
         echo: bool = False,
     ):
         """Initialize the database connection manager.
-        
+
         Args:
             url: Database URL. If None, reads from DATABASE_URL env var.
             pool_size: Number of connections to keep in the pool.
@@ -181,7 +184,7 @@ class DatabaseConnection:
         self._echo = echo
         self._engine: AsyncEngine | None = None
         self._session_factory: async_sessionmaker[AsyncSession] | None = None
-    
+
     @property
     def engine(self) -> AsyncEngine:
         """Get or create the database engine."""
@@ -193,18 +196,18 @@ class DatabaseConnection:
                 echo=self._echo,
             )
         return self._engine
-    
+
     @property
     def session_factory(self) -> async_sessionmaker[AsyncSession]:
         """Get or create the session factory."""
         if self._session_factory is None:
             self._session_factory = create_session_factory(self.engine)
         return self._session_factory
-    
+
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:
         """Create a new session context.
-        
+
         Usage:
             async with db.session() as session:
                 result = await session.execute(query)
@@ -216,7 +219,7 @@ class DatabaseConnection:
             except Exception:
                 await session.rollback()
                 raise
-    
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -226,19 +229,19 @@ class DatabaseConnection:
         """Test the database connection with retry logic."""
         async with self.engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-    
+
     async def close(self) -> None:
         """Close the database engine and all connections."""
         if self._engine is not None:
             await self._engine.dispose()
             self._engine = None
             self._session_factory = None
-    
+
     async def create_tables(self) -> None:
         """Create all tables defined in the models."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-    
+
     async def drop_tables(self) -> None:
         """Drop all tables defined in the models."""
         async with self.engine.begin() as conn:
@@ -259,7 +262,7 @@ def get_db() -> DatabaseConnection:
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency for getting a database session.
-    
+
     Usage in FastAPI:
         @app.get("/items")
         async def get_items(session: AsyncSession = Depends(get_session)):

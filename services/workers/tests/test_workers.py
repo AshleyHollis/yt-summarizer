@@ -4,11 +4,10 @@ These tests verify the worker processing logic using mocked dependencies.
 They test the core business logic without requiring external services.
 """
 
-import pytest
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
 
 # =============================================================================
 # Test Fixtures
@@ -76,10 +75,10 @@ class TestTranscribeWorkerMessageParsing:
 
     def test_parse_valid_message(self):
         """Test parsing a valid transcribe message."""
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
-        
+
         raw_message = {
             "job_id": "123e4567-e89b-12d3-a456-426614174000",
             "video_id": "123e4567-e89b-12d3-a456-426614174001",
@@ -87,9 +86,9 @@ class TestTranscribeWorkerMessageParsing:
             "correlation_id": "test-correlation-123",
             "retry_count": 0,
         }
-        
+
         message = worker.parse_message(raw_message)
-        
+
         assert isinstance(message, TranscribeMessage)
         assert message.job_id == raw_message["job_id"]
         assert message.video_id == raw_message["video_id"]
@@ -99,18 +98,18 @@ class TestTranscribeWorkerMessageParsing:
 
     def test_parse_message_with_missing_optional_fields(self):
         """Test parsing a message with missing optional fields."""
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+        from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
-        
+
         raw_message = {
             "job_id": "123e4567-e89b-12d3-a456-426614174000",
             "video_id": "123e4567-e89b-12d3-a456-426614174001",
             "youtube_video_id": "dQw4w9WgXcQ",
         }
-        
+
         message = worker.parse_message(raw_message)
-        
+
         assert message.correlation_id == "unknown"
         assert message.retry_count == 0
 
@@ -123,7 +122,7 @@ class TestTranscribeWorkerProcessing:
         from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
-        
+
         # Verify worker has required interface
         assert hasattr(worker, "queue_name")
         assert hasattr(worker, "parse_message")
@@ -139,16 +138,17 @@ class TestTranscribeWorkerProcessing:
         sample_correlation_id,
     ):
         """Test that transcribe worker properly fails when video has no transcript.
-        
+
         This validates that videos without captions or auto-generated subtitles
         are marked as failed with a clear error message, preventing them from
         progressing through the pipeline with empty content.
         """
         from shared.worker.base_worker import WorkerStatus
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
-        
+
         # Create a message for a video without transcripts
         # Using a known video ID that has no transcripts (CrossFit's "The Push-Up")
         message = TranscribeMessage(
@@ -158,21 +158,22 @@ class TestTranscribeWorkerProcessing:
             correlation_id=sample_correlation_id,
             retry_count=0,
         )
-        
+
         # Mock the job status updates to avoid DB calls
-        with patch("transcribe.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
-             patch("transcribe.worker.mark_job_failed", new_callable=AsyncMock) as mock_failed:
-            
+        with (
+            patch("transcribe.worker.mark_job_running", new_callable=AsyncMock) as mock_running,
+            patch("transcribe.worker.mark_job_failed", new_callable=AsyncMock) as mock_failed,
+        ):
             # Process the message - should fail due to no transcript
             result = await worker.process_message(message, sample_correlation_id)
-            
+
             # Verify the job was marked as failed
             assert result.status == WorkerStatus.FAILED
             assert "No transcript available" in result.message
-            
+
             # Verify mark_job_running was called
             mock_running.assert_called_once_with(sample_job_id, "transcribing")
-            
+
             # Verify mark_job_failed was called with appropriate error message
             mock_failed.assert_called_once()
             call_args = mock_failed.call_args
@@ -188,15 +189,16 @@ class TestTranscribeWorkerProcessing:
         sample_transcript,
     ):
         """Test that transcribe worker succeeds when transcript is available.
-        
+
         This validates the happy path where a video has transcripts and
         the worker extracts them successfully.
         """
         from shared.worker.base_worker import WorkerStatus
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
-        
+
         message = TranscribeMessage(
             job_id=sample_job_id,
             video_id=sample_video_id,
@@ -204,44 +206,49 @@ class TestTranscribeWorkerProcessing:
             correlation_id=sample_correlation_id,
             retry_count=0,
         )
-        
+
         # Mock all external dependencies
-        with patch("transcribe.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
-             patch("transcribe.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
-             patch.object(worker, "_fetch_transcript_with_timestamps_and_text", new_callable=AsyncMock) as mock_fetch, \
-             patch.object(worker, "_store_transcript", new_callable=AsyncMock) as mock_store, \
-             patch.object(worker, "_store_timestamped_segments", new_callable=AsyncMock) as mock_store_ts, \
-             patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact, \
-             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue:
-            
+        with (
+            patch("transcribe.worker.mark_job_running", new_callable=AsyncMock) as mock_running,
+            patch("transcribe.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed,
+            patch.object(
+                worker, "_fetch_transcript_with_timestamps_and_text", new_callable=AsyncMock
+            ) as mock_fetch,
+            patch.object(worker, "_store_transcript", new_callable=AsyncMock) as mock_store,
+            patch.object(
+                worker, "_store_timestamped_segments", new_callable=AsyncMock
+            ) as mock_store_ts,
+            patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact,
+            patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue,
+        ):
             # Configure mocks - method returns (transcript, segments) tuple
             mock_fetch.return_value = (
                 sample_transcript,
                 [
                     {"start": 0.0, "duration": 5.0, "text": "Hello world"},
                     {"start": 5.0, "duration": 5.0, "text": "This is a test"},
-                ]
+                ],
             )
             mock_store.return_value = f"transcripts/{sample_video_id}.txt"
             mock_store_ts.return_value = f"transcripts/{sample_video_id}_segments.json"
-            
+
             # Process the message
             result = await worker.process_message(message, sample_correlation_id)
-            
+
             # Verify success
             assert result.status == WorkerStatus.SUCCESS
-            
+
             # Verify job status updates
             mock_running.assert_called_once_with(sample_job_id, "transcribing")
             mock_completed.assert_called_once_with(sample_job_id)
-            
+
             # Verify transcript was stored and artifact created
             mock_store.assert_called_once()
             mock_artifact.assert_called_once()
-            
+
             # Verify timestamped segments were stored
             mock_store_ts.assert_called_once()
-            
+
             # Verify next job was queued
             mock_queue.assert_called_once()
 
@@ -256,10 +263,10 @@ class TestSummarizeWorkerMessageParsing:
 
     def test_parse_valid_message(self):
         """Test parsing a valid summarize message."""
-        from summarize.worker import SummarizeWorker, SummarizeMessage
+        from summarize.worker import SummarizeWorker
 
         worker = SummarizeWorker()
-        
+
         raw_message = {
             "job_id": "123e4567-e89b-12d3-a456-426614174000",
             "video_id": "123e4567-e89b-12d3-a456-426614174001",
@@ -267,9 +274,9 @@ class TestSummarizeWorkerMessageParsing:
             "correlation_id": "test-correlation-123",
             "retry_count": 0,
         }
-        
+
         message = worker.parse_message(raw_message)
-        
+
         assert message.job_id == raw_message["job_id"]
         assert message.video_id == raw_message["video_id"]
         assert message.youtube_video_id == raw_message["youtube_video_id"]
@@ -283,7 +290,7 @@ class TestSummarizeWorkerProcessing:
         from summarize.worker import SummarizeWorker
 
         worker = SummarizeWorker()
-        
+
         assert hasattr(worker, "queue_name")
         assert hasattr(worker, "parse_message")
         assert hasattr(worker, "process_message")
@@ -301,10 +308,11 @@ class TestSummarizeWorkerProcessing:
     ):
         """Test that summarize worker succeeds when transcript exists."""
         from shared.worker.base_worker import WorkerStatus
-        from summarize.worker import SummarizeWorker, SummarizeMessage
+
+        from summarize.worker import SummarizeMessage, SummarizeWorker
 
         worker = SummarizeWorker()
-        
+
         message = SummarizeMessage(
             job_id=sample_job_id,
             video_id=sample_video_id,
@@ -313,22 +321,26 @@ class TestSummarizeWorkerProcessing:
             correlation_id=sample_correlation_id,
             retry_count=0,
         )
-        
+
         # Mock all external dependencies
-        with patch("summarize.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
-             patch("summarize.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
-             patch.object(worker, "_fetch_transcript", new_callable=AsyncMock) as mock_fetch, \
-             patch.object(worker, "_generate_summary", new_callable=AsyncMock) as mock_gen, \
-             patch.object(worker, "_store_summary", new_callable=AsyncMock) as mock_store, \
-             patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact, \
-             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue:
-            
+        with (
+            patch("summarize.worker.mark_job_running", new_callable=AsyncMock) as mock_running,
+            patch("summarize.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed,
+            patch.object(worker, "_fetch_transcript", new_callable=AsyncMock) as mock_fetch,
+            patch.object(worker, "_generate_summary", new_callable=AsyncMock) as mock_gen,
+            patch.object(worker, "_store_summary", new_callable=AsyncMock) as mock_store,
+            patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact,
+            patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue,
+        ):
             mock_fetch.return_value = sample_transcript
-            mock_gen.return_value = (sample_summary, sample_summary)  # Returns tuple (summary, summary_text)
+            mock_gen.return_value = (
+                sample_summary,
+                sample_summary,
+            )  # Returns tuple (summary, summary_text)
             mock_store.return_value = f"summaries/{sample_video_id}.md"
-            
+
             result = await worker.process_message(message, sample_correlation_id)
-            
+
             assert result.status == WorkerStatus.SUCCESS
             mock_running.assert_called_once_with(sample_job_id, "summarizing")
             mock_completed.assert_called_once_with(sample_job_id)
@@ -345,19 +357,19 @@ class TestEmbedWorkerMessageParsing:
 
     def test_parse_valid_message(self):
         """Test parsing a valid embed message."""
-        from embed.worker import EmbedWorker, EmbedMessage
+        from embed.worker import EmbedWorker
 
         worker = EmbedWorker()
-        
+
         raw_message = {
             "job_id": "123e4567-e89b-12d3-a456-426614174000",
             "video_id": "123e4567-e89b-12d3-a456-426614174001",
             "youtube_video_id": "dQw4w9WgXcQ",
             "correlation_id": "test-correlation-123",
         }
-        
+
         message = worker.parse_message(raw_message)
-        
+
         assert message.job_id == raw_message["job_id"]
         assert message.video_id == raw_message["video_id"]
         assert message.youtube_video_id == raw_message["youtube_video_id"]
@@ -371,13 +383,13 @@ class TestEmbedWorkerChunking:
         from embed.worker import EmbedWorker
 
         worker = EmbedWorker()
-        
+
         # Create a long text
         long_text = sample_transcript * 100  # Repeat to make it long
-        
+
         # Chunk using the actual method name
         chunks = worker._chunk_content(long_text)
-        
+
         # Should have multiple chunks for long text
         assert len(chunks) >= 1
 
@@ -386,11 +398,11 @@ class TestEmbedWorkerChunking:
         from embed.worker import EmbedWorker
 
         worker = EmbedWorker()
-        
+
         short_text = "This is a short text."
-        
+
         chunks = worker._chunk_content(short_text)
-        
+
         # Should have at least one chunk
         assert len(chunks) >= 1
         # First chunk should contain the text
@@ -405,7 +417,7 @@ class TestEmbedWorkerProcessing:
         from embed.worker import EmbedWorker
 
         worker = EmbedWorker()
-        
+
         assert hasattr(worker, "queue_name")
         assert hasattr(worker, "parse_message")
         assert hasattr(worker, "process_message")
@@ -421,12 +433,13 @@ class TestEmbedWorkerProcessing:
         sample_transcript,
     ):
         """Test that embed worker succeeds when content exists."""
-        from shared.worker.base_worker import WorkerStatus
-        from embed.worker import EmbedWorker, EmbedMessage
         import numpy as np
+        from shared.worker.base_worker import WorkerStatus
+
+        from embed.worker import EmbedMessage, EmbedWorker
 
         worker = EmbedWorker()
-        
+
         message = EmbedMessage(
             job_id=sample_job_id,
             video_id=sample_video_id,
@@ -435,22 +448,23 @@ class TestEmbedWorkerProcessing:
             correlation_id=sample_correlation_id,
             retry_count=0,
         )
-        
+
         # Mock external dependencies
         fake_embedding = np.random.rand(1536).tolist()
-        
-        with patch("embed.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
-             patch("embed.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
-             patch.object(worker, "_fetch_content", new_callable=AsyncMock) as mock_fetch, \
-             patch.object(worker, "_generate_embeddings", new_callable=AsyncMock) as mock_gen, \
-             patch.object(worker, "_store_embeddings", new_callable=AsyncMock) as mock_store, \
-             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue:
-            
+
+        with (
+            patch("embed.worker.mark_job_running", new_callable=AsyncMock) as mock_running,
+            patch("embed.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed,
+            patch.object(worker, "_fetch_content", new_callable=AsyncMock) as mock_fetch,
+            patch.object(worker, "_generate_embeddings", new_callable=AsyncMock) as mock_gen,
+            patch.object(worker, "_store_embeddings", new_callable=AsyncMock) as mock_store,
+            patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue,
+        ):
             mock_fetch.return_value = sample_transcript
             mock_gen.return_value = ([fake_embedding], None)  # Returns tuple (embeddings, error)
-            
+
             result = await worker.process_message(message, sample_correlation_id)
-            
+
             assert result.status == WorkerStatus.SUCCESS
             mock_running.assert_called_once()
             mock_completed.assert_called_once()
@@ -467,19 +481,19 @@ class TestRelationshipsWorkerMessageParsing:
 
     def test_parse_valid_message(self):
         """Test parsing a valid relationships message."""
-        from relationships.worker import RelationshipsWorker, RelationshipsMessage
+        from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
-        
+
         raw_message = {
             "job_id": "123e4567-e89b-12d3-a456-426614174000",
             "video_id": "123e4567-e89b-12d3-a456-426614174001",
             "youtube_video_id": "dQw4w9WgXcQ",
             "correlation_id": "test-correlation-123",
         }
-        
+
         message = worker.parse_message(raw_message)
-        
+
         assert message.job_id == raw_message["job_id"]
         assert message.video_id == raw_message["video_id"]
         assert message.youtube_video_id == raw_message["youtube_video_id"]
@@ -489,7 +503,7 @@ class TestRelationshipsWorkerMessageParsing:
         from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
-        
+
         raw_message = {
             "job_id": "123e4567-e89b-12d3-a456-426614174000",
             "video_id": "123e4567-e89b-12d3-a456-426614174001",
@@ -498,9 +512,9 @@ class TestRelationshipsWorkerMessageParsing:
             "batch_id": "batch-123",
             "retry_count": 2,
         }
-        
+
         message = worker.parse_message(raw_message)
-        
+
         assert message.batch_id == "batch-123"
         assert message.retry_count == 2
 
@@ -510,47 +524,49 @@ class TestRelationshipsWorkerEmbeddingMath:
 
     def test_average_embeddings_single(self):
         """Test averaging a single embedding."""
-        from relationships.worker import RelationshipsWorker
         import numpy as np
 
+        from relationships.worker import RelationshipsWorker
+
         worker = RelationshipsWorker()
-        
+
         # Single embedding
         embeddings = [[1.0, 0.0, 0.0]]
         result = worker._average_embeddings(embeddings)
-        
+
         # Should be normalized unit vector
         assert len(result) == 3
         np.testing.assert_almost_equal(np.linalg.norm(result), 1.0)
-        
+
     def test_average_embeddings_multiple(self):
         """Test averaging multiple embeddings."""
-        from relationships.worker import RelationshipsWorker
         import numpy as np
 
+        from relationships.worker import RelationshipsWorker
+
         worker = RelationshipsWorker()
-        
+
         # Two embeddings
         embeddings = [
             [1.0, 0.0, 0.0],
             [0.0, 1.0, 0.0],
         ]
         result = worker._average_embeddings(embeddings)
-        
+
         # Result should be normalized
         assert len(result) == 3
         np.testing.assert_almost_equal(np.linalg.norm(result), 1.0)
         # Average of [1,0,0] and [0,1,0] normalized should have equal x and y components
         np.testing.assert_almost_equal(result[0], result[1])
-        
+
     def test_average_embeddings_empty(self):
         """Test averaging empty embeddings returns empty list."""
         from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
-        
+
         result = worker._average_embeddings([])
-        
+
         assert result == []
 
 
@@ -560,7 +576,7 @@ class TestRelationshipsWorkerSimilarityThreshold:
     def test_similarity_threshold_default(self):
         """Test default similarity threshold is 0.7."""
         from relationships.worker import DEFAULT_SIMILARITY_THRESHOLD
-        
+
         # The system should use 0.7 as the default similarity threshold
         # Videos must be at least 70% similar to be considered related
         assert DEFAULT_SIMILARITY_THRESHOLD == 0.7
@@ -568,7 +584,7 @@ class TestRelationshipsWorkerSimilarityThreshold:
     def test_max_related_default(self):
         """Test default max related videos is 10."""
         from relationships.worker import DEFAULT_MAX_RELATED
-        
+
         # Should not return more than 10 related videos per video
         assert DEFAULT_MAX_RELATED == 10
 
@@ -581,7 +597,7 @@ class TestRelationshipsWorkerProcessing:
         from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
-        
+
         assert hasattr(worker, "queue_name")
         assert hasattr(worker, "parse_message")
         assert hasattr(worker, "process_message")
@@ -596,12 +612,13 @@ class TestRelationshipsWorkerProcessing:
         sample_correlation_id,
     ):
         """Test that relationships worker succeeds when embeddings exist."""
-        from shared.worker.base_worker import WorkerStatus
-        from relationships.worker import RelationshipsWorker, RelationshipsMessage
         import numpy as np
+        from shared.worker.base_worker import WorkerStatus
+
+        from relationships.worker import RelationshipsMessage, RelationshipsWorker
 
         worker = RelationshipsWorker()
-        
+
         message = RelationshipsMessage(
             job_id=sample_job_id,
             video_id=sample_video_id,
@@ -610,22 +627,25 @@ class TestRelationshipsWorkerProcessing:
             correlation_id=sample_correlation_id,
             retry_count=0,
         )
-        
+
         # Mock external dependencies
         fake_embedding = np.random.rand(1536).tolist()
-        
-        with patch("relationships.worker.mark_job_running", new_callable=AsyncMock) as mock_running, \
-             patch("relationships.worker.mark_job_completed", new_callable=AsyncMock) as mock_completed, \
-             patch.object(worker, "_get_video_embeddings", new_callable=AsyncMock) as mock_get_embed, \
-             patch.object(worker, "_find_related_videos", new_callable=AsyncMock) as mock_find, \
-             patch.object(worker, "_store_relationships", new_callable=AsyncMock) as mock_store, \
-             patch.object(worker, "_update_video_status", new_callable=AsyncMock) as mock_update:
-            
+
+        with (
+            patch("relationships.worker.mark_job_running", new_callable=AsyncMock) as mock_running,
+            patch(
+                "relationships.worker.mark_job_completed", new_callable=AsyncMock
+            ) as mock_completed,
+            patch.object(worker, "_get_video_embeddings", new_callable=AsyncMock) as mock_get_embed,
+            patch.object(worker, "_find_related_videos", new_callable=AsyncMock) as mock_find,
+            patch.object(worker, "_store_relationships", new_callable=AsyncMock) as mock_store,
+            patch.object(worker, "_update_video_status", new_callable=AsyncMock) as mock_update,
+        ):
             mock_get_embed.return_value = [fake_embedding]  # Returns list of embeddings
             mock_find.return_value = []  # No similar videos found
-            
+
             result = await worker.process_message(message, sample_correlation_id)
-            
+
             assert result.status == WorkerStatus.SUCCESS
             mock_running.assert_called_once()
             mock_completed.assert_called_once()
@@ -641,32 +661,36 @@ class TestWorkerQueueNames:
 
     def test_transcribe_worker_queue_name(self):
         """Test transcribe worker uses correct queue."""
-        from transcribe.worker import TranscribeWorker
         from shared.queue.client import TRANSCRIBE_QUEUE
+
+        from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
         assert worker.queue_name == TRANSCRIBE_QUEUE
 
     def test_summarize_worker_queue_name(self):
         """Test summarize worker uses correct queue."""
-        from summarize.worker import SummarizeWorker
         from shared.queue.client import SUMMARIZE_QUEUE
+
+        from summarize.worker import SummarizeWorker
 
         worker = SummarizeWorker()
         assert worker.queue_name == SUMMARIZE_QUEUE
 
     def test_embed_worker_queue_name(self):
         """Test embed worker uses correct queue."""
-        from embed.worker import EmbedWorker
         from shared.queue.client import EMBED_QUEUE
+
+        from embed.worker import EmbedWorker
 
         worker = EmbedWorker()
         assert worker.queue_name == EMBED_QUEUE
 
     def test_relationships_worker_queue_name(self):
         """Test relationships worker uses correct queue."""
-        from relationships.worker import RelationshipsWorker
         from shared.queue.client import RELATIONSHIPS_QUEUE
+
+        from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
         assert worker.queue_name == RELATIONSHIPS_QUEUE
@@ -685,7 +709,7 @@ class TestWorkerResult:
         from shared.worker.base_worker import WorkerResult, WorkerStatus
 
         result = WorkerResult.success()
-        
+
         assert result.status == WorkerStatus.SUCCESS
         assert result.error is None
 
@@ -695,7 +719,7 @@ class TestWorkerResult:
 
         error = Exception("Test error")
         result = WorkerResult.failed(error, "Test failure message")
-        
+
         assert result.status == WorkerStatus.FAILED
         assert result.error == error
         assert result.message == "Test failure message"
@@ -705,7 +729,7 @@ class TestWorkerResult:
         from shared.worker.base_worker import WorkerResult, WorkerStatus
 
         result = WorkerResult.retry("Temporary failure")
-        
+
         assert result.status == WorkerStatus.RETRY
         assert result.message == "Temporary failure"
 
@@ -728,7 +752,7 @@ class TestWorkerPipelineIntegration:
     ):
         """Test that workers pass correct message structure to next worker."""
         # This test verifies the message contract between workers
-        
+
         # All workers use similar message structure
         common_message = {
             "job_id": sample_job_id,
@@ -736,30 +760,34 @@ class TestWorkerPipelineIntegration:
             "youtube_video_id": sample_youtube_video_id,
             "correlation_id": sample_correlation_id,
         }
-        
+
         # Test Transcribe worker parsing
         from transcribe.worker import TranscribeWorker
+
         transcribe_worker = TranscribeWorker()
         transcribe_message = transcribe_worker.parse_message(common_message)
         assert transcribe_message.video_id == sample_video_id
         assert transcribe_message.youtube_video_id == sample_youtube_video_id
-        
+
         # Test Summarize worker parsing
         from summarize.worker import SummarizeWorker
+
         summarize_worker = SummarizeWorker()
         summarize_message = summarize_worker.parse_message(common_message)
         assert summarize_message.video_id == sample_video_id
         assert summarize_message.youtube_video_id == sample_youtube_video_id
-        
+
         # Test Embed worker parsing
         from embed.worker import EmbedWorker
+
         embed_worker = EmbedWorker()
         embed_message = embed_worker.parse_message(common_message)
         assert embed_message.video_id == sample_video_id
         assert embed_message.youtube_video_id == sample_youtube_video_id
-        
+
         # Test Relationships worker parsing
         from relationships.worker import RelationshipsWorker
+
         relationships_worker = RelationshipsWorker()
         relationships_message = relationships_worker.parse_message(common_message)
         assert relationships_message.video_id == sample_video_id

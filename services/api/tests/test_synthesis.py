@@ -9,13 +9,12 @@ These tests verify the synthesis capabilities for User Story 6:
 All synthesis operations are read-only and build upon copilot infrastructure.
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from fastapi import status
-
 
 # ============================================================================
 # Synthesis Fixtures
@@ -65,7 +64,9 @@ def synthesis_scope(synthesis_channel_id):
 
 
 @pytest.fixture
-def mock_videos_for_synthesis(synthesis_video_id, synthesis_video_id_2, synthesis_video_id_3, synthesis_channel_id):
+def mock_videos_for_synthesis(
+    synthesis_video_id, synthesis_video_id_2, synthesis_video_id_3, synthesis_channel_id
+):
     """Create mock video objects for synthesis tests."""
     videos = []
     titles = [
@@ -74,22 +75,22 @@ def mock_videos_for_synthesis(synthesis_video_id, synthesis_video_id_2, synthesi
         ("Advanced Python Patterns", 600),
     ]
     video_ids = [synthesis_video_id, synthesis_video_id_2, synthesis_video_id_3]
-    
+
     for i, (title, duration) in enumerate(titles):
         video = MagicMock()
         video.video_id = video_ids[i]
-        video.youtube_video_id = f"video{i+1}abc"
+        video.youtube_video_id = f"video{i + 1}abc"
         video.channel_id = synthesis_channel_id
         video.title = title
         video.description = f"Description for {title}"
         video.duration = duration
         video.publish_date = datetime.utcnow()
-        video.thumbnail_url = f"https://example.com/thumb{i+1}.jpg"
+        video.thumbnail_url = f"https://example.com/thumb{i + 1}.jpg"
         video.processing_status = "completed"
         video.created_at = datetime.utcnow()
         video.updated_at = datetime.utcnow()
         videos.append(video)
-    
+
     return videos
 
 
@@ -140,7 +141,9 @@ def watch_list_request_data():
 
 
 @pytest.fixture
-def mock_learning_path_response(synthesis_video_id, synthesis_video_id_2, synthesis_video_id_3, synthesis_segment_id):
+def mock_learning_path_response(
+    synthesis_video_id, synthesis_video_id_2, synthesis_video_id_3, synthesis_segment_id
+):
     """Create a mock learning path response."""
     from api.models.synthesis import (
         LearningPath,
@@ -149,7 +152,7 @@ def mock_learning_path_response(synthesis_video_id, synthesis_video_id_2, synthe
         SynthesisType,
         SynthesizeResponse,
     )
-    
+
     return SynthesizeResponse(
         synthesis_type=SynthesisType.LEARNING_PATH,
         learning_path=LearningPath(
@@ -221,7 +224,7 @@ def mock_watch_list_response(synthesis_video_id, synthesis_video_id_2, synthesis
         WatchList,
         WatchListItem,
     )
-    
+
     return SynthesizeResponse(
         synthesis_type=SynthesisType.WATCH_LIST,
         watch_list=WatchList(
@@ -274,7 +277,7 @@ def mock_watch_list_response(synthesis_video_id, synthesis_video_id_2, synthesis
 def mock_insufficient_content_response():
     """Create a mock response for insufficient content."""
     from api.models.synthesis import SynthesisType, SynthesizeResponse
-    
+
     return SynthesizeResponse(
         synthesis_type=SynthesisType.LEARNING_PATH,
         learning_path=None,
@@ -301,32 +304,30 @@ class TestSynthesizeLearningPath:
         mock_learning_path_response,
     ):
         """Test successful learning path synthesis."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_learning_path_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=learning_path_request_data,
             )
-            
+
             # Check response status
             assert response.status_code == status.HTTP_200_OK
-            
+
             # Check response structure
             data = response.json()
             assert data["synthesisType"] == "learning_path"
             assert data["learningPath"] is not None
             assert data["insufficientContent"] is False
-            
+
             # Check learning path content
             learning_path = data["learningPath"]
             assert learning_path["title"] == "Python Programming Learning Path"
             assert len(learning_path["items"]) == 3
-            
+
             # Check first item
             first_item = learning_path["items"][0]
             assert first_item["order"] == 1
@@ -341,20 +342,18 @@ class TestSynthesizeLearningPath:
         mock_learning_path_response,
     ):
         """Test learning path synthesis with scope filtering."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_learning_path_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=learning_path_request_with_scope,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
-            
+
             # Verify service was called with scope
             mock_service.synthesize.assert_called_once()
             call_args = mock_service.synthesize.call_args
@@ -368,25 +367,23 @@ class TestSynthesizeLearningPath:
         mock_learning_path_response,
     ):
         """Test that learning path items include evidence with timestamps."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_learning_path_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=learning_path_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            
+
             # First item should have evidence
             first_item = data["learningPath"]["items"][0]
             assert len(first_item["evidence"]) > 0
-            
+
             evidence = first_item["evidence"][0]
             assert "segmentText" in evidence
             assert "youTubeUrl" in evidence
@@ -398,27 +395,25 @@ class TestSynthesizeLearningPath:
         mock_learning_path_response,
     ):
         """Test that learning path items have proper prerequisite ordering."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_learning_path_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=learning_path_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             items = data["learningPath"]["items"]
-            
+
             # Check prerequisite chain
             assert items[0]["prerequisites"] == []  # First item has no prerequisites
-            assert 1 in items[1]["prerequisites"]   # Second depends on first
-            assert 1 in items[2]["prerequisites"]   # Third depends on first
-            assert 2 in items[2]["prerequisites"]   # Third depends on second
+            assert 1 in items[1]["prerequisites"]  # Second depends on first
+            assert 1 in items[2]["prerequisites"]  # Third depends on first
+            assert 2 in items[2]["prerequisites"]  # Third depends on second
 
 
 class TestSynthesizeWatchList:
@@ -431,25 +426,23 @@ class TestSynthesizeWatchList:
         mock_watch_list_response,
     ):
         """Test successful watch list synthesis."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_watch_list_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=watch_list_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
-            
+
             data = response.json()
             assert data["synthesisType"] == "watch_list"
             assert data["watchList"] is not None
             assert data["insufficientContent"] is False
-            
+
             # Check watch list content
             watch_list = data["watchList"]
             assert watch_list["title"] == "Data Science Watch List"
@@ -462,22 +455,20 @@ class TestSynthesizeWatchList:
         mock_watch_list_response,
     ):
         """Test that watch list items have proper priority levels."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_watch_list_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=watch_list_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             items = data["watchList"]["items"]
-            
+
             # Check priorities are set correctly
             assert items[0]["priority"] == "high"
             assert items[1]["priority"] == "medium"
@@ -490,22 +481,20 @@ class TestSynthesizeWatchList:
         mock_watch_list_response,
     ):
         """Test that watch list items include reasons for recommendation."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_watch_list_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=watch_list_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             items = data["watchList"]["items"]
-            
+
             # All items should have a reason
             for item in items:
                 assert "reason" in item
@@ -518,22 +507,20 @@ class TestSynthesizeWatchList:
         mock_watch_list_response,
     ):
         """Test that watch list items can include categorization tags."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_watch_list_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=watch_list_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             items = data["watchList"]["items"]
-            
+
             # First item should have tags
             assert "tags" in items[0]
             assert "python" in items[0]["tags"]
@@ -549,21 +536,19 @@ class TestSynthesizeInsufficientContent:
         mock_insufficient_content_response,
     ):
         """Test that insufficient content returns proper messaging."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_insufficient_content_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=learning_path_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            
+
             assert data["insufficientContent"] is True
             assert data["insufficientMessage"] is not None
             assert "not enough content" in data["insufficientMessage"].lower()
@@ -575,13 +560,11 @@ class TestSynthesizeInsufficientContent:
         mock_insufficient_content_response,
     ):
         """Test that an empty scope results in insufficient content message."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_insufficient_content_response
             mock_service_class.return_value = mock_service
-            
+
             request_data = {
                 "synthesisType": "learning_path",
                 "query": "Create a learning path for quantum physics",
@@ -590,12 +573,12 @@ class TestSynthesizeInsufficientContent:
                 },
                 "maxItems": 5,
             }
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             assert data["insufficientContent"] is True
@@ -611,21 +594,19 @@ class TestSynthesizeGaps:
         mock_learning_path_response,
     ):
         """Test that learning path includes gap detection."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_learning_path_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=learning_path_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            
+
             gaps = data["learningPath"]["gaps"]
             assert isinstance(gaps, list)
             assert len(gaps) > 0
@@ -638,21 +619,19 @@ class TestSynthesizeGaps:
         mock_watch_list_response,
     ):
         """Test that watch list includes gap detection."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_watch_list_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=watch_list_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            
+
             gaps = data["watchList"]["gaps"]
             assert isinstance(gaps, list)
             assert len(gaps) > 0
@@ -670,12 +649,12 @@ class TestSynthesizeValidation:
             "synthesisType": "invalid_type",
             "query": "Create something",
         }
-        
+
         response = client.post(
             "/api/v1/copilot/synthesize",
             json=request_data,
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_empty_query_rejected(
@@ -687,14 +666,17 @@ class TestSynthesizeValidation:
             "synthesisType": "learning_path",
             "query": "",
         }
-        
+
         response = client.post(
             "/api/v1/copilot/synthesize",
             json=request_data,
         )
-        
+
         # May be 422 for validation error or 400 for business logic rejection
-        assert response.status_code in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_ENTITY]
+        assert response.status_code in [
+            status.HTTP_400_BAD_REQUEST,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ]
 
     def test_max_items_exceeds_limit(
         self,
@@ -706,12 +688,12 @@ class TestSynthesizeValidation:
             "query": "Create a learning path",
             "maxItems": 100,
         }
-        
+
         response = client.post(
             "/api/v1/copilot/synthesize",
             json=request_data,
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_max_items_below_minimum(
@@ -724,12 +706,12 @@ class TestSynthesizeValidation:
             "query": "Create a watch list",
             "maxItems": 0,
         }
-        
+
         response = client.post(
             "/api/v1/copilot/synthesize",
             json=request_data,
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -742,26 +724,24 @@ class TestSynthesizeCorrelationId:
         mock_learning_path_response,
     ):
         """Test that correlation ID is passed to the synthesis service."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_learning_path_response
             mock_service_class.return_value = mock_service
-            
+
             request_data = {
                 "synthesisType": "learning_path",
                 "query": "Create a learning path",
                 "correlationId": "test-correlation-123",
             }
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
-            
+
             # Verify correlation ID was passed
             mock_service.synthesize.assert_called_once()
             call_args = mock_service.synthesize.call_args
@@ -774,25 +754,23 @@ class TestSynthesizeCorrelationId:
         mock_learning_path_response,
     ):
         """Test that correlation ID from header is used when not in body."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_learning_path_response
             mock_service_class.return_value = mock_service
-            
+
             request_data = {
                 "synthesisType": "learning_path",
                 "query": "Create a learning path",
                 # No correlationId in body
             }
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=request_data,
                 headers={"X-Correlation-ID": "header-correlation-456"},
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
 
 
@@ -806,21 +784,19 @@ class TestSynthesizeDurations:
         mock_learning_path_response,
     ):
         """Test that learning path includes correct estimated duration."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_learning_path_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=learning_path_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            
+
             # Duration should be sum of all items: 300 + 450 + 600 = 1350
             assert data["learningPath"]["estimatedDuration"] == 1350
 
@@ -831,21 +807,19 @@ class TestSynthesizeDurations:
         mock_watch_list_response,
     ):
         """Test that watch list includes correct total duration."""
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_watch_list_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json=watch_list_request_data,
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            
+
             # Duration should be sum of all items: 300 + 450 + 600 = 1350
             assert data["watchList"]["totalDuration"] == 1350
 
@@ -888,24 +862,24 @@ class TestSynthesisServiceShortsExclusion:
         client,
     ):
         """Test that learning paths exclude videos under 60 seconds.
-        
+
         Shorts (< 60s) lack sufficient content depth for pedagogical ordering.
         They should be filtered out during learning path generation.
         """
+        from uuid import uuid4
+
         from api.models.synthesis import (
             LearningPath,
-            LearningPathEvidence,
             LearningPathItem,
             SynthesisType,
             SynthesizeResponse,
         )
-        from uuid import uuid4
-        
+
         # Create a response that includes only non-short videos
         # The service should filter out shorts before synthesis
         video_id_1 = uuid4()
         video_id_2 = uuid4()
-        
+
         mock_response = SynthesizeResponse(
             synthesis_type=SynthesisType.LEARNING_PATH,
             learning_path=LearningPath(
@@ -946,14 +920,12 @@ class TestSynthesisServiceShortsExclusion:
             ),
             insufficient_content=False,
         )
-        
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json={
@@ -962,27 +934,31 @@ class TestSynthesisServiceShortsExclusion:
                     "maxItems": 10,
                 },
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            
+
             # Verify learning path was generated
             assert data["learningPath"] is not None
-            
+
             # All videos in the learning path should be > 60 seconds
             for item in data["learningPath"]["items"]:
                 duration = item.get("duration", 0)
-                assert duration >= 60, f"Short video ({duration}s) should be excluded from learning path"
+                assert duration >= 60, (
+                    f"Short video ({duration}s) should be excluded from learning path"
+                )
 
     def test_watch_list_includes_shorts(
         self,
         client,
     ):
         """Test that watch lists can include short videos.
-        
+
         Unlike learning paths, watch lists don't require pedagogical ordering,
         so shorts are acceptable as quick recommendations.
         """
+        from uuid import uuid4
+
         from api.models.synthesis import (
             Priority,
             SynthesisType,
@@ -990,11 +966,10 @@ class TestSynthesisServiceShortsExclusion:
             WatchList,
             WatchListItem,
         )
-        from uuid import uuid4
-        
+
         video_id_short = uuid4()
         video_id_regular = uuid4()
-        
+
         mock_response = SynthesizeResponse(
             synthesis_type=SynthesisType.WATCH_LIST,
             watch_list=WatchList(
@@ -1030,14 +1005,12 @@ class TestSynthesisServiceShortsExclusion:
             ),
             insufficient_content=False,
         )
-        
-        with patch(
-            "api.routes.copilot.SynthesisService"
-        ) as mock_service_class:
+
+        with patch("api.routes.copilot.SynthesisService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.synthesize.return_value = mock_response
             mock_service_class.return_value = mock_service
-            
+
             response = client.post(
                 "/api/v1/copilot/synthesize",
                 json={
@@ -1046,10 +1019,10 @@ class TestSynthesisServiceShortsExclusion:
                     "maxItems": 10,
                 },
             )
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            
+
             # Watch list can include shorts
             assert data["watchList"] is not None
             durations = [item.get("duration", 0) for item in data["watchList"]["items"]]

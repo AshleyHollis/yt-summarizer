@@ -1,6 +1,5 @@
 """Video service for handling video submission and retrieval."""
 
-import re
 from datetime import datetime
 from uuid import UUID
 
@@ -32,7 +31,7 @@ except ImportError:
 
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
-    
+
     def inject_trace_context(message):
         return message
 
@@ -51,7 +50,7 @@ logger = get_logger(__name__)
 
 class VideoNotFoundError(Exception):
     """Raised when a YouTube video does not exist or is unavailable."""
-    
+
     def __init__(self, youtube_video_id: str, reason: str = "Video not found on YouTube"):
         self.youtube_video_id = youtube_video_id
         self.reason = reason
@@ -60,7 +59,7 @@ class VideoNotFoundError(Exception):
 
 class NoTranscriptError(Exception):
     """Raised when a YouTube video has no transcripts/captions available."""
-    
+
     def __init__(self, youtube_video_id: str):
         self.youtube_video_id = youtube_video_id
         super().__init__(
@@ -145,7 +144,7 @@ class VideoService:
             processing_status="pending",
         )
         self.session.add(video)
-        
+
         # Handle race condition: if video was inserted by another request
         # between our check and insert, re-query and return existing
         try:
@@ -157,7 +156,7 @@ class VideoService:
                 select(Video).where(Video.youtube_video_id == youtube_video_id)
             )
             existing_video = existing.scalar_one_or_none()
-            
+
             if existing_video:
                 # Get the latest job for this video
                 job_result = await self.session.execute(
@@ -179,6 +178,7 @@ class VideoService:
 
         # Calculate estimated queue wait before creating the job
         from .stats_service import StatsService
+
         stats_service = StatsService(self.session)
         estimated_wait = await stats_service.estimate_queue_wait()
 
@@ -198,13 +198,15 @@ class VideoService:
         try:
             queue_client = get_queue_client()
             # Inject trace context for distributed tracing
-            message = inject_trace_context({
-                "job_id": str(job.job_id),
-                "video_id": str(video.video_id),
-                "youtube_video_id": youtube_video_id,
-                "channel_name": channel.name,
-                "correlation_id": correlation_id,
-            })
+            message = inject_trace_context(
+                {
+                    "job_id": str(job.job_id),
+                    "video_id": str(video.video_id),
+                    "youtube_video_id": youtube_video_id,
+                    "channel_name": channel.name,
+                    "correlation_id": correlation_id,
+                }
+            )
             queue_client.send_message(
                 TRANSCRIBE_QUEUE,
                 message,
@@ -241,9 +243,7 @@ class VideoService:
             VideoResponse or None if not found.
         """
         result = await self.session.execute(
-            select(Video)
-            .options(selectinload(Video.channel))
-            .where(Video.video_id == video_id)
+            select(Video).options(selectinload(Video.channel)).where(Video.video_id == video_id)
         )
         video = result.scalar_one_or_none()
 
@@ -324,9 +324,7 @@ class VideoService:
             ValueError: If video not found.
         """
         result = await self.session.execute(
-            select(Video)
-            .options(selectinload(Video.channel))
-            .where(Video.video_id == video_id)
+            select(Video).options(selectinload(Video.channel)).where(Video.video_id == video_id)
         )
         video = result.scalar_one_or_none()
 
@@ -339,7 +337,12 @@ class VideoService:
         # Determine which stage to start from
         start_stage = JobType.TRANSCRIBE
         if stages:
-            stage_order = [JobType.TRANSCRIBE, JobType.SUMMARIZE, JobType.EMBED, JobType.BUILD_RELATIONSHIPS]
+            stage_order = [
+                JobType.TRANSCRIBE,
+                JobType.SUMMARIZE,
+                JobType.EMBED,
+                JobType.BUILD_RELATIONSHIPS,
+            ]
             for stage in stage_order:
                 if stage.value in stages:
                     start_stage = stage
@@ -397,30 +400,26 @@ class VideoService:
             True if video was deleted, False if not found.
         """
         from sqlalchemy import delete as sql_delete
-        
+
         # Check if video exists
-        result = await self.session.execute(
-            select(Video).where(Video.video_id == video_id)
-        )
+        result = await self.session.execute(select(Video).where(Video.video_id == video_id))
         video = result.scalar_one_or_none()
 
         if not video:
             return False
 
-        logger.info("Deleting video", video_id=str(video_id), youtube_video_id=video.youtube_video_id)
+        logger.info(
+            "Deleting video", video_id=str(video_id), youtube_video_id=video.youtube_video_id
+        )
 
         # Delete associated jobs first (foreign key constraint)
-        await self.session.execute(
-            sql_delete(Job).where(Job.video_id == video_id)
-        )
+        await self.session.execute(sql_delete(Job).where(Job.video_id == video_id))
 
         # Delete the video (segments will cascade)
-        await self.session.execute(
-            sql_delete(Video).where(Video.video_id == video_id)
-        )
+        await self.session.execute(sql_delete(Video).where(Video.video_id == video_id))
 
         await self.session.commit()
-        
+
         logger.info("Video deleted successfully", video_id=str(video_id))
         return True
 
@@ -434,6 +433,7 @@ class VideoService:
             Dictionary with video metadata.
         """
         import asyncio
+
         import yt_dlp
 
         logger.info("Fetching video metadata from YouTube", youtube_video_id=youtube_video_id)
@@ -475,7 +475,7 @@ class VideoService:
                     reverse=True,
                 )
                 thumbnail_url = sorted_thumbs[0].get("url") if sorted_thumbs else None
-            
+
             # Fallback to standard YouTube thumbnail URL
             if not thumbnail_url:
                 thumbnail_url = f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg"
@@ -507,7 +507,7 @@ class VideoService:
 
         except Exception as e:
             error_str = str(e).lower()
-            
+
             # Check for specific error patterns that indicate video doesn't exist
             video_not_found_patterns = [
                 "video unavailable",
@@ -522,7 +522,7 @@ class VideoService:
                 "is not a valid url",
                 "no video formats found",
             ]
-            
+
             if any(pattern in error_str for pattern in video_not_found_patterns):
                 logger.warning(
                     "Video not found on YouTube",
@@ -533,7 +533,7 @@ class VideoService:
                     youtube_video_id=youtube_video_id,
                     reason="Video not found or unavailable on YouTube",
                 )
-            
+
             # For other errors (network issues, rate limits), log warning and raise
             # to allow retry rather than silently creating bad data
             logger.warning(
@@ -640,9 +640,7 @@ class VideoService:
             Channel instance.
         """
         result = await self.session.execute(
-            select(Channel).where(
-                Channel.youtube_channel_id == channel_data["youtube_channel_id"]
-            )
+            select(Channel).where(Channel.youtube_channel_id == channel_data["youtube_channel_id"])
         )
         channel = result.scalar_one_or_none()
 
@@ -656,7 +654,7 @@ class VideoService:
             thumbnail_url=channel_data.get("thumbnail_url"),
         )
         self.session.add(channel)
-        
+
         try:
             await self.session.flush()
         except IntegrityError:
@@ -696,9 +694,7 @@ class VideoService:
         """
         # Get the video
         result = await self.session.execute(
-            select(Video)
-            .options(selectinload(Video.channel))
-            .where(Video.video_id == video_id)
+            select(Video).options(selectinload(Video.channel)).where(Video.video_id == video_id)
         )
         video = result.scalar_one_or_none()
 
@@ -718,12 +714,10 @@ class VideoService:
 
         # Get or create the channel with proper metadata
         channel_data = metadata["channel"]
-        
+
         # Check if we need to update or create a channel
         result = await self.session.execute(
-            select(Channel).where(
-                Channel.youtube_channel_id == channel_data["youtube_channel_id"]
-            )
+            select(Channel).where(Channel.youtube_channel_id == channel_data["youtube_channel_id"])
         )
         channel = result.scalar_one_or_none()
 

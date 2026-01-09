@@ -1,0 +1,37 @@
+# =============================================================================
+# Production Overlay Kustomization
+# =============================================================================
+# Single production environment - auto-synced by Argo CD on merge to main
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: yt-summarizer
+
+resources:
+  - ../../base
+  - priority-class.yaml
+
+# Image tags - updated by deploy-prod.yml workflow on merge
+# Using digest pinning for immutable deployments
+images:
+  - name: yt-summarizer-api
+    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newTag: latest
+  - name: yt-summarizer-workers
+    newName: acrytsummprd.azurecr.io/yt-summarizer-workers
+    newTag: latest
+
+# Production-specific patches
+patches:
+  - path: patches/configmap-patch.yaml
+  - path: patches/ingress-patch.yaml
+  - path: patches/resources-patch.yaml
+  - path: patches/priority-class-patch.yaml
+
+labels:
+  - pairs:
+      environment: production
+      app.kubernetes.io/part-of: yt-summarizer
+
+commonAnnotations:
+  deployment.kubernetes.io/environment: production

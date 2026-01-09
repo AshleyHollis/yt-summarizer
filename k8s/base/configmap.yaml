@@ -1,0 +1,16 @@
+# =============================================================================
+# ConfigMap for shared configuration
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yt-summarizer-config
+  namespace: yt-summarizer
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/part-of: yt-summarizer
+data:
+  ENVIRONMENT: "staging"
+  LOG_LEVEL: "INFO"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"

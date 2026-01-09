@@ -11,7 +11,6 @@ from uuid import uuid4
 import pytest
 from fastapi import status
 
-
 # ============================================================================
 # Copilot Fixtures
 # ============================================================================
@@ -118,7 +117,7 @@ def copilot_query_response(copilot_video_id, copilot_segment_id):
         RecommendedVideo,
         VideoExplanation,
     )
-    
+
     return CopilotQueryResponse(
         answer="Based on the indexed content, the recommendation is to start with basic concepts.",
         video_cards=[
@@ -169,7 +168,7 @@ def copilot_query_response(copilot_video_id, copilot_segment_id):
 def copilot_segment_search_response(copilot_segment_id, copilot_video_id):
     """Create a mock segment search response."""
     from api.models.copilot import ScoredSegment, SegmentSearchResponse
-    
+
     return SegmentSearchResponse(
         segments=[
             ScoredSegment(
@@ -192,7 +191,7 @@ def copilot_segment_search_response(copilot_segment_id, copilot_video_id):
 def copilot_video_search_response(copilot_video_id):
     """Create a mock video search response."""
     from api.models.copilot import RecommendedVideo, VideoSearchResponse
-    
+
     return VideoSearchResponse(
         videos=[
             RecommendedVideo(
@@ -214,7 +213,7 @@ def copilot_video_search_response(copilot_video_id):
 def copilot_topics_response(copilot_facet_id):
     """Create a mock topics response."""
     from api.models.copilot import TopicCount, TopicsResponse
-    
+
     return TopicsResponse(
         topics=[
             TopicCount(
@@ -233,7 +232,7 @@ def copilot_topics_response(copilot_facet_id):
 def copilot_coverage_response():
     """Create a mock coverage response."""
     from api.models.copilot import CoverageDateRange, CoverageResponse
-    
+
     return CoverageResponse(
         video_count=50,
         segment_count=500,
@@ -251,12 +250,12 @@ def copilot_coverage_response():
 def copilot_neighbors_response(copilot_video_id):
     """Create a mock neighbors response."""
     from api.models.copilot import (
-        NeighborVideo,
         NeighborsResponse,
+        NeighborVideo,
         RecommendedVideo,
         RelationshipType,
     )
-    
+
     related_video_id = uuid4()
     return NeighborsResponse(
         source_video_id=copilot_video_id,
@@ -295,21 +294,19 @@ class TestCopilotQuery:
         copilot_query_response,
     ):
         """Test successful copilot query."""
-        with patch(
-            "api.routes.copilot.CopilotService"
-        ) as mock_service_class:
+        with patch("api.routes.copilot.CopilotService") as mock_service_class:
             mock_service = AsyncMock()
             mock_service.query.return_value = copilot_query_response
             mock_service_class.return_value = mock_service
-            
+
             response = await async_client.post(
                 "/api/v1/copilot/query",
                 json={
                     "query": "What are the best practices for Python?",
                 },
             )
-        
-        # Note: This may return 500 due to missing database, 
+
+        # Note: This may return 500 due to missing database,
         # but we're testing the route exists and accepts the request
         assert response.status_code in [status.HTTP_200_OK, status.HTTP_500_INTERNAL_SERVER_ERROR]
 
@@ -330,7 +327,7 @@ class TestCopilotQuery:
                 "scope": copilot_scope,
             },
         )
-        
+
         # Accept 200 (success with fallback) or 500 (service unavailable)
         assert response.status_code in [status.HTTP_200_OK, status.HTTP_500_INTERNAL_SERVER_ERROR]
 
@@ -343,7 +340,7 @@ class TestCopilotQuery:
                 "query": "",
             },
         )
-        
+
         # Empty query is allowed - copilot handles it gracefully
         # It may return 200 with uncertainty message or 500 if service unavailable
         assert response.status_code in [
@@ -355,7 +352,7 @@ class TestCopilotQuery:
     async def test_query_with_conversation_id(self, async_client):
         """Test copilot query with conversation context."""
         conversation_id = str(uuid4())
-        
+
         response = await async_client.post(
             "/api/v1/copilot/query",
             json={
@@ -363,7 +360,7 @@ class TestCopilotQuery:
                 "conversationId": conversation_id,
             },
         )
-        
+
         # Test route accepts conversationId parameter
         assert response.status_code in [
             status.HTTP_200_OK,
@@ -392,7 +389,7 @@ class TestSegmentSearch:
                 "limit": 10,
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -413,7 +410,7 @@ class TestSegmentSearch:
                 "limit": 20,
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -430,7 +427,7 @@ class TestSegmentSearch:
                 "limit": 250,  # Exceeds max of 200
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -455,7 +452,7 @@ class TestVideoSearch:
                 "limit": 10,
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -476,7 +473,7 @@ class TestVideoSearch:
                 "limit": 15,
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -498,7 +495,7 @@ class TestTopics:
             "/api/v1/copilot/topics",
             json={},
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -517,7 +514,7 @@ class TestTopics:
                 "scope": copilot_scope,
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -539,7 +536,7 @@ class TestCoverage:
             "/api/v1/copilot/coverage",
             json={},
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -558,7 +555,7 @@ class TestCoverage:
                 "scope": copilot_scope,
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -583,7 +580,7 @@ class TestNeighbors:
         response = await async_client.get(
             f"/api/v1/copilot/neighbors/{copilot_video_id}",
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -600,7 +597,7 @@ class TestNeighbors:
             f"/api/v1/copilot/neighbors/{copilot_video_id}",
             params={"types": ["same_topic", "series"]},
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -617,7 +614,7 @@ class TestNeighbors:
             f"/api/v1/copilot/neighbors/{copilot_video_id}",
             params={"limit": 5},
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -629,7 +626,7 @@ class TestNeighbors:
         response = await async_client.get(
             "/api/v1/copilot/neighbors/not-a-uuid",
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -654,7 +651,7 @@ class TestExplain:
                 "queryText": "What are Python best practices?",
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_404_NOT_FOUND,  # Video might not exist
@@ -677,7 +674,7 @@ class TestExplain:
                 "scope": copilot_scope,
             },
         )
-        
+
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_404_NOT_FOUND,
@@ -692,7 +689,7 @@ class TestExplain:
             "/api/v1/copilot/explain/not-a-uuid",
             json={},
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -707,22 +704,22 @@ class TestCopilotModels:
     def test_query_scope_model(self):
         """Test QueryScope model validation."""
         from api.models.copilot import QueryScope
-        
+
         scope = QueryScope(
             channels=[uuid4()],
             video_ids=[uuid4()],
             date_range={"from": "2024-01-01", "to": "2024-12-31"},
         )
-        
+
         assert scope.channels is not None
         assert len(scope.channels) == 1
 
     def test_query_scope_empty(self):
         """Test empty QueryScope is valid."""
         from api.models.copilot import QueryScope
-        
+
         scope = QueryScope()
-        
+
         assert scope.channels is None
         assert scope.video_ids is None
         assert scope.date_range is None
@@ -730,7 +727,7 @@ class TestCopilotModels:
     def test_evidence_model(self):
         """Test Evidence model validation."""
         from api.models.copilot import Evidence
-        
+
         evidence = Evidence(
             video_id=uuid4(),
             youtube_video_id="abc123",
@@ -742,15 +739,16 @@ class TestCopilotModels:
             youtube_url="https://youtube.com/watch?v=abc123&t=10",
             confidence=0.85,
         )
-        
+
         assert evidence.confidence == 0.85
         assert evidence.start_time == 10.0
 
     def test_evidence_confidence_bounds(self):
         """Test Evidence confidence must be between 0 and 1."""
-        from api.models.copilot import Evidence
         from pydantic import ValidationError
-        
+
+        from api.models.copilot import Evidence
+
         with pytest.raises(ValidationError):
             Evidence(
                 video_id=uuid4(),
@@ -766,23 +764,24 @@ class TestCopilotModels:
 
     def test_segment_search_request_limit_bounds(self):
         """Test SegmentSearchRequest limit validation."""
-        from api.models.copilot import SegmentSearchRequest
         from pydantic import ValidationError
-        
+
+        from api.models.copilot import SegmentSearchRequest
+
         # Valid limit
         request = SegmentSearchRequest(
             query_text="test",
             limit=25,
         )
         assert request.limit == 25
-        
+
         # Valid limit at new max (200 to support CANDIDATE_K=100)
         request = SegmentSearchRequest(
             query_text="test",
             limit=200,
         )
         assert request.limit == 200
-        
+
         # Invalid limit > 200
         with pytest.raises(ValidationError):
             SegmentSearchRequest(
@@ -793,13 +792,13 @@ class TestCopilotModels:
     def test_copilot_query_response_aliases(self):
         """Test CopilotQueryResponse uses camelCase aliases."""
         from api.models.copilot import CopilotQueryResponse
-        
+
         response = CopilotQueryResponse(
             answer="Test answer",
             video_cards=[],
             evidence=[],
         )
-        
+
         # Test serialization uses camelCase
         data = response.model_dump(by_alias=True)
         assert "videoCards" in data
@@ -808,7 +807,7 @@ class TestCopilotModels:
     def test_content_type_enum(self):
         """Test ContentType enum values."""
         from api.models.copilot import ContentType
-        
+
         assert ContentType.SUMMARY.value == "summary"
         assert ContentType.SEGMENT.value == "segment"
         assert ContentType.RELATIONSHIP.value == "relationship"
@@ -816,7 +815,7 @@ class TestCopilotModels:
     def test_relationship_type_enum(self):
         """Test RelationshipType enum values."""
         from api.models.copilot import RelationshipType
-        
+
         assert RelationshipType.SERIES.value == "series"
         assert RelationshipType.PROGRESSION.value == "progression"
         assert RelationshipType.SAME_TOPIC.value == "same_topic"
@@ -835,8 +834,9 @@ class TestUS5ExplanationModels:
     def test_key_moment_model(self):
         """Test KeyMoment model creation and serialization."""
         from uuid import uuid4
+
         from api.models.copilot import KeyMoment
-        
+
         segment_id = uuid4()
         moment = KeyMoment(
             timestamp="2:34",
@@ -844,12 +844,12 @@ class TestUS5ExplanationModels:
             segment_id=segment_id,
             youtube_url="https://youtube.com/watch?v=abc123&t=154",
         )
-        
+
         assert moment.timestamp == "2:34"
         assert moment.description == "Demonstrates the hip hinge technique"
         assert moment.segment_id == segment_id
         assert moment.youtube_url == "https://youtube.com/watch?v=abc123&t=154"
-        
+
         # Test camelCase aliases
         data = moment.model_dump(by_alias=True)
         assert "segmentId" in data
@@ -858,20 +858,21 @@ class TestUS5ExplanationModels:
     def test_key_moment_optional_fields(self):
         """Test KeyMoment with optional fields as None."""
         from api.models.copilot import KeyMoment
-        
+
         moment = KeyMoment(
             timestamp="5:00",
             description="General tip",
         )
-        
+
         assert moment.segment_id is None
         assert moment.youtube_url is None
 
     def test_video_explanation_model(self):
         """Test VideoExplanation model creation and serialization."""
         from uuid import uuid4
+
         from api.models.copilot import KeyMoment, VideoExplanation
-        
+
         segment_id = uuid4()
         explanation = VideoExplanation(
             summary="This video covers the exact kettlebell technique you asked about",
@@ -888,11 +889,14 @@ class TestUS5ExplanationModels:
             ],
             related_to="Part of the Kettlebell Fundamentals series",
         )
-        
-        assert explanation.summary == "This video covers the exact kettlebell technique you asked about"
+
+        assert (
+            explanation.summary
+            == "This video covers the exact kettlebell technique you asked about"
+        )
         assert len(explanation.key_moments) == 2
         assert explanation.related_to == "Part of the Kettlebell Fundamentals series"
-        
+
         # Test camelCase aliases
         data = explanation.model_dump(by_alias=True)
         assert "keyMoments" in data
@@ -901,19 +905,20 @@ class TestUS5ExplanationModels:
     def test_video_explanation_empty_key_moments(self):
         """Test VideoExplanation with no key moments."""
         from api.models.copilot import VideoExplanation
-        
+
         explanation = VideoExplanation(
             summary="Relevant to your query",
         )
-        
+
         assert explanation.key_moments == []
         assert explanation.related_to is None
 
     def test_recommended_video_with_explanation(self):
         """Test RecommendedVideo includes explanation field."""
         from uuid import uuid4
+
         from api.models.copilot import KeyMoment, RecommendedVideo, VideoExplanation
-        
+
         video_id = uuid4()
         explanation = VideoExplanation(
             summary="This video demonstrates the exact technique",
@@ -921,7 +926,7 @@ class TestUS5ExplanationModels:
                 KeyMoment(timestamp="1:23", description="Intro"),
             ],
         )
-        
+
         video = RecommendedVideo(
             video_id=video_id,
             youtube_video_id="abc123",
@@ -931,7 +936,7 @@ class TestUS5ExplanationModels:
             primary_reason="Contains relevant content",
             explanation=explanation,
         )
-        
+
         assert video.explanation is not None
         assert video.explanation.summary == "This video demonstrates the exact technique"
         assert len(video.explanation.key_moments) == 1
@@ -939,8 +944,9 @@ class TestUS5ExplanationModels:
     def test_recommended_video_without_explanation(self):
         """Test RecommendedVideo works without explanation (backward compatible)."""
         from uuid import uuid4
+
         from api.models.copilot import RecommendedVideo
-        
+
         video = RecommendedVideo(
             video_id=uuid4(),
             youtube_video_id="abc123",
@@ -949,18 +955,21 @@ class TestUS5ExplanationModels:
             relevance_score=0.9,
             primary_reason="Contains relevant content",
         )
-        
+
         assert video.explanation is None
 
     def test_copilot_response_with_explanations(self, copilot_query_response):
         """Test CopilotQueryResponse includes explanations in video cards."""
         assert len(copilot_query_response.video_cards) > 0
-        
+
         first_card = copilot_query_response.video_cards[0]
         assert first_card.explanation is not None
-        assert first_card.explanation.summary == "This video demonstrates the exact technique you asked about"
+        assert (
+            first_card.explanation.summary
+            == "This video demonstrates the exact technique you asked about"
+        )
         assert len(first_card.explanation.key_moments) == 1
-        
+
         first_moment = first_card.explanation.key_moments[0]
         assert first_moment.timestamp == "2:34"
         assert first_moment.description == "Introduction to the concept"
@@ -968,8 +977,9 @@ class TestUS5ExplanationModels:
     def test_explanation_serialization_format(self):
         """Test explanation serializes to correct JSON format for frontend."""
         from uuid import uuid4
+
         from api.models.copilot import KeyMoment, RecommendedVideo, VideoExplanation
-        
+
         video = RecommendedVideo(
             video_id=uuid4(),
             youtube_video_id="abc123",
@@ -990,10 +1000,10 @@ class TestUS5ExplanationModels:
                 related_to="Part of a series",
             ),
         )
-        
+
         # Serialize with aliases (as it would go to frontend)
         data = video.model_dump(by_alias=True, mode="json")
-        
+
         # Verify structure matches frontend expectations
         assert "explanation" in data
         assert data["explanation"]["summary"] == "Explanation text"
@@ -1014,9 +1024,9 @@ class TestAIKnowledgeSettings:
     def test_ai_knowledge_settings_defaults(self):
         """Test AIKnowledgeSettings default values."""
         from api.models.copilot import AIKnowledgeSettings
-        
+
         settings = AIKnowledgeSettings()
-        
+
         # All enabled by default
         assert settings.use_video_context is True
         assert settings.use_llm_knowledge is True
@@ -1025,13 +1035,13 @@ class TestAIKnowledgeSettings:
     def test_ai_knowledge_settings_custom_values(self):
         """Test AIKnowledgeSettings with custom values."""
         from api.models.copilot import AIKnowledgeSettings
-        
+
         settings = AIKnowledgeSettings(
             use_video_context=False,
             use_llm_knowledge=True,
             use_web_search=True,
         )
-        
+
         assert settings.use_video_context is False
         assert settings.use_llm_knowledge is True
         assert settings.use_web_search is True
@@ -1039,15 +1049,15 @@ class TestAIKnowledgeSettings:
     def test_ai_knowledge_settings_serialization(self):
         """Test AIKnowledgeSettings serializes with camelCase aliases."""
         from api.models.copilot import AIKnowledgeSettings
-        
+
         settings = AIKnowledgeSettings(
             use_video_context=False,
             use_llm_knowledge=True,
             use_web_search=False,
         )
-        
+
         data = settings.model_dump(by_alias=True, mode="json")
-        
+
         # Should use camelCase for frontend
         assert "useVideoContext" in data
         assert "useLLMKnowledge" in data
@@ -1074,7 +1084,7 @@ class TestCopilotQueryWithAISettings:
                 },
             },
         )
-        
+
         # Accept 200 or 500 (service unavailable)
         assert response.status_code in [
             status.HTTP_200_OK,
@@ -1095,7 +1105,7 @@ class TestCopilotQueryWithAISettings:
                 },
             },
         )
-        
+
         # Accept 200 or 500 (service unavailable)
         assert response.status_code in [
             status.HTTP_200_OK,
@@ -1116,13 +1126,13 @@ class TestCopilotQueryWithAISettings:
                 },
             },
         )
-        
+
         # Accept 200 (with appropriate error message) or 500
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ]
-        
+
         # If 200, check it returns appropriate message
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
@@ -1139,7 +1149,7 @@ class TestCopilotQueryWithAISettings:
                 # No aiSettings provided - should use defaults
             },
         )
-        
+
         # Accept 200 or 500 (service unavailable)
         assert response.status_code in [
             status.HTTP_200_OK,
@@ -1154,9 +1164,10 @@ class TestCopilotServiceAISettings:
     async def test_copilot_service_respects_video_context_disabled(self):
         """Test that CopilotService respects useVideoContext=False."""
         from unittest.mock import AsyncMock, MagicMock
+
         from api.models.copilot import AIKnowledgeSettings, CopilotQueryRequest
         from api.services.copilot_service import CopilotService
-        
+
         # Create mock session and LLM service
         mock_session = AsyncMock()
         mock_llm_service = MagicMock()
@@ -1169,13 +1180,13 @@ class TestCopilotServiceAISettings:
         mock_llm_service.generate_follow_ups = AsyncMock(
             return_value=["What are Python's key features?"]
         )
-        
+
         # Create service with mock LLM
         service = CopilotService(
             session=mock_session,
             llm_service=mock_llm_service,
         )
-        
+
         # Create request with video context disabled
         request = CopilotQueryRequest(
             query="What is Python?",
@@ -1185,10 +1196,10 @@ class TestCopilotServiceAISettings:
                 use_web_search=False,
             ),
         )
-        
+
         # Execute query
         response = await service.query(request)
-        
+
         # Should return LLM-only response without evidence
         assert response.answer is not None
         assert response.video_cards == []
@@ -1202,19 +1213,20 @@ class TestCopilotServiceAISettings:
     async def test_copilot_service_error_when_all_disabled(self):
         """Test that CopilotService returns error when all knowledge disabled."""
         from unittest.mock import AsyncMock, MagicMock
+
         from api.models.copilot import AIKnowledgeSettings, CopilotQueryRequest
         from api.services.copilot_service import CopilotService
-        
+
         # Create mock session
         mock_session = AsyncMock()
         mock_llm_service = MagicMock()
-        
+
         # Create service
         service = CopilotService(
             session=mock_session,
             llm_service=mock_llm_service,
         )
-        
+
         # Create request with all knowledge disabled
         request = CopilotQueryRequest(
             query="What is Python?",
@@ -1224,10 +1236,10 @@ class TestCopilotServiceAISettings:
                 use_web_search=False,
             ),
         )
-        
+
         # Execute query
         response = await service.query(request)
-        
+
         # Should return error message
         assert "cannot answer" in response.answer.lower() or "disabled" in response.answer.lower()
         assert response.video_cards == []

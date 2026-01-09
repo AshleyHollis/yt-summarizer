@@ -20,8 +20,8 @@ Debug endpoints (mirrors worker debug endpoints for consistency):
 import os
 import sys
 import time
-from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -31,45 +31,29 @@ router = APIRouter()
 
 class HealthStatus(BaseModel):
     """Health check response model."""
-    
-    status: Literal["healthy", "degraded", "unhealthy"] = Field(
-        description="Overall health status"
-    )
+
+    status: Literal["healthy", "degraded", "unhealthy"] = Field(description="Overall health status")
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="Current server timestamp (UTC)"
+        default_factory=datetime.utcnow, description="Current server timestamp (UTC)"
     )
-    version: str = Field(
-        description="Service version"
-    )
+    version: str = Field(description="Service version")
     checks: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Individual component health checks"
+        default_factory=dict, description="Individual component health checks"
     )
-    uptime_seconds: Optional[float] = Field(
-        default=None,
-        description="Seconds since the API started"
-    )
-    started_at: Optional[datetime] = Field(
-        default=None,
-        description="Timestamp when the API started (UTC)"
+    uptime_seconds: float | None = Field(default=None, description="Seconds since the API started")
+    started_at: datetime | None = Field(
+        default=None, description="Timestamp when the API started (UTC)"
     )
 
 
 class ReadinessStatus(BaseModel):
     """Readiness check response model."""
-    
-    ready: bool = Field(
-        description="Whether the service is ready to accept requests"
-    )
+
+    ready: bool = Field(description="Whether the service is ready to accept requests")
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="Current server timestamp (UTC)"
+        default_factory=datetime.utcnow, description="Current server timestamp (UTC)"
     )
-    checks: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Individual readiness checks"
-    )
+    checks: dict[str, bool] = Field(default_factory=dict, description="Individual readiness checks")
 
 
 @router.get(
@@ -80,25 +64,26 @@ class ReadinessStatus(BaseModel):
 )
 async def health_check(request: Request) -> HealthStatus:
     """Health check endpoint for liveness probes.
-    
-    Returns health status including dependency checks for database, 
+
+    Returns health status including dependency checks for database,
     blob storage, and queue services.
     Used by container orchestrators and monitoring systems.
     """
     # Get version from app or settings
     version = getattr(request.app, "version", "0.1.0")
-    
+
     checks = {"api": True}
     overall_status = "healthy"
-    
+
     # Check database status from app state (set during startup)
     db_initialized = getattr(request.app.state, "db_initialized", False)
     checks["database"] = db_initialized
-    
+
     # Try to verify database connection is still alive
     if db_initialized:
         try:
             from shared.db.connection import get_db
+
             db = get_db()
             await db.connect()
             checks["database_connection"] = True
@@ -107,31 +92,33 @@ async def health_check(request: Request) -> HealthStatus:
             overall_status = "degraded"
     else:
         overall_status = "degraded"
-    
+
     # Check blob storage connectivity
     try:
         from shared.blob.client import get_connection_string as get_blob_conn
+
         get_blob_conn()  # Verify connection string is available
         checks["blob_storage"] = True
     except Exception:
         checks["blob_storage"] = False
         # Blob storage is optional for basic health, don't degrade
-    
+
     # Check queue storage connectivity
     try:
         from shared.queue.client import get_connection_string as get_queue_conn
+
         get_queue_conn()  # Verify connection string is available
         checks["queue_storage"] = True
     except Exception:
         checks["queue_storage"] = False
         # Queue storage is optional for basic health, don't degrade
-    
+
     # Calculate uptime from stored startup timestamp
     started_at = getattr(request.app.state, "started_at", None)
     uptime_seconds = None
     if started_at:
         uptime_seconds = (datetime.utcnow() - started_at).total_seconds()
-    
+
     return HealthStatus(
         status=overall_status,
         version=version,
@@ -149,26 +136,27 @@ async def health_check(request: Request) -> HealthStatus:
 )
 async def readiness_check(request: Request) -> ReadinessStatus:
     """Readiness check endpoint for readiness probes.
-    
+
     Checks that all dependencies (database, storage, etc.) are available.
     Used by load balancers to determine if traffic should be sent to this instance.
     """
     checks = {}
     all_ready = True
-    
+
     # Check if API is running
     checks["api"] = True
-    
+
     # Check database initialization status from startup
     db_initialized = getattr(request.app.state, "db_initialized", False)
     checks["database_init"] = db_initialized
     if not db_initialized:
         all_ready = False
-    
+
     # Also verify we can actually connect to the database
     if db_initialized:
         try:
             from shared.db.connection import get_db
+
             db = get_db()
             await db.connect()
             checks["database_connection"] = True
@@ -176,7 +164,7 @@ async def readiness_check(request: Request) -> ReadinessStatus:
             checks["database_connection"] = False
             checks["database_error"] = str(e)[:100]  # Truncate error message
             all_ready = False
-    
+
     return ReadinessStatus(
         ready=all_ready,
         checks=checks,
@@ -190,7 +178,7 @@ async def readiness_check(request: Request) -> ReadinessStatus:
 )
 async def liveness_check() -> dict[str, str]:
     """Simple liveness check endpoint.
-    
+
     Returns a minimal response to indicate the service is running.
     """
     return {"status": "ok"}
@@ -204,28 +192,29 @@ async def liveness_check() -> dict[str, str]:
 )
 async def debug_check() -> dict:
     """Debug endpoint to check database and environment.
-    
-    DEPRECATED: Use /debug for comprehensive debug info or 
+
+    DEPRECATED: Use /debug for comprehensive debug info or
     /debug/connectivity for all service connectivity checks.
     """
     import os
-    
+
     result = {
         "note": "This endpoint is deprecated. Use /debug or /debug/connectivity instead.",
         "connection_strings": {},
         "database": {"status": "unknown", "error": None, "url": None},
     }
-    
+
     # Check for connection strings
     for key in ["DATABASE_URL", "ConnectionStrings__ytsummarizer", "ConnectionStrings__sql"]:
         val = os.environ.get(key)
         if val:
             # Mask password
             result["connection_strings"][key] = val[:30] + "..." if len(val) > 30 else val
-    
+
     # Try to get database URL and connect
     try:
         from shared.db.connection import get_database_url, get_db
+
         url = get_database_url()
         # Mask password in URL
         if "@" in url:
@@ -234,12 +223,12 @@ async def debug_check() -> dict:
         else:
             masked_url = url[:50] + "..."
         result["database"]["url"] = masked_url
-        
+
         # Try to connect
         db = get_db()
         await db.connect()
         result["database"]["status"] = "connected"
-        
+
         # Try to create tables
         try:
             await db.create_tables()
@@ -250,15 +239,16 @@ async def debug_check() -> dict:
     except Exception as e:
         result["database"]["status"] = "error"
         result["database"]["error"] = str(e)
-    
+
     return result
+
 
 # =============================================================================
 # DEBUG ENDPOINTS - Match worker debug endpoints for consistency
 # =============================================================================
 
 # Store API startup time for uptime calculation
-_api_started_at = datetime.now(timezone.utc)
+_api_started_at = datetime.now(UTC)
 
 
 @router.get(
@@ -268,13 +258,21 @@ _api_started_at = datetime.now(timezone.utc)
 )
 async def debug_info(request: Request) -> dict[str, Any]:
     """Return detailed debug information for troubleshooting.
-    
+
     Mirrors the worker /debug endpoint for consistency across services.
     """
     # Calculate uptime
     started_at = getattr(request.app.state, "started_at", _api_started_at)
-    uptime = (datetime.now(timezone.utc) - started_at.replace(tzinfo=timezone.utc) if started_at.tzinfo is None else started_at).total_seconds() if started_at else 0
-    
+    uptime = (
+        (
+            datetime.now(UTC) - started_at.replace(tzinfo=UTC)
+            if started_at.tzinfo is None
+            else started_at
+        ).total_seconds()
+        if started_at
+        else 0
+    )
+
     # Get OTEL-related env vars (redact sensitive values)
     otel_vars = {}
     for key, value in os.environ.items():
@@ -283,10 +281,10 @@ async def debug_info(request: Request) -> dict[str, Any]:
                 otel_vars[key] = "[REDACTED]" if value else "(not set)"
             else:
                 otel_vars[key] = value
-    
+
     # Get version from app
     version = getattr(request.app, "version", "0.1.0")
-    
+
     return {
         "service": "yt-summarizer-api",
         "version": version,
@@ -305,7 +303,7 @@ async def debug_info(request: Request) -> dict[str, Any]:
             "debug_connectivity": "/debug/connectivity",
             "debug_telemetry": "/debug/telemetry",
             "debug_trace_test": "/debug/trace-test",
-        }
+        },
     }
 
 
@@ -316,24 +314,34 @@ async def debug_info(request: Request) -> dict[str, Any]:
 )
 async def debug_env() -> dict[str, Any]:
     """Return relevant environment variables for debugging.
-    
+
     Includes OTEL, connection strings, and service-related vars.
     Sensitive values are redacted.
     """
     relevant_prefixes = (
-        "OTEL_", "SSL_", "BLOBS_", "QUEUES_", "YTSUMMARIZER_", 
-        "ConnectionStrings__", "API_", "AZURE_OPENAI_", "SERVICE_"
+        "OTEL_",
+        "SSL_",
+        "BLOBS_",
+        "QUEUES_",
+        "YTSUMMARIZER_",
+        "ConnectionStrings__",
+        "API_",
+        "AZURE_OPENAI_",
+        "SERVICE_",
     )
-    
+
     env_vars = {}
     for key, value in sorted(os.environ.items()):
         if any(key.startswith(prefix) for prefix in relevant_prefixes):
             # Redact sensitive values
-            if any(sensitive in key.upper() for sensitive in ("PASSWORD", "KEY", "SECRET", "HEADER", "AUTH")):
+            if any(
+                sensitive in key.upper()
+                for sensitive in ("PASSWORD", "KEY", "SECRET", "HEADER", "AUTH")
+            ):
                 env_vars[key] = "[REDACTED]" if value else "(not set)"
             else:
                 env_vars[key] = value
-    
+
     return {
         "service": "yt-summarizer-api",
         "environment_variables": env_vars,
@@ -349,10 +357,11 @@ async def debug_env() -> dict[str, Any]:
 async def debug_connectivity() -> dict[str, Any]:
     """Test connectivity to external services with latency measurements."""
     results = {}
-    
+
     # Test database connectivity
     try:
         from shared.db.connection import get_db
+
         start = time.time()
         db = get_db()
         await db.connect()
@@ -366,10 +375,11 @@ async def debug_connectivity() -> dict[str, Any]:
             "status": "error",
             "error": str(e),
         }
-    
+
     # Test blob storage connectivity
     try:
         from shared.blob.client import get_container_client
+
         start = time.time()
         client = get_container_client()
         # Check if container exists (creates it if not)
@@ -385,10 +395,11 @@ async def debug_connectivity() -> dict[str, Any]:
             "status": "error",
             "error": str(e),
         }
-    
+
     # Test queue storage connectivity
     try:
         from shared.queue.client import get_queue_client
+
         start = time.time()
         client = get_queue_client()
         # Try to ensure queue exists
@@ -404,15 +415,17 @@ async def debug_connectivity() -> dict[str, Any]:
             "status": "error",
             "error": str(e),
         }
-    
+
     # Test Azure OpenAI connectivity (for copilot/agent features)
     try:
         from shared.config import get_settings
+
         settings = get_settings()
         openai_settings = settings.openai
-        
+
         if openai_settings.is_azure_configured:
             import httpx
+
             start = time.time()
             endpoint = openai_settings.azure_endpoint
             # Make a simple HTTP HEAD request to check endpoint reachability
@@ -445,9 +458,9 @@ async def debug_connectivity() -> dict[str, Any]:
             "status": "error",
             "error": str(e),
         }
-    
+
     all_ok = all(r.get("status") in ("ok", "not_configured") for r in results.values())
-    
+
     return {
         "service": "yt-summarizer-api",
         "overall_status": "healthy" if all_ok else "degraded",
@@ -462,14 +475,14 @@ async def debug_connectivity() -> dict[str, Any]:
 )
 async def debug_telemetry() -> dict[str, Any]:
     """Return telemetry configuration status.
-    
+
     Shows OTLP endpoint, protocol, tracer provider status, and connectivity.
     """
     otel_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
     otel_protocol = os.environ.get("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
     otel_service = os.environ.get("OTEL_SERVICE_NAME", "yt-summarizer-api")
     ssl_cert_dir = os.environ.get("SSL_CERT_DIR", "")
-    
+
     # Check if OpenTelemetry packages are available
     otel_packages = {}
     for pkg in ["opentelemetry-api", "opentelemetry-sdk", "opentelemetry-exporter-otlp"]:
@@ -477,33 +490,37 @@ async def debug_telemetry() -> dict[str, Any]:
             module_name = pkg.replace("-", "_")
             if pkg == "opentelemetry-api":
                 from opentelemetry import trace
+
                 otel_packages[pkg] = "installed"
             elif pkg == "opentelemetry-sdk":
                 from opentelemetry.sdk import trace as sdk_trace
+
                 otel_packages[pkg] = "installed"
             elif pkg == "opentelemetry-exporter-otlp":
                 from opentelemetry.exporter.otlp.proto.http import trace_exporter
+
                 otel_packages[pkg] = "installed"
         except ImportError:
             otel_packages[pkg] = "not installed"
-    
+
     # Check tracer provider
     tracer_info = {}
     try:
         from opentelemetry import trace
+
         provider = trace.get_tracer_provider()
         tracer_info["provider_class"] = type(provider).__name__
         tracer_info["provider_configured"] = type(provider).__name__ != "ProxyTracerProvider"
     except Exception as e:
         tracer_info["error"] = str(e)
-    
+
     # Test OTLP endpoint connectivity
     otlp_connectivity = {"status": "not tested"}
     if otel_endpoint:
         try:
-            import urllib.request
             import ssl
-            
+            import urllib.request
+
             ctx = ssl.create_default_context()
             if ssl_cert_dir:
                 for cert_file in os.listdir(ssl_cert_dir):
@@ -512,19 +529,26 @@ async def debug_telemetry() -> dict[str, Any]:
                             ctx.load_verify_locations(os.path.join(ssl_cert_dir, cert_file))
                         except Exception:
                             pass
-            
+
             req = urllib.request.Request(otel_endpoint, method="HEAD")
             start = time.time()
             try:
                 urllib.request.urlopen(req, timeout=5, context=ctx)
-                otlp_connectivity = {"status": "ok", "latency_ms": round((time.time() - start) * 1000, 2)}
+                otlp_connectivity = {
+                    "status": "ok",
+                    "latency_ms": round((time.time() - start) * 1000, 2),
+                }
             except urllib.error.HTTPError as e:
-                otlp_connectivity = {"status": "ok", "http_code": e.code, "latency_ms": round((time.time() - start) * 1000, 2)}
+                otlp_connectivity = {
+                    "status": "ok",
+                    "http_code": e.code,
+                    "latency_ms": round((time.time() - start) * 1000, 2),
+                }
             except urllib.error.URLError as e:
                 otlp_connectivity = {"status": "error", "error": str(e.reason)}
         except Exception as e:
             otlp_connectivity = {"status": "error", "error": str(e)}
-    
+
     return {
         "service": "yt-summarizer-api",
         "configuration": {
@@ -546,7 +570,7 @@ async def debug_telemetry() -> dict[str, Any]:
 )
 async def debug_trace_test() -> dict[str, Any]:
     """Generate a test trace span to verify telemetry is working.
-    
+
     Creates a span with the name 'debug_trace_test' and attempts to
     flush it to the OTLP endpoint.
     """
@@ -557,18 +581,20 @@ async def debug_trace_test() -> dict[str, Any]:
         "tracer_info": {},
         "errors": [],
     }
-    
+
     try:
         from opentelemetry import trace
         from opentelemetry.trace import Status, StatusCode
-        
+
         # Get tracer info
         provider = trace.get_tracer_provider()
         result["tracer_info"]["provider_class"] = type(provider).__name__
-        
+
         if type(provider).__name__ == "ProxyTracerProvider":
-            result["errors"].append("TracerProvider is ProxyTracerProvider - telemetry may not be configured")
-        
+            result["errors"].append(
+                "TracerProvider is ProxyTracerProvider - telemetry may not be configured"
+            )
+
         # Create a test span
         tracer = trace.get_tracer("api-debug-test")
         with tracer.start_as_current_span(
@@ -577,7 +603,7 @@ async def debug_trace_test() -> dict[str, Any]:
                 "test.id": result["test_id"],
                 "service.name": "yt-summarizer-api",
                 "test.type": "api_diagnostic",
-            }
+            },
         ) as span:
             result["span_created"] = True
             result["span_info"] = {
@@ -585,10 +611,10 @@ async def debug_trace_test() -> dict[str, Any]:
                 "span_id": format(span.get_span_context().span_id, "016x"),
                 "is_recording": span.is_recording(),
             }
-            
+
             span.add_event("test_event", {"message": "Debug trace test completed"})
             span.set_status(Status(StatusCode.OK))
-        
+
         # Try to force flush
         try:
             if hasattr(provider, "force_flush"):
@@ -600,10 +626,10 @@ async def debug_trace_test() -> dict[str, Any]:
         except Exception as e:
             result["flush_status"] = f"flush error: {e}"
             result["errors"].append(f"Force flush failed: {e}")
-            
+
     except ImportError as e:
         result["errors"].append(f"OpenTelemetry not available: {e}")
     except Exception as e:
         result["errors"].append(f"Error creating test span: {e}")
-    
+
     return result

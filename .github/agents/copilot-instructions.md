@@ -6,6 +6,10 @@ Auto-generated from all feature plans. Last updated: 2025-12-14
 ## Active Technologies
 - Python 3.11, TypeScript 5.x + FastAPI, yt-dlp, Next.js 14, React 18 (001-product-spec)
 - Azure SQL (serverless), Azure Blob, Azure Storage Queue (001-product-spec)
+- GitHub Actions YAML, Terraform HCL, Python 3.11, Node.js 20+ + GitHub Actions, Terraform azurerm provider, Azure CLI (002-azure-cicd)
+- Azure Storage Account (Terraform state), Azure Container Registry (images) (002-azure-cicd)
+- Python 3.11 (API/Workers), TypeScript/Node 20 (Frontend) + FastAPI, Next.js, Playwright, pytest, Argo CD, Kustomize (002-azure-cicd)
+- Azure SQL (serverless), Azure Blob Storage, Azure Storage Queue (002-azure-cicd)
 
 
 
@@ -82,6 +86,8 @@ If tests fail, fix the issue and re-run until all pass.
 General: Follow standard conventions
 
 ## Recent Changes
+- 002-azure-cicd: Added Python 3.11 (API/Workers), TypeScript/Node 20 (Frontend) + FastAPI, Next.js, Playwright, pytest, Argo CD, Kustomize
+- 002-azure-cicd: Added GitHub Actions YAML, Terraform HCL, Python 3.11, Node.js 20+ + GitHub Actions, Terraform azurerm provider, Azure CLI
 - 001-product-spec: Added Python 3.11, TypeScript 5.x + FastAPI, yt-dlp, Next.js 14, React 18
 
 
