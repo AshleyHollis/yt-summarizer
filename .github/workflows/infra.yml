@@ -92,13 +92,16 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: |
+          set -o pipefail
           terraform plan -no-color -input=false -out=tfplan \
             -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
             -var="sql_admin_password=${{ secrets.SQL_ADMIN_PASSWORD }}" \
             2>&1 | tee plan_output.txt
+          PLAN_EXIT_CODE=$?
           echo "plan_output<<EOF" >> "$GITHUB_OUTPUT"
           cat plan_output.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
+          exit $PLAN_EXIT_CODE
         continue-on-error: true
 
       - name: Post Plan to PR
