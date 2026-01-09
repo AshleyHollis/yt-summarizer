@@ -1,6 +1,7 @@
 # =============================================================================
 # API Ingress
 # =============================================================================
+# Base ingress configuration - overlays can patch the host and TLS settings
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -12,14 +13,15 @@ metadata:
     app.kubernetes.io/part-of: yt-summarizer
   annotations:
     kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
 spec:
   ingressClassName: nginx
   rules:
-    - host: api.yt-summarizer.example.com
-      http:
+    # Default rule without host - accepts any Host header
+    # Overlays should patch this to add a specific host for production/preview
+    - http:
         paths:
           - path: /
             pathType: Prefix

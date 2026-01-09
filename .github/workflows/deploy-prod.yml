@@ -479,7 +479,6 @@ jobs:
           
           echo "## Quick Links" >> $GITHUB_STEP_SUMMARY
           echo "- 🌐 [Production Site](${{ env.PRODUCTION_URL }})" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔄 [Argo CD Dashboard](https://argocd.yt-summarizer.example.com)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.health-check.result }}" = "failure" ] || [ "${{ needs.smoke-tests.result }}" = "failure" ]; then

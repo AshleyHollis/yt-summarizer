@@ -9,7 +9,6 @@ namespace: preview-pr-4
 
 resources:
   - ../../base
-  - namespace.yaml
   - resource-quota.yaml
   - limit-range.yaml
 
@@ -27,6 +26,7 @@ images:
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
     newTag: "pr-4-23f5e75"
 
-commonLabels:
-  app.kubernetes.io/part-of: yt-summarizer-preview
-  preview.pr-number: "4"
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: yt-summarizer-preview
+      preview.pr-number: "4"

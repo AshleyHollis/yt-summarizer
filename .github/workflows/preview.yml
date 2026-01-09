@@ -208,7 +208,6 @@ jobs:
 
           resources:
             - ../../base
-            - namespace.yaml
             - resource-quota.yaml
             - limit-range.yaml
 
@@ -226,9 +225,10 @@ jobs:
               newName: ${ACR_SERVER}/yt-summarizer-workers
               newTag: "${IMAGE_TAG}"
 
-          commonLabels:
-            app.kubernetes.io/part-of: yt-summarizer-preview
-            preview.pr-number: "${PR_NUMBER}"
+          labels:
+            - pairs:
+                app.kubernetes.io/part-of: yt-summarizer-preview
+                preview.pr-number: "${PR_NUMBER}"
           EOF
           
           # Generate preview URL from configured variable or leave empty
@@ -426,7 +426,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
           echo "- [Preview Site](${{ needs.update-overlay.outputs.preview_url }})" >> $GITHUB_STEP_SUMMARY
-          echo "- [Argo CD Dashboard](https://argocd.yt-summarizer.example.com)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ℹ️ Architecture" >> $GITHUB_STEP_SUMMARY
           echo "This preview uses Argo CD ApplicationSet with Pull Request Generator." >> $GITHUB_STEP_SUMMARY
