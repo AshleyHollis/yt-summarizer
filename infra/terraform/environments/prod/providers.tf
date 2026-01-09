@@ -8,14 +8,8 @@ provider "azurerm" {
       purge_soft_delete_on_destroy = false
     }
   }
+  subscription_id = var.subscription_id
 }
 
-provider "helm" {
-  kubernetes {
-    config_path = "~/.kube/config"
-  }
-}
-
-provider "kubernetes" {
-  config_path = "~/.kube/config"
-}
+# Helm and Kubernetes providers will be configured after AKS is created
+# using data sources to get credentials

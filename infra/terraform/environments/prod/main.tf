@@ -159,52 +159,20 @@ module "swa" {
   tags = local.common_tags
 }
 
-# -----------------------------------------------------------------------------
-# Nginx Ingress Controller
-# Handles routing for both production and preview environments
-# -----------------------------------------------------------------------------
-
-module "nginx_ingress" {
-  source = "../../modules/nginx-ingress"
-
-  depends_on = [module.aks]
-}
-
-# -----------------------------------------------------------------------------
-# External Secrets Operator
-# -----------------------------------------------------------------------------
-
-module "external_secrets" {
-  source = "../../modules/external-secrets"
-
-  key_vault_name      = module.key_vault.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  client_id           = module.aks.identity_principal_id
-  app_namespace       = "yt-summarizer"
-
-  depends_on = [module.aks, module.key_vault]
-}
-
-# -----------------------------------------------------------------------------
-# Argo CD
-# Manages production + preview ApplicationSet
-# -----------------------------------------------------------------------------
-
-module "argocd" {
-  source = "../../modules/argocd"
-
-  namespace     = "argocd"
-  chart_version = "5.51.6"
-
-  ingress_enabled = true
-  ingress_host    = "argocd.${var.domain}"
-  ingress_class   = "nginx"
-
-  github_org  = var.github_org
-  github_repo = var.github_repo
-
-  depends_on = [module.aks, module.nginx_ingress]
-}
+# =============================================================================
+# CLUSTER COMPONENTS - Managed by Argo CD (not Terraform)
+# =============================================================================
+# 
+# The following components are NOT managed by Terraform:
+# - Nginx Ingress Controller → k8s/argocd/infra-apps.yaml
+# - External Secrets Operator → k8s/argocd/infra-apps.yaml
+# - Argo CD → scripts/bootstrap-argocd.ps1
+#
+# After terraform apply, run:
+#   1. az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
+#   2. ./scripts/bootstrap-argocd.ps1
+#   3. kubectl apply -f k8s/argocd/infra-apps.yaml
+# =============================================================================
 
 # -----------------------------------------------------------------------------
 # Data Sources
@@ -251,4 +219,27 @@ output "sql_server_fqdn" {
 
 output "storage_primary_endpoint" {
   value = module.storage.primary_blob_endpoint
+}
+
+# Output for post-deploy instructions
+output "post_deploy_instructions" {
+  value = <<-EOT
+    
+    ╔═══════════════════════════════════════════════════════════════════════════╗
+    ║ NEXT STEPS: Bootstrap Argo CD and Cluster Components                      ║
+    ╠═══════════════════════════════════════════════════════════════════════════╣
+    ║ 1. Get AKS credentials:                                                    ║
+    ║    az aks get-credentials --resource-group ${azurerm_resource_group.main.name} --name ${module.aks.name}   ║
+    ║                                                                            ║
+    ║ 2. Bootstrap Argo CD:                                                      ║
+    ║    ./scripts/bootstrap-argocd.ps1                                          ║
+    ║                                                                            ║
+    ║ 3. Apply infrastructure apps (ingress-nginx, external-secrets):            ║
+    ║    kubectl apply -f k8s/argocd/infra-apps.yaml                             ║
+    ║                                                                            ║
+    ║ 4. Apply application configs:                                              ║
+    ║    kubectl apply -f k8s/argocd/prod-app.yaml                               ║
+    ║    kubectl apply -f k8s/argocd/preview-appset.yaml                         ║
+    ╚═══════════════════════════════════════════════════════════════════════════╝
+  EOT
 }
