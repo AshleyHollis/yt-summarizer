@@ -328,8 +328,13 @@ jobs:
     name: Post Preview Status
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend-preview]
-    # Always run if update-overlay succeeded
-    if: ${{ always() && needs.update-overlay.result == 'success' }}
+    # Run only if:
+    # 1. update-overlay succeeded AND
+    # 2. Either frontend deployment wasn't attempted (no token) OR it succeeded
+    if: |
+      always() && 
+      needs.update-overlay.result == 'success' &&
+      (needs.deploy-frontend-preview.outputs.deployment_attempted != 'true' || needs.deploy-frontend-preview.result == 'success')
     steps:
       - name: Post preview URL to PR
         uses: actions/github-script@v7
@@ -431,9 +436,13 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend-preview, post-status]
-    # Run if update-overlay succeeded - use always() to run even if optional frontend deployment failed
-    # E2E tests can run against the backend API directly when frontend isn't deployed
-    if: ${{ always() && needs.update-overlay.result == 'success' }}
+    # Run only if:
+    # 1. update-overlay succeeded AND
+    # 2. Either frontend deployment wasn't attempted (no token) OR it succeeded
+    if: |
+      always() && 
+      needs.update-overlay.result == 'success' &&
+      (needs.deploy-frontend-preview.outputs.deployment_attempted != 'true' || needs.deploy-frontend-preview.result == 'success')
     outputs:
       result: ${{ steps.run-tests.outcome }}
     steps:
