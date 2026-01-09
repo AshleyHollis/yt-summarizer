@@ -10,10 +10,8 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-    paths-ignore:
-      - "*.md"
-      - "docs/**"
-      - "specs/**"
+    # Note: paths-ignore checks entire PR diff, not latest commit
+    # We use commit-level detection in detect-changes job for efficiency
 
 concurrency:
   group: preview-${{ github.event.pull_request.number }}
@@ -31,11 +29,59 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Detect Changes (commit-level check for docs-only changes)
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_code_changes: ${{ steps.check.outputs.has_code_changes }}
+    steps:
+      - name: Check if commit has code changes
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get files changed in the latest commit (not entire PR)
+          COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "Checking commit: $COMMIT_SHA"
+          
+          # Fetch commit details from GitHub API
+          FILES=$(gh api repos/${{ github.repository }}/commits/${COMMIT_SHA} --jq '.files[].filename')
+          
+          echo "Files changed in this commit:"
+          echo "$FILES"
+          
+          # Check if any file is NOT docs/specs/markdown
+          HAS_CODE=false
+          while IFS= read -r file; do
+            if [[ -n "$file" ]]; then
+              # Skip docs, specs, and markdown files
+              if [[ "$file" == docs/* ]] || [[ "$file" == specs/* ]] || [[ "$file" == *.md ]]; then
+                echo "  [skip] $file (docs/specs/markdown)"
+              else
+                echo "  [CODE] $file"
+                HAS_CODE=true
+              fi
+            fi
+          done <<< "$FILES"
+          
+          echo "has_code_changes=$HAS_CODE" >> $GITHUB_OUTPUT
+          
+          if [ "$HAS_CODE" = "true" ]; then
+            echo "✅ Commit contains code changes - proceeding with preview"
+          else
+            echo "📝 Commit only contains docs/specs/markdown - skipping preview build"
+          fi
+
+  # ---------------------------------------------------------------------------
   # Check CI Status (wait for CI to pass)
   # ---------------------------------------------------------------------------
   wait-for-ci:
     name: Wait for CI
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_code_changes == 'true'
     steps:
       - name: Wait for CI workflow
         uses: fountainhead/action-wait-for-check@v1.2.0
