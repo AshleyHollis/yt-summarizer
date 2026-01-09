@@ -38,9 +38,32 @@ env:
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Check if Azure credentials are configured
+  # ---------------------------------------------------------------------------
+  check-credentials:
+    name: Check Credentials
+    runs-on: ubuntu-latest
+    outputs:
+      has_credentials: ${{ steps.check.outputs.has_credentials }}
+    steps:
+      - name: Check for Azure credentials
+        id: check
+        run: |
+          if [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] && \
+             [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && \
+             [ -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+            echo "has_credentials=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_credentials=false" >> $GITHUB_OUTPUT
+            echo "::warning::Azure OIDC credentials not configured. Skipping Terraform operations."
+          fi
+
   terraform:
     name: Terraform
     runs-on: ubuntu-latest
+    needs: check-credentials
+    if: needs.check-credentials.outputs.has_credentials == 'true'
     permissions:
       id-token: write
       contents: read
@@ -136,7 +159,7 @@ jobs:
   summary:
     name: Summary
     runs-on: ubuntu-latest
-    needs: terraform
+    needs: [check-credentials, terraform]
     if: always()
     steps:
       - name: Summary
@@ -145,4 +168,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Terraform | ${{ needs.terraform.result }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.check-credentials.outputs.has_credentials }}" == "false" ]; then
+            echo "| Credentials | ⚠️ Not configured |" >> $GITHUB_STEP_SUMMARY
+            echo "| Terraform | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Note:** Azure OIDC credentials need to be configured in repository secrets." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Terraform | ${{ needs.terraform.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi

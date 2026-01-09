@@ -42,7 +42,7 @@ jobs:
         id: wait-for-ci
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          checkName: E2E Tests
+          checkName: CI Status
           ref: ${{ github.event.pull_request.head.sha }}
           timeoutSeconds: 900
           intervalSeconds: 30
