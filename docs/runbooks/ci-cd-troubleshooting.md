@@ -181,6 +181,105 @@ az role assignment list --scope /subscriptions/<sub>/resourceGroups/<rg>/provide
 2. Check build output exists at expected location
 3. Verify `staticwebapp.config.json` syntax
 
+## Preview Environment Issues
+
+### Preview Not Created
+
+**Symptom**: PR merged but no preview environment appears
+
+**Steps**:
+
+1. Check if CI passed (preview requires CI success):
+   - Go to PR > Checks tab > Verify "CI" passed
+
+2. Check Preview workflow ran:
+   - Actions > Preview workflow > Find run for your PR
+
+3. Verify preview overlay was created:
+```bash
+ls k8s/overlays/previews/pr-<number>/
+```
+
+4. Check Argo CD ApplicationSet picked it up:
+```bash
+argocd app list | grep preview
+```
+
+### Preview Environment Not Accessible
+
+**Symptom**: Preview URL returns 404 or connection refused
+
+**Steps**:
+
+1. Check pods are running:
+```bash
+kubectl get pods -n preview-pr-<number>
+```
+
+2. Check ingress is configured:
+```bash
+kubectl get ingress -n preview-pr-<number>
+kubectl describe ingress -n preview-pr-<number>
+```
+
+3. Check services:
+```bash
+kubectl get svc -n preview-pr-<number>
+kubectl get endpoints -n preview-pr-<number>
+```
+
+4. Check pod logs:
+```bash
+kubectl logs -n preview-pr-<number> deployment/api
+```
+
+### Preview Not Cleaned Up
+
+**Symptom**: Preview namespace still exists after PR closed/merged
+
+**Steps**:
+
+1. Check cleanup workflow ran:
+   - Actions > Preview Cleanup > Find run for your PR
+
+2. Verify overlay was deleted:
+```bash
+ls k8s/overlays/previews/  # Should not contain pr-<number>
+```
+
+3. Manual cleanup if needed:
+```bash
+# Delete the overlay directory
+rm -rf k8s/overlays/previews/pr-<number>
+git add -A
+git commit -m "chore: manual cleanup of pr-<number> preview"
+git push origin main
+
+# Argo CD will prune the namespace automatically
+```
+
+### Max Preview Limit Reached
+
+**Symptom**: Preview workflow skipped with "Max previews exceeded"
+
+**Steps**:
+
+1. Check current preview count:
+```bash
+ls k8s/overlays/previews/ | grep -c "pr-"
+```
+
+2. Close old PRs or manually clean up stale previews:
+```bash
+# List PRs with previews
+for dir in k8s/overlays/previews/pr-*/; do
+  pr_num=$(basename $dir | sed 's/pr-//')
+  echo "PR #$pr_num: $(gh pr view $pr_num --json state -q .state)"
+done
+```
+
+3. Delete stale previews for closed PRs
+
 ## Production Deployment Issues
 
 ### Confirmation Not Accepted

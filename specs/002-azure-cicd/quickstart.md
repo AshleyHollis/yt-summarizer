@@ -4,6 +4,55 @@
 **Date**: 2026-01-08 (Updated 2026-01-09)  
 **Purpose**: Step-by-step guide to set up and use the CI/CD pipelines
 
+## Quick Start: Daily Developer Workflow
+
+### Creating a PR with Preview Environment
+
+```bash
+# 1. Create feature branch
+git checkout -b feature/my-feature
+
+# 2. Make changes and commit
+git add .
+git commit -m "feat: add new feature"
+
+# 3. Push and create PR
+git push origin feature/my-feature
+gh pr create --title "feat: add new feature" --body "Description of changes"
+
+# 4. Wait for CI to pass, then Preview workflow will:
+#    - Build Docker images with PR SHA tag
+#    - Create preview namespace (preview-pr-<number>)
+#    - Argo CD syncs preview environment
+#    - Comment posted with preview URL
+```
+
+### Merging to Production
+
+```bash
+# 1. After PR is approved and CI passes, merge
+gh pr merge --squash
+
+# 2. Automatically:
+#    - deploy-prod.yml updates k8s/overlays/prod with image digests
+#    - Argo CD syncs production namespace
+#    - Health check runs against production API
+#    - Preview environment is cleaned up
+```
+
+### Checking Deployment Status
+
+```bash
+# View Argo CD applications
+argocd app list
+
+# Check production status
+argocd app get yt-summarizer-prod
+
+# Check preview status
+argocd app get preview-pr-<number>
+```
+
 ## Architecture Overview
 
 ```

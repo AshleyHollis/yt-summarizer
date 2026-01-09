@@ -33,12 +33,26 @@ Move-Item argocd.exe $env:USERPROFILE\bin\argocd.exe
 
 ## Installation
 
-Argo CD is installed via Terraform as part of the infrastructure deployment:
+Argo CD is installed via bootstrap script after Terraform deploys the AKS cluster:
 
 ```powershell
-# Deploy infrastructure (includes Argo CD)
-.\scripts\deploy-infra.ps1 -Environment staging
+# 1. Deploy infrastructure (creates AKS cluster)
+cd infra/terraform/environments/prod
+terraform init
+terraform apply
+
+# 2. Get AKS credentials
+az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
+
+# 3. Bootstrap Argo CD (installs Argo CD + infrastructure apps)
+.\scripts\bootstrap-argocd.ps1
 ```
+
+The bootstrap script:
+1. Installs Argo CD from official Helm chart
+2. Configures GitHub repository access
+3. Applies infrastructure apps (ingress-nginx, external-secrets)
+4. Sets up production and preview ApplicationSets
 
 ### Manual Installation (if needed)
 
@@ -122,26 +136,61 @@ argocd repo add https://github.com/AshleyHollis/yt-summarizer.git \
 
 ## Application Management
 
-### Deploy Staging Application
+### ApplicationSet for Preview Environments
+
+Preview environments are managed by an ApplicationSet that automatically creates/deletes applications based on preview overlay directories:
+
+```yaml
+# k8s/argocd/preview-appset.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: preview-environments
+spec:
+  generators:
+  - git:
+      repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+      revision: main
+      directories:
+      - path: k8s/overlays/previews/pr-*
+  template:
+    metadata:
+      name: '{{path.basename}}'
+    spec:
+      project: yt-summarizer
+      source:
+        repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+```
+
+### Deploy Production Application
 
 ```bash
-# Apply via kubectl
-kubectl apply -f k8s/argocd/staging-app.yaml
+# Apply production app (single prod environment)
+kubectl apply -f k8s/argocd/prod-app.yaml
 
 # Or via CLI
-argocd app create yt-summarizer-staging \
+argocd app create yt-summarizer-prod \
   --repo git@github.com:AshleyHollis/yt-summarizer.git \
-  --path k8s/overlays/staging \
+  --path k8s/overlays/prod \
   --dest-server https://kubernetes.default.svc \
   --dest-namespace yt-summarizer \
   --sync-policy automated \
   --auto-prune
 ```
 
-### Deploy Production Application
+### Apply Preview ApplicationSet
 
 ```bash
-kubectl apply -f k8s/argocd/production-app.yaml
+kubectl apply -f k8s/argocd/preview-appset.yaml
 ```
 
 ### Sync Application

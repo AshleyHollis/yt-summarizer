@@ -80,23 +80,54 @@ argocd app rollback yt-summarizer-production 4
 **Pros**: Instant, preserves history
 **Cons**: Only works if Argo CD is functional
 
-### Method 2: Git Revert
+### Method 2: Git Revert (GitOps Rollback)
 
 **Use when**: Argo CD is unreachable or you need a permanent fix
 
 ```bash
-# Identify the bad commit
-git log --oneline k8s/overlays/production/
+# 1. Identify the bad commit that updated production images
+git log --oneline k8s/overlays/prod/
 
-# Revert the commit
-git revert <bad-commit-sha>
+# Example output:
+# abc1234 chore(deploy): update production images to sha-def5678
+# xyz7890 chore(deploy): update production images to sha-abc1234  <- rollback to this
 
-# Push to trigger Argo CD sync
+# 2. Revert the bad commit
+git revert abc1234 --no-edit
+
+# 3. Push to trigger Argo CD sync
+git push origin main
+
+# 4. Verify Argo CD picks up the change
+argocd app sync yt-summarizer-prod
+argocd app get yt-summarizer-prod
+```
+
+**Pros**: Creates audit trail, permanent fix in git history
+**Cons**: Slower (~2-3 minutes), requires git access
+
+### Method 3: Restore Previous Image Directly
+
+**Use when**: You know the exact previous image digest
+
+```bash
+# 1. Update kustomization.yaml with previous image
+cd k8s/overlays/prod
+
+# Edit kustomization.yaml to restore previous image:
+# images:
+# - name: api
+#   newName: acrytsummprd.azurecr.io/yt-summarizer-api
+#   newTag: sha-<previous-good-sha>
+
+# 2. Commit and push
+git add kustomization.yaml
+git commit -m "fix: rollback to previous stable version"
 git push origin main
 ```
 
-**Pros**: Creates audit trail, triggers full pipeline
-**Cons**: Slower, requires git access
+**Pros**: Precise control over which version to restore
+**Cons**: Manual process, requires knowing the previous image tag
 
 ### Method 3: Kubectl Direct Apply
 

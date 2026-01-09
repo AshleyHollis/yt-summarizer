@@ -214,10 +214,10 @@
 
 ### Documentation Updates
 
-- [ ] T082 [P] Update `specs/002-azure-cicd/quickstart.md` with new preview/prod workflow
-- [ ] T083 [P] Update `docs/runbooks/argocd-setup.md` with ApplicationSet config and bootstrap script
-- [ ] T084 [P] Update `docs/runbooks/deployment-rollback.md` with git revert procedure
-- [ ] T085 [P] Update `docs/runbooks/ci-cd-troubleshooting.md` with preview debugging
+- [X] T082 [P] Update `specs/002-azure-cicd/quickstart.md` with new preview/prod workflow
+- [X] T083 [P] Update `docs/runbooks/argocd-setup.md` with ApplicationSet config and bootstrap script
+- [X] T084 [P] Update `docs/runbooks/deployment-rollback.md` with git revert procedure
+- [X] T085 [P] Update `docs/runbooks/ci-cd-troubleshooting.md` with preview debugging
 
 ### Security Audit
 
@@ -246,8 +246,8 @@
 | 4. US2 - PR Previews | 24 | 24 | 0 |
 | 5. US3 - Prod Deploy | 11 | 11 | 0 |
 | 6. US4 - IaC | 6 | 6 | 0 |
-| 7. Polish | 13 | 4 | 9 |
-| **Total** | **94** | **85** | **9** |
+| 7. Polish | 13 | 8 | 5 |
+| **Total** | **94** | **89** | **5** |
 
 ---
 
