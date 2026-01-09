@@ -14,10 +14,10 @@ resources:
 # Image tags - updated by deploy-prod.yml workflow on merge
 # Using digest pinning for immutable deployments
 images:
-  - name: ACR_LOGIN_SERVER/yt-summarizer-api
+  - name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
     newTag: latest
-  - name: ACR_LOGIN_SERVER/yt-summarizer-workers
+  - name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
     newTag: latest
 

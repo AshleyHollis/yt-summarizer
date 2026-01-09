@@ -25,7 +25,7 @@ spec:
       serviceAccountName: yt-summarizer-sa
       containers:
         - name: api
-          image: ACR_LOGIN_SERVER/yt-summarizer-api:latest
+          image: yt-summarizer-api
           imagePullPolicy: Always
           ports:
             - name: http

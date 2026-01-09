@@ -25,7 +25,7 @@ spec:
       serviceAccountName: yt-summarizer-sa
       containers:
         - name: worker
-          image: ACR_LOGIN_SERVER/yt-summarizer-workers:latest
+          image: yt-summarizer-workers
           imagePullPolicy: Always
           env:
             # Prevent K8s service env var collision (API_PORT=tcp://...)

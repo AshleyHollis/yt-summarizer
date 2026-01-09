@@ -28,7 +28,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: migration
-          image: ACR_LOGIN_SERVER/yt-summarizer-api:latest
+          image: yt-summarizer-api
           command:
             - /bin/sh
             - -c
