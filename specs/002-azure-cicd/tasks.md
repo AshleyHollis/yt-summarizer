@@ -236,12 +236,11 @@
   - ✅ Created a PR with a failing test, CI blocked merge (runs 20850663682, 20850687881)
   - ✅ Fixed the test, CI passed (run 20850765998)
 - [ ] T090 Validate PR preview deploy end-to-end (open PR → preview URL works)
-  - ⚠️ **BLOCKED**: Branch protection rules prevent `github-actions[bot]` from pushing to main
-  - Need to add bypass rule for GitHub Actions or use separate branch for overlays
-  - Open a PR with code changes
-  - Verify Preview workflow builds images and creates overlay
-  - Verify Argo CD deploys the preview
-  - Access the preview URL
+  - ⚠️ **Refactored**: Changed from push-to-main to Pull Request Generator approach
+  - Architecture: Preview overlays now live in PR branch (`k8s/overlays/preview/`)
+  - Argo CD ApplicationSet uses Pull Request Generator to discover open PRs
+  - Waiting for CI to pass on new architecture before merging
+  - After merge: Open a new PR with code changes to test full flow
 - [ ] T091 Validate PR preview cleanup (close PR → namespace deleted)
   - Close or merge the test PR
   - Verify preview-cleanup workflow runs
