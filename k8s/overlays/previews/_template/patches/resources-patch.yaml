@@ -1,12 +1,12 @@
 # =============================================================================
-# Production Resource Limits Patch
+# Preview Resource Limits Patch
 # =============================================================================
-# Standard resource limits for production
+# Minimal resources for preview environments (lower than production)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api
-  namespace: yt-summarizer
+  namespace: preview-pr-{{PR_NUMBER}}
 spec:
   template:
     spec:
@@ -14,17 +14,17 @@ spec:
         - name: api
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 200m
+              memory: 256Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: transcribe-worker
-  namespace: yt-summarizer
+  namespace: preview-pr-{{PR_NUMBER}}
 spec:
   template:
     spec:
@@ -32,17 +32,17 @@ spec:
         - name: worker
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 200m
+              memory: 256Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: summarize-worker
-  namespace: yt-summarizer
+  namespace: preview-pr-{{PR_NUMBER}}
 spec:
   template:
     spec:
@@ -50,17 +50,17 @@ spec:
         - name: worker
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 200m
+              memory: 256Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: embed-worker
-  namespace: yt-summarizer
+  namespace: preview-pr-{{PR_NUMBER}}
 spec:
   template:
     spec:
@@ -68,17 +68,17 @@ spec:
         - name: worker
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 200m
+              memory: 256Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: relationships-worker
-  namespace: yt-summarizer
+  namespace: preview-pr-{{PR_NUMBER}}
 spec:
   template:
     spec:
@@ -86,8 +86,8 @@ spec:
         - name: worker
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 200m
+              memory: 256Mi

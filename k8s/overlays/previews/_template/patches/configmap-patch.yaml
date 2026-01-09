@@ -1,11 +1,12 @@
 # =============================================================================
-# Staging ConfigMap Patch
+# Preview ConfigMap Patch
 # =============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: yt-summarizer-config
-  namespace: yt-summarizer
+  namespace: preview-pr-{{PR_NUMBER}}
 data:
-  ENVIRONMENT: "staging"
+  ENVIRONMENT: "preview"
   LOG_LEVEL: "DEBUG"
+  PR_NUMBER: "{{PR_NUMBER}}"

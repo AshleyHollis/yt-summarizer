@@ -50,7 +50,7 @@
 - [X] T015 [P] Create nginx-ingress controller module in `infra/terraform/modules/nginx-ingress/main.tf`
 - [X] T016 Create External Secrets Operator module in `infra/terraform/modules/external-secrets/main.tf`
 - [X] T017 Add ESO SecretStore for Azure Key Vault in `infra/terraform/modules/external-secrets/secretstore.tf`
-- [ ] T018 Consolidate staging+production environments to single `infra/terraform/environments/prod/main.tf` (delete `staging/`)
+- [X] T018 Consolidate staging+production environments to single `infra/terraform/environments/prod/main.tf` (delete `staging/`)
 
 ### K8s Base Manifests (unchanged)
 
@@ -105,45 +105,45 @@
 
 ### Production Overlay (replaces staging/production)
 
-- [ ] T041 [US2] Create prod overlay in `k8s/overlays/prod/kustomization.yaml`
-- [ ] T042 [US2] [P] Create prod Ingress patch in `k8s/overlays/prod/patches/ingress-patch.yaml`
-- [ ] T043 [US2] [P] Create prod replica/resource patches in `k8s/overlays/prod/patches/`
-- [ ] T044 [US2] Delete obsolete overlays `k8s/overlays/staging/` and `k8s/overlays/production/`
+- [X] T041 [US2] Create prod overlay in `k8s/overlays/prod/kustomization.yaml`
+- [X] T042 [US2] [P] Create prod Ingress patch in `k8s/overlays/prod/patches/ingress-patch.yaml`
+- [X] T043 [US2] [P] Create prod replica/resource patches in `k8s/overlays/prod/patches/`
+- [X] T044 [US2] Delete obsolete overlays `k8s/overlays/staging/` and `k8s/overlays/production/`
 
 ### Preview Overlay Templates
 
-- [ ] T045 [US2] Create preview ResourceQuota manifest template in `k8s/overlays/previews/_template/resource-quota.yaml`
-- [ ] T046 [US2] [P] Create preview LimitRange manifest template in `k8s/overlays/previews/_template/limit-range.yaml`
-- [ ] T047 [US2] [P] Create preview kustomization template in `k8s/overlays/previews/_template/kustomization.yaml`
-- [ ] T048 [US2] [P] Create preview namespace template in `k8s/overlays/previews/_template/namespace.yaml`
-- [ ] T049 [US2] [P] Create preview Ingress patch template in `k8s/overlays/previews/_template/patches/ingress-patch.yaml`
+- [X] T045 [US2] Create preview ResourceQuota manifest template in `k8s/overlays/previews/_template/resource-quota.yaml`
+- [X] T046 [US2] [P] Create preview LimitRange manifest template in `k8s/overlays/previews/_template/limit-range.yaml`
+- [X] T047 [US2] [P] Create preview kustomization template in `k8s/overlays/previews/_template/kustomization.yaml`
+- [X] T048 [US2] [P] Create preview namespace template in `k8s/overlays/previews/_template/namespace.yaml`
+- [X] T049 [US2] [P] Create preview Ingress patch template in `k8s/overlays/previews/_template/patches/ingress-patch.yaml`
 
 ### Argo CD Configuration
 
-- [ ] T050 [US2] Create Argo CD prod Application in `k8s/argocd/prod-app.yaml` (replaces staging-app + production-app)
-- [ ] T051 [US2] Create Argo CD ApplicationSet for previews in `k8s/argocd/preview-appset.yaml`
-- [ ] T052 [US2] Delete obsolete Argo CD apps `k8s/argocd/staging-app.yaml` and `k8s/argocd/production-app.yaml`
+- [X] T050 [US2] Create Argo CD prod Application in `k8s/argocd/prod-app.yaml` (replaces staging-app + production-app)
+- [X] T051 [US2] Create Argo CD ApplicationSet for previews in `k8s/argocd/preview-appset.yaml`
+- [X] T052 [US2] Delete obsolete Argo CD apps `k8s/argocd/staging-app.yaml` and `k8s/argocd/production-app.yaml`
 
 ### Preview Workflow
 
-- [ ] T053 [US2] Create preview workflow in `.github/workflows/preview.yml`
-- [ ] T054 [US2] Add Azure OIDC login + ACR login steps to preview workflow
-- [ ] T055 [US2] Add Docker build step for API + Workers with PR-SHA tags
-- [ ] T056 [US2] Add step to generate `k8s/overlays/previews/pr-<number>/` from template
-- [ ] T057 [US2] Add step to commit and push preview overlay to main branch
-- [ ] T058 [US2] Add step to post preview URL and status as PR comment
-- [ ] T059 [US2] Add concurrency limit (max 3 previews) to preview workflow
+- [X] T053 [US2] Create preview workflow in `.github/workflows/preview.yml`
+- [X] T054 [US2] Add Azure OIDC login + ACR login steps to preview workflow
+- [X] T055 [US2] Add Docker build step for API + Workers with PR-SHA tags
+- [X] T056 [US2] Add step to generate `k8s/overlays/previews/pr-<number>/` from template
+- [X] T057 [US2] Add step to commit and push preview overlay to main branch
+- [X] T058 [US2] Add step to post preview URL and status as PR comment
+- [X] T059 [US2] Add concurrency limit (max 3 previews) to preview workflow
 
 ### Cleanup Workflow
 
-- [ ] T060 [US2] Create preview cleanup workflow in `.github/workflows/preview-cleanup.yml`
-- [ ] T061 [US2] Add step to delete `k8s/overlays/previews/pr-<number>/` directory
-- [ ] T062 [US2] Add step to commit and push deletion (triggers Argo CD prune)
+- [X] T060 [US2] Create preview cleanup workflow in `.github/workflows/preview-cleanup.yml`
+- [X] T061 [US2] Add step to delete `k8s/overlays/previews/pr-<number>/` directory
+- [X] T062 [US2] Add step to commit and push deletion (triggers Argo CD prune)
 
 ### Delete Obsolete Workflows
 
-- [ ] T063 [US2] Delete obsolete `build-push.yml` workflow
-- [ ] T064 [US2] Delete obsolete `cd-production.yml` workflow
+- [X] T063 [US2] Delete obsolete `build-push.yml` workflow
+- [X] T064 [US2] Delete obsolete `cd-production.yml` workflow
 
 **Checkpoint**: PR opens → preview deployed; PR closes → preview torn down
 
@@ -157,23 +157,23 @@
 
 ### Production Deploy Workflow
 
-- [ ] T065 [US3] Create deploy-prod workflow in `.github/workflows/deploy-prod.yml`
-- [ ] T066 [US3] Add trigger on push to main branch
-- [ ] T067 [US3] Add step to extract image digests from merged PR (or rebuild with digest tagging)
-- [ ] T068 [US3] Add step to update `k8s/overlays/prod/kustomization.yaml` with image digests
-- [ ] T069 [US3] Add step to commit and push prod overlay update
-- [ ] T070 [US3] Add post-deploy health check/smoke test step
-- [ ] T071 [US3] Add workflow summary with production URL and Argo CD link
+- [X] T065 [US3] Create deploy-prod workflow in `.github/workflows/deploy-prod.yml`
+- [X] T066 [US3] Add trigger on push to main branch
+- [X] T067 [US3] Add step to extract image digests from merged PR (or rebuild with digest tagging)
+- [X] T068 [US3] Add step to update `k8s/overlays/prod/kustomization.yaml` with image digests
+- [X] T069 [US3] Add step to commit and push prod overlay update
+- [X] T070 [US3] Add post-deploy health check/smoke test step
+- [X] T071 [US3] Add workflow summary with production URL and Argo CD link
 
 ### Production Protection
 
-- [ ] T072 [US3] Create PriorityClass manifest for production pods in `k8s/base/priority-class.yaml`
-- [ ] T073 [US3] Update production deployments to use production-critical PriorityClass
+- [X] T072 [US3] Create PriorityClass manifest for production pods in `k8s/base/priority-class.yaml`
+- [X] T073 [US3] Update production deployments to use production-critical PriorityClass
 
 ### Frontend (SWA) Production Deploy
 
-- [ ] T074 [US3] Add SWA production deployment step to deploy-prod workflow
-- [ ] T075 [US3] Configure SWA to auto-deploy staging slot on PR (verify existing config)
+- [X] T074 [US3] Add SWA production deployment step to deploy-prod workflow
+- [X] T075 [US3] Configure SWA to auto-deploy staging slot on PR (verify existing config)
 
 **Checkpoint**: Merge to main → production auto-deploys with validated artifacts
 
@@ -231,13 +231,13 @@
 | Phase | Task Count | Completed | Remaining |
 |-------|------------|-----------|-----------|
 | 1. Setup | 8 | 8 | 0 |
-| 2. Foundational | 18 | 17 | 1 |
+| 2. Foundational | 18 | 18 | 0 |
 | 3. US1 - CI | 14 | 14 | 0 |
-| 4. US2 - PR Previews | 24 | 0 | 24 |
-| 5. US3 - Prod Deploy | 11 | 0 | 11 |
+| 4. US2 - PR Previews | 24 | 24 | 0 |
+| 5. US3 - Prod Deploy | 11 | 11 | 0 |
 | 6. US4 - IaC | 6 | 6 | 0 |
 | 7. Polish | 13 | 4 | 9 |
-| **Total** | **94** | **49** | **45** |
+| **Total** | **94** | **85** | **9** |
 
 ---
 

@@ -1,0 +1,4 @@
+# Production Environment Variables
+# These values should be customized for your deployment
+
+sql_admin_password = "CHANGE_ME_IN_PRODUCTION"

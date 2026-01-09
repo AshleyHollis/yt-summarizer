@@ -6,6 +6,8 @@ kind: Ingress
 metadata:
   name: api-ingress
   namespace: yt-summarizer
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   rules:
     - host: api.yt-summarizer.example.com

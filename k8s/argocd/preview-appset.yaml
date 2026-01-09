@@ -1,0 +1,76 @@
+# =============================================================================
+# Argo CD ApplicationSet - Preview Environments
+# =============================================================================
+# Dynamically discovers and creates Applications for PR preview overlays
+# Uses git directory generator to watch k8s/overlays/previews/pr-*
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: yt-summarizer-previews
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/component: preview
+    app.kubernetes.io/part-of: yt-summarizer
+spec:
+  # Git directory generator discovers preview overlays
+  generators:
+    - git:
+        repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+        revision: main
+        directories:
+          - path: k8s/overlays/previews/pr-*
+        # Exclude the template directory
+        # Template dir starts with _ so won't match pr-* pattern
+
+  # Template for each discovered preview
+  template:
+    metadata:
+      # Application name matches the overlay directory name
+      name: 'preview-{{path.basename}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: yt-summarizer
+        app.kubernetes.io/instance: '{{path.basename}}'
+        app.kubernetes.io/component: preview
+        app.kubernetes.io/part-of: yt-summarizer
+      # Finalizer ensures resources are cleaned up when Application is deleted
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+
+      source:
+        repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+        targetRevision: main
+        path: '{{path}}'
+
+      destination:
+        server: https://kubernetes.default.svc
+        # Namespace matches the preview naming convention
+        namespace: 'preview-{{path.basename}}'
+
+      syncPolicy:
+        # Auto-sync and auto-prune for ephemeral environments
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+          - PruneLast=true
+        retry:
+          limit: 3
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 1m
+
+      # Keep minimal history for previews
+      revisionHistoryLimit: 3
+
+  # Sync policy for the ApplicationSet itself
+  syncPolicy:
+    # Preserve resources on delete for safety (can be changed to Delete)
+    preserveResourcesOnDeletion: false

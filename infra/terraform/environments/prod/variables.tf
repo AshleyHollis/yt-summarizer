@@ -1,11 +1,11 @@
 # =============================================================================
-# Variables for Staging Environment
+# Variables for Production Environment
 # =============================================================================
 
 variable "location" {
   description = "Azure region for resources"
   type        = string
-  default     = "eastasia"  # Hong Kong - closest SWA region to Australia
+  default     = "eastasia"
 }
 
 variable "acr_sku" {
@@ -41,7 +41,7 @@ variable "aks_node_size" {
 variable "domain" {
   description = "Base domain for the application"
   type        = string
-  default     = "yt-summarizer.local"
+  default     = "yt-summarizer.example.com"
 }
 
 variable "github_org" {
@@ -54,10 +54,4 @@ variable "github_repo" {
   description = "GitHub repository name"
   type        = string
   default     = "yt-summarizer"
-}
-
-variable "deploy_k8s" {
-  description = "Whether to deploy Kubernetes resources (set to true after AKS is created)"
-  type        = bool
-  default     = false
 }

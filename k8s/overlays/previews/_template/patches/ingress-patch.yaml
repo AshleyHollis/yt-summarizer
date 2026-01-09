@@ -1,14 +1,17 @@
 # =============================================================================
-# Staging Ingress Patch
+# Preview Ingress Patch
 # =============================================================================
+# Routes traffic via subdomain: pr-<number>.preview.yt-summarizer.example.com
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-ingress
-  namespace: yt-summarizer
+  namespace: preview-pr-{{PR_NUMBER}}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   rules:
-    - host: api-staging.yt-summarizer.example.com
+    - host: pr-{{PR_NUMBER}}.preview.yt-summarizer.example.com
       http:
         paths:
           - path: /

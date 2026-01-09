@@ -1,7 +1,8 @@
 # =============================================================================
-# Staging Environment Configuration
+# Production Environment Configuration
 # =============================================================================
-# Deploys Azure infrastructure for the staging environment
+# Single production environment - previews share this infrastructure
+# but run in different AKS namespaces
 
 terraform {
   required_version = ">= 1.5.0"
@@ -12,8 +13,8 @@ terraform {
 # -----------------------------------------------------------------------------
 
 locals {
-  environment = "staging"
-  name_prefix = "ytsumm-stg"
+  environment = "prod"
+  name_prefix = "ytsumm-prd"
   
   common_tags = {
     Environment = local.environment
@@ -34,6 +35,7 @@ resource "azurerm_resource_group" "main" {
 
 # -----------------------------------------------------------------------------
 # Azure Container Registry
+# Shared by production and preview environments
 # -----------------------------------------------------------------------------
 
 module "acr" {
@@ -54,9 +56,10 @@ module "acr" {
 module "key_vault" {
   source = "../../modules/key-vault"
 
-  name                = "kv-${local.name_prefix}"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  name                     = "kv-${local.name_prefix}"
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = azurerm_resource_group.main.location
+  purge_protection_enabled = true
 
   secrets = {
     "sql-connection-string" = module.sql.connection_string
@@ -76,6 +79,9 @@ module "storage" {
   name                = replace("st${local.name_prefix}", "-", "")
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
+
+  # Use GRS for production data protection
+  account_replication_type = "GRS"
 
   containers = [
     { name = "transcripts" },
@@ -109,13 +115,14 @@ module "sql" {
 
   # Serverless for cost savings
   sku_name                    = "GP_S_Gen5_1"
-  auto_pause_delay_in_minutes = 60
+  auto_pause_delay_in_minutes = 120
 
   tags = local.common_tags
 }
 
 # -----------------------------------------------------------------------------
 # AKS Cluster
+# Single-node cluster hosts both production and preview namespaces
 # -----------------------------------------------------------------------------
 
 module "aks" {
@@ -127,13 +134,12 @@ module "aks" {
   dns_prefix          = local.name_prefix
   kubernetes_version  = var.kubernetes_version
 
-  # Single-node for cost savings
-  node_count  = 1
+  # Single-node for cost savings (~$30/month)
+  node_count   = 1
   node_vm_size = var.aks_node_size
 
   # ACR integration
-  attach_acr = true
-  acr_id     = module.acr.id
+  acr_id = module.acr.id
 
   tags = local.common_tags
 }
@@ -155,11 +161,11 @@ module "swa" {
 
 # -----------------------------------------------------------------------------
 # Nginx Ingress Controller
+# Handles routing for both production and preview environments
 # -----------------------------------------------------------------------------
 
 module "nginx_ingress" {
   source = "../../modules/nginx-ingress"
-  count  = var.deploy_k8s ? 1 : 0
 
   depends_on = [module.aks]
 }
@@ -170,7 +176,6 @@ module "nginx_ingress" {
 
 module "external_secrets" {
   source = "../../modules/external-secrets"
-  count  = var.deploy_k8s ? 1 : 0
 
   key_vault_name      = module.key_vault.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
@@ -182,11 +187,11 @@ module "external_secrets" {
 
 # -----------------------------------------------------------------------------
 # Argo CD
+# Manages production + preview ApplicationSet
 # -----------------------------------------------------------------------------
 
 module "argocd" {
   source = "../../modules/argocd"
-  count  = var.deploy_k8s ? 1 : 0
 
   namespace     = "argocd"
   chart_version = "5.51.6"

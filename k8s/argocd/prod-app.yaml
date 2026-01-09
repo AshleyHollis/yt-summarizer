@@ -1,15 +1,16 @@
 # =============================================================================
-# Argo CD Application - Staging
+# Argo CD Application - Production
 # =============================================================================
-# Watches the main branch and auto-syncs changes to staging
+# Single production application - auto-syncs on merge to main
+# Replaces the old staging-app.yaml and production-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: yt-summarizer-staging
+  name: yt-summarizer-prod
   namespace: argocd
   labels:
     app.kubernetes.io/name: yt-summarizer
-    app.kubernetes.io/instance: staging
+    app.kubernetes.io/instance: prod
     app.kubernetes.io/part-of: yt-summarizer
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -19,13 +20,14 @@ spec:
   source:
     repoURL: https://github.com/AshleyHollis/yt-summarizer.git
     targetRevision: main
-    path: k8s/overlays/staging
+    path: k8s/overlays/prod
 
   destination:
     server: https://kubernetes.default.svc
     namespace: yt-summarizer
 
   syncPolicy:
+    # Auto-sync enabled - deploys automatically when overlay changes
     automated:
       prune: true
       selfHeal: true
@@ -34,6 +36,7 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
+      - ApplyOutOfSyncOnly=true
     retry:
       limit: 5
       backoff:
