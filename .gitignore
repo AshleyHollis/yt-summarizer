@@ -177,3 +177,10 @@ uv.lock
 *.tfvars
 *.tfvars.json
 !*.tfvars.example
+
+# Terraform local files (providers, state, plans)
+.terraform/
+*.tfstate
+*.tfstate.backup
+tfplan
+*.tfplan

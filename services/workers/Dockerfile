@@ -98,4 +98,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD pgrep -f "python -m ${WORKER_TYPE}" || exit 1
 
 # Run the worker - selects worker based on WORKER_TYPE
-CMD ["sh", "-c", "python -m ${WORKER_TYPE}.main"]
+CMD ["sh", "-c", "python -m ${WORKER_TYPE}"]
