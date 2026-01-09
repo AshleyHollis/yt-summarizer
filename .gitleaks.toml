@@ -18,6 +18,8 @@ useDefault = true
     '''infra/terraform/variables\.tf''',
     # Terraform example files
     '''.*\.tfvars\.example''',
+    # CI/test docker compose (only contains dummy values)
+    '''docker-compose\.ci\.yml''',
     # Test fixtures and test files (very broad)
     '''tests/''',
     '''test_''',
