@@ -189,15 +189,63 @@ jobs:
       - name: Start CI services
         run: |
           docker compose -f docker-compose.ci.yml up -d --build
-          # Wait for services to be healthy
-          sleep 60
+          echo "Waiting for services to start..."
+          
+          # Wait for API to be healthy (up to 3 minutes)
+          echo "Waiting for API health check..."
+          for i in {1..36}; do
+            if curl -sf http://localhost:8000/health/live > /dev/null 2>&1; then
+              echo "✓ API is healthy"
+              break
+            fi
+            echo "  Attempt $i/36 - API not ready, waiting 5s..."
+            sleep 5
+          done
+          
+          # Show container status for debugging
+          echo ""
+          echo "Container status:"
+          docker compose -f docker-compose.ci.yml ps
+          echo ""
+          echo "API logs (last 50 lines):"
+          docker compose -f docker-compose.ci.yml logs --tail=50 api || true
+          echo ""
+          
+          # Final health check
+          if ! curl -sf http://localhost:8000/health/live > /dev/null 2>&1; then
+            echo "ERROR: API failed to become healthy"
+            docker compose -f docker-compose.ci.yml logs
+            exit 1
+          fi
+
+      - name: Build Next.js app
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: "http://localhost:8000"
+        run: npm run build
+
+      - name: Start Next.js server
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: "http://localhost:8000"
+        run: |
+          npm run start &
+          # Wait for Next.js to be ready
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "✓ Next.js is ready"
+              break
+            fi
+            echo "  Waiting for Next.js... ($i/30)"
+            sleep 2
+          done
 
       - name: Run E2E tests
         working-directory: apps/web
         env:
           USE_EXTERNAL_SERVER: "true"
+          NEXT_PUBLIC_API_URL: "http://localhost:8000"
           API_URL: "http://localhost:8000"
-          BASE_URL: "http://localhost:3000"
         run: npx playwright test --reporter=html
 
       - name: Stop CI services
