@@ -7,7 +7,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Sus
 import { useSearchParams } from "next/navigation";
 import { ToolResultProvider } from "@/contexts/ToolResultContext";
 import { HealthStatusProvider, useHealthStatus } from "@/contexts/HealthStatusContext";
-import { WarmingUpIndicator } from "@/components/common";
+import { WarmingUpIndicator, CopilotErrorBoundary } from "@/components/common";
 
 // Types for scope management
 export interface DateRange {
@@ -305,21 +305,23 @@ function ProvidersInner({ children }: ProvidersProps) {
   // causes the "page refresh" effect. CopilotKit handles threadId changes internally.
   
   return (
-    <CopilotKit 
-      runtimeUrl={runtimeUrl} 
-      agent="yt-summarizer" 
-      showDevConsole={false}
-      enableInspector={false}
-      threadId={mounted ? (urlThreadId ?? undefined) : undefined}
-    >
-      <ToolResultProvider>
-        <VideoContextProvider>
-          <ScopeProvider>
-            <AISettingsProvider>{children}</AISettingsProvider>
-          </ScopeProvider>
-        </VideoContextProvider>
-      </ToolResultProvider>
-    </CopilotKit>
+    <CopilotErrorBoundary>
+      <CopilotKit 
+        runtimeUrl={runtimeUrl} 
+        agent="yt-summarizer" 
+        showDevConsole={false}
+        enableInspector={false}
+        threadId={mounted ? (urlThreadId ?? undefined) : undefined}
+      >
+        <ToolResultProvider>
+          <VideoContextProvider>
+            <ScopeProvider>
+              <AISettingsProvider>{children}</AISettingsProvider>
+            </ScopeProvider>
+          </VideoContextProvider>
+        </ToolResultProvider>
+      </CopilotKit>
+    </CopilotErrorBoundary>
   );
 }
 
