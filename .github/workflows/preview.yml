@@ -279,6 +279,16 @@ patches:
         path: /metadata/annotations/azure.workload.identity~1client-id
       - op: remove
         path: /metadata/annotations/azure.workload.identity~1tenant-id
+  # Use default SA for migration job (avoids circular dependency with SA sync wave)
+  - target:
+      group: batch
+      version: v1
+      kind: Job
+      name: db-migration
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/serviceAccountName
+        value: default
 
 images:
   - name: yt-summarizer-api
