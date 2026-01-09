@@ -21,5 +21,6 @@ resources:
   - externalsecret-storage.yaml
   - migration-job.yaml
 
-commonLabels:
-  app.kubernetes.io/managed-by: kustomize
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize

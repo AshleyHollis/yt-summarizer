@@ -5,6 +5,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-ingress
+  namespace: yt-summarizer
 spec:
   rules:
     - host: api-staging.yt-summarizer.example.com

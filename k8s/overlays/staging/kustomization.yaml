@@ -24,8 +24,9 @@ patches:
   - path: patches/ingress-patch.yaml
   - path: patches/resources-patch.yaml
 
-commonLabels:
-  environment: staging
+labels:
+  - pairs:
+      environment: staging
 
 commonAnnotations:
   deployment.kubernetes.io/environment: staging

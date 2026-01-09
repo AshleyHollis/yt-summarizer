@@ -24,8 +24,9 @@ patches:
   - path: patches/ingress-patch.yaml
   - path: patches/resources-patch.yaml
 
-commonLabels:
-  environment: production
+labels:
+  - pairs:
+      environment: production
 
 commonAnnotations:
   deployment.kubernetes.io/environment: production

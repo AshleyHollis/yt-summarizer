@@ -5,6 +5,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: yt-summarizer-config
+  namespace: yt-summarizer
 data:
   ENVIRONMENT: "staging"
   LOG_LEVEL: "DEBUG"
