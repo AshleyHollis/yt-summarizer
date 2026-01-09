@@ -336,9 +336,11 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.SWA_PRODUCTION_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
+          # For Next.js hybrid, app_location is the Next.js app root
           app_location: apps/web
-          # Standalone output location for Next.js hybrid rendering
-          output_location: .next/standalone
+          # For Next.js hybrid, output_location MUST be empty
+          # SWA handles the .next folder internally
+          output_location: ""
           skip_app_build: true
           production_branch: main
 
