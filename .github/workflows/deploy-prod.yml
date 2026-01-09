@@ -257,7 +257,8 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: apps/web
-          output_location: .next
+          # Standalone output location for Next.js hybrid rendering
+          output_location: .next/standalone
           skip_app_build: true
           production_branch: main
 

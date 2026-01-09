@@ -9,6 +9,10 @@ const withBundleAnalyzer = bundleAnalyzer({
 const isDev = process.env.NODE_ENV !== 'production';
 
 const nextConfig: NextConfig = {
+  // Enable standalone output for Azure SWA deployment
+  // This reduces app size and is required for hybrid rendering on SWA
+  output: 'standalone',
+
   // Enable React Compiler only in production (reduces dev memory ~15-20%)
   reactCompiler: !isDev,
 
@@ -60,22 +64,30 @@ const nextConfig: NextConfig = {
   },
 
   // Redirect API requests to the backend during development
+  // Note: Exclude .swa paths for Azure Static Web Apps health checks
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.API_URL || 'http://localhost:8000'}/api/:path*`,
-      },
-      // Proxy health check endpoints to the backend API
-      {
-        source: '/health/:path*',
-        destination: `${process.env.API_URL || 'http://localhost:8000'}/health/:path*`,
-      },
-      {
-        source: '/health',
-        destination: `${process.env.API_URL || 'http://localhost:8000'}/health`,
-      },
-    ];
+    return {
+      beforeFiles: [
+        // Exclude .swa paths from rewrites (required for SWA deployment validation)
+        // SWA uses /.swa/health.html to verify deployment
+      ],
+      afterFiles: [
+        {
+          source: '/api/:path*',
+          destination: `${process.env.API_URL || 'http://localhost:8000'}/api/:path*`,
+        },
+        // Proxy health check endpoints to the backend API
+        {
+          source: '/health/:path*',
+          destination: `${process.env.API_URL || 'http://localhost:8000'}/health/:path*`,
+        },
+        {
+          source: '/health',
+          destination: `${process.env.API_URL || 'http://localhost:8000'}/health`,
+        },
+      ],
+      fallback: [],
+    };
   },
 };
 
