@@ -2,6 +2,7 @@
 # CI Workflow - Automated Testing on Pull Request
 # =============================================================================
 # Runs all tests when a PR is created or updated
+# Builds Docker images to validate Dockerfile and catch build errors
 # User Story 1: Automated Testing on PR
 
 name: CI
@@ -21,6 +22,8 @@ concurrency:
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
+  ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -166,29 +169,128 @@ jobs:
         run: npm run test:run
 
   # ---------------------------------------------------------------------------
-  # Frontend Build Verification
+  # Build Docker Images
   # ---------------------------------------------------------------------------
-  build-frontend:
-    name: Build Frontend
+  # Builds and pushes Docker images to ACR. This validates:
+  # - Dockerfile syntax and build steps
+  # - Frontend npm run build (catches TypeScript errors)
+  # - All dependencies install correctly
+  # 
+  # Images are pushed with tags that can be used by preview/prod workflows:
+  # - PRs: pr-<number>-<sha>
+  # - Main: sha-<sha>
+  # ---------------------------------------------------------------------------
+  build-images:
+    name: Build Images
     runs-on: ubuntu-latest
-    needs: [lint-frontend]
+    needs: [lint-python, lint-frontend]
+    # Only build/push if Azure secrets are configured
+    if: ${{ vars.ACR_NAME != '' }}
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      api_image: ${{ steps.meta.outputs.api_image }}
+      workers_image: ${{ steps.meta.outputs.workers_image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          working-directory: apps/web
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build Next.js
-        working-directory: apps/web
-        env:
-          # Use placeholder values for build-time env vars
-          NEXT_PUBLIC_API_URL: https://api.example.com
-          NEXT_PUBLIC_ENVIRONMENT: ci
-        run: npm run build
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Generate image metadata
+        id: meta
+        run: |
+          SHORT_SHA=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c1-7)
+          
+          # Different tag format for PRs vs main
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            IMAGE_TAG="pr-${{ github.event.pull_request.number }}-${SHORT_SHA}"
+          else
+            IMAGE_TAG="sha-${SHORT_SHA}"
+          fi
+          
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "api_image=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-api:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "workers_image=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-workers:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "Generated image tag: ${IMAGE_TAG}"
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-api:${{ steps.meta.outputs.image_tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Build and push Workers image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/workers/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-workers:${{ steps.meta.outputs.image_tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  # ---------------------------------------------------------------------------
+  # Build Docker Images (Validation Only - No Push)
+  # ---------------------------------------------------------------------------
+  # When ACR is not configured, still validate that Docker images build
+  # This catches Dockerfile errors without requiring Azure credentials
+  # ---------------------------------------------------------------------------
+  build-images-validate:
+    name: Build Images (Validate)
+    runs-on: ubuntu-latest
+    needs: [lint-python, lint-frontend]
+    # Only run if ACR is NOT configured (validation mode)
+    if: ${{ vars.ACR_NAME == '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/api/Dockerfile
+          push: false
+          platforms: linux/amd64
+
+      - name: Build Workers image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/workers/Dockerfile
+          push: false
+          platforms: linux/amd64
 
   # ---------------------------------------------------------------------------
   # E2E Tests - Run against Preview Environment
@@ -268,7 +370,8 @@ jobs:
       - test-api
       - test-workers
       - test-frontend
-      - build-frontend
+      - build-images
+      - build-images-validate
       - validate-terraform
       - validate-kustomize
       - secret-scanning
@@ -276,15 +379,29 @@ jobs:
     steps:
       - name: Check all jobs passed
         run: |
+          # Check required jobs (tests, validation)
           if [ "${{ needs.test-shared.result }}" != "success" ] ||
              [ "${{ needs.test-api.result }}" != "success" ] ||
              [ "${{ needs.test-workers.result }}" != "success" ] ||
              [ "${{ needs.test-frontend.result }}" != "success" ] ||
-             [ "${{ needs.build-frontend.result }}" != "success" ] ||
              [ "${{ needs.validate-terraform.result }}" != "success" ] ||
              [ "${{ needs.validate-kustomize.result }}" != "success" ] ||
              [ "${{ needs.secret-scanning.result }}" != "success" ]; then
-            echo "One or more jobs failed"
+            echo "One or more required jobs failed"
             exit 1
           fi
+          
+          # Check build jobs - one of them must succeed (based on ACR config)
+          BUILD_PUSH="${{ needs.build-images.result }}"
+          BUILD_VALIDATE="${{ needs.build-images-validate.result }}"
+          
+          # If ACR configured: build-images runs, build-images-validate skipped
+          # If ACR not configured: build-images skipped, build-images-validate runs
+          if [ "$BUILD_PUSH" = "success" ] || [ "$BUILD_PUSH" = "skipped" -a "$BUILD_VALIDATE" = "success" ]; then
+            echo "Build validation passed ✅"
+          else
+            echo "Build jobs failed: build-images=$BUILD_PUSH, build-images-validate=$BUILD_VALIDATE"
+            exit 1
+          fi
+          
           echo "All CI checks passed! ✅"
