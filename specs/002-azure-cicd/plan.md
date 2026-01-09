@@ -118,19 +118,54 @@ k8s/
 infra/
 └── terraform/
     ├── backend.tf
-    ├── providers.tf
+    ├── providers.tf           # Azure provider only (no Helm/K8s)
     ├── variables.tf
+    ├── modules/
+    │   ├── aks/               # AKS cluster (no add-ons installed via TF)
+    │   ├── container-registry/
+    │   ├── key-vault/
+    │   ├── sql-database/
+    │   ├── static-web-app/
+    │   └── storage/
     └── environments/
-        └── prod/            # Single environment (previews share infra)
+        └── prod/              # Single environment (previews share infra)
             ├── main.tf
             ├── variables.tf
             └── terraform.tfvars
+
+scripts/
+└── bootstrap-argocd.ps1       # One-time Argo CD installation
 ```
 
 **Structure Decision**: 
 - Replaced `staging/` and `production/` overlays with `prod/` and `previews/pr-*/`
 - Terraform collapsed to single `prod/` environment (previews reuse same infra, different namespaces)
 - Argo CD ApplicationSet discovers preview overlays dynamically
+
+## Terraform Scope (Azure Infrastructure Only)
+
+**Architectural Decision**: Terraform manages Azure resources only. Helm charts and Kubernetes resources are managed by Argo CD.
+
+| Layer | Tool | Resources |
+|-------|------|-----------|
+| **Azure Infrastructure** | Terraform | AKS, ACR, Azure SQL, Key Vault, Storage, SWA |
+| **Cluster Bootstrap** | `scripts/bootstrap-argocd.ps1` | Argo CD installation (one-time) |
+| **Cluster Infrastructure** | Argo CD | ingress-nginx, external-secrets (via Helm) |
+| **Application Workloads** | Argo CD | API, Workers, migrations (via Kustomize) |
+
+**Rationale**: See [research.md § 9. Terraform Scope](research.md#9-terraform-scope---azure-infrastructure-only)
+
+**Removed Terraform Modules** (now managed by Argo CD):
+- ~~`infra/terraform/modules/nginx-ingress/`~~
+- ~~`infra/terraform/modules/external-secrets/`~~
+- ~~`infra/terraform/modules/argocd/`~~
+
+**New Argo CD Applications**:
+```yaml
+# k8s/argocd/infra-apps.yaml
+# Manages ingress-nginx and external-secrets Helm charts
+# Applied after Argo CD bootstrap
+```
 
 ## Argo CD / GitOps Design
 

@@ -270,6 +270,110 @@ terraform {
 
 ---
 
+### 9. Terraform Scope - Azure Infrastructure Only
+
+**Question**: Should Terraform manage Helm releases and Kubernetes resources?
+
+**Decision**: NO - Terraform manages Azure infrastructure only; Argo CD manages all cluster resources
+
+**Rationale**:
+
+| Problem with Helm in Terraform | Impact |
+|--------------------------------|--------|
+| **Chicken-and-egg** | Helm/K8s providers need AKS credentials that don't exist until AKS is created |
+| **Two-phase applies** | Often need `terraform apply` twice (once for AKS, once for Helm) |
+| **State coupling** | Terraform state becomes coupled to cluster state; manual changes cause drift |
+| **Blast radius** | Destroying infrastructure also destroys all cluster state |
+| **Long applies** | Helm releases can take 5-10 minutes, making iterations slow |
+| **Provider churn** | Helm provider v3.x has breaking changes from v2.x (set block syntax) |
+
+**New Architecture**:
+
+| Layer | Tool | Manages |
+|-------|------|---------|
+| **Azure Infrastructure** | Terraform | AKS, ACR, SQL, KeyVault, Storage, SWA |
+| **Cluster Bootstrap** | `scripts/bootstrap-argocd.ps1` | Argo CD installation (one-time) |
+| **Cluster Resources** | Argo CD | ingress-nginx, external-secrets, app workloads |
+
+**Benefits**:
+- Clean separation of concerns
+- Terraform runs are fast (Azure API only)
+- Cluster state is managed declaratively by GitOps
+- No Helm/Kubernetes provider version issues
+- Argo CD provides visibility, rollback, and self-heal for cluster resources
+
+**Bootstrap Process**:
+```bash
+# 1. Terraform creates Azure infrastructure
+terraform apply
+
+# 2. Get AKS credentials
+az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
+
+# 3. Bootstrap Argo CD (one-time)
+./scripts/bootstrap-argocd.ps1
+
+# 4. Apply Argo CD Applications for cluster infrastructure
+kubectl apply -f k8s/argocd/infra-apps.yaml
+```
+
+**Argo CD Managed Infrastructure**:
+```yaml
+# k8s/argocd/infra-apps.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: 4.9.1
+    helm:
+      values: |
+        controller:
+          replicaCount: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: 0.9.13
+    helm:
+      values: |
+        installCRDs: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+---
+
 ## Summary of Decisions
 
 | Area | Decision |
@@ -279,7 +383,8 @@ terraform {
 | GitOps tool | Argo CD (UI, auto-sync, rollback) |
 | K8s manifests | Kustomize (base + overlays) |
 | Frontend hosting | Azure Static Web Apps (free tier) |
-| Terraform role | Provision AKS, ACR, SQL, KeyVault; not app deploys |
+| **Terraform scope** | **Azure infrastructure ONLY - no Helm/K8s providers** |
+| Cluster bootstrap | Script + Argo CD Applications for ingress-nginx, external-secrets |
 | Terraform state | Azure Storage with OIDC auth |
 | Azure auth | OIDC federation (no secrets) |
 | E2E in CI | Docker Compose test environment |
@@ -296,6 +401,7 @@ terraform {
 2. **Azure AD setup**: Manual step to create app registration with federated credentials
 3. **Terraform state bootstrap**: Manual one-time creation of state storage account
 4. **Existing Dockerfiles**: Need to verify Dockerfiles work with docker buildx (multi-platform)
-5. **Argo CD installation**: Terraform or Helm to install Argo CD on AKS
-6. **Kustomize base manifests**: Create K8s Deployments, Services, ConfigMaps
-7. **External Secrets Operator**: For syncing Azure Key Vault to K8s Secrets
+5. **Argo CD bootstrap script**: `scripts/bootstrap-argocd.ps1` to install Argo CD on AKS
+6. **Argo CD infra apps**: `k8s/argocd/infra-apps.yaml` for ingress-nginx and external-secrets
+7. **Kustomize base manifests**: Create K8s Deployments, Services, ConfigMaps
+8. **SecretStore for ESO**: Configure Azure Key Vault integration after ESO is installed
