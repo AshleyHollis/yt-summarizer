@@ -10,6 +10,8 @@ metadata:
     app.kubernetes.io/name: transcribe-worker
     app.kubernetes.io/component: worker
     app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   replicas: 1
   selector:
