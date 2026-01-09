@@ -23,6 +23,10 @@ env:
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
   MAX_PREVIEWS: 3
+  # Backend API URL for previews - configure via repository variable
+  # Set PREVIEW_API_URL in repo settings > Secrets and variables > Variables
+  # Leave empty to skip backend connection (frontend-only preview)
+  PREVIEW_API_URL: ${{ vars.PREVIEW_API_URL || '' }}
 
 permissions:
   id-token: write
@@ -227,12 +231,20 @@ jobs:
             preview.pr-number: "${PR_NUMBER}"
           EOF
           
-          # Generate preview URL
-          PREVIEW_URL="https://pr-${PR_NUMBER}.preview.yt-summarizer.example.com"
+          # Generate preview URL from configured variable or leave empty
+          # If PREVIEW_API_URL is set in repo variables, use it
+          # Otherwise, frontend will work in offline/mock mode
+          if [ -n "${{ env.PREVIEW_API_URL }}" ]; then
+            PREVIEW_URL="${{ env.PREVIEW_API_URL }}"
+            echo "✅ Using configured API URL: ${PREVIEW_URL}"
+          else
+            PREVIEW_URL=""
+            echo "⚠️ PREVIEW_API_URL not configured - frontend will run without backend"
+            echo "::warning::Set PREVIEW_API_URL in repository variables to enable backend API"
+          fi
           echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
           
           echo "Updated preview overlay at ${OVERLAY_FILE}"
-          echo "Preview URL: ${PREVIEW_URL}"
           cat "$OVERLAY_FILE"
 
       - name: Commit and push overlay update
@@ -293,10 +305,19 @@ jobs:
       - name: Build frontend for preview
         working-directory: apps/web
         env:
-          # Point to the preview API backend
-          NEXT_PUBLIC_API_URL: ${{ needs.update-overlay.outputs.preview_url }}
+          # Point to the preview API backend (empty if not configured)
+          # When empty, the frontend will use relative paths which won't work for API calls
+          # Configure PREVIEW_API_URL in repo variables to enable backend connectivity
+          NEXT_PUBLIC_API_URL: ${{ needs.update-overlay.outputs.preview_url || '' }}
           NEXT_PUBLIC_ENVIRONMENT: preview
-        run: npm run build
+        run: |
+          if [ -z "$NEXT_PUBLIC_API_URL" ]; then
+            echo "::warning::Building frontend without backend API URL"
+            echo "::warning::Set PREVIEW_API_URL in repository variables to enable backend connectivity"
+          else
+            echo "Building frontend with API URL: $NEXT_PUBLIC_API_URL"
+          fi
+          npm run build
 
       - name: Deploy to SWA staging environment
         id: deploy
@@ -419,6 +440,8 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend-preview, post-status]
+    # Skip E2E tests if no API URL is configured
+    if: needs.update-overlay.outputs.preview_url != ''
     outputs:
       result: ${{ steps.run-tests.outcome }}
     steps:
@@ -538,6 +561,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # This job provides a single status check that deploy-prod can gate on.
   # It only succeeds if all preview steps completed successfully.
+  # E2E tests are optional (skipped if no backend API URL is configured).
   # ---------------------------------------------------------------------------
   preview-status:
     name: Preview Status
@@ -546,6 +570,8 @@ jobs:
     if: always()
     steps:
       - name: Check preview pipeline status
+        env:
+          API_URL_CONFIGURED: ${{ needs.update-overlay.outputs.preview_url }}
         run: |
           echo "## Preview Pipeline Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -559,14 +585,30 @@ jobs:
             exit 0
           fi
           
+          # Determine E2E test status display
+          E2E_RESULT="${{ needs.e2e-tests.result }}"
+          if [ -z "$API_URL_CONFIGURED" ]; then
+            E2E_STATUS="⏭️ Skipped (no API URL)"
+            E2E_REQUIRED=false
+          elif [ "$E2E_RESULT" = "success" ]; then
+            E2E_STATUS="✅ Passed"
+            E2E_REQUIRED=true
+          elif [ "$E2E_RESULT" = "skipped" ]; then
+            E2E_STATUS="⏭️ Skipped"
+            E2E_REQUIRED=false
+          else
+            E2E_STATUS="❌ Failed"
+            E2E_REQUIRED=true
+          fi
+          
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Update Overlay | ${{ needs.update-overlay.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy Frontend | ${{ needs.deploy-frontend-preview.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| E2E Tests | ${{ needs.e2e-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${E2E_STATUS} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # All jobs must succeed
+          # Required jobs must succeed
           if [ "${{ needs.update-overlay.result }}" != "success" ]; then
             echo "::error::Update overlay failed"
             exit 1
@@ -577,9 +619,18 @@ jobs:
             exit 1
           fi
           
-          if [ "${{ needs.e2e-tests.result }}" != "success" ]; then
+          # E2E tests only required if API URL is configured
+          if [ "$E2E_REQUIRED" = "true" ] && [ "$E2E_RESULT" != "success" ]; then
             echo "::error::E2E tests failed"
             exit 1
+          fi
+          
+          if [ -z "$API_URL_CONFIGURED" ]; then
+            echo "⚠️ Preview deployed without backend API" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To enable full preview functionality:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Set \`PREVIEW_API_URL\` in repository variables" >> $GITHUB_STEP_SUMMARY
+            echo "2. Re-run this workflow" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "✅ Preview pipeline completed successfully!" >> $GITHUB_STEP_SUMMARY
