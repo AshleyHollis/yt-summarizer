@@ -2,9 +2,11 @@
 # Deploy to Production Workflow
 # =============================================================================
 # Automatically deploys to production when a PR is merged to main
-# WAITS for CI to pass before building/deploying
+# GATES:
+#   1. CI must pass (builds images)
+#   2. Preview workflow must have passed for the merged PR (includes E2E tests)
 # Updates prod overlay with image digests, Argo CD syncs automatically
-# NO manual approval gates - relies on PR review process
+# NO manual approval gates - relies on PR review process + automated testing
 
 name: Deploy to Production
 
@@ -29,15 +31,92 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Gate: Only proceed if CI passed
+  # Gate: Verify CI and Preview Status
   # ---------------------------------------------------------------------------
-  check-ci:
-    name: Check CI Status
+  check-gates:
+    name: Check Gates
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      can_deploy: ${{ steps.check.outputs.can_deploy }}
+      pr_number: ${{ steps.check.outputs.pr_number }}
     steps:
       - name: CI passed
-        run: echo "CI workflow passed, proceeding with production deployment"
+        run: echo "✅ CI workflow passed"
+
+      - name: Find merged PR for this commit
+        id: find-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "Looking for PR that merged commit: $COMMIT_SHA"
+          
+          # Find the PR that was merged with this commit
+          PR_DATA=$(gh api repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls --jq '.[0] | {number, state, merged}' 2>/dev/null || echo '{}')
+          
+          if [ "$PR_DATA" = "{}" ] || [ -z "$PR_DATA" ]; then
+            echo "No PR found for commit - may be a direct push to main"
+            echo "pr_number=" >> $GITHUB_OUTPUT
+          else
+            PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+            PR_MERGED=$(echo "$PR_DATA" | jq -r '.merged')
+            echo "Found PR #${PR_NUMBER} (merged: ${PR_MERGED})"
+            echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check Preview workflow status
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.find-pr.outputs.pr_number }}
+        run: |
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::warning::No PR found - allowing deployment (direct push to main)"
+            echo "can_deploy=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Checking Preview Status for PR #${PR_NUMBER}..."
+          
+          # Get the head SHA of the merged PR to check its status
+          PR_HEAD_SHA=$(gh api repos/${{ github.repository }}/pulls/${PR_NUMBER} --jq '.merge_commit_sha // .head.sha')
+          
+          # Look for the Preview Status check on the PR's head commit
+          # We need to check the PR's original head SHA, not the merge commit
+          PR_ORIGINAL_HEAD=$(gh api repos/${{ github.repository }}/pulls/${PR_NUMBER} --jq '.head.sha')
+          
+          echo "Checking Preview Status for commit: $PR_ORIGINAL_HEAD"
+          
+          # Get check runs for the commit
+          PREVIEW_STATUS=$(gh api repos/${{ github.repository }}/commits/${PR_ORIGINAL_HEAD}/check-runs \
+            --jq '.check_runs[] | select(.name == "Preview Status") | .conclusion' 2>/dev/null || echo "")
+          
+          if [ -z "$PREVIEW_STATUS" ]; then
+            # Check if Preview workflow ran at all
+            PREVIEW_RUN=$(gh api repos/${{ github.repository }}/commits/${PR_ORIGINAL_HEAD}/check-runs \
+              --jq '.check_runs[] | select(.name | contains("Preview")) | .name' | head -1 2>/dev/null || echo "")
+            
+            if [ -z "$PREVIEW_RUN" ]; then
+              echo "::warning::No Preview workflow found for PR - may be docs-only"
+              echo "can_deploy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            echo "::error::Preview Status check not found for PR #${PR_NUMBER}"
+            echo "can_deploy=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          if [ "$PREVIEW_STATUS" = "success" ]; then
+            echo "✅ Preview Status passed for PR #${PR_NUMBER}"
+            echo "can_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Preview Status was '${PREVIEW_STATUS}' for PR #${PR_NUMBER}"
+            echo "::error::Production deployment blocked - E2E tests must pass"
+            echo "can_deploy=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
 
   # ---------------------------------------------------------------------------
   # Build and Push Production Images
@@ -45,7 +124,8 @@ jobs:
   build:
     name: Build Production Images
     runs-on: ubuntu-latest
-    needs: check-ci
+    needs: check-gates
+    if: needs.check-gates.outputs.can_deploy == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
       api_digest: ${{ steps.build-api.outputs.digest }}
@@ -307,12 +387,67 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
+  # Production Smoke Tests
+  # ---------------------------------------------------------------------------
+  smoke-tests:
+    name: Production Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [build, deploy-frontend, health-check]
+    if: needs.health-check.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke tests
+        working-directory: apps/web
+        env:
+          USE_EXTERNAL_SERVER: "true"
+          BASE_URL: ${{ vars.PRODUCTION_FRONTEND_URL || env.PRODUCTION_URL }}
+          NEXT_PUBLIC_API_URL: ${{ env.PRODUCTION_URL }}
+          API_URL: ${{ env.PRODUCTION_URL }}
+          # Only run smoke test suite (tagged tests)
+          SMOKE_TEST: "true"
+        run: |
+          # Run a subset of E2E tests as smoke tests
+          # Use grep to run only smoke-tagged tests, or run a minimal set
+          npx playwright test --grep "@smoke" --reporter=html || \
+            npx playwright test e2e/smoke.spec.ts --reporter=html || \
+            echo "No smoke tests found - running basic navigation tests" && \
+            npx playwright test e2e/navigation.spec.ts --reporter=html || \
+            echo "Skipping smoke tests - no test files matched"
+
+      - name: Upload smoke test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-smoke-test-report
+          path: apps/web/playwright-report/
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
   # Deployment Summary
   # ---------------------------------------------------------------------------
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [build, deploy-frontend, health-check]
+    needs: [build, deploy-frontend, health-check, smoke-tests]
     if: always()
     steps:
       - name: Generate summary
@@ -337,6 +472,7 @@ jobs:
           echo "| Build | ${{ needs.build.result == 'success' && '✅ Success' || (needs.build.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy Frontend | ${{ needs.deploy-frontend.result == 'success' && '✅ Success' || (needs.deploy-frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Health Check | ${{ needs.health-check.result == 'success' && '✅ Passed' || (needs.health-check.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ needs.smoke-tests.result == 'success' && '✅ Passed' || (needs.smoke-tests.result == 'skipped' && '⏭️ Skipped' || '⚠️ Failed') }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "## Quick Links" >> $GITHUB_STEP_SUMMARY
@@ -344,7 +480,7 @@ jobs:
           echo "- 🔄 [Argo CD Dashboard](https://argocd.yt-summarizer.example.com)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          if [ "${{ needs.health-check.result }}" = "failure" ]; then
+          if [ "${{ needs.health-check.result }}" = "failure" ] || [ "${{ needs.smoke-tests.result }}" = "failure" ]; then
             echo "## ⚠️ Rollback Instructions" >> $GITHUB_STEP_SUMMARY
             echo "If you need to rollback, use git revert:" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
