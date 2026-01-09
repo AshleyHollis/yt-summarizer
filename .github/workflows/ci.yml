@@ -10,8 +10,26 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
+    paths:
+      - 'services/**'
+      - 'apps/**'
+      - 'k8s/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - 'docker-compose*.yml'
+      - 'pyproject.toml'
+      - 'package.json'
   push:
     branches: [main]
+    paths:
+      - 'services/**'
+      - 'apps/**'
+      - 'k8s/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - 'docker-compose*.yml'
+      - 'pyproject.toml'
+      - 'package.json'
   workflow_dispatch:
 
 concurrency:
