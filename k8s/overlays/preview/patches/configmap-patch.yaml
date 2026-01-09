@@ -7,5 +7,6 @@ metadata:
   name: yt-summarizer-config
   namespace: yt-summarizer
 data:
-  ENVIRONMENT: "preview"
+  # Use 'staging' since app only allows development/staging/production
+  ENVIRONMENT: "staging"
   LOG_LEVEL: "DEBUG"
