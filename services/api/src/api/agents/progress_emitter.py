@@ -19,10 +19,10 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, AsyncGenerator, Callable, Optional, Protocol
+from typing import Any, Protocol
 
 
 class WorkflowStatus(str, Enum):
@@ -76,10 +76,10 @@ class WorkflowProgress:
     percent: float
     message: str
     status: WorkflowStatus
-    current_step: Optional[StepInfo] = None
+    current_step: StepInfo | None = None
     completed_steps: list[CompletedStep] = field(default_factory=list)
-    error: Optional[ErrorInfo] = None
-    result: Optional[Any] = None
+    error: ErrorInfo | None = None
+    result: Any | None = None
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization (camelCase for frontend)."""
@@ -132,7 +132,7 @@ class ProgressEmitter:
     def __init__(
         self,
         event_sink: EventSink,
-        workflow_id: Optional[str] = None,
+        workflow_id: str | None = None,
         total_steps: int = 1,
         initial_message: str = "Starting...",
     ):
@@ -147,7 +147,7 @@ class ProgressEmitter:
         self.event_sink = event_sink
         self.workflow_id = workflow_id or str(uuid.uuid4())
         self.total_steps = total_steps
-        self._step_start_time: Optional[float] = None
+        self._step_start_time: float | None = None
         
         self.progress = WorkflowProgress(
             workflow_id=self.workflow_id,
@@ -158,7 +158,7 @@ class ProgressEmitter:
             status=WorkflowStatus.PENDING,
         )
     
-    async def __aenter__(self) -> "ProgressEmitter":
+    async def __aenter__(self) -> ProgressEmitter:
         """Enter async context - emit initial state."""
         await self.initialize()
         return self
@@ -181,7 +181,7 @@ class ProgressEmitter:
         self.progress.status = WorkflowStatus.RUNNING
         await self._emit()
     
-    async def start_step(self, step_name: str, description: str, message: Optional[str] = None) -> None:
+    async def start_step(self, step_name: str, description: str, message: str | None = None) -> None:
         """Start a new step in the workflow.
         
         Args:
@@ -229,7 +229,7 @@ class ProgressEmitter:
         self.progress.percent = min(max(percent, 0), 100)
         await self._emit()
     
-    async def complete_step(self, message: Optional[str] = None) -> None:
+    async def complete_step(self, message: str | None = None) -> None:
         """Complete the current step.
         
         Args:

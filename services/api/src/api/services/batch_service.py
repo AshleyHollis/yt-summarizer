@@ -37,13 +37,15 @@ except ImportError:
 
 from ..models.batch import (
     BatchDetailResponse,
-    BatchItem as BatchItemResponse,
     BatchItemStatus,
     BatchListResponse,
     BatchResponse,
     BatchRetryResponse,
     BatchStatus,
     CreateBatchRequest,
+)
+from ..models.batch import (
+    BatchItem as BatchItemResponse,
 )
 from ..models.job import JobStage, JobStatus, JobType
 from .channel_service import ChannelService

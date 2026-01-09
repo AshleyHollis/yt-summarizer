@@ -4,11 +4,10 @@ These tests verify that job status updates correctly propagate to
 BatchItem and Batch counts, which is critical for batch progress tracking.
 """
 
-import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
 
 # =============================================================================
 # Test Fixtures

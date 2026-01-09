@@ -1,25 +1,24 @@
 """Tests for Pydantic models."""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
 
-from api.models.video import (
-    SubmitVideoRequest,
-    ChannelSummary,
-    ProcessingStatus,
-    extract_youtube_video_id,
-)
 from api.models.job import (
-    JobType,
     JobStage,
     JobStatus,
-    JobResponse,
     JobSummaryResponse,
-    VideoJobsProgress,
+    JobType,
     RetryJobRequest,
+    VideoJobsProgress,
+)
+from api.models.video import (
+    ChannelSummary,
+    ProcessingStatus,
+    SubmitVideoRequest,
+    extract_youtube_video_id,
 )
 
 

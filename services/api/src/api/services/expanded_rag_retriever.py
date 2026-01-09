@@ -75,7 +75,6 @@ Example tuning for different scenarios:
 import json
 import math
 from dataclasses import dataclass, field
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession

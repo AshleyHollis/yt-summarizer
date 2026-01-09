@@ -3,9 +3,10 @@
 These tests verify the job listing, retrieval, retry, and progress endpoints.
 """
 
+from uuid import uuid4
+
 import pytest
 from fastapi import status
-from uuid import uuid4
 
 
 class TestListJobs:

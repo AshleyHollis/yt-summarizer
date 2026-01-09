@@ -31,8 +31,8 @@ if TYPE_CHECKING:
 
 # Import shared logging and database
 try:
-    from shared.logging.config import get_logger
     from shared.db.connection import get_db
+    from shared.logging.config import get_logger
 except ImportError:
     import logging
     def get_logger(name: str) -> logging.Logger:
@@ -117,6 +117,7 @@ class AGUIEndpoint:
         try:
             from agent_framework_ag_ui import AgentFrameworkAgent
             from agent_framework_ag_ui._endpoint import EventEncoder
+
             from .yt_summarizer_agent import create_yt_summarizer_agent
             
             # Create the underlying agent

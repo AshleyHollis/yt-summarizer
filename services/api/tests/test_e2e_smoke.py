@@ -25,11 +25,11 @@ Usage:
 """
 
 import os
-import pytest
-import httpx
 from uuid import uuid4
-from fastapi import status
 
+import httpx
+import pytest
+from fastapi import status
 
 # Configuration
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")

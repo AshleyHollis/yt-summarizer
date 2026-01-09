@@ -24,12 +24,12 @@ Usage:
 
 import os
 import time
-import pytest
-import httpx
 from datetime import datetime
 from uuid import uuid4
-from fastapi import status
 
+import httpx
+import pytest
+from fastapi import status
 
 # Configuration
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
@@ -96,7 +96,7 @@ class TestPipelineJobCreation:
 
     def test_video_response_includes_content_urls_field(self, client, headers):
         """Video response model should include transcript_url and summary_url fields."""
-        from api.models.video import VideoResponse, ProcessingStatus
+        from api.models.video import ProcessingStatus, VideoResponse
         
         # Verify the model has the expected fields
         video = VideoResponse(
@@ -440,8 +440,9 @@ class TestPipelineRegressions:
 
     def test_completed_video_has_content_urls_populated(self):
         """Regression: Completed videos should have content URLs populated."""
-        from api.models.video import VideoResponse, ProcessingStatus
         from uuid import uuid4
+
+        from api.models.video import ProcessingStatus, VideoResponse
         
         # Verify the service logic: completed videos should have URLs
         # This is a model-level test; service-level test is in live tests

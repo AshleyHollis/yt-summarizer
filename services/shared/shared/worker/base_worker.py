@@ -5,10 +5,11 @@ import os
 import signal
 import sys
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from shared.config import get_settings
 from shared.logging.config import (
@@ -27,7 +28,6 @@ from shared.telemetry.config import (
     record_exception_on_span,
 )
 from shared.worker.health_server import WorkerHealthServer
-
 
 T = TypeVar("T")
 
@@ -242,8 +242,9 @@ class BaseWorker(ABC, Generic[T]):
         Used by health endpoint to determine worker health.
         """
         try:
-            from shared.db.connection import get_db
             import asyncio
+
+            from shared.db.connection import get_db
             
             # Run async connect in sync context
             db = get_db()
@@ -351,9 +352,9 @@ class BaseWorker(ABC, Generic[T]):
                     message = self.parse_message(raw_message)
                     # Add video_id to span if available
                     if hasattr(message, "video_id"):
-                        span.set_attribute("video.id", str(getattr(message, "video_id")))
+                        span.set_attribute("video.id", str(message.video_id))
                     if hasattr(message, "job_id"):
-                        span.set_attribute("job.id", str(getattr(message, "job_id")))
+                        span.set_attribute("job.id", str(message.job_id))
                     
                     # Add event: message parsed successfully
                     add_span_event(span, "message_parsed", {
@@ -558,7 +559,7 @@ class BaseWorker(ABC, Generic[T]):
                     # No messages, wait before polling again
                     await asyncio.sleep(self.poll_interval)
                     
-            except Exception as e:
+            except Exception:
                 self._logger.exception("Error during poll loop")
                 await asyncio.sleep(self.poll_interval * 2)  # Back off on errors
         

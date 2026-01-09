@@ -10,9 +10,9 @@ import sqlalchemy as sa
 from shared.config import get_settings
 from shared.db.connection import get_db
 from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_running
-from shared.db.models import Job, Relationship, Segment, Video
+from shared.db.models import Relationship, Video
 from shared.logging.config import get_logger
-from shared.queue.client import RELATIONSHIPS_QUEUE, get_queue_client
+from shared.queue.client import RELATIONSHIPS_QUEUE
 from shared.worker.base_worker import BaseWorker, WorkerResult, run_worker
 
 logger = get_logger(__name__)
@@ -132,7 +132,6 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
     async def _get_video_embeddings(self, video_id: str) -> list[list[float]]:
         """Get all embeddings for a video."""
         import json
-        from uuid import UUID
 
         db = get_db()
         async with db.session() as session:
@@ -190,7 +189,6 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
         Uses batch processing to limit memory usage for large libraries.
         Returns list of (video_id, similarity_score) tuples.
         """
-        import json
 
         settings = get_settings()
         similarity_threshold = getattr(

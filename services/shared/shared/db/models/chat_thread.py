@@ -1,10 +1,8 @@
 """ChatThread SQLAlchemy model for storing copilot conversation threads."""
 
-from datetime import datetime
 from typing import Any
-from uuid import UUID
 
-from sqlalchemy import DateTime, Index, String, Text, func
+from sqlalchemy import Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin

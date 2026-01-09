@@ -1,7 +1,6 @@
 """FastAPI application factory and main entry point."""
 
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError

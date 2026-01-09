@@ -20,14 +20,13 @@ Environment variables used by Aspire:
 import logging as stdlib_logging
 import os
 import sys
-from typing import Optional
 
 # Flag to track if telemetry has been configured
 _telemetry_configured = False
 _log_handler_configured = False
 
 
-def _parse_headers(headers_str: Optional[str]) -> dict[str, str]:
+def _parse_headers(headers_str: str | None) -> dict[str, str]:
     """Parse OTEL_EXPORTER_OTLP_HEADERS format (key=value,key2=value2)."""
     if not headers_str:
         return {}
@@ -39,7 +38,7 @@ def _parse_headers(headers_str: Optional[str]) -> dict[str, str]:
     return headers
 
 
-def _find_ssl_cert() -> Optional[str]:
+def _find_ssl_cert() -> str | None:
     """Find SSL certificate from environment or SSL_CERT_DIR.
     
     Sets OTEL_EXPORTER_OTLP_CERTIFICATE environment variable if found,
@@ -76,7 +75,7 @@ def _find_ssl_cert() -> Optional[str]:
 def configure_telemetry(
     service_name: str,
     service_version: str = "0.1.0",
-    environment: Optional[str] = None,
+    environment: str | None = None,
 ) -> bool:
     """
     Configure OpenTelemetry for the service (traces, logs, and metrics).
@@ -103,7 +102,7 @@ def configure_telemetry(
     
     # Skip if already configured
     if _telemetry_configured:
-        print(f"[TELEMETRY] Already configured, skipping", file=sys.stderr, flush=True)
+        print("[TELEMETRY] Already configured, skipping", file=sys.stderr, flush=True)
         return True
     
     # Get OTLP endpoint from environment (Aspire sets this automatically)
@@ -121,14 +120,14 @@ def configure_telemetry(
     
     # Skip telemetry if no endpoint configured
     if not otlp_endpoint:
-        print(f"[TELEMETRY] No OTLP endpoint configured, telemetry disabled", file=sys.stderr, flush=True)
+        print("[TELEMETRY] No OTLP endpoint configured, telemetry disabled", file=sys.stderr, flush=True)
         return False
     
     try:
         from opentelemetry import trace
+        from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
-        from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
         
         # Find SSL certificate for HTTPS endpoints
         ssl_cert = _find_ssl_cert()
@@ -146,8 +145,8 @@ def configure_telemetry(
         provider = TracerProvider(resource=resource)
         
         if otlp_protocol == "http/protobuf":
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
             import requests
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
             
             # HTTP exporter needs /v1/traces appended if not present
             traces_endpoint = otlp_endpoint
@@ -169,7 +168,7 @@ def configure_telemetry(
                 else:
                     # For local development with self-signed certs, disable SSL verification
                     session.verify = False
-                    print(f"[TELEMETRY] WARNING: Disabling SSL verification (no cert found)", file=sys.stderr, flush=True)
+                    print("[TELEMETRY] WARNING: Disabling SSL verification (no cert found)", file=sys.stderr, flush=True)
                     # Suppress SSL warnings for local dev
                     import urllib3
                     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -204,16 +203,16 @@ def configure_telemetry(
         
         provider.add_span_processor(BatchSpanProcessor(trace_exporter))
         trace.set_tracer_provider(provider)
-        print(f"[TELEMETRY] Trace exporter configured", file=sys.stderr, flush=True)
+        print("[TELEMETRY] Trace exporter configured", file=sys.stderr, flush=True)
         
         # ==================== INSTRUMENT LIBRARIES ====================
         # OpenAI - Gen AI semantic conventions for LLM calls
         try:
             from opentelemetry.instrumentation.openai_v2 import OpenAIInstrumentor
             OpenAIInstrumentor().instrument()
-            print(f"[TELEMETRY] OpenAI instrumentation enabled (Gen AI traces)", file=sys.stderr, flush=True)
+            print("[TELEMETRY] OpenAI instrumentation enabled (Gen AI traces)", file=sys.stderr, flush=True)
         except ImportError:
-            print(f"[TELEMETRY] OpenAI instrumentation not available", file=sys.stderr, flush=True)
+            print("[TELEMETRY] OpenAI instrumentation not available", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"[TELEMETRY] OpenAI instrumentation failed: {e}", file=sys.stderr, flush=True)
         
@@ -221,9 +220,9 @@ def configure_telemetry(
         try:
             from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
             SQLAlchemyInstrumentor().instrument()
-            print(f"[TELEMETRY] SQLAlchemy instrumentation enabled (DB traces)", file=sys.stderr, flush=True)
+            print("[TELEMETRY] SQLAlchemy instrumentation enabled (DB traces)", file=sys.stderr, flush=True)
         except ImportError:
-            print(f"[TELEMETRY] SQLAlchemy instrumentation not available", file=sys.stderr, flush=True)
+            print("[TELEMETRY] SQLAlchemy instrumentation not available", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"[TELEMETRY] SQLAlchemy instrumentation failed: {e}", file=sys.stderr, flush=True)
         
@@ -231,9 +230,9 @@ def configure_telemetry(
         try:
             from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
             HTTPXClientInstrumentor().instrument()
-            print(f"[TELEMETRY] HTTPX instrumentation enabled (HTTP client traces)", file=sys.stderr, flush=True)
+            print("[TELEMETRY] HTTPX instrumentation enabled (HTTP client traces)", file=sys.stderr, flush=True)
         except ImportError:
-            print(f"[TELEMETRY] HTTPX instrumentation not available", file=sys.stderr, flush=True)
+            print("[TELEMETRY] HTTPX instrumentation not available", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"[TELEMETRY] HTTPX instrumentation failed: {e}", file=sys.stderr, flush=True)
         
@@ -241,9 +240,9 @@ def configure_telemetry(
         try:
             from opentelemetry.instrumentation.logging import LoggingInstrumentor
             LoggingInstrumentor().instrument(set_logging_format=True)
-            print(f"[TELEMETRY] Logging instrumentation enabled (log-trace correlation)", file=sys.stderr, flush=True)
+            print("[TELEMETRY] Logging instrumentation enabled (log-trace correlation)", file=sys.stderr, flush=True)
         except ImportError:
-            print(f"[TELEMETRY] Logging instrumentation not available", file=sys.stderr, flush=True)
+            print("[TELEMETRY] Logging instrumentation not available", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"[TELEMETRY] Logging instrumentation failed: {e}", file=sys.stderr, flush=True)
         
@@ -253,9 +252,9 @@ def configure_telemetry(
             from azure.core.settings import settings
             from azure.core.tracing.ext.opentelemetry_span import OpenTelemetrySpan
             settings.tracing_implementation = OpenTelemetrySpan
-            print(f"[TELEMETRY] Azure SDK tracing enabled (Storage Queue/Blob traces)", file=sys.stderr, flush=True)
+            print("[TELEMETRY] Azure SDK tracing enabled (Storage Queue/Blob traces)", file=sys.stderr, flush=True)
         except ImportError:
-            print(f"[TELEMETRY] Azure SDK tracing not available (install azure-core-tracing-opentelemetry)", file=sys.stderr, flush=True)
+            print("[TELEMETRY] Azure SDK tracing not available (install azure-core-tracing-opentelemetry)", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"[TELEMETRY] Azure SDK tracing failed: {e}", file=sys.stderr, flush=True)
         
@@ -266,9 +265,9 @@ def configure_telemetry(
         try:
             from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrumentor
             SystemMetricsInstrumentor().instrument()
-            print(f"[TELEMETRY] System metrics instrumentation enabled (CPU, memory, runtime)", file=sys.stderr, flush=True)
+            print("[TELEMETRY] System metrics instrumentation enabled (CPU, memory, runtime)", file=sys.stderr, flush=True)
         except ImportError:
-            print(f"[TELEMETRY] System metrics not available (install opentelemetry-instrumentation-system-metrics)", file=sys.stderr, flush=True)
+            print("[TELEMETRY] System metrics not available (install opentelemetry-instrumentation-system-metrics)", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"[TELEMETRY] System metrics instrumentation failed: {e}", file=sys.stderr, flush=True)
         
@@ -294,7 +293,7 @@ def _configure_log_exporter(
     otlp_endpoint: str,
     otlp_protocol: str,
     otlp_headers: dict[str, str],
-    ssl_cert: Optional[str],
+    ssl_cert: str | None,
     resource,
 ) -> bool:
     """Configure OTLP log exporter for structured logging."""
@@ -350,7 +349,7 @@ def _configure_log_exporter(
         stdlib_logging.getLogger().addHandler(handler)
         
         _log_handler_configured = True
-        print(f"[TELEMETRY] Log exporter configured", file=sys.stderr, flush=True)
+        print("[TELEMETRY] Log exporter configured", file=sys.stderr, flush=True)
         return True
         
     except ImportError as e:
@@ -366,7 +365,7 @@ def _configure_metrics_exporter(
     otlp_endpoint: str,
     otlp_protocol: str,
     otlp_headers: dict[str, str],
-    ssl_cert: Optional[str],
+    ssl_cert: str | None,
     resource,
 ) -> bool:
     """Configure OTLP metrics exporter for application metrics."""

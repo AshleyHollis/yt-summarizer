@@ -4,11 +4,10 @@ These tests verify the worker processing logic using mocked dependencies.
 They test the core business logic without requiring external services.
 """
 
-import pytest
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
 
 # =============================================================================
 # Test Fixtures
@@ -76,7 +75,7 @@ class TestTranscribeWorkerMessageParsing:
 
     def test_parse_valid_message(self):
         """Test parsing a valid transcribe message."""
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
         
@@ -99,7 +98,7 @@ class TestTranscribeWorkerMessageParsing:
 
     def test_parse_message_with_missing_optional_fields(self):
         """Test parsing a message with missing optional fields."""
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+        from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
         
@@ -145,7 +144,8 @@ class TestTranscribeWorkerProcessing:
         progressing through the pipeline with empty content.
         """
         from shared.worker.base_worker import WorkerStatus
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
         
@@ -193,7 +193,8 @@ class TestTranscribeWorkerProcessing:
         the worker extracts them successfully.
         """
         from shared.worker.base_worker import WorkerStatus
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
         
@@ -256,7 +257,7 @@ class TestSummarizeWorkerMessageParsing:
 
     def test_parse_valid_message(self):
         """Test parsing a valid summarize message."""
-        from summarize.worker import SummarizeWorker, SummarizeMessage
+        from summarize.worker import SummarizeWorker
 
         worker = SummarizeWorker()
         
@@ -301,7 +302,8 @@ class TestSummarizeWorkerProcessing:
     ):
         """Test that summarize worker succeeds when transcript exists."""
         from shared.worker.base_worker import WorkerStatus
-        from summarize.worker import SummarizeWorker, SummarizeMessage
+
+        from summarize.worker import SummarizeMessage, SummarizeWorker
 
         worker = SummarizeWorker()
         
@@ -345,7 +347,7 @@ class TestEmbedWorkerMessageParsing:
 
     def test_parse_valid_message(self):
         """Test parsing a valid embed message."""
-        from embed.worker import EmbedWorker, EmbedMessage
+        from embed.worker import EmbedWorker
 
         worker = EmbedWorker()
         
@@ -421,9 +423,10 @@ class TestEmbedWorkerProcessing:
         sample_transcript,
     ):
         """Test that embed worker succeeds when content exists."""
-        from shared.worker.base_worker import WorkerStatus
-        from embed.worker import EmbedWorker, EmbedMessage
         import numpy as np
+        from shared.worker.base_worker import WorkerStatus
+
+        from embed.worker import EmbedMessage, EmbedWorker
 
         worker = EmbedWorker()
         
@@ -467,7 +470,7 @@ class TestRelationshipsWorkerMessageParsing:
 
     def test_parse_valid_message(self):
         """Test parsing a valid relationships message."""
-        from relationships.worker import RelationshipsWorker, RelationshipsMessage
+        from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
         
@@ -510,8 +513,9 @@ class TestRelationshipsWorkerEmbeddingMath:
 
     def test_average_embeddings_single(self):
         """Test averaging a single embedding."""
-        from relationships.worker import RelationshipsWorker
         import numpy as np
+
+        from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
         
@@ -525,8 +529,9 @@ class TestRelationshipsWorkerEmbeddingMath:
         
     def test_average_embeddings_multiple(self):
         """Test averaging multiple embeddings."""
-        from relationships.worker import RelationshipsWorker
         import numpy as np
+
+        from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
         
@@ -596,9 +601,10 @@ class TestRelationshipsWorkerProcessing:
         sample_correlation_id,
     ):
         """Test that relationships worker succeeds when embeddings exist."""
-        from shared.worker.base_worker import WorkerStatus
-        from relationships.worker import RelationshipsWorker, RelationshipsMessage
         import numpy as np
+        from shared.worker.base_worker import WorkerStatus
+
+        from relationships.worker import RelationshipsMessage, RelationshipsWorker
 
         worker = RelationshipsWorker()
         
@@ -641,32 +647,36 @@ class TestWorkerQueueNames:
 
     def test_transcribe_worker_queue_name(self):
         """Test transcribe worker uses correct queue."""
-        from transcribe.worker import TranscribeWorker
         from shared.queue.client import TRANSCRIBE_QUEUE
+
+        from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
         assert worker.queue_name == TRANSCRIBE_QUEUE
 
     def test_summarize_worker_queue_name(self):
         """Test summarize worker uses correct queue."""
-        from summarize.worker import SummarizeWorker
         from shared.queue.client import SUMMARIZE_QUEUE
+
+        from summarize.worker import SummarizeWorker
 
         worker = SummarizeWorker()
         assert worker.queue_name == SUMMARIZE_QUEUE
 
     def test_embed_worker_queue_name(self):
         """Test embed worker uses correct queue."""
-        from embed.worker import EmbedWorker
         from shared.queue.client import EMBED_QUEUE
+
+        from embed.worker import EmbedWorker
 
         worker = EmbedWorker()
         assert worker.queue_name == EMBED_QUEUE
 
     def test_relationships_worker_queue_name(self):
         """Test relationships worker uses correct queue."""
-        from relationships.worker import RelationshipsWorker
         from shared.queue.client import RELATIONSHIPS_QUEUE
+
+        from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
         assert worker.queue_name == RELATIONSHIPS_QUEUE

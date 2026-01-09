@@ -12,10 +12,9 @@ from shared.blob.client import (
     get_segments_blob_path,
     get_transcript_blob_path,
 )
-from shared.config import get_settings
 from shared.db.connection import get_db
 from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_rate_limited, mark_job_running
-from shared.db.models import Artifact, Job, Video
+from shared.db.models import Artifact, Job
 from shared.logging.config import get_logger
 from shared.queue.client import SUMMARIZE_QUEUE, TRANSCRIBE_QUEUE, get_queue_client
 from shared.telemetry.config import inject_trace_context
@@ -367,7 +366,6 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         import tempfile
         import os
         import glob
-        import random
         import yt_dlp
         
         self._log_youtube_request(youtube_video_id, "yt-dlp-download-subtitles")

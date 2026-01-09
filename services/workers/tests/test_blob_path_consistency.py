@@ -11,10 +11,9 @@ All workers MUST use the shared path helpers:
 - get_summary_blob_path(channel_name, youtube_video_id)
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from uuid import uuid4
 
+import pytest
 
 # ============================================================================
 # Test fixtures
@@ -87,9 +86,9 @@ class TestBlobPathHelpers:
     def test_all_blob_paths_use_same_channel_sanitization(self, sample_channel_name, sample_youtube_video_id):
         """Test all path helpers use the same channel sanitization."""
         from shared.blob.client import (
-            get_transcript_blob_path,
             get_segments_blob_path,
             get_summary_blob_path,
+            get_transcript_blob_path,
         )
 
         transcript_path = get_transcript_blob_path(sample_channel_name, sample_youtube_video_id)
@@ -224,10 +223,10 @@ class TestChannelNamePropagation:
 
     def test_all_workers_parse_channel_name_from_message(self):
         """Test all workers correctly parse channel_name from raw message."""
-        from transcribe.worker import TranscribeWorker
-        from summarize.worker import SummarizeWorker
         from embed.worker import EmbedWorker
         from relationships.worker import RelationshipsWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
 
         raw_message = {
             "job_id": str(uuid4()),
@@ -251,10 +250,10 @@ class TestChannelNamePropagation:
 
     def test_all_workers_default_channel_name_when_missing(self):
         """Test all workers default to 'unknown-channel' when channel_name is missing."""
-        from transcribe.worker import TranscribeWorker
-        from summarize.worker import SummarizeWorker
         from embed.worker import EmbedWorker
         from relationships.worker import RelationshipsWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
 
         raw_message = {
             "job_id": str(uuid4()),
@@ -293,10 +292,9 @@ class TestWorkersUseBlobPathHelpers:
     def test_summarize_worker_imports_path_helpers(self):
         """Test SummarizeWorker imports and can use blob path helpers."""
         # Verify the import exists in summarize worker
-        import summarize.worker
 
         # Check that the module imports the path helpers
-        from shared.blob.client import get_transcript_blob_path, get_summary_blob_path
+        from shared.blob.client import get_transcript_blob_path
 
         # Verify the helpers are callable
         path = get_transcript_blob_path("Test Channel", "abc123")
@@ -304,13 +302,12 @@ class TestWorkersUseBlobPathHelpers:
 
     def test_embed_worker_imports_path_helpers(self):
         """Test EmbedWorker imports and can use blob path helpers."""
-        import embed.worker
 
         # Check that the module imports the path helpers
         from shared.blob.client import (
-            get_transcript_blob_path,
             get_segments_blob_path,
             get_summary_blob_path,
+            get_transcript_blob_path,
         )
 
         # Verify all helpers work
@@ -367,9 +364,9 @@ class TestEndToEndPathConsistency:
     ):
         """Test that transcript path is consistent across all workers that use it."""
         from shared.blob.client import (
-            get_transcript_blob_path,
             get_segments_blob_path,
             get_summary_blob_path,
+            get_transcript_blob_path,
             sanitize_channel_name,
         )
 

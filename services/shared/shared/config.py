@@ -50,8 +50,6 @@ class DatabaseSettings(BaseSettings):
         This needs to be converted to SQLAlchemy format:
         mssql+pyodbc://sa:password@localhost:port/database?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
         """
-        import os
-        import re
         
         # Return direct URL if set
         if self.url:
@@ -72,7 +70,6 @@ class DatabaseSettings(BaseSettings):
     
     def _convert_ado_to_sqlalchemy(self, ado_conn: str) -> str:
         """Convert ADO.NET connection string to SQLAlchemy URL."""
-        import re
         from urllib.parse import quote_plus
         
         # Parse key=value pairs (case-insensitive)
@@ -127,7 +124,6 @@ class AzureStorageSettings(BaseSettings):
     @property
     def effective_connection_string(self) -> str:
         """Get the effective connection string, checking Aspire env vars if needed."""
-        import os
         if self.connection_string:
             return self.connection_string
         # Check Aspire-injected connection strings
@@ -174,7 +170,6 @@ class OpenAISettings(BaseSettings):
     @property
     def effective_api_key(self) -> str:
         """Get the effective API key, preferring Azure OpenAI if configured."""
-        import os
         # Prefer Azure OpenAI API key if set
         azure_key = os.environ.get("AZURE_OPENAI_API_KEY", "")
         if azure_key:
@@ -184,25 +179,21 @@ class OpenAISettings(BaseSettings):
     @property
     def azure_endpoint(self) -> str | None:
         """Get Azure OpenAI endpoint if configured."""
-        import os
         return os.environ.get("AZURE_OPENAI_ENDPOINT") or None
     
     @property  
     def azure_api_version(self) -> str:
         """Get Azure OpenAI API version."""
-        import os
         return os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
     
     @property
     def azure_deployment(self) -> str | None:
         """Get Azure OpenAI deployment name if configured."""
-        import os
         return os.environ.get("AZURE_OPENAI_DEPLOYMENT") or None
     
     @property
     def azure_embedding_deployment(self) -> str | None:
         """Get Azure OpenAI embedding deployment name if configured."""
-        import os
         return os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT") or None
     
     @property

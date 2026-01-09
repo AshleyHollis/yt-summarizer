@@ -6,8 +6,9 @@ These tests verify that the transcribe worker:
 3. Properly fails after max retries
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 
 class TestContentValidation:
@@ -102,9 +103,9 @@ class TestFetchTranscriptRetry:
     @pytest.mark.asyncio
     async def test_succeeds_on_valid_content(self, worker):
         """Fetch should succeed when yt-dlp downloads valid subtitles to temp directory."""
-        import tempfile
-        import os
         import json
+        import os
+        import tempfile
         
         valid_json3 = json.dumps({
             "events": [
@@ -166,6 +167,7 @@ class TestFetchTranscriptRetry:
     async def test_raises_rate_limit_on_download_error(self, worker):
         """Fetch should raise RateLimitError when yt-dlp encounters rate limiting."""
         import yt_dlp
+
         from transcribe.worker import RateLimitError
         
         with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
@@ -186,8 +188,9 @@ class TestWorkerResultOnInvalidContent:
     @pytest.mark.asyncio
     async def test_job_fails_with_clear_message_when_no_transcript(self):
         """Job should fail with clear message when no valid transcript is available."""
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
         from shared.worker.base_worker import WorkerStatus
+
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
         
         worker = TranscribeWorker()
         
@@ -233,8 +236,9 @@ class TestRateLimitHandling:
 
     async def test_rate_limit_error_returns_rate_limited_result(self, worker, message):
         """When RateLimitError is raised, should return rate_limited result for infinite retry."""
-        from transcribe.worker import RateLimitError
         from shared.worker.base_worker import WorkerStatus
+
+        from transcribe.worker import RateLimitError
         
         with patch("transcribe.worker.mark_job_running", new_callable=AsyncMock), \
              patch("transcribe.worker.mark_job_rate_limited", new_callable=AsyncMock) as mock_rate_limited, \
@@ -256,8 +260,9 @@ class TestRateLimitHandling:
 
     async def test_rate_limit_does_not_increment_retry_count(self, worker, message):
         """Rate limited jobs should not count toward max_retries."""
-        from transcribe.worker import RateLimitError
         from shared.worker.base_worker import WorkerStatus
+
+        from transcribe.worker import RateLimitError
         
         with patch("transcribe.worker.mark_job_running", new_callable=AsyncMock), \
              patch("transcribe.worker.mark_job_rate_limited", new_callable=AsyncMock), \

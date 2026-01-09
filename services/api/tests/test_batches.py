@@ -4,13 +4,12 @@ These tests verify the batch creation, listing, and management endpoints.
 Batch API is critical for User Story 2: Ingest from Channel.
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
+import pytest
 from fastapi import status
-
 
 # ============================================================================
 # Batch Fixtures

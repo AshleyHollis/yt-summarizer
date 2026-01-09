@@ -11,12 +11,11 @@ from uuid import uuid4
 import pytest
 
 from api.models.copilot import (
-    ContentType,
     CoverageDateRange,
     CoverageResponse,
     DateRange,
-    NeighborVideo,
     NeighborsResponse,
+    NeighborVideo,
     QueryScope,
     RecommendedVideo,
     RelationshipType,
@@ -29,7 +28,6 @@ from api.models.copilot import (
     VideoSearchResponse,
 )
 from api.services.search_service import SearchService
-
 
 # ============================================================================
 # Fixtures

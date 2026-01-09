@@ -3,10 +3,11 @@
 These tests verify the video submission, retrieval, and reprocessing endpoints.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
 import pytest
 from fastapi import status
-from unittest.mock import patch, MagicMock, AsyncMock
-from uuid import uuid4
 
 
 class TestSubmitVideo:
@@ -319,8 +320,9 @@ class TestVideoContentUrls:
         """Test that completed video response includes transcript and summary URLs."""
         # This test requires a mocked completed video
         # For now, we verify the model accepts these fields
-        from api.models.video import VideoResponse, ProcessingStatus
         from datetime import datetime
+
+        from api.models.video import ProcessingStatus, VideoResponse
         
         # Create a completed video response
         video_data = VideoResponse(
@@ -344,8 +346,9 @@ class TestVideoContentUrls:
 
     def test_pending_video_response_has_null_content_urls(self, client, headers):
         """Test that pending video response has null transcript and summary URLs."""
-        from api.models.video import VideoResponse, ProcessingStatus
         from datetime import datetime
+
+        from api.models.video import ProcessingStatus, VideoResponse
         
         # Create a pending video response
         video_data = VideoResponse(
@@ -394,8 +397,7 @@ class TestVideoNotFoundError:
     @pytest.mark.asyncio
     async def test_fetch_video_metadata_raises_for_unavailable_video(self):
         """Test that _fetch_video_metadata raises VideoNotFoundError for unavailable videos."""
-        from unittest.mock import patch, MagicMock, AsyncMock
-        from api.services.video_service import VideoService, VideoNotFoundError
+        from api.services.video_service import VideoNotFoundError, VideoService
         
         # Mock yt-dlp to simulate "Video unavailable" error
         with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
@@ -416,8 +418,7 @@ class TestVideoNotFoundError:
     @pytest.mark.asyncio
     async def test_fetch_video_metadata_raises_for_private_video(self):
         """Test that _fetch_video_metadata raises VideoNotFoundError for private videos."""
-        from unittest.mock import patch, MagicMock, AsyncMock
-        from api.services.video_service import VideoService, VideoNotFoundError
+        from api.services.video_service import VideoNotFoundError, VideoService
         
         # Mock yt-dlp to simulate "Private video" error
         with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
@@ -481,8 +482,9 @@ class TestBlobPathConsistency:
 
     def test_api_and_worker_transcript_paths_match(self):
         """Test that API and workers use the same transcript path helper."""
-        from api.routes.videos import get_transcript_blob_path as api_helper
         from shared.blob.client import get_transcript_blob_path as worker_helper
+
+        from api.routes.videos import get_transcript_blob_path as api_helper
         
         test_cases = [
             ("Simple Channel", "dQw4w9WgXcQ"),
@@ -502,8 +504,9 @@ class TestBlobPathConsistency:
 
     def test_api_and_worker_summary_paths_match(self):
         """Test that API and workers use the same summary path helper."""
-        from api.routes.videos import get_summary_blob_path as api_helper
         from shared.blob.client import get_summary_blob_path as worker_helper
+
+        from api.routes.videos import get_summary_blob_path as api_helper
         
         test_cases = [
             ("Simple Channel", "dQw4w9WgXcQ"),

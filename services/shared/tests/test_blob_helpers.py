@@ -1,6 +1,5 @@
 """Tests for blob storage helper functions."""
 
-import pytest
 
 from shared.blob.client import (
     get_segments_blob_path,

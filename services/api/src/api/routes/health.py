@@ -20,8 +20,8 @@ Debug endpoints (mirrors worker debug endpoints for consistency):
 import os
 import sys
 import time
-from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -46,11 +46,11 @@ class HealthStatus(BaseModel):
         default_factory=dict,
         description="Individual component health checks"
     )
-    uptime_seconds: Optional[float] = Field(
+    uptime_seconds: float | None = Field(
         default=None,
         description="Seconds since the API started"
     )
-    started_at: Optional[datetime] = Field(
+    started_at: datetime | None = Field(
         default=None,
         description="Timestamp when the API started (UTC)"
     )
@@ -258,7 +258,7 @@ async def debug_check() -> dict:
 # =============================================================================
 
 # Store API startup time for uptime calculation
-_api_started_at = datetime.now(timezone.utc)
+_api_started_at = datetime.now(UTC)
 
 
 @router.get(
@@ -273,7 +273,7 @@ async def debug_info(request: Request) -> dict[str, Any]:
     """
     # Calculate uptime
     started_at = getattr(request.app.state, "started_at", _api_started_at)
-    uptime = (datetime.now(timezone.utc) - started_at.replace(tzinfo=timezone.utc) if started_at.tzinfo is None else started_at).total_seconds() if started_at else 0
+    uptime = (datetime.now(UTC) - started_at.replace(tzinfo=UTC) if started_at.tzinfo is None else started_at).total_seconds() if started_at else 0
     
     # Get OTEL-related env vars (redact sensitive values)
     otel_vars = {}
@@ -501,8 +501,8 @@ async def debug_telemetry() -> dict[str, Any]:
     otlp_connectivity = {"status": "not tested"}
     if otel_endpoint:
         try:
-            import urllib.request
             import ssl
+            import urllib.request
             
             ctx = ssl.create_default_context()
             if ssl_cert_dir:

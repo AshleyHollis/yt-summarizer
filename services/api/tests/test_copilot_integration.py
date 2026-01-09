@@ -7,26 +7,20 @@ These tests focus on:
 4. Failure scenarios
 """
 
-from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from fastapi import status
-from httpx import AsyncClient
-from openai import APIConnectionError, APIStatusError, RateLimitError
+from openai import APIConnectionError, RateLimitError
 
 from api.models.copilot import (
     CopilotQueryRequest,
-    CopilotQueryResponse,
-    QueryScope,
     ScoredSegment,
-    SegmentSearchRequest,
 )
 from api.services.copilot_service import CopilotService
 from api.services.llm_service import LLMService
 from api.services.search_service import SearchService
-
 
 # =============================================================================
 # Fixtures
@@ -931,7 +925,8 @@ class TestLLMServiceUncertaintyIntegration:
     @pytest.mark.asyncio
     async def test_generate_answer_handles_null_string(self):
         """Test that generate_answer properly handles 'null' string from LLM."""
-        from unittest.mock import AsyncMock, MagicMock, patch
+        from unittest.mock import AsyncMock, MagicMock
+
         from api.services.llm_service import LLMService
         
         # Create mock response that returns "null" string
@@ -967,7 +962,8 @@ class TestLLMServiceUncertaintyIntegration:
     @pytest.mark.asyncio
     async def test_generate_answer_preserves_valid_uncertainty(self):
         """Test that generate_answer preserves valid uncertainty messages."""
-        from unittest.mock import AsyncMock, MagicMock, patch
+        from unittest.mock import AsyncMock, MagicMock
+
         from api.services.llm_service import LLMService
         
         # Create mock response with valid uncertainty
@@ -1018,7 +1014,7 @@ class TestRelevanceFiltering:
         self, mock_db_session, mock_llm_service
     ):
         """Test that segments with high distance (low relevance) are filtered out."""
-        from api.services.copilot_service import CopilotService, MAX_DISTANCE_FOR_RELEVANCE
+        from api.services.copilot_service import CopilotService
         
         mock_llm_service.get_embedding = AsyncMock(return_value=[0.1] * 1536)
         mock_llm_service.generate_answer = AsyncMock(return_value={
@@ -1085,7 +1081,7 @@ class TestRelevanceFiltering:
         self, mock_db_session, mock_llm_service
     ):
         """Test that when all segments are irrelevant, we return 'no information' response."""
-        from api.services.copilot_service import CopilotService, MAX_DISTANCE_FOR_RELEVANCE
+        from api.services.copilot_service import CopilotService
         
         mock_llm_service.get_embedding = AsyncMock(return_value=[0.1] * 1536)
         
@@ -1142,7 +1138,7 @@ class TestRelevanceFiltering:
     @pytest.mark.asyncio
     async def test_relevance_threshold_boundary(self, mock_db_session, mock_llm_service):
         """Test segments exactly at the threshold boundary."""
-        from api.services.copilot_service import CopilotService, MAX_DISTANCE_FOR_RELEVANCE
+        from api.services.copilot_service import MAX_DISTANCE_FOR_RELEVANCE, CopilotService
         
         mock_llm_service.get_embedding = AsyncMock(return_value=[0.1] * 1536)
         mock_llm_service.generate_answer = AsyncMock(return_value={
@@ -1348,7 +1344,7 @@ class TestModerateRelevanceThreshold:
         relevant content, especially for queries using different vocabulary than
         the source material.
         """
-        from api.services.copilot_service import CopilotService, MAX_DISTANCE_FOR_RELEVANCE
+        from api.services.copilot_service import MAX_DISTANCE_FOR_RELEVANCE, CopilotService
         
         mock_llm_service.get_embedding = AsyncMock(return_value=[0.1] * 1536)
         mock_llm_service.generate_answer = AsyncMock(return_value={
@@ -1487,7 +1483,7 @@ class TestModerateRelevanceThreshold:
         While we want to allow moderate relevance through, truly unrelated content
         should still be filtered to avoid confusing the LLM.
         """
-        from api.services.copilot_service import CopilotService, MAX_DISTANCE_FOR_RELEVANCE
+        from api.services.copilot_service import CopilotService
         
         mock_llm_service.get_embedding = AsyncMock(return_value=[0.1] * 1536)
         

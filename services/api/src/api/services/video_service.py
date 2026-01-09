@@ -1,6 +1,5 @@
 """Video service for handling video submission and retrieval."""
 
-import re
 from datetime import datetime
 from uuid import UUID
 
@@ -434,6 +433,7 @@ class VideoService:
             Dictionary with video metadata.
         """
         import asyncio
+
         import yt_dlp
 
         logger.info("Fetching video metadata from YouTube", youtube_video_id=youtube_video_id)

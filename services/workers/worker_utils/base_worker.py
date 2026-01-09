@@ -375,7 +375,7 @@ class BaseWorker(ABC, Generic[T]):
                     # No messages, wait before polling again
                     await asyncio.sleep(self.poll_interval)
                     
-            except Exception as e:
+            except Exception:
                 self._logger.exception("Error during poll loop")
                 await asyncio.sleep(self.poll_interval * 2)  # Back off on errors
         

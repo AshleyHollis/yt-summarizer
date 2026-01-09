@@ -6,12 +6,11 @@ These tests verify the internal logic of LibraryService, particularly:
 - Artifact handling
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-
 
 # ============================================================================
 # Blob URI Extraction Tests
@@ -160,7 +159,7 @@ class TestGetVideoDetailSummaryFetching:
         summary_artifact.blob_uri = f"http://127.0.0.1:62442/devstoreaccount1/summaries/{video_id}/{youtube_video_id}_summary.md"
         summary_artifact.content_length = 3000
         summary_artifact.model_name = "gpt-4o-mini"
-        summary_artifact.created_at = datetime.now(timezone.utc)
+        summary_artifact.created_at = datetime.now(UTC)
         
         # Mock video
         video = MagicMock()
@@ -171,11 +170,11 @@ class TestGetVideoDetailSummaryFetching:
         video.channel = channel
         video.channel_id = channel.channel_id
         video.duration = 300
-        video.publish_date = datetime.now(timezone.utc)
+        video.publish_date = datetime.now(UTC)
         video.thumbnail_url = "https://example.com/thumb.jpg"
         video.processing_status = "completed"
-        video.created_at = datetime.now(timezone.utc)
-        video.updated_at = datetime.now(timezone.utc)
+        video.created_at = datetime.now(UTC)
+        video.updated_at = datetime.now(UTC)
         video.artifacts = [summary_artifact]
         
         return video, str(video_id), youtube_video_id
@@ -309,11 +308,11 @@ class TestGetVideoDetailSummaryFetching:
         video.channel = channel
         video.channel_id = channel.channel_id
         video.duration = 300
-        video.publish_date = datetime.now(timezone.utc)
+        video.publish_date = datetime.now(UTC)
         video.thumbnail_url = "https://example.com/thumb.jpg"
         video.processing_status = "pending"
-        video.created_at = datetime.now(timezone.utc)
-        video.updated_at = datetime.now(timezone.utc)
+        video.created_at = datetime.now(UTC)
+        video.updated_at = datetime.now(UTC)
         video.artifacts = []  # No artifacts
         
         mock_session = AsyncMock()
@@ -372,7 +371,7 @@ class TestCompletedStatusValidation:
         summary_artifact.blob_uri = f"http://localhost/summaries/{video_id}/{youtube_video_id}_summary.md"
         summary_artifact.content_length = 1000
         summary_artifact.model_name = "gpt-4"
-        summary_artifact.created_at = datetime.now(timezone.utc)
+        summary_artifact.created_at = datetime.now(UTC)
         
         video = MagicMock()
         video.video_id = video_id
@@ -382,11 +381,11 @@ class TestCompletedStatusValidation:
         video.channel = channel
         video.channel_id = channel.channel_id
         video.duration = 600
-        video.publish_date = datetime.now(timezone.utc)
+        video.publish_date = datetime.now(UTC)
         video.thumbnail_url = "https://example.com/thumb.jpg"
         video.processing_status = "completed"  # Key: marked as completed
-        video.created_at = datetime.now(timezone.utc)
-        video.updated_at = datetime.now(timezone.utc)
+        video.created_at = datetime.now(UTC)
+        video.updated_at = datetime.now(UTC)
         video.artifacts = [summary_artifact]  # Key: has summary artifact
         
         mock_session = AsyncMock()

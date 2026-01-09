@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Select, and_, func, or_, select, text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -24,7 +24,7 @@ try:
         VideoFacet,
     )
     from shared.logging.config import get_logger
-    from shared.telemetry import get_tracer, add_span_event
+    from shared.telemetry import add_span_event, get_tracer
 except ImportError:
     import logging
     from typing import Any as AnyType
@@ -52,14 +52,12 @@ except ImportError:
 
 
 from ..models.copilot import (
-    ContentType,
-    CoverageResponse,
     CoverageDateRange,
-    NeighborVideo,
+    CoverageResponse,
     NeighborsResponse,
+    NeighborVideo,
     QueryScope,
     RecommendedVideo,
-    RelationshipType,
     ScoredSegment,
     SegmentSearchRequest,
     SegmentSearchResponse,

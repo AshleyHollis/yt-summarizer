@@ -4,8 +4,7 @@ Verifies T185-T188: Observability implementation.
 """
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestTelemetryConfiguration:
@@ -13,10 +12,9 @@ class TestTelemetryConfiguration:
 
     def test_configure_telemetry_returns_false_without_endpoint(self):
         """Telemetry should be disabled if no OTLP endpoint is configured."""
-        from shared.telemetry.config import configure_telemetry, _telemetry_configured
-        
         # Reset the global flag for testing
         import shared.telemetry.config as config_module
+        from shared.telemetry.config import configure_telemetry
         config_module._telemetry_configured = False
         
         with patch.dict(os.environ, {}, clear=True):
@@ -95,7 +93,7 @@ class TestTraceContextPropagation:
 
     def test_inject_and_extract_roundtrip(self):
         """Injected context should be extractable."""
-        from shared.telemetry.config import inject_trace_context, extract_trace_context
+        from shared.telemetry.config import extract_trace_context, inject_trace_context
         
         original_message = {"data": "test"}
         

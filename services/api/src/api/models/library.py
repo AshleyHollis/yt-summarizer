@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .base import BaseResponse, PaginatedResponse, TimestampMixin
+from .base import BaseResponse, TimestampMixin
 
 
 class ProcessingStatusFilter(str, Enum):

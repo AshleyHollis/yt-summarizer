@@ -9,13 +9,12 @@ These tests verify the synthesis capabilities for User Story 6:
 All synthesis operations are read-only and build upon copilot infrastructure.
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from fastapi import status
-
 
 # ============================================================================
 # Synthesis Fixtures
@@ -892,14 +891,14 @@ class TestSynthesisServiceShortsExclusion:
         Shorts (< 60s) lack sufficient content depth for pedagogical ordering.
         They should be filtered out during learning path generation.
         """
+        from uuid import uuid4
+
         from api.models.synthesis import (
             LearningPath,
-            LearningPathEvidence,
             LearningPathItem,
             SynthesisType,
             SynthesizeResponse,
         )
-        from uuid import uuid4
         
         # Create a response that includes only non-short videos
         # The service should filter out shorts before synthesis
@@ -983,6 +982,8 @@ class TestSynthesisServiceShortsExclusion:
         Unlike learning paths, watch lists don't require pedagogical ordering,
         so shorts are acceptable as quick recommendations.
         """
+        from uuid import uuid4
+
         from api.models.synthesis import (
             Priority,
             SynthesisType,
@@ -990,7 +991,6 @@ class TestSynthesisServiceShortsExclusion:
             WatchList,
             WatchListItem,
         )
-        from uuid import uuid4
         
         video_id_short = uuid4()
         video_id_regular = uuid4()

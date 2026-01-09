@@ -10,13 +10,10 @@ initialized and registered. They catch issues like:
 Run early to catch integration issues before E2E tests.
 """
 
-import os
-from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 
 # Check if agent framework packages are available
 try:
@@ -701,9 +698,8 @@ class TestConfigurationExports:
     def test_agents_module_exports(self):
         """Verify agents module exports expected symbols."""
         from src.api.agents import (
-            AGENT_NAME,
             AGENT_DESCRIPTION,
-            AGUIEndpoint,
+            AGENT_NAME,
             create_openai_chat_client,
             create_yt_summarizer_agent,
             get_agent_tools,

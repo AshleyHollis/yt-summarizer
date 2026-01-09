@@ -11,7 +11,6 @@ from uuid import uuid4
 import pytest
 from fastapi import status
 
-
 # ============================================================================
 # Copilot Fixtures
 # ============================================================================
@@ -251,8 +250,8 @@ def copilot_coverage_response():
 def copilot_neighbors_response(copilot_video_id):
     """Create a mock neighbors response."""
     from api.models.copilot import (
-        NeighborVideo,
         NeighborsResponse,
+        NeighborVideo,
         RecommendedVideo,
         RelationshipType,
     )
@@ -748,8 +747,9 @@ class TestCopilotModels:
 
     def test_evidence_confidence_bounds(self):
         """Test Evidence confidence must be between 0 and 1."""
-        from api.models.copilot import Evidence
         from pydantic import ValidationError
+
+        from api.models.copilot import Evidence
         
         with pytest.raises(ValidationError):
             Evidence(
@@ -766,8 +766,9 @@ class TestCopilotModels:
 
     def test_segment_search_request_limit_bounds(self):
         """Test SegmentSearchRequest limit validation."""
-        from api.models.copilot import SegmentSearchRequest
         from pydantic import ValidationError
+
+        from api.models.copilot import SegmentSearchRequest
         
         # Valid limit
         request = SegmentSearchRequest(
@@ -835,6 +836,7 @@ class TestUS5ExplanationModels:
     def test_key_moment_model(self):
         """Test KeyMoment model creation and serialization."""
         from uuid import uuid4
+
         from api.models.copilot import KeyMoment
         
         segment_id = uuid4()
@@ -870,6 +872,7 @@ class TestUS5ExplanationModels:
     def test_video_explanation_model(self):
         """Test VideoExplanation model creation and serialization."""
         from uuid import uuid4
+
         from api.models.copilot import KeyMoment, VideoExplanation
         
         segment_id = uuid4()
@@ -912,6 +915,7 @@ class TestUS5ExplanationModels:
     def test_recommended_video_with_explanation(self):
         """Test RecommendedVideo includes explanation field."""
         from uuid import uuid4
+
         from api.models.copilot import KeyMoment, RecommendedVideo, VideoExplanation
         
         video_id = uuid4()
@@ -939,6 +943,7 @@ class TestUS5ExplanationModels:
     def test_recommended_video_without_explanation(self):
         """Test RecommendedVideo works without explanation (backward compatible)."""
         from uuid import uuid4
+
         from api.models.copilot import RecommendedVideo
         
         video = RecommendedVideo(
@@ -968,6 +973,7 @@ class TestUS5ExplanationModels:
     def test_explanation_serialization_format(self):
         """Test explanation serializes to correct JSON format for frontend."""
         from uuid import uuid4
+
         from api.models.copilot import KeyMoment, RecommendedVideo, VideoExplanation
         
         video = RecommendedVideo(
@@ -1154,6 +1160,7 @@ class TestCopilotServiceAISettings:
     async def test_copilot_service_respects_video_context_disabled(self):
         """Test that CopilotService respects useVideoContext=False."""
         from unittest.mock import AsyncMock, MagicMock
+
         from api.models.copilot import AIKnowledgeSettings, CopilotQueryRequest
         from api.services.copilot_service import CopilotService
         
@@ -1202,6 +1209,7 @@ class TestCopilotServiceAISettings:
     async def test_copilot_service_error_when_all_disabled(self):
         """Test that CopilotService returns error when all knowledge disabled."""
         from unittest.mock import AsyncMock, MagicMock
+
         from api.models.copilot import AIKnowledgeSettings, CopilotQueryRequest
         from api.services.copilot_service import CopilotService
         

@@ -8,7 +8,6 @@ from pydantic import Field
 from .base import BaseResponse, TimestampMixin
 from .library import FacetTag
 
-
 # =============================================================================
 # Channel Ingestion Models (US2)
 # =============================================================================

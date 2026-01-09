@@ -13,13 +13,10 @@ This is critical for preventing bugs where:
 - Status enums don't match between services
 """
 
-import pytest
 from dataclasses import fields
-from datetime import datetime
-from typing import get_type_hints
-from unittest.mock import MagicMock
 from uuid import uuid4
-import sys
+
+import pytest
 
 # Check if numpy is available (required for relationships worker)
 try:
@@ -30,7 +27,7 @@ except ImportError:
 
 # Check if api module is available (for cross-service consistency tests)
 try:
-    from api.models.job import JobStatus, JobType, JobStage
+    from api.models.job import JobStage, JobStatus, JobType
     HAS_API = True
 except ImportError:
     HAS_API = False
@@ -132,7 +129,7 @@ class TestWorkerMessageRequiredFields:
 
     def test_transcribe_worker_required_fields(self, complete_api_message):
         """Test TranscribeWorker can parse all required fields."""
-        from transcribe.worker import TranscribeWorker, TranscribeMessage
+        from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
         message = worker.parse_message(complete_api_message)
@@ -144,7 +141,7 @@ class TestWorkerMessageRequiredFields:
 
     def test_summarize_worker_required_fields(self, complete_api_message):
         """Test SummarizeWorker can parse all required fields."""
-        from summarize.worker import SummarizeWorker, SummarizeMessage
+        from summarize.worker import SummarizeWorker
 
         worker = SummarizeWorker()
         message = worker.parse_message(complete_api_message)
@@ -155,7 +152,7 @@ class TestWorkerMessageRequiredFields:
 
     def test_embed_worker_required_fields(self, complete_api_message):
         """Test EmbedWorker can parse all required fields."""
-        from embed.worker import EmbedWorker, EmbedMessage
+        from embed.worker import EmbedWorker
 
         worker = EmbedWorker()
         message = worker.parse_message(complete_api_message)
@@ -167,7 +164,7 @@ class TestWorkerMessageRequiredFields:
     @requires_numpy
     def test_relationships_worker_required_fields(self, complete_api_message):
         """Test RelationshipsWorker can parse all required fields."""
-        from relationships.worker import RelationshipsWorker, RelationshipsMessage
+        from relationships.worker import RelationshipsWorker
 
         worker = RelationshipsWorker()
         message = worker.parse_message(complete_api_message)
@@ -179,10 +176,10 @@ class TestWorkerMessageRequiredFields:
     @requires_numpy
     def test_all_workers_have_consistent_required_fields(self):
         """Verify all worker message dataclasses have the same required fields."""
-        from transcribe.worker import TranscribeMessage
-        from summarize.worker import SummarizeMessage
         from embed.worker import EmbedMessage
         from relationships.worker import RelationshipsMessage
+        from summarize.worker import SummarizeMessage
+        from transcribe.worker import TranscribeMessage
 
         message_classes = [
             TranscribeMessage,
@@ -253,10 +250,10 @@ class TestWorkerMessageOptionalFields:
 
     def test_all_workers_default_retry_count_to_zero(self, minimal_api_message):
         """Test all workers default retry_count to 0."""
-        from transcribe.worker import TranscribeWorker
-        from summarize.worker import SummarizeWorker
         from embed.worker import EmbedWorker
         from relationships.worker import RelationshipsWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
 
         workers = [
             TranscribeWorker(),
@@ -326,10 +323,10 @@ class TestBatchIdPropagation:
 
     def test_all_workers_preserve_batch_id(self, complete_api_message):
         """Test all workers include batch_id in their message dataclass."""
-        from transcribe.worker import TranscribeWorker
-        from summarize.worker import SummarizeWorker
         from embed.worker import EmbedWorker
         from relationships.worker import RelationshipsWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
 
         workers = [
             TranscribeWorker(),
@@ -347,10 +344,10 @@ class TestBatchIdPropagation:
 
     def test_batch_id_is_optional_in_all_workers(self, minimal_api_message):
         """Test all workers handle None batch_id."""
-        from transcribe.worker import TranscribeWorker
-        from summarize.worker import SummarizeWorker
         from embed.worker import EmbedWorker
         from relationships.worker import RelationshipsWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
 
         workers = [
             TranscribeWorker(),
@@ -378,10 +375,10 @@ class TestJobTypeConsistency:
         """Test JobType enum values match the expected worker patterns."""
         from api.models.job import JobType
         from shared.queue.client import (
-            TRANSCRIBE_QUEUE,
-            SUMMARIZE_QUEUE,
             EMBED_QUEUE,
             RELATIONSHIPS_QUEUE,
+            SUMMARIZE_QUEUE,
+            TRANSCRIBE_QUEUE,
         )
 
         # Map JobType to expected queue names
@@ -454,16 +451,17 @@ class TestQueueNameConsistency:
 
     def test_all_workers_use_shared_queue_names(self):
         """Test workers use queue names from shared package."""
-        from transcribe.worker import TranscribeWorker
-        from summarize.worker import SummarizeWorker
-        from embed.worker import EmbedWorker
-        from relationships.worker import RelationshipsWorker
         from shared.queue.client import (
-            TRANSCRIBE_QUEUE,
-            SUMMARIZE_QUEUE,
             EMBED_QUEUE,
             RELATIONSHIPS_QUEUE,
+            SUMMARIZE_QUEUE,
+            TRANSCRIBE_QUEUE,
         )
+
+        from embed.worker import EmbedWorker
+        from relationships.worker import RelationshipsWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
 
         workers_and_queues = [
             (TranscribeWorker(), TRANSCRIBE_QUEUE),
@@ -480,10 +478,10 @@ class TestQueueNameConsistency:
     def test_queue_name_format(self):
         """Test queue names follow expected naming convention."""
         from shared.queue.client import (
-            TRANSCRIBE_QUEUE,
-            SUMMARIZE_QUEUE,
             EMBED_QUEUE,
             RELATIONSHIPS_QUEUE,
+            SUMMARIZE_QUEUE,
+            TRANSCRIBE_QUEUE,
         )
 
         queues = [TRANSCRIBE_QUEUE, SUMMARIZE_QUEUE, EMBED_QUEUE, RELATIONSHIPS_QUEUE]
@@ -660,10 +658,10 @@ class TestFullPipelineMessageFlow:
 
     def test_complete_pipeline_message_flow(self, complete_api_message):
         """Test that a message flows correctly through the entire pipeline."""
-        from transcribe.worker import TranscribeWorker
-        from summarize.worker import SummarizeWorker
         from embed.worker import EmbedWorker
         from relationships.worker import RelationshipsWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
 
         # Step 1: API sends to Transcribe
         transcribe_worker = TranscribeWorker()
@@ -723,10 +721,10 @@ class TestFullPipelineMessageFlow:
 
     def test_pipeline_without_batch_id(self, minimal_api_message):
         """Test pipeline works without batch_id (single video submission)."""
-        from transcribe.worker import TranscribeWorker
-        from summarize.worker import SummarizeWorker
         from embed.worker import EmbedWorker
         from relationships.worker import RelationshipsWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
 
         workers = [
             TranscribeWorker(),
@@ -752,10 +750,10 @@ class TestMessageContractRegressions:
 
     def test_batch_id_field_exists_in_all_worker_messages(self):
         """Regression: All workers must have batch_id field for batch status updates."""
-        from transcribe.worker import TranscribeMessage
-        from summarize.worker import SummarizeMessage
         from embed.worker import EmbedMessage
         from relationships.worker import RelationshipsMessage
+        from summarize.worker import SummarizeMessage
+        from transcribe.worker import TranscribeMessage
 
         message_classes = [
             TranscribeMessage,

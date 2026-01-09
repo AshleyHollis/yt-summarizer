@@ -7,7 +7,6 @@ Orchestrates the creation of structured outputs from library content:
 Uses the existing search and copilot infrastructure.
 """
 
-from datetime import datetime
 from typing import Any
 from uuid import UUID
 

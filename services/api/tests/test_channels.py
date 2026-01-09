@@ -3,13 +3,11 @@
 These tests verify the channel fetching endpoint for User Story 2: Ingest from Channel.
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
 from fastapi import status
-
 
 # ============================================================================
 # Channel Fixtures
@@ -224,7 +222,7 @@ class TestChannelModels:
 
     def test_channel_videos_response_model(self):
         """Test ChannelVideosResponse model."""
-        from api.models.channel import ChannelVideosResponse, ChannelVideo
+        from api.models.channel import ChannelVideo, ChannelVideosResponse
         
         response = ChannelVideosResponse(
             youtube_channel_id="UCfOQzBDXWXmP1qrL1u-XjUw",
@@ -320,7 +318,7 @@ class TestChannelList:
 
     def test_channel_list_response_model(self):
         """Test ChannelListResponse model."""
-        from api.models.channel import ChannelListResponse, ChannelCard
+        from api.models.channel import ChannelCard, ChannelListResponse
         
         response = ChannelListResponse(
             channels=[

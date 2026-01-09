@@ -6,13 +6,10 @@ These tests verify thread persistence with proper toolCalls structure:
 - Tool call format preservation (assistant toolCalls + tool toolCallId)
 """
 
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from fastapi import status
-
 
 # ============================================================================
 # Thread Fixtures

@@ -1,14 +1,15 @@
 """Library service for browsing and filtering videos."""
 
-from datetime import date, datetime
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Select, case, func, or_, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 # Import shared modules
 try:
+    from shared.blob.client import SUMMARIES_CONTAINER, BlobClient
     from shared.db.models import (
         Artifact,
         Channel,
@@ -19,7 +20,6 @@ try:
         VideoFacet,
     )
     from shared.logging.config import get_logger
-    from shared.blob.client import BlobClient, SUMMARIES_CONTAINER
 except ImportError as e:
     import logging
     logging.warning(f"Failed to import shared modules: {e}")
@@ -49,8 +49,6 @@ from ..models.library import (
     ChannelSummaryLibrary,
     FacetTag,
     LibraryStatsResponse,
-    ProcessingStatusFilter,
-    Segment as SegmentModel,
     SegmentListResponse,
     SortField,
     SortOrder,
@@ -58,6 +56,9 @@ from ..models.library import (
     VideoDetailResponse,
     VideoFilterParams,
     VideoListResponse,
+)
+from ..models.library import (
+    Segment as SegmentModel,
 )
 
 logger = get_logger(__name__)

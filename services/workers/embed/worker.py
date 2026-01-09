@@ -24,7 +24,7 @@ from shared.blob.client import (
 from shared.config import get_settings
 from shared.db.connection import get_db
 from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_running
-from shared.db.models import Job, Video, Segment
+from shared.db.models import Job, Segment
 from shared.logging.config import get_logger
 from shared.queue.client import EMBED_QUEUE, RELATIONSHIPS_QUEUE, get_queue_client
 from shared.telemetry.config import inject_trace_context
@@ -387,7 +387,6 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             timestamps: Optional list of (start_time, end_time) tuples for each chunk
         """
         import hashlib
-        import struct
         from uuid import UUID
 
         db = get_db()

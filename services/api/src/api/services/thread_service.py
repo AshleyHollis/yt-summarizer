@@ -5,10 +5,10 @@ enabling server-side thread persistence for CopilotKit's AG-UI integration.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, update, delete
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import shared modules
@@ -161,7 +161,7 @@ class ThreadService:
             )
             existing = result.scalar_one_or_none()
             
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             
             if existing:
                 # Update existing thread
@@ -399,7 +399,7 @@ class ThreadService:
             # Serialize to JSON
             messages_json = json.dumps(messages)
             message_count = len(messages)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             
             # Create new thread with messages
             thread = ChatThread(
@@ -462,7 +462,7 @@ class ThreadService:
                 logger.debug(f"Thread {thread_id} not found for settings update")
                 return None
             
-            update_values = {"updated_at": datetime.now(timezone.utc)}
+            update_values = {"updated_at": datetime.now(UTC)}
             
             if scope is not None:
                 update_values["scope_json"] = json.dumps(scope)

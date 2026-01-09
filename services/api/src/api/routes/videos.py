@@ -8,14 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import shared modules
 try:
-    from shared.db.connection import get_session
     from shared.blob.client import (
-        get_blob_client,
-        get_transcript_blob_path,
-        get_summary_blob_path,
-        TRANSCRIPTS_CONTAINER,
         SUMMARIES_CONTAINER,
+        TRANSCRIPTS_CONTAINER,
+        get_blob_client,
+        get_summary_blob_path,
+        get_transcript_blob_path,
     )
+    from shared.db.connection import get_session
 except ImportError:
     # Fallback for development
     async def get_session():

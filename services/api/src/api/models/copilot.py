@@ -8,7 +8,6 @@ All copilot operations are read-only. The copilot cannot:
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field

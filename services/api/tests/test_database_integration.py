@@ -11,9 +11,9 @@ Use environment variable DATABASE_URL or ConnectionStrings__ytsummarizer.
 """
 
 import os
-import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 
 # Mark all tests in this module as database integration tests
 pytestmark = pytest.mark.integration
@@ -104,8 +104,9 @@ class TestDatabaseRetryLogic:
         
         # Import after setting env vars
         with patch("api.main.get_db", return_value=mock_db):
-            from api.main import lifespan
             from fastapi import FastAPI
+
+            from api.main import lifespan
             
             app = FastAPI()
             
@@ -137,8 +138,10 @@ class TestReadinessWithDatabase:
     def test_readiness_not_ready_when_db_not_initialized(self):
         """Verify readiness returns not ready when database init failed."""
         from contextlib import asynccontextmanager
+
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from api.routes import health
         
         @asynccontextmanager
@@ -162,10 +165,12 @@ class TestReadinessWithDatabase:
     def test_readiness_ready_when_db_initialized(self):
         """Verify readiness returns ready when database init succeeded."""
         from contextlib import asynccontextmanager
+        from unittest.mock import patch
+
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from api.routes import health
-        from unittest.mock import patch, AsyncMock
         
         @asynccontextmanager
         async def mock_lifespan(app: FastAPI):

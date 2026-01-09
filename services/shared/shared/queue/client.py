@@ -3,7 +3,6 @@
 import base64
 import json
 import os
-from datetime import timedelta
 from typing import Any
 
 from azure.core.exceptions import ResourceExistsError

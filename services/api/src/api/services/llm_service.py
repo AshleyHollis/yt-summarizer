@@ -11,13 +11,19 @@ import random
 import time
 from typing import Any
 
-from openai import AsyncAzureOpenAI, AsyncOpenAI, RateLimitError, APITimeoutError, APIConnectionError
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncAzureOpenAI,
+    AsyncOpenAI,
+    RateLimitError,
+)
 
 # Import shared modules
 try:
     from shared.config import get_settings
     from shared.logging.config import get_logger
-    from shared.telemetry import get_tracer, add_span_event, record_exception_on_span
+    from shared.telemetry import add_span_event, get_tracer, record_exception_on_span
 except ImportError:
     import logging
     import os
@@ -958,7 +964,7 @@ Respond in JSON:
                 record_exception_on_span(span, e)
                 logger.error(f"Failed to generate answer without evidence: {e}")
                 return {
-                    "answer": f"I encountered an error while processing your question. Please try again.",
+                    "answer": "I encountered an error while processing your question. Please try again.",
                     "follow_ups": ["Try rephrasing your question"],
                 }
     

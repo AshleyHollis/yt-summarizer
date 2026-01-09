@@ -10,8 +10,9 @@ See: https://learn.microsoft.com/en-us/agent-framework/
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Annotated, Any, AsyncGenerator
+from typing import Annotated, Any
 
 import httpx
 

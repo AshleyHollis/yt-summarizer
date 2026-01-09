@@ -3,16 +3,15 @@
 Provides endpoints for monitoring and debugging worker processes.
 """
 
-import asyncio
 import json
 import os
 import sys
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Any, Callable, Optional
+from datetime import UTC, datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from shared.logging.config import get_logger
 
@@ -26,9 +25,9 @@ class WorkerStats:
     messages_processed: int = 0
     messages_succeeded: int = 0
     messages_failed: int = 0
-    last_message_at: Optional[datetime] = None
-    last_error: Optional[str] = None
-    last_error_at: Optional[datetime] = None
+    last_message_at: datetime | None = None
+    last_error: str | None = None
+    last_error_at: datetime | None = None
 
 
 @dataclass
@@ -40,7 +39,7 @@ class HealthServerConfig:
     queue_name: str
     stats: WorkerStats = field(default_factory=WorkerStats)
     connectivity_checks: dict[str, Callable[[], bool]] = field(default_factory=dict)
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class HealthRequestHandler(BaseHTTPRequestHandler):
@@ -84,7 +83,7 @@ class HealthRequestHandler(BaseHTTPRequestHandler):
     
     def _handle_health(self) -> None:
         """Return health status based on connectivity checks."""
-        uptime = (datetime.now(timezone.utc) - self.config.started_at).total_seconds()
+        uptime = (datetime.now(UTC) - self.config.started_at).total_seconds()
         
         # Determine health based on connectivity checks
         overall_status = "healthy"
@@ -163,7 +162,7 @@ class HealthRequestHandler(BaseHTTPRequestHandler):
     
     def _handle_debug(self) -> None:
         """Return detailed debug information."""
-        uptime = (datetime.now(timezone.utc) - self.config.started_at).total_seconds()
+        uptime = (datetime.now(UTC) - self.config.started_at).total_seconds()
         
         # Get OTEL-related env vars (redact sensitive values)
         otel_vars = {}
@@ -289,8 +288,8 @@ class HealthRequestHandler(BaseHTTPRequestHandler):
         otlp_connectivity = {"status": "not tested"}
         if otel_endpoint:
             try:
-                import urllib.request
                 import ssl
+                import urllib.request
                 
                 # Create SSL context that trusts system certs
                 ctx = ssl.create_default_context()
@@ -355,7 +354,7 @@ class HealthRequestHandler(BaseHTTPRequestHandler):
         
         # Try to connect to queue service
         try:
-            from shared.queue.client import get_queue_client, get_connection_string
+            from shared.queue.client import get_connection_string, get_queue_client
             
             # Show which connection string is being used
             try:
@@ -482,8 +481,8 @@ class WorkerHealthServer:
             worker_name=worker_name,
             queue_name=queue_name,
         )
-        self._server: Optional[HTTPServer] = None
-        self._thread: Optional[threading.Thread] = None
+        self._server: HTTPServer | None = None
+        self._thread: threading.Thread | None = None
     
     @property
     def stats(self) -> WorkerStats:
@@ -534,10 +533,10 @@ class WorkerHealthServer:
             self._thread = None
             logger.info("Health server stopped", worker=self.config.worker_name)
     
-    def record_message_processed(self, success: bool, error: Optional[str] = None) -> None:
+    def record_message_processed(self, success: bool, error: str | None = None) -> None:
         """Record that a message was processed."""
         self.stats.messages_processed += 1
-        self.stats.last_message_at = datetime.now(timezone.utc)
+        self.stats.last_message_at = datetime.now(UTC)
         
         if success:
             self.stats.messages_succeeded += 1
@@ -545,4 +544,4 @@ class WorkerHealthServer:
             self.stats.messages_failed += 1
             if error:
                 self.stats.last_error = error
-                self.stats.last_error_at = datetime.now(timezone.utc)
+                self.stats.last_error_at = datetime.now(UTC)

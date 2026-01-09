@@ -1,11 +1,9 @@
 """Job status update utilities."""
 
 from datetime import datetime, timedelta
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from shared.db.connection import get_db
 from shared.db.models import Batch, BatchItem, Job, JobHistory, Video
@@ -17,9 +15,9 @@ logger = get_logger(__name__)
 async def update_job_status(
     job_id: str,
     status: str,
-    stage: Optional[str] = None,
-    error_message: Optional[str] = None,
-    progress: Optional[int] = None,
+    stage: str | None = None,
+    error_message: str | None = None,
+    progress: int | None = None,
 ) -> None:
     """Update job status in the database.
 
@@ -113,7 +111,7 @@ async def _update_batch_item_status(
     batch_id: UUID,
     video_id: UUID,
     new_status: str,
-    error_message: Optional[str] = None,
+    error_message: str | None = None,
 ) -> None:
     """Update batch item status and batch counts.
 

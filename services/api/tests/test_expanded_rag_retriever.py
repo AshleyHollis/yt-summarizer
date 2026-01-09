@@ -8,14 +8,13 @@ Tests cover:
 5. MMR diversity selection
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
+
 from api.models.copilot import (
-    QueryScope,
     ScoredSegment,
-    SegmentSearchRequest,
     SegmentSearchResponse,
 )
 from api.services.expanded_rag_retriever import (
@@ -31,11 +30,9 @@ from api.services.expanded_rag_retriever import (
     parse_query_expansion_response,
     select_mmr,
     select_top_k,
-    RRF_K,
 )
 from api.services.llm_service import LLMService
 from api.services.search_service import SearchService
-
 
 # =============================================================================
 # Fixtures

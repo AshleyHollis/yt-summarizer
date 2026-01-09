@@ -8,7 +8,7 @@ This middleware ensures correlation IDs propagate through:
 """
 
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -33,7 +33,7 @@ def _set_trace_correlation(correlation_id: str) -> None:
     - OpenTelemetry baggage (for cross-service propagation)
     """
     try:
-        from opentelemetry import trace, baggage
+        from opentelemetry import baggage, trace
         from opentelemetry.context import attach, get_current
         
         # Add to current span as attribute

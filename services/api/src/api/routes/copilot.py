@@ -32,7 +32,6 @@ from ..models.copilot import (
     ExplainRequest,
     ExplainResponse,
     NeighborsResponse,
-    RelationshipType,
     ScopeRequest,
     SegmentSearchRequest,
     SegmentSearchResponse,

@@ -4,12 +4,11 @@ These tests verify the library browsing, filtering, and detail endpoints.
 """
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 from fastapi import status
-
 
 # ============================================================================
 # Library Fixtures

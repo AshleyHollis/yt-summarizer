@@ -3,15 +3,12 @@
 import asyncio
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
-
-from api.main import create_app
-
 
 # ============================================================================
 # Event Loop Configuration
@@ -68,12 +65,13 @@ def app(mock_session):
     to avoid database connection attempts during testing.
     """
     from contextlib import asynccontextmanager
+
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    
+    from shared.db.connection import get_session
+
     from api.middleware import CorrelationIdMiddleware
     from api.routes import batches, channels, copilot, health, jobs, library, threads, videos
-    from shared.db.connection import get_session
     
     @asynccontextmanager
     async def mock_lifespan(app: FastAPI):
@@ -317,6 +315,7 @@ def agui_app(azure_openai_env):
     starting the full application.
     """
     from fastapi import FastAPI
+
     from api.agents import setup_agui_endpoint
     
     app = FastAPI()

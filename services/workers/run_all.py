@@ -2,21 +2,21 @@
 import asyncio
 import signal
 import sys
-from typing import List
 
 from shared.logging.config import configure_logging, get_logger
 
-# Import all workers
-from transcribe.worker import TranscribeWorker
-from summarize.worker import SummarizeWorker
 from embed.worker import EmbedWorker
 from relationships.worker import RelationshipsWorker
+from summarize.worker import SummarizeWorker
+
+# Import all workers
+from transcribe.worker import TranscribeWorker
 from worker_utils.base_worker import BaseWorker
 
 logger = get_logger(__name__)
 
 
-async def run_all_workers(workers: List[BaseWorker]) -> None:
+async def run_all_workers(workers: list[BaseWorker]) -> None:
     """Run all workers concurrently."""
     # Set up signal handlers
     stop_event = asyncio.Event()

@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 try:
     from shared.db.models import Channel, Segment, Video
     from shared.logging.config import get_logger
-    from shared.telemetry import get_tracer, add_span_event, record_exception_on_span
+    from shared.telemetry import add_span_event, get_tracer, record_exception_on_span
 except ImportError:
     import logging
     from typing import Any as AnyType
