@@ -41,7 +41,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🔐 Setting up Azure OIDC for GitHub Actions" -ForegroundColor Cyan
+Write-Host "[SETUP] Setting up Azure OIDC for GitHub Actions" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if logged in to Azure
@@ -52,8 +52,8 @@ if (-not $account) {
     $account = az account show | ConvertFrom-Json
 }
 
-Write-Host "✓ Logged in as: $($account.user.name)" -ForegroundColor Green
-Write-Host "✓ Subscription: $($account.name) ($($account.id))" -ForegroundColor Green
+Write-Host "[OK] Logged in as: $($account.user.name)" -ForegroundColor Green
+Write-Host "[OK] Subscription: $($account.name) ($($account.id))" -ForegroundColor Green
 Write-Host ""
 
 # Set the subscription
@@ -72,7 +72,7 @@ if ($existingApp -and $existingApp.Count -gt 0) {
     $app = $existingApp[0]
 } else {
     $app = az ad app create --display-name $appName | ConvertFrom-Json
-    Write-Host "  ✓ Created app: $($app.appId)" -ForegroundColor Green
+    Write-Host "  [OK] Created app: $($app.appId)" -ForegroundColor Green
 }
 
 $clientId = $app.appId
@@ -85,7 +85,7 @@ if ($existingSp -and $existingSp.Count -gt 0) {
     $sp = $existingSp[0]
 } else {
     $sp = az ad sp create --id $clientId | ConvertFrom-Json
-    Write-Host "  ✓ Created service principal" -ForegroundColor Green
+    Write-Host "  [OK] Created service principal" -ForegroundColor Green
 }
 
 # Create Federated Credentials
@@ -93,7 +93,8 @@ Write-Host "Creating Federated Credentials..." -ForegroundColor Yellow
 
 # Main branch credential
 $mainCredName = "github-main"
-$mainCredExists = az ad app federated-credential list --id $clientId 2>$null | ConvertFrom-Json | Where-Object { $_.name -eq $mainCredName }
+$existingCreds = az ad app federated-credential list --id $clientId 2>$null | ConvertFrom-Json
+$mainCredExists = $existingCreds | Where-Object { $_.name -eq $mainCredName }
 if (-not $mainCredExists) {
     $mainCredential = @{
         name = $mainCredName
@@ -103,14 +104,14 @@ if (-not $mainCredExists) {
     } | ConvertTo-Json -Compress
 
     az ad app federated-credential create --id $clientId --parameters $mainCredential
-    Write-Host "  ✓ Created credential for main branch" -ForegroundColor Green
+    Write-Host "  [OK] Created credential for main branch" -ForegroundColor Green
 } else {
     Write-Host "  Main branch credential already exists" -ForegroundColor Yellow
 }
 
 # PR credential (for pull request events)
 $prCredName = "github-pr"
-$prCredExists = az ad app federated-credential list --id $clientId 2>$null | ConvertFrom-Json | Where-Object { $_.name -eq $prCredName }
+$prCredExists = $existingCreds | Where-Object { $_.name -eq $prCredName }
 if (-not $prCredExists) {
     $prCredential = @{
         name = $prCredName
@@ -120,14 +121,14 @@ if (-not $prCredExists) {
     } | ConvertTo-Json -Compress
 
     az ad app federated-credential create --id $clientId --parameters $prCredential
-    Write-Host "  ✓ Created credential for pull requests" -ForegroundColor Green
+    Write-Host "  [OK] Created credential for pull requests" -ForegroundColor Green
 } else {
     Write-Host "  PR credential already exists" -ForegroundColor Yellow
 }
 
 # Environment credential (for environment deployments)
 $envCredName = "github-env-production"
-$envCredExists = az ad app federated-credential list --id $clientId 2>$null | ConvertFrom-Json | Where-Object { $_.name -eq $envCredName }
+$envCredExists = $existingCreds | Where-Object { $_.name -eq $envCredName }
 if (-not $envCredExists) {
     $envCredential = @{
         name = $envCredName
@@ -137,48 +138,45 @@ if (-not $envCredExists) {
     } | ConvertTo-Json -Compress
 
     az ad app federated-credential create --id $clientId --parameters $envCredential
-    Write-Host "  ✓ Created credential for production environment" -ForegroundColor Green
+    Write-Host "  [OK] Created credential for production environment" -ForegroundColor Green
 } else {
     Write-Host "  Environment credential already exists" -ForegroundColor Yellow
 }
 
 # Assign Contributor role on subscription
 Write-Host "Assigning Contributor role on subscription..." -ForegroundColor Yellow
-$roleExists = az role assignment list --assignee $clientId --scope "/subscriptions/$SubscriptionId" 2>$null | ConvertFrom-Json | Where-Object { $_.roleDefinitionName -eq "Contributor" }
+$roleAssignments = az role assignment list --assignee $clientId --scope "/subscriptions/$SubscriptionId" 2>$null | ConvertFrom-Json
+$roleExists = $roleAssignments | Where-Object { $_.roleDefinitionName -eq "Contributor" }
 if (-not $roleExists) {
-    az role assignment create `
-        --assignee $clientId `
-        --role "Contributor" `
-        --scope "/subscriptions/$SubscriptionId"
-    Write-Host "  ✓ Assigned Contributor role" -ForegroundColor Green
+    az role assignment create --assignee $clientId --role "Contributor" --scope "/subscriptions/$SubscriptionId"
+    Write-Host "  [OK] Assigned Contributor role" -ForegroundColor Green
 } else {
     Write-Host "  Contributor role already assigned" -ForegroundColor Yellow
 }
 
 # Output the values for GitHub Secrets
 Write-Host ""
-Write-Host "=" * 60 -ForegroundColor Cyan
-Write-Host "✅ Setup Complete! Add these secrets to your GitHub repository:" -ForegroundColor Green
-Write-Host "=" * 60 -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "[DONE] Setup Complete! Add these secrets to your GitHub repository:" -ForegroundColor Green
+Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Go to: https://github.com/$GitHubOrg/$GitHubRepo/settings/secrets/actions" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Add the following repository secrets:" -ForegroundColor White
 Write-Host ""
-Write-Host "  AZURE_CLIENT_ID:" -ForegroundColor Cyan -NoNewline
-Write-Host "        $clientId" -ForegroundColor White
-Write-Host "  AZURE_TENANT_ID:" -ForegroundColor Cyan -NoNewline
-Write-Host "        $tenantId" -ForegroundColor White
-Write-Host "  AZURE_SUBSCRIPTION_ID:" -ForegroundColor Cyan -NoNewline
-Write-Host "  $SubscriptionId" -ForegroundColor White
-Write-Host "  SQL_ADMIN_PASSWORD:" -ForegroundColor Cyan -NoNewline
-Write-Host "     (your secure password)" -ForegroundColor White
+Write-Host "  AZURE_CLIENT_ID:        " -ForegroundColor Cyan -NoNewline
+Write-Host $clientId -ForegroundColor White
+Write-Host "  AZURE_TENANT_ID:        " -ForegroundColor Cyan -NoNewline
+Write-Host $tenantId -ForegroundColor White
+Write-Host "  AZURE_SUBSCRIPTION_ID:  " -ForegroundColor Cyan -NoNewline
+Write-Host $SubscriptionId -ForegroundColor White
+Write-Host "  SQL_ADMIN_PASSWORD:     " -ForegroundColor Cyan -NoNewline
+Write-Host "(your secure password)" -ForegroundColor White
 Write-Host ""
-Write-Host "=" * 60 -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
 
 # Copy to clipboard if available
 $secretsOutput = @"
-
 AZURE_CLIENT_ID=$clientId
 AZURE_TENANT_ID=$tenantId
 AZURE_SUBSCRIPTION_ID=$SubscriptionId
@@ -186,7 +184,7 @@ AZURE_SUBSCRIPTION_ID=$SubscriptionId
 
 try {
     $secretsOutput | Set-Clipboard
-    Write-Host "📋 Values copied to clipboard!" -ForegroundColor Green
+    Write-Host "[CLIPBOARD] Values copied to clipboard!" -ForegroundColor Green
 } catch {
     # Clipboard not available
 }
