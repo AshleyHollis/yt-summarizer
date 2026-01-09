@@ -94,16 +94,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: ./.github/actions/setup-python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          working-directory: services/api
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: Install shared package
-        run: |
-          cd services/shared
-          pip install -e ".[dev]"
+        run: uv pip install --system -e "services/shared[dev]"
+
+      - name: Install API package
+        run: uv pip install --system -e "services/api[dev]"
 
       - name: Run API tests
         working-directory: services/api
@@ -117,16 +123,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: ./.github/actions/setup-python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          working-directory: services/workers
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: Install shared package
-        run: |
-          cd services/shared
-          pip install -e ".[dev]"
+        run: uv pip install --system -e "services/shared[dev]"
+
+      - name: Install Workers package
+        run: uv pip install --system -e "services/workers[dev]"
 
       - name: Run workers tests
         working-directory: services/workers
