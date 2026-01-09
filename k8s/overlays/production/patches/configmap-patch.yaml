@@ -1,0 +1,10 @@
+# =============================================================================
+# Production ConfigMap Patch
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yt-summarizer-config
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"

@@ -1,0 +1,10 @@
+# =============================================================================
+# Staging ConfigMap Patch
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yt-summarizer-config
+data:
+  ENVIRONMENT: "staging"
+  LOG_LEVEL: "DEBUG"

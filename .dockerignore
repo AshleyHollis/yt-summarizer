@@ -1,0 +1,82 @@
+# =============================================================================
+# Docker Build Context Ignore
+# =============================================================================
+# Excludes files/folders from Docker build context to speed up builds
+# and prevent sensitive data from being included in images
+
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node.js
+node_modules/
+.next/
+out/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Testing
+tests/
+test-results/
+playwright-report/
+coverage/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+Dockerfile*
+docker-compose*.yml
+
+# Specs and design docs
+specs/
+
+# Terraform
+infra/
+
+# Kubernetes manifests
+k8s/
+
+# Local development
+*.log
+*.tmp
+azurite/
+__azurite_db*.json
+__blobstorage__/
+__queuestorage__/

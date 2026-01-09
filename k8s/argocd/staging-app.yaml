@@ -1,0 +1,45 @@
+# =============================================================================
+# Argo CD Application - Staging
+# =============================================================================
+# Watches the main branch and auto-syncs changes to staging
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: yt-summarizer-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/instance: staging
+    app.kubernetes.io/part-of: yt-summarizer
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+    targetRevision: main
+    path: k8s/overlays/staging
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yt-summarizer
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health check configuration
+  revisionHistoryLimit: 10

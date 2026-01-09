@@ -1,0 +1,31 @@
+# =============================================================================
+# Production Overlay Kustomization
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: yt-summarizer
+
+resources:
+  - ../../base
+
+# Image tag will be updated by CI/CD pipeline
+images:
+  - name: ACR_LOGIN_SERVER/yt-summarizer-api
+    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newTag: latest
+  - name: ACR_LOGIN_SERVER/yt-summarizer-workers
+    newName: acrytsummprd.azurecr.io/yt-summarizer-workers
+    newTag: latest
+
+# Production-specific patches
+patches:
+  - path: patches/configmap-patch.yaml
+  - path: patches/ingress-patch.yaml
+  - path: patches/resources-patch.yaml
+
+commonLabels:
+  environment: production
+
+commonAnnotations:
+  deployment.kubernetes.io/environment: production

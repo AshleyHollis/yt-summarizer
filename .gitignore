@@ -172,3 +172,8 @@ appsettings.*.json
 
 # UV lockfiles
 uv.lock
+
+# Terraform variables with secrets
+*.tfvars
+*.tfvars.json
+!*.tfvars.example

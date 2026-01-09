@@ -1,0 +1,170 @@
+# =============================================================================
+# Docker Compose CI Environment
+# =============================================================================
+# Complete test environment for CI pipelines with all dependencies
+# Uses MS SQL Server 2025 for native VECTOR support
+
+name: yt-summarizer-ci
+
+services:
+  # ---------------------------------------------------------------------------
+  # Database: MS SQL Server 2025 with VECTOR support
+  # ---------------------------------------------------------------------------
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: yt-summarizer-mssql-ci
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD:-YourStrong!Passw0rd123}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ci-network
+
+  # ---------------------------------------------------------------------------
+  # Azure Storage Emulator: Azurite
+  # ---------------------------------------------------------------------------
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: yt-summarizer-azurite-ci
+    ports:
+      - "10000:10000"  # Blob
+      - "10001:10001"  # Queue
+      - "10002:10002"  # Table
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    healthcheck:
+      test: nc -z localhost 10000 || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - ci-network
+
+  # ---------------------------------------------------------------------------
+  # API Service
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    container_name: yt-summarizer-api-ci
+    environment:
+      ENVIRONMENT: ci
+      DATABASE_URL: "mssql+pyodbc://sa:${SQL_SA_PASSWORD:-YourStrong!Passw0rd123}@mssql:1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-test-key}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mssql:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f http://localhost:8000/health/live || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - ci-network
+
+  # ---------------------------------------------------------------------------
+  # Transcribe Worker
+  # ---------------------------------------------------------------------------
+  transcribe-worker:
+    build:
+      context: .
+      dockerfile: services/workers/Dockerfile
+    container_name: yt-summarizer-transcribe-worker-ci
+    environment:
+      WORKER_TYPE: transcribe
+      ENVIRONMENT: ci
+      DATABASE_URL: "mssql+pyodbc://sa:${SQL_SA_PASSWORD:-YourStrong!Passw0rd123}@mssql:1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-test-key}
+    depends_on:
+      mssql:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    networks:
+      - ci-network
+
+  # ---------------------------------------------------------------------------
+  # Summarize Worker
+  # ---------------------------------------------------------------------------
+  summarize-worker:
+    build:
+      context: .
+      dockerfile: services/workers/Dockerfile
+    container_name: yt-summarizer-summarize-worker-ci
+    environment:
+      WORKER_TYPE: summarize
+      ENVIRONMENT: ci
+      DATABASE_URL: "mssql+pyodbc://sa:${SQL_SA_PASSWORD:-YourStrong!Passw0rd123}@mssql:1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-test-key}
+    depends_on:
+      mssql:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    networks:
+      - ci-network
+
+  # ---------------------------------------------------------------------------
+  # Embed Worker
+  # ---------------------------------------------------------------------------
+  embed-worker:
+    build:
+      context: .
+      dockerfile: services/workers/Dockerfile
+    container_name: yt-summarizer-embed-worker-ci
+    environment:
+      WORKER_TYPE: embed
+      ENVIRONMENT: ci
+      DATABASE_URL: "mssql+pyodbc://sa:${SQL_SA_PASSWORD:-YourStrong!Passw0rd123}@mssql:1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-test-key}
+    depends_on:
+      mssql:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    networks:
+      - ci-network
+
+  # ---------------------------------------------------------------------------
+  # Relationships Worker
+  # ---------------------------------------------------------------------------
+  relationships-worker:
+    build:
+      context: .
+      dockerfile: services/workers/Dockerfile
+    container_name: yt-summarizer-relationships-worker-ci
+    environment:
+      WORKER_TYPE: relationships
+      ENVIRONMENT: ci
+      DATABASE_URL: "mssql+pyodbc://sa:${SQL_SA_PASSWORD:-YourStrong!Passw0rd123}@mssql:1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-test-key}
+    depends_on:
+      mssql:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    networks:
+      - ci-network
+
+networks:
+  ci-network:
+    driver: bridge
