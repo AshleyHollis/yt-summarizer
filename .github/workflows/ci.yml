@@ -107,7 +107,7 @@ jobs:
 
       - name: Run API tests
         working-directory: services/api
-        run: python -m pytest tests/ -v --tb=short -p no:asyncio
+        run: python -m pytest tests/ -v --tb=short
 
   test-workers:
     name: Test Workers
@@ -130,7 +130,7 @@ jobs:
 
       - name: Run workers tests
         working-directory: services/workers
-        run: python -m pytest tests/ -v --tb=short -p no:asyncio
+        run: python -m pytest tests/ -v --tb=short
 
   # ---------------------------------------------------------------------------
   # Frontend Tests
