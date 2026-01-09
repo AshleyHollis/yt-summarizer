@@ -37,22 +37,20 @@ Write-Host ""
 Write-Host "Checking prerequisites..." -ForegroundColor Yellow
 
 # Check kubectl
-try {
-    $kubeContext = kubectl config current-context 2>&1
-    Write-Host "  ✓ kubectl context: $kubeContext" -ForegroundColor Green
-} catch {
-    Write-Error "kubectl not configured. Run: az aks get-credentials --resource-group <rg> --name <aks>"
+$kubeContext = kubectl config current-context 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "kubectl not configured. Run: az aks get-credentials --resource-group [rg] --name [aks]"
     exit 1
 }
+Write-Host "  ✓ kubectl context: $kubeContext" -ForegroundColor Green
 
 # Check helm
-try {
-    $helmVersion = helm version --short 2>&1
-    Write-Host "  ✓ helm version: $helmVersion" -ForegroundColor Green
-} catch {
+$helmVersion = helm version --short 2>&1
+if ($LASTEXITCODE -ne 0) {
     Write-Error "helm not installed. Install from: https://helm.sh/docs/intro/install/"
     exit 1
 }
+Write-Host "  ✓ helm version: $helmVersion" -ForegroundColor Green
 
 Write-Host ""
 
