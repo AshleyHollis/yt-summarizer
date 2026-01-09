@@ -24,7 +24,7 @@ export function WarmingUpIndicator({
   status,
   message,
   show,
-}: WarmingUpIndicatorProps): JSX.Element | null {
+}: WarmingUpIndicatorProps): React.ReactElement | null {
   // Determine if we should show the banner
   const shouldShow = show ?? status === 'degraded';
   
