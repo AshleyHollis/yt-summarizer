@@ -1,0 +1,34 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "yt-summarizer gitleaks config"
+
+[extend]
+# Extend the default gitleaks config
+useDefault = true
+
+# Allowlist rules for false positives
+[allowlist]
+  description = "Allowlist for false positives"
+  
+  # Terraform variable definitions (not actual secrets)
+  paths = [
+    '''infra/terraform/modules/.*/variables\.tf''',
+    '''infra/terraform/environments/.*/variables\.tf''',
+    '''infra/terraform/variables\.tf''',
+    # Terraform example files
+    '''.*\.tfvars\.example''',
+    # Test fixtures
+    '''.*test.*fixture.*''',
+    '''.*__snapshots__.*''',
+  ]
+  
+  # Regex patterns that are not secrets
+  regexes = [
+    # Variable placeholder patterns
+    '''var\.(sql_admin_password|admin_password|api_key)''',
+    # Terraform variable references
+    '''\$\{var\..*password.*\}''',
+    # Example/placeholder values
+    '''CHANGE_ME|REPLACE_ME|your-.*-here|example-.*''',
+  ]

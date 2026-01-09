@@ -8,10 +8,7 @@ on:
     branches: [main]
     paths:
       - 'infra/terraform/**'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'infra/terraform/**'
+  # Note: PRs only run terraform validate, not plan/apply (see CI workflow)
   workflow_dispatch:
     inputs:
       environment:
