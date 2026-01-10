@@ -10,8 +10,12 @@ name: Preview
 
 on:
   pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
     # Note: paths-ignore checks entire PR diff, not latest commit
     # We use commit-level detection in detect-changes job for efficiency
 
