@@ -8,6 +8,7 @@ namespace: yt-summarizer
 
 resources:
   - namespace.yaml
+  - serviceaccount.yaml
   - configmap.yaml
   - api-deployment.yaml
   - api-service.yaml
