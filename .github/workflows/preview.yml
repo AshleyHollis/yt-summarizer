@@ -355,8 +355,15 @@ jobs:
           TMP_MANIFEST="/tmp/preview-manifests.yaml"
           ERR_FILE="/tmp/kustomize.err"
 
+          echo "--- Git status / branch / commit ---"
+          git rev-parse --abbrev-ref HEAD || true
+          git status --porcelain -b || true
+          git log -1 --pretty=oneline || true
+
           echo "--- Overlay file (post-generation) ---"
           if [ -f "$OVERLAY_FILE" ]; then
+            echo "file size: $(wc -c < "$OVERLAY_FILE") bytes" || true
+            echo "first bytes (hex):"; if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$OVERLAY_FILE" || true; else head -c 32 "$OVERLAY_FILE" | od -An -t x1 || true; fi
             cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
           else
             echo "(overlay file not found)"
@@ -366,8 +373,12 @@ jobs:
           ls -la k8s/overlays/preview/patches || true
           for f in k8s/overlays/preview/patches/*; do
             echo "--- $f (first 200 lines) ---"
+            echo "first bytes (hex):"; if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$f" || true; else head -c 32 "$f" | od -An -t x1 || true; fi
             cat -n "$f" | sed -n '1,200p' || true
           done || true
+
+          echo "--- Show overlay file as committed in HEAD (if present) ---"
+          git show HEAD:$OVERLAY_FILE || echo "(no file in HEAD at path)"
 
           echo "Building manifests with kustomize..."
           if ! kubectl kustomize k8s/overlays/preview > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
@@ -378,6 +389,8 @@ jobs:
 
             echo "--- Generated overlay file (again) ---"
             if [ -f "$OVERLAY_FILE" ]; then
+              echo "file size: $(wc -c < "$OVERLAY_FILE") bytes" || true
+              echo "first bytes (hex):"; if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$OVERLAY_FILE" || true; else head -c 32 "$OVERLAY_FILE" | od -An -t x1 || true; fi
               cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
             else
               echo "(overlay file not found)"
@@ -387,6 +400,7 @@ jobs:
             ls -la k8s/overlays/preview/patches || true
             for f in k8s/overlays/preview/patches/*; do
               echo "--- $f (first 200 lines) ---"
+              echo "first bytes (hex):"; if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$f" || true; else head -c 32 "$f" | od -An -t x1 || true; fi
               cat -n "$f" | sed -n '1,200p' || true
             done || true
 
