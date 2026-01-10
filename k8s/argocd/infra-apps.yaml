@@ -165,6 +165,34 @@ spec:
 
 ---
 # -----------------------------------------------------------------------------
+# Apply cert-manager ClusterIssuer manifests (staging + prod)
+# -----------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-clusterissuers
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    targetRevision: main
+    path: k8s/argocd/cert-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+---
+# -----------------------------------------------------------------------------
 # SecretStore for Azure Key Vault
 # Configures External Secrets to connect to Azure Key Vault
 # Note: Requires AKS Workload Identity to be configured
