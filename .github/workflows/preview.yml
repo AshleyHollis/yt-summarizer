@@ -430,6 +430,9 @@ jobs:
       - name: Deploy to SWA staging environment
         id: deploy
         uses: Azure/static-web-apps-deploy@v1
+        env:
+          NEXT_PUBLIC_API_URL: ${{ needs.update-overlay.outputs.preview_url || '' }}
+          NEXT_PUBLIC_ENVIRONMENT: preview
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
