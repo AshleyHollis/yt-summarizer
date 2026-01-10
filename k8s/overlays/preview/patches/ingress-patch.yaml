@@ -27,5 +27,5 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - __PREVIEW_HOST__
+        - api.preview-pr-4.20-255-113-149.nip.io
       secretName: preview-pr-4-tls
