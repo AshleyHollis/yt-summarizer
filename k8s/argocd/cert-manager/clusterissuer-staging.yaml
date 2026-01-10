@@ -6,7 +6,7 @@ spec:
   acme:
     # Let's Encrypt staging endpoint (use for testing to avoid rate limits)
     server: https://acme-staging-v02.api.letsencrypt.org/directory
-    email: you@example.com
+    email: ops@ytsummarizer.dev
     privateKeySecretRef:
       name: letsencrypt-staging-key
     solvers:
