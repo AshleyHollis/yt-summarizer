@@ -4,9 +4,9 @@
 
 import { generateCorrelationId } from './correlation';
 
-// API base URL - use configured API URL or fallback
-// Client-side uses NEXT_PUBLIC_API_URL (e.g., "/api/proxy" for SWA deployments)
-// Server-side uses API_URL or NEXT_PUBLIC_API_URL
+// API base URL
+// For SWA deployments, NEXT_PUBLIC_API_URL should be the full backend URL
+// For development, it defaults to localhost or can be left empty for rewrites
 const API_BASE_URL =
   typeof window === 'undefined'
     ? process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'

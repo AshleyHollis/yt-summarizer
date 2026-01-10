@@ -484,20 +484,14 @@ jobs:
       - name: Build frontend for preview
         working-directory: apps/web
         env:
-          # Use relative path via proxy for mixed content support
-          NEXT_PUBLIC_API_URL: /api/proxy
-          # Direct backend URL for server-side proxying
-          REAL_BACKEND_URL: ${{ needs.get-ingress.outputs.preview_url }}
+          # Set the backend API URL directly (SWA doesn't support Next.js rewrites)
+          NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url }}
           NEXT_PUBLIC_ENVIRONMENT: preview
         run: |
-          # Inject backend URL into config file for next.config.ts to read
-          echo "{\"url\": \"$REAL_BACKEND_URL\"}" > backend-config.json
-          echo "✅ Generated backend-config.json for server-side proxying"
-
-          if [ -z "$REAL_BACKEND_URL" ]; then
+          if [ -z "$NEXT_PUBLIC_API_URL" ]; then
             echo "::warning::Building frontend without backend API URL"
           else
-            echo "Building frontend with API URL: $NEXT_PUBLIC_API_URL (proxied to $REAL_BACKEND_URL)"
+            echo "Building frontend with API URL: $NEXT_PUBLIC_API_URL"
           fi
           npm run build
 
@@ -505,10 +499,8 @@ jobs:
         id: deploy
         uses: Azure/static-web-apps-deploy@v1
         env:
-          # Use proxy route for client-side requests
-          NEXT_PUBLIC_API_URL: /api/proxy
-          # Configure proxy to talk to actual backend
-          API_BASE_URL: ${{ needs.get-ingress.outputs.preview_url || '' }}
+          # Set the backend API URL for runtime
+          NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url || '' }}
           NEXT_PUBLIC_ENVIRONMENT: preview
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
