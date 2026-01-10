@@ -218,7 +218,7 @@ jobs:
           
           # Update image tags in kustomization.yaml
           # Write template first, then substitute variables
-          cat > "${OVERLAY_FILE}.template" << '          TEMPLATE_EOF'
+          cat > "${OVERLAY_FILE}.template" << '          EOF'
           # Preview overlay - updated by GitHub Actions
           # PR: #__PR_NUMBER__
           # Image Tag: __IMAGE_TAG__
@@ -323,7 +323,7 @@ jobs:
             - pairs:
                 app.kubernetes.io/part-of: yt-summarizer-preview
                 preview.pr-number: "__PR_NUMBER__"
-          TEMPLATE_EOF
+          EOF
           
           # Remove leading spaces from template
           sed -i 's/^          //' "${OVERLAY_FILE}.template"
