@@ -25,6 +25,10 @@ env:
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
 
+defaults:
+  run:
+    shell: bash -e {0}  # Exit immediately if any command fails
+
 jobs:
   # ---------------------------------------------------------------------------
   # Linting
@@ -305,13 +309,13 @@ jobs:
         run: |
           echo "::group::kustomize build prod"
           if ! kustomize build k8s/overlays/prod > /tmp/prod.yaml; then
-            echo "::warning::kustomize build failed for overlay 'prod' (non-fatal)"
+            echo "::error::kustomize build failed for overlay 'prod'"
             kustomize build k8s/overlays/prod || true
             echo "::endgroup::"
-          else
-            echo "::endgroup::"
-            echo "✅ Built prod overlay: $(wc -c /tmp/prod.yaml | cut -d' ' -f1) bytes"
+            exit 1
           fi
+          echo "::endgroup::"
+          echo "✅ Built prod overlay: $(wc -c /tmp/prod.yaml | cut -d' ' -f1) bytes"
 
       - name: Validate kustomize build (prod-secretstore overlay)
         run: |
