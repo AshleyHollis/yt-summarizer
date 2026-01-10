@@ -46,21 +46,29 @@ def main():
 
     generate_from_template(args.template, args.output, variables, header_comments)
 
-    # Optionally substitute placeholders in overlay patch files (ingress patch)
-    if args.preview_host or args.tls_secret:
-        patch_path = 'k8s/overlays/preview/patches/ingress-patch.yaml'
-        try:
+    # Optionally substitute placeholders in overlay patch files (ingress patch and __PR_NUMBER__ placeholders)
+    patch_dir = 'k8s/overlays/preview/patches'
+    try:
+        import os
+        for filename in os.listdir(patch_dir):
+            patch_path = os.path.join(patch_dir, filename)
+            # Only process regular files
+            if not os.path.isfile(patch_path):
+                continue
             with open(patch_path, 'r', encoding='utf-8') as f:
                 content = f.read()
+            # Global substitutions
+            content = content.replace('__PR_NUMBER__', args.pr_number)
+            # Optional values
             if args.preview_host:
                 content = content.replace('__PREVIEW_HOST__', args.preview_host)
             if args.tls_secret:
                 content = content.replace('__TLS_SECRET__', args.tls_secret)
             with open(patch_path, 'w', encoding='utf-8') as f:
                 f.write(content)
-            print(f'Patched {patch_path} with preview host and TLS secret')
-        except FileNotFoundError:
-            print(f'Patch file not found: {patch_path} (skipping patch substitution)')
+            print(f'Patched {patch_path} (placeholders substituted)')
+    except FileNotFoundError:
+        print(f'Patch directory not found: {patch_dir} (skipping patch substitutions)')
 
     print(f'Generated {args.output} for PR #{args.pr_number} with image tag: {args.image_tag}')
 
