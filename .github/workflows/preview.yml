@@ -352,7 +352,7 @@ jobs:
           kubectl kustomize k8s/overlays/preview > /tmp/preview-manifests.yaml
 
           echo "Checking YAML syntax by parsing manifests..."
-          python - <<'PY'
+          python - <<PY
 import sys, yaml
 try:
     with open('/tmp/preview-manifests.yaml') as f:
