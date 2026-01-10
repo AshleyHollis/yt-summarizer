@@ -1,7 +1,7 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #4
-# Image Tag: pr-4-8b8a860
-# Updated: 2026-01-10T12:56:50Z
+# Image Tag: pr-4-7c258f0
+# Updated: 2026-01-10T13:06:04Z
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -30,16 +30,16 @@ patches:
         name: api
       spec:
         template:
-          spec:
-            containers:
-              - name: api
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: api
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
       group: apps
       version: v1
@@ -52,16 +52,16 @@ patches:
         name: transcribe-worker
       spec:
         template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
       group: apps
       version: v1
@@ -74,16 +74,16 @@ patches:
         name: summarize-worker
       spec:
         template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
       group: apps
       version: v1
@@ -96,16 +96,16 @@ patches:
         name: embed-worker
       spec:
         template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
       group: apps
       version: v1
@@ -118,16 +118,16 @@ patches:
         name: relationships-worker
       spec:
         template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   # Minimal replicas for preview environments (1 replica each)
   - target:
       group: apps
@@ -264,10 +264,10 @@ patches:
 images:
   - name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: "pr-4-8b8a860"
+    newTag: "pr-4-7c258f0"
   - name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: "pr-4-8b8a860"
+    newTag: "pr-4-7c258f0"
 
 labels:
   - pairs:
