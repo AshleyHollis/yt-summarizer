@@ -239,47 +239,47 @@ jobs:
           
           # Update kustomization.yaml with new image tags/digests
           cat > kustomization.yaml << EOF
-# =============================================================================
-# Production Overlay Kustomization
-# =============================================================================
-# Single production environment - auto-synced by Argo CD on merge to main
-# Last updated: ${TIMESTAMP}
-# Commit: ${COMMIT_SHA}
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-namespace: yt-summarizer
-
-resources:
-  - ../../base
-  - priority-class.yaml
-
-# Image tags - pinned to specific digests for immutable deployments
-images:
-  - name: yt-summarizer-api
-    newName: ${ACR_URL}/yt-summarizer-api
-    newTag: ${IMAGE_TAG}
-    # digest: ${API_DIGEST}
-  - name: yt-summarizer-workers
-    newName: ${ACR_URL}/yt-summarizer-workers
-    newTag: ${IMAGE_TAG}
-    # digest: ${WORKERS_DIGEST}
-
-# Production-specific patches
-patches:
-  - path: patches/configmap-patch.yaml
-  - path: patches/ingress-patch.yaml
-  - path: patches/resources-patch.yaml
-  - path: patches/priority-class-patch.yaml
-
-labels:
-  - pairs:
-      environment: production
-      app.kubernetes.io/part-of: yt-summarizer
-
-commonAnnotations:
-  deployment.kubernetes.io/environment: production
-EOF
+          # =============================================================================
+          # Production Overlay Kustomization
+          # =============================================================================
+          # Single production environment - auto-synced by Argo CD on merge to main
+          # Last updated: ${TIMESTAMP}
+          # Commit: ${COMMIT_SHA}
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          
+          namespace: yt-summarizer
+          
+          resources:
+            - ../../base
+            - priority-class.yaml
+          
+          # Image tags - pinned to specific digests for immutable deployments
+          images:
+            - name: yt-summarizer-api
+              newName: ${ACR_URL}/yt-summarizer-api
+              newTag: ${IMAGE_TAG}
+              # digest: ${API_DIGEST}
+            - name: yt-summarizer-workers
+              newName: ${ACR_URL}/yt-summarizer-workers
+              newTag: ${IMAGE_TAG}
+              # digest: ${WORKERS_DIGEST}
+          
+          # Production-specific patches
+          patches:
+            - path: patches/configmap-patch.yaml
+            - path: patches/ingress-patch.yaml
+            - path: patches/resources-patch.yaml
+            - path: patches/priority-class-patch.yaml
+          
+          labels:
+            - pairs:
+                environment: production
+                app.kubernetes.io/part-of: yt-summarizer
+          
+          commonAnnotations:
+            deployment.kubernetes.io/environment: production
+          EOF
           
           echo "Updated production kustomization with tag: ${IMAGE_TAG}"
           cat kustomization.yaml

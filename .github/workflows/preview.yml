@@ -306,7 +306,7 @@ labels:
   - pairs:
       app.kubernetes.io/part-of: yt-summarizer-preview
       preview.pr-number: "__PR_NUMBER__"
-TEMPLATE_EOF
+          TEMPLATE_EOF
           # For Next.js hybrid, output_location MUST be empty
           # SWA handles the .next folder internally
           output_location: ""
