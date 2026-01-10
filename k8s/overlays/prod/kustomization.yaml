@@ -11,6 +11,16 @@ resources:
   - ../../base
   - priority-class.yaml
 
+# Exclude ServiceAccount - managed by eso-secretstore application
+patchesStrategicMerge:
+  - |-
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: yt-summarizer-sa
+      namespace: yt-summarizer
+    $patch: delete
+
 # Image tags - updated by deploy-prod.yml workflow on merge
 # Using digest pinning for immutable deployments
 images:
