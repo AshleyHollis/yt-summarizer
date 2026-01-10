@@ -243,7 +243,7 @@ jobs:
   update-overlay:
     name: Update Preview Overlay
     runs-on: ubuntu-latest
-    needs: get-ingress
+    needs: [check-concurrency, get-ingress]
     if: needs.check-concurrency.outputs.can_deploy == 'true'
     outputs:
       preview_url: ${{ steps.overlay.outputs.preview_url }}
