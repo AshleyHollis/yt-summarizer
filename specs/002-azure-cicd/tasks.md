@@ -238,11 +238,11 @@
 - [X] T089 Validate full CI workflow with intentional test failure
   - ✅ Created a PR with a failing test, CI blocked merge (runs 20850663682, 20850687881)
   - ✅ Fixed the test, CI passed (run 20850765998)
-- [X] T090 Validate PR preview deploy end-to-end (open PR → preview URL works)
-  - ⚠️ **Issue Found**: Frontend was hardcoded to `localhost:8000` (mixed content error).
-  - ✅ **Fix Implemented**: Updated `preview.yml` to inject Ingress URL into `NEXT_PUBLIC_API_URL`.
-  - ✅ **Backend Health**: Verified backend running at `20.255.113.149` returns 200 OK.
-  - ⏳ **Final Verification**: Requires pushing the fix to trigger a new build.
+- [ ] T090 Validate PR preview deploy end-to-end (open PR → preview URL works)
+  - ⚠️ **Issue Found**: Frontend was hardcoded to `localhost:8000`, then later failed to receive API URL due to pipeline script error.
+  - ✅ **Fix Implemented**: Updated `preview.yml` to inject Ingress URL and fixed heredoc syntax (`bd2d032`).
+  - 🐛 **Bug Fix 3 (Mixed Content)**: Frontend blocked HTTP requesting backend IP. Implemented rewrite proxy in `next.config.ts` and injected backend IP via `preview.yml`.
+  - ⏳ **Verification**: Waiting for new pipeline run to deploy mixed content fix.
 - [ ] T091 Validate PR preview cleanup (close PR → namespace deleted)
   - Close or merge the test PR
   - Verify preview-cleanup workflow runs

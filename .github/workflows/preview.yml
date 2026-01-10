@@ -413,17 +413,20 @@ jobs:
       - name: Build frontend for preview
         working-directory: apps/web
         env:
-          # Point to the preview API backend (empty if not configured)
-          # When empty, the frontend will use relative paths which won't work for API calls
-          # Configure PREVIEW_API_URL in repo variables to enable backend connectivity
-          NEXT_PUBLIC_API_URL: ${{ needs.update-overlay.outputs.preview_url || '' }}
+          # Use relative path via proxy for mixed content support
+          NEXT_PUBLIC_API_URL: /api/proxy
+          # Direct backend URL for server-side proxying
+          REAL_BACKEND_URL: ${{ needs.update-overlay.outputs.preview_url }}
           NEXT_PUBLIC_ENVIRONMENT: preview
         run: |
-          if [ -z "$NEXT_PUBLIC_API_URL" ]; then
+          # Inject backend URL into config file for next.config.ts to read
+          echo "{\"url\": \"$REAL_BACKEND_URL\"}" > backend-config.json
+          echo "✅ Generated backend-config.json for server-side proxying"
+
+          if [ -z "$REAL_BACKEND_URL" ]; then
             echo "::warning::Building frontend without backend API URL"
-            echo "::warning::Set PREVIEW_API_URL in repository variables to enable backend connectivity"
           else
-            echo "Building frontend with API URL: $NEXT_PUBLIC_API_URL"
+            echo "Building frontend with API URL: $NEXT_PUBLIC_API_URL (proxied to $REAL_BACKEND_URL)"
           fi
           npm run build
 

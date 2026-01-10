@@ -8,7 +8,7 @@ import { generateCorrelationId } from './correlation';
 // Only use absolute URL on server-side or when explicitly set
 const API_BASE_URL =
   typeof window === 'undefined'
-    ? process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:8000'
+    ? process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     : ''; // Client-side: use relative URLs for Next.js rewrite proxy
 
 // Correlation ID header name
