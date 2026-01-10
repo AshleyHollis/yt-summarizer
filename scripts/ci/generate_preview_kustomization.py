@@ -3,9 +3,9 @@
 Generate preview kustomization.yaml with proper YAML formatting.
 
 Usage:
-  generate_preview_kustomization.py --pr-number <number> --image-tag <tag> --acr-server <server> --output <file>
+  generate_preview_kustomization.py --template <template.yaml> --output <file> --pr-number <number> --image-tag <tag> --acr-server <server>
 
-This script generates a properly formatted kustomization.yaml for the preview overlay.
+This script loads a template and substitutes variables for the preview overlay.
 """
 import argparse
 import sys
@@ -13,333 +13,54 @@ from datetime import datetime, timezone
 import yaml
 
 
-#!/usr/bin/env python3
-"""
-Generate preview kustomization.yaml with proper YAML formatting.
+def generate_from_template(template_path: str, output_path: str, pr_number: str, image_tag: str, acr_server: str):
+    """Load template and substitute variables."""
+    with open(template_path, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
 
-Usage:
-  generate_preview_kustomization.py --pr-number <number> --image-tag <tag> --acr-server <server> --output <file>
+    # Substitute variables
+    if 'namespace' in data and '__PR_NUMBER__' in data['namespace']:
+        data['namespace'] = data['namespace'].replace('__PR_NUMBER__', pr_number)
 
-This script generates a properly formatted kustomization.yaml for the preview overlay.
-"""
-import argparse
-import sys
-from datetime import datetime, timezone
-import yaml
+    # Substitute in images
+    for image in data.get('images', []):
+        if '__ACR_SERVER__' in str(image.get('newName', '')):
+            image['newName'] = image['newName'].replace('__ACR_SERVER__', acr_server)
+        if '__IMAGE_TAG__' in str(image.get('newTag', '')):
+            image['newTag'] = image['newTag'].replace('__IMAGE_TAG__', image_tag)
 
+    # Substitute in labels
+    for label_group in data.get('labels', []):
+        pairs = label_group.get('pairs', {})
+        if '__PR_NUMBER__' in str(pairs.get('preview.pr-number', '')):
+            pairs['preview.pr-number'] = pairs['preview.pr-number'].replace('__PR_NUMBER__', pr_number)
 
-def generate_kustomization(pr_number: str, image_tag: str, acr_server: str) -> dict:
-    """Generate the kustomization dictionary structure."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    return {
-        'apiVersion': 'kustomize.config.k8s.io/v1beta1',
-        'kind': 'Kustomization',
-        'metadata': {
-            'annotations': {
-                'config.kubernetes.io/local-config': 'true'
-            }
-        },
-        'namespace': f'preview-pr-{pr_number}',
-        'resources': [
-            '../../base',
-            'resource-quota.yaml',
-            'limit-range.yaml'
-        ],
-        'patches': [
-            {'path': 'patches/configmap-patch.yaml'},
-            {'path': 'patches/ingress-patch.yaml'},
-            # Resource requests/limits lowered for preview
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'api'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/template/spec/containers/0/resources',
-                        'value': {
-                            'requests': {'cpu': '25m', 'memory': '64Mi'},
-                            'limits': {'cpu': '150m', 'memory': '256Mi'}
-                        }
-                    }
-                ]
-            },
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'transcribe-worker'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/template/spec/containers/0/resources',
-                        'value': {
-                            'requests': {'cpu': '25m', 'memory': '64Mi'},
-                            'limits': {'cpu': '150m', 'memory': '256Mi'}
-                        }
-                    }
-                ]
-            },
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'summarize-worker'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/template/spec/containers/0/resources',
-                        'value': {
-                            'requests': {'cpu': '25m', 'memory': '64Mi'},
-                            'limits': {'cpu': '150m', 'memory': '256Mi'}
-                        }
-                    }
-                ]
-            },
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'embed-worker'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/template/spec/containers/0/resources',
-                        'value': {
-                            'requests': {'cpu': '25m', 'memory': '64Mi'},
-                            'limits': {'cpu': '150m', 'memory': '256Mi'}
-                        }
-                    }
-                ]
-            },
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'relationships-worker'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/template/spec/containers/0/resources',
-                        'value': {
-                            'requests': {'cpu': '25m', 'memory': '64Mi'},
-                            'limits': {'cpu': '150m', 'memory': '256Mi'}
-                        }
-                    }
-                ]
-            },
-            # Minimal replicas for preview
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'api'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/replicas',
-                        'value': 1
-                    }
-                ]
-            },
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'transcribe-worker'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/replicas',
-                        'value': 1
-                    }
-                ]
-            },
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'summarize-worker'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/replicas',
-                        'value': 1
-                    }
-                ]
-            },
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'embed-worker'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/replicas',
-                        'value': 1
-                    }
-                ]
-            },
-            {
-                'target': {
-                    'group': 'apps',
-                    'version': 'v1',
-                    'kind': 'Deployment',
-                    'name': 'relationships-worker'
-                },
-                'patch': [
-                    {
-                        'op': 'replace',
-                        'path': '/spec/replicas',
-                        'value': 1
-                    }
-                ]
-            },
-            {'path': 'patches/api-deployment-patch.yaml'},
-            # Patch ExternalSecrets to use ClusterSecretStore
-            {
-                'target': {
-                    'group': 'external-secrets.io',
-                    'version': 'v1beta1',
-                    'kind': 'ExternalSecret',
-                    'name': 'db-credentials'
-                },
-                'patch': [
-                    {'op': 'replace', 'path': '/spec/secretStoreRef/kind', 'value': 'ClusterSecretStore'},
-                    {'op': 'replace', 'path': '/spec/secretStoreRef/name', 'value': 'azure-keyvault-cluster'}
-                ]
-            },
-            {
-                'target': {
-                    'group': 'external-secrets.io',
-                    'version': 'v1beta1',
-                    'kind': 'ExternalSecret',
-                    'name': 'openai-credentials'
-                },
-                'patch': [
-                    {'op': 'replace', 'path': '/spec/secretStoreRef/kind', 'value': 'ClusterSecretStore'},
-                    {'op': 'replace', 'path': '/spec/secretStoreRef/name', 'value': 'azure-keyvault-cluster'}
-                ]
-            },
-            {
-                'target': {
-                    'group': 'external-secrets.io',
-                    'version': 'v1beta1',
-                    'kind': 'ExternalSecret',
-                    'name': 'storage-credentials'
-                },
-                'patch': [
-                    {'op': 'replace', 'path': '/spec/secretStoreRef/kind', 'value': 'ClusterSecretStore'},
-                    {'op': 'replace', 'path': '/spec/secretStoreRef/name', 'value': 'azure-keyvault-cluster'}
-                ]
-            },
-            # Delete SecretStore (preview uses ClusterSecretStore)
-            {
-                'target': {
-                    'group': 'external-secrets.io',
-                    'version': 'v1beta1',
-                    'kind': 'SecretStore',
-                    'name': 'azure-keyvault'
-                },
-                'patch': {
-                    '$patch': 'delete',
-                    'apiVersion': 'external-secrets.io/v1beta1',
-                    'kind': 'SecretStore',
-                    'metadata': {'name': 'azure-keyvault'}
-                }
-            },
-            # Strip federated identity annotations from ServiceAccount
-            {
-                'target': {
-                    'kind': 'ServiceAccount',
-                    'name': 'yt-summarizer-sa'
-                },
-                'patch': [
-                    {'op': 'remove', 'path': '/metadata/annotations/azure.workload.identity~1client-id'},
-                    {'op': 'remove', 'path': '/metadata/annotations/azure.workload.identity~1tenant-id'}
-                ]
-            },
-            # Use default SA for migration job
-            {
-                'target': {
-                    'group': 'batch',
-                    'version': 'v1',
-                    'kind': 'Job',
-                    'name': 'db-migration'
-                },
-                'patch': [
-                    {'op': 'replace', 'path': '/spec/template/spec/serviceAccountName', 'value': 'default'}
-                ]
-            }
-        ],
-        'images': [
-            {
-                'name': 'yt-summarizer-api',
-                'newName': f'{acr_server}/yt-summarizer-api',
-                'newTag': image_tag
-            },
-            {
-                'name': 'yt-summarizer-workers',
-                'newName': f'{acr_server}/yt-summarizer-workers',
-                'newTag': image_tag
-            }
-        ],
-        'labels': [
-            {
-                'pairs': {
-                    'app.kubernetes.io/part-of': 'yt-summarizer-preview',
-                    'preview.pr-number': pr_number
-                }
-            }
-        ]
-    }
-
-
-def main():
-    parser = argparse.ArgumentParser(description='Generate preview kustomization.yaml')
-    parser.add_argument('--pr-number', required=True, help='PR number')
-    parser.add_argument('--image-tag', required=True, help='Image tag')
-    parser.add_argument('--acr-server', required=True, help='ACR server')
-    parser.add_argument('--output', required=True, help='Output file path')
-
-    args = parser.parse_args()
-
-    kustomization = generate_kustomization(args.pr_number, args.image_tag, args.acr_server)
-
-    # Write with proper YAML formatting
-    with open(args.output, 'w', encoding='utf-8') as f:
+    # Write to output with proper formatting
+    with open(output_path, 'w', encoding='utf-8') as f:
         # Write header comments
-        f.write(f'# Preview overlay - updated by GitHub Actions\n')
-        f.write(f'# PR: #{args.pr_number}\n')
-        f.write(f'# Image Tag: {args.image_tag}\n')
+        f.write('# Preview overlay - updated by GitHub Actions\n')
+        f.write(f'# PR: #{pr_number}\n')
+        f.write(f'# Image Tag: {image_tag}\n')
         f.write(f'# Updated: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}\n')
         f.write('\n')
 
         # Use yaml.dump with proper formatting
-        yaml.dump(kustomization, f, default_flow_style=False, sort_keys=False, indent=2, allow_unicode=True)
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False, indent=2, allow_unicode=True)
 
-    print(f'Generated kustomization.yaml at {args.output}')
+    print(f'Generated {output_path} for PR #{pr_number} with image tag: {image_tag}')
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Generate preview kustomization.yaml')
+    parser.add_argument('--template', required=True, help='Path to template file')
+    parser.add_argument('--output', required=True, help='Output file path')
+    parser.add_argument('--pr-number', required=True, help='PR number')
+    parser.add_argument('--image-tag', required=True, help='Image tag')
+    parser.add_argument('--acr-server', required=True, help='ACR server')
+
+    args = parser.parse_args()
+
+    generate_from_template(args.template, args.output, args.pr_number, args.image_tag, args.acr_server)
 
 
 if __name__ == '__main__':

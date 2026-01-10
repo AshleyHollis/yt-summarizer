@@ -315,10 +315,11 @@ jobs:
           
           # Update image tags in kustomization.yaml using Python script
           python scripts/ci/generate_preview_kustomization.py \
+            --template scripts/ci/templates/preview-kustomization-template.yaml \
+            --output "$OVERLAY_FILE" \
             --pr-number "${PR_NUMBER}" \
             --image-tag "${IMAGE_TAG}" \
-            --acr-server "${ACR_SERVER}" \
-            --output "$OVERLAY_FILE"
+            --acr-server "${ACR_SERVER}"
           
           # Use preview info from get-ingress job outputs
           PREVIEW_URL="${{ needs.get-ingress.outputs.preview_url }}"
