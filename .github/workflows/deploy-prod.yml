@@ -191,172 +191,22 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
       - name: Update production kustomization
         run: |
           IMAGE_TAG="${{ needs.meta.outputs.image_tag }}"
-          API_DIGEST="${{ needs.build-api.outputs.api_digest }}"
-          WORKERS_DIGEST="${{ needs.build-workers.outputs.workers_digest }}"
-          ACR_URL="${{ env.ACR_LOGIN_SERVER }}"
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           
           cd k8s/overlays/prod
-          
-          # Update kustomization.yaml with new image tags/digests
-          cat > kustomization.yaml << '          EOF'
-          # =============================================================================
-          # Production Overlay Kustomization
-          # =============================================================================
-          # Single production environment - auto-synced by Argo CD on merge to main
-          # Last updated: ${TIMESTAMP}
-          # Commit: ${{ github.sha }}
-          apiVersion: kustomize.config.k8s.io/v1beta1
-          kind: Kustomization
-          
-          namespace: yt-summarizer
-          
-          resources:
-            - ../../base
-            - priority-class.yaml
-          
-          # Image tags - pinned to specific digests for immutable deployments
-          images:
-            - name: yt-summarizer-api
-              newName: ${ACR_URL}/yt-summarizer-api
-              newTag: ${IMAGE_TAG}
-              # digest: ${API_DIGEST}
-            - name: yt-summarizer-workers
-              newName: ${ACR_URL}/yt-summarizer-workers
-              newTag: ${IMAGE_TAG}
-              # digest: ${WORKERS_DIGEST}
-          
-          # Production-specific patches
-          patches:
-            - path: patches/configmap-patch.yaml
-            - path: patches/ingress-patch.yaml
-            # Production resource requests/limits per deployment (split into per-target patches)
-            - target:
-                group: apps
-                version: v1
-                kind: Deployment
-                name: api
-              patch: |-
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: api
-                spec:
-                  template:
-                    spec:
-                      containers:
-                        - name: api
-                          resources:
-                            requests:
-                              cpu: 25m
-                              memory: 128Mi
-                            limits:
-                              cpu: 500m
-                              memory: 512Mi
-            - target:
-                group: apps
-                version: v1
-                kind: Deployment
-                name: transcribe-worker
-              patch: |-
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: transcribe-worker
-                spec:
-                  template:
-                    spec:
-                      containers:
-                        - name: worker
-                          resources:
-                            requests:
-                              cpu: 25m
-                              memory: 128Mi
-                            limits:
-                              cpu: 500m
-                              memory: 512Mi
-            - target:
-                group: apps
-                version: v1
-                kind: Deployment
-                name: summarize-worker
-              patch: |-
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: summarize-worker
-                spec:
-                  template:
-                    spec:
-                      containers:
-                        - name: worker
-                          resources:
-                            requests:
-                              cpu: 25m
-                              memory: 128Mi
-                            limits:
-                              cpu: 500m
-                              memory: 512Mi
-            - target:
-                group: apps
-                version: v1
-                kind: Deployment
-                name: embed-worker
-              patch: |-
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: embed-worker
-                spec:
-                  template:
-                    spec:
-                      containers:
-                        - name: worker
-                          resources:
-                            requests:
-                              cpu: 25m
-                              memory: 128Mi
-                            limits:
-                              cpu: 500m
-                              memory: 512Mi
-            - target:
-                group: apps
-                version: v1
-                kind: Deployment
-                name: relationships-worker
-              patch: |-
-                apiVersion: apps/v1
-                kind: Deployment
-                metadata:
-                  name: relationships-worker
-                spec:
-                  template:
-                    spec:
-                      containers:
-                        - name: worker
-                          resources:
-                            requests:
-                              cpu: 25m
-                              memory: 128Mi
-                            limits:
-                              cpu: 500m
-                              memory: 512Mi
-            - path: patches/priority-class-patch.yaml
-          
-          labels:
-            - pairs:
-                environment: production
-                app.kubernetes.io/part-of: yt-summarizer
-          
-          commonAnnotations:
-            deployment.kubernetes.io/environment: production
-          EOF
-          
-          # Remove leading spaces from file
-          sed -i 's/^          //' kustomization.yaml
+          python ../../../scripts/ci/update_prod_kustomization.py --file kustomization.yaml --image-tag "${IMAGE_TAG}"
           
           echo "Updated production kustomization with tag: ${IMAGE_TAG}"
           cat kustomization.yaml
