@@ -3,6 +3,8 @@
  * This helps diagnose issues with environment variable injection in deployments
  */
 
+import Link from 'next/link';
+
 export default function DebugPage() {
   // These are evaluated at BUILD time and baked into the bundle
   const buildTimeEnv = {
@@ -97,12 +99,12 @@ export default function DebugPage() {
         </div>
 
         <div className="mt-6 text-center">
-          <a
+          <Link
             href="/"
             className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
           >
             ← Back to Home
-          </a>
+          </Link>
         </div>
       </div>
     </div>
