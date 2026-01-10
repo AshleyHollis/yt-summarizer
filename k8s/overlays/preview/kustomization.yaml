@@ -17,8 +17,178 @@ resources:
 patches:
   - path: patches/configmap-patch.yaml
   - path: patches/ingress-patch.yaml
-  - path: patches/resources-patch.yaml
-  - path: patches/replicas-patch.yaml
+  # Resource requests/limits lowered for preview to fit preview quota (split into per-target patches)
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: api
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        template:
+          spec:
+            containers:
+              - name: api
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 64Mi
+                  limits:
+                    cpu: 150m
+                    memory: 256Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: transcribe-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: transcribe-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 64Mi
+                  limits:
+                    cpu: 150m
+                    memory: 256Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: summarize-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: summarize-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 64Mi
+                  limits:
+                    cpu: 150m
+                    memory: 256Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: embed-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: embed-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 64Mi
+                  limits:
+                    cpu: 150m
+                    memory: 256Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: relationships-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: relationships-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 64Mi
+                  limits:
+                    cpu: 150m
+                    memory: 256Mi
+  # Minimal replicas for preview environments (1 replica each)
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: api
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        replicas: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: transcribe-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: transcribe-worker
+      spec:
+        replicas: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: summarize-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: summarize-worker
+      spec:
+        replicas: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: embed-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: embed-worker
+      spec:
+        replicas: 1
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: relationships-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: relationships-worker
+      spec:
+        replicas: 1
   - path: patches/api-deployment-patch.yaml
   # Patch ExternalSecrets to use ClusterSecretStore
   - target:
