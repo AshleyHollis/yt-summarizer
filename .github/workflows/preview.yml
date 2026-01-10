@@ -49,18 +49,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Get files changed in the latest commit (not entire PR)
-          COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
-          echo "Checking commit: $COMMIT_SHA"
-          
-          # Fetch commit details from GitHub API
-          FILES=$(gh api repos/${{ github.repository }}/commits/${COMMIT_SHA} --jq '.files[].filename')
-          
-          echo "Files changed in this commit:"
+          # Get files changed in the PR (all commits) and allow manual override via label
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "Checking PR: ${PR_NUMBER}"
+
+          # Fetch all changed files in the PR (across all commits)
+          FILES=$(gh api repos/${{ github.repository }}/pulls/${PR_NUMBER}/files --jq '.[] .filename')
+
+          echo "Files changed in this PR:"
           echo "$FILES"
-          
-          # Check if any file is NOT docs/specs/markdown
+
+          # Optional override: if PR has a 'preview' or 'force-preview' label, run preview regardless
           HAS_CODE=false
+          LABELS=$(gh api repos/${{ github.repository }}/issues/${PR_NUMBER} --jq '.labels[].name') || LABELS=""
+          for lbl in $LABELS; do
+            if [[ "$lbl" == "preview" ]] || [[ "$lbl" == "force-preview" ]]; then
+              echo "🔔 Force preview label detected: $lbl"
+              HAS_CODE=true
+            fi
+          done
+
+          # Check if any file is NOT docs/specs/markdown
           while IFS= read -r file; do
             if [[ -n "$file" ]]; then
               # Skip docs, specs, and markdown files
@@ -72,13 +81,13 @@ jobs:
               fi
             fi
           done <<< "$FILES"
-          
+
           echo "has_code_changes=$HAS_CODE" >> $GITHUB_OUTPUT
-          
+
           if [ "$HAS_CODE" = "true" ]; then
-            echo "✅ Commit contains code changes - proceeding with preview"
+            echo "✅ PR contains code changes or force-preview label - proceeding with preview"
           else
-            echo "📝 Commit only contains docs/specs/markdown - skipping preview"
+            echo "📝 PR only contains docs/specs/markdown - skipping preview"
           fi
 
   # ---------------------------------------------------------------------------
@@ -736,13 +745,13 @@ jobs:
           echo "| E2E Tests | ${E2E_STATUS} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Required jobs must succeed
-          if [ "${{ needs.update-overlay.result }}" != "success" ]; then
+          # Required jobs must succeed only if the PR contains code changes
+          if [ "${{ needs.detect-changes.outputs.has_code_changes }}" = "true" ] && [ "${{ needs.update-overlay.result }}" != "success" ]; then
             echo "::error::Update overlay failed"
             exit 1
           fi
-          
-          if [ "${{ needs.deploy-frontend-preview.result }}" != "success" ]; then
+
+          if [ "${{ needs.detect-changes.outputs.has_code_changes }}" = "true" ] && [ "${{ needs.deploy-frontend-preview.result }}" != "success" ]; then
             echo "::error::Frontend deployment failed"
             exit 1
           fi
