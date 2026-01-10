@@ -67,8 +67,9 @@ def convert_ado_connection_string(ado_string: str) -> str:
 
     Converts strings like:
         Server=localhost,1433;Database=ytsummarizer;User Id=sa;Password=xxx;TrustServerCertificate=True
+        Server=tcp:sql-server.database.windows.net,1433;Initial Catalog=db;...
     To:
-        mssql+aioodbc://sa:xxx@localhost:1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+        mssql+aioodbc://sa:xxx@localhost,1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
     """
     parts = {}
     for part in ado_string.split(";"):
@@ -81,6 +82,10 @@ def convert_ado_connection_string(ado_string: str) -> str:
     database = parts.get("database", parts.get("initial catalog", ""))
     user = parts.get("user id", parts.get("uid", "sa"))
     password = parts.get("password", parts.get("pwd", ""))
+
+    # Strip "tcp:" prefix if present (Azure SQL uses this format)
+    if server.lower().startswith("tcp:"):
+        server = server[4:]
 
     # Handle port in server (e.g., "localhost,1433" or "localhost:1433")
     if "," in server:
