@@ -12,6 +12,15 @@ const API_BASE_URL =
     ? process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     : process.env.NEXT_PUBLIC_API_URL || '';
 
+// Debug logging for production troubleshooting
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENVIRONMENT === 'preview') {
+  console.log('[API Client Debug]', {
+    API_BASE_URL,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
+  });
+}
+
 // Correlation ID header name
 const CORRELATION_ID_HEADER = 'X-Correlation-ID';
 

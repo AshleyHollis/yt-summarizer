@@ -282,6 +282,16 @@ function ProvidersInner({ children }: ProvidersProps) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const runtimeUrl = `${apiUrl}/api/copilotkit`;
   
+  // Debug logging for production troubleshooting
+  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENVIRONMENT === 'preview') {
+    console.log('[CopilotKit Debug]', {
+      apiUrl,
+      runtimeUrl,
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+      NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
+    });
+  }
+  
   // ============================================================================
   // THREAD ID FROM URL - The Single Source of Truth
   // ============================================================================
