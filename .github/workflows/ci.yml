@@ -296,16 +296,79 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Validate kustomize build (preview overlay)
         run: |
+          set -eo pipefail
+          OVERLAY_DIR="k8s/overlays/preview"
+          OVERLAY_FILE="$OVERLAY_DIR/kustomization.yaml"
+          TMP_MANIFEST="/tmp/preview.yaml"
+          ERR_FILE="/tmp/kustomize-preview.err"
+
           echo "::group::kustomize build preview"
-          if ! kustomize build k8s/overlays/preview > /tmp/preview.yaml; then
-            echo "::error::kustomize build failed for overlay 'preview'"
-            echo "Showing kustomize build debug output:"
-            kustomize build k8s/overlays/preview || true
+
+          echo "--- Git info ---"
+          git rev-parse --abbrev-ref HEAD || true
+          git status --porcelain -b || true
+          git log -1 --pretty=oneline || true
+
+          echo "--- Overlay file (if present) ---"
+          if [ -f "$OVERLAY_FILE" ]; then
+            echo "file size: $(wc -c < "$OVERLAY_FILE") bytes" || true
+            if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$OVERLAY_FILE" || true; else head -c 32 "$OVERLAY_FILE" | od -An -t x1 || true; fi
+            echo "--- Contents (first 200 lines) ---"
+            cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
+          else
+            echo "(overlay file not found at $OVERLAY_FILE)"
+          fi
+
+          echo "--- Patch files ---"
+          ls -la "$OVERLAY_DIR/patches" || true
+          for f in "$OVERLAY_DIR"/patches/*; do
+            echo "--- $f ---"
+            if [ -f "$f" ]; then
+              if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$f" || true; else head -c 32 "$f" | od -An -t x1 || true; fi
+              cat -n "$f" | sed -n '1,200p' || true
+            else
+              echo "(no patch files found)"
+            fi
+          done || true
+
+          echo "Building manifests with kustomize..."
+          if ! kustomize build "$OVERLAY_DIR" > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
+            echo "::error::kustomize build FAILED for overlay 'preview'"
+            echo "--- kustomize stderr ---"
+            sed -n '1,200p' "$ERR_FILE" || true
+            echo "--- end kustomize stderr ---"
+
+            echo "--- Overlay file (again) ---"
+            if [ -f "$OVERLAY_FILE" ]; then
+              echo "file size: $(wc -c < "$OVERLAY_FILE") bytes" || true
+              if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$OVERLAY_FILE" || true; else head -c 32 "$OVERLAY_FILE" | od -An -t x1 || true; fi
+              cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
+            fi
+
+            echo "--- Listing patch files (again) ---"
+            ls -la "$OVERLAY_DIR/patches" || true
+            for f in "$OVERLAY_DIR"/patches/*; do
+              echo "--- $f ---"
+              if [ -f "$f" ]; then
+                if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$f" || true; else head -c 32 "$f" | od -An -t x1 || true; fi
+                cat -n "$f" | sed -n '1,200p' || true
+              fi
+            done || true
+
+            echo "Searching for 'group:' occurrences"
+            grep -n "^\s*group:\s" "$OVERLAY_FILE" || true
+            grep -n "^\s*group:\s" "$OVERLAY_DIR"/patches/* || true
+
+            echo "::error::kustomize build failed for overlay 'preview' - see diagnostics above"
             echo "::endgroup::"
             exit 1
           fi
+
           echo "::endgroup::"
-          echo "✅ Built preview overlay: $(wc -c /tmp/preview.yaml | cut -d' ' -f1) bytes"
+          echo "✅ Built preview overlay: $(wc -c "$TMP_MANIFEST" | awk '{print $1}') bytes"
+
+          # Basic YAML parse check
+          python scripts/ci/parse_yaml.py "$TMP_MANIFEST" || (echo "::error::YAML parse failed for rendered preview manifests"; head -n 200 "$TMP_MANIFEST" || true; exit 1)
 
       - name: Validate preview CPU within quota
         run: |
