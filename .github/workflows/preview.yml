@@ -355,6 +355,20 @@ jobs:
           TMP_MANIFEST="/tmp/preview-manifests.yaml"
           ERR_FILE="/tmp/kustomize.err"
 
+          echo "--- Overlay file (post-generation) ---"
+          if [ -f "$OVERLAY_FILE" ]; then
+            cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
+          else
+            echo "(overlay file not found)"
+          fi
+
+          echo "--- Listing patch files (k8s/overlays/preview/patches) ---"
+          ls -la k8s/overlays/preview/patches || true
+          for f in k8s/overlays/preview/patches/*; do
+            echo "--- $f (first 200 lines) ---"
+            cat -n "$f" | sed -n '1,200p' || true
+          done || true
+
           echo "Building manifests with kustomize..."
           if ! kubectl kustomize k8s/overlays/preview > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
             echo "::error::kustomize build FAILED for overlay 'preview'"
@@ -362,9 +376,9 @@ jobs:
             sed -n '1,200p' "$ERR_FILE" || true
             echo "--- end kustomize stderr ---"
 
-            echo "--- Generated overlay file: $OVERLAY_FILE ---"
+            echo "--- Generated overlay file (again) ---"
             if [ -f "$OVERLAY_FILE" ]; then
-              nl -ba "$OVERLAY_FILE" | sed -n '1,200p' || true
+              cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
             else
               echo "(overlay file not found)"
             fi
@@ -373,12 +387,12 @@ jobs:
             ls -la k8s/overlays/preview/patches || true
             for f in k8s/overlays/preview/patches/*; do
               echo "--- $f (first 200 lines) ---"
-              nl -ba "$f" | sed -n '1,200p' || true
+              cat -n "$f" | sed -n '1,200p' || true
             done || true
 
             echo "Searching for 'group:' occurrences (common cause of 'unknown field \"group\"')"
-            grep -n "^\s*group:\s" -n "$OVERLAY_FILE" || true
-            grep -n "^\s*group:\s" -n k8s/overlays/preview/patches/* || true
+            grep -n "^\s*group:\s" "$OVERLAY_FILE" || true
+            grep -n "^\s*group:\s" k8s/overlays/preview/patches/* || true
 
             echo "::error::kustomize build failed for overlay 'preview' - see log and files above for diagnostics"
             exit 1
@@ -393,7 +407,7 @@ jobs:
           else
             echo "::error::Server dry-run failed - printing manifest and exiting"
             sed -n '1,200p' "$ERR_FILE" || true
-            nl -ba "$OVERLAY_FILE" | sed -n '1,200p' || true
+            cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
             cat "$TMP_MANIFEST" | sed -n '1,200p' || true
             exit 1
           fi
