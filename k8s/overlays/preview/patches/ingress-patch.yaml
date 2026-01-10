@@ -12,7 +12,7 @@
 # - NEVER use "letsencrypt-staging" - it creates untrusted certs that browsers reject
 #
 # Access URL: https://api.preview-pr-<num>.<ip-dashed>.nip.io
-# Example: https://api.preview-pr-4.20-255-113-149.nip.io
+# Example: https://api.preview-pr-4-20260110.20-255-113-149.nip.io
 # =============================================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -22,14 +22,13 @@ metadata:
   annotations:
     # IMPORTANT: ssl-redirect must be "true" for HTTPS (prevents mixed content errors)
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    # TEMPORARY: Using letsencrypt-staging due to rate limiting on production
-    # TODO: Switch back to letsencrypt-prod once rate limit resets
-    # letsencrypt-staging creates untrusted certs, but allows testing HTTPS
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    # Using letsencrypt-prod with new domain to avoid rate limits
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   rules:
     # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
-    - host: api.preview-pr-4.20-255-113-149.nip.io
+    # Modified domain to avoid Let's Encrypt rate limits
+    - host: api.preview-pr-4-20260110.20-255-113-149.nip.io
       http:
         paths:
           - path: /api(/|$)(.*)
@@ -48,5 +47,5 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - api.preview-pr-4.20-255-113-149.nip.io
+        - api.preview-pr-4-20260110.20-255-113-149.nip.io
       secretName: preview-pr-4-tls
