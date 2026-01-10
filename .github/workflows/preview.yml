@@ -459,41 +459,6 @@ jobs:
     needs: get-ingress
     outputs:
       frontend_preview_url: ${{ steps.deploy.outputs.static_web_app_url }}
-    
-@@
-       - name: Build frontend for preview
-         working-directory: apps/web
-         env:
-           # Use relative path via proxy for mixed content support
-           NEXT_PUBLIC_API_URL: /api/proxy
-           # Direct backend URL for server-side proxying
--          REAL_BACKEND_URL: ${{ needs.update-overlay.outputs.preview_url }}
-+          REAL_BACKEND_URL: ${{ needs.get-ingress.outputs.preview_url }}
-           NEXT_PUBLIC_ENVIRONMENT: preview
-         run: |
-@@
-       - name: Deploy to SWA staging environment
-         id: deploy
-         uses: Azure/static-web-apps-deploy@v1
-         env:
-           # Use proxy route for client-side requests
-           NEXT_PUBLIC_API_URL: /api/proxy
-           # Configure proxy to talk to actual backend
--          API_BASE_URL: ${{ needs.update-overlay.outputs.preview_url || '' }}
-+          API_BASE_URL: ${{ needs.get-ingress.outputs.preview_url || '' }}
-           NEXT_PUBLIC_ENVIRONMENT: preview
-         with:
-           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-           repo_token: ${{ secrets.GITHUB_TOKEN }}
-           action: upload
-           # For Next.js hybrid, app_location is the Next.js app root
-           app_location: apps/web
-           # For Next.js hybrid, output_location MUST be empty
-           # SWA handles the .next folder internally
-           output_location: ""
-           skip_app_build: true
-           # Deploying to a PR creates a staging environment automatically
-           production_branch: main
     steps:
       - name: Verify SWA token is configured
         env:
