@@ -41,9 +41,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup PowerShell
-        uses: actions/setup-powershell@v1
-        with:
-          pwsh: true
+        run: |
+          # PowerShell Core (pwsh) should be available on Ubuntu runners
+          pwsh --version
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
