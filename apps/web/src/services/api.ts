@@ -4,12 +4,13 @@
 
 import { generateCorrelationId } from './correlation';
 
-// API base URL - use relative path for client-side requests (handled by Next.js rewrites)
-// Only use absolute URL on server-side or when explicitly set
+// API base URL - use configured API URL or fallback
+// Client-side uses NEXT_PUBLIC_API_URL (e.g., "/api/proxy" for SWA deployments)
+// Server-side uses API_URL or NEXT_PUBLIC_API_URL
 const API_BASE_URL =
   typeof window === 'undefined'
     ? process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-    : ''; // Client-side: use relative URLs for Next.js rewrite proxy
+    : process.env.NEXT_PUBLIC_API_URL || '';
 
 // Correlation ID header name
 const CORRELATION_ID_HEADER = 'X-Correlation-ID';
