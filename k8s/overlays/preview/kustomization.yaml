@@ -1,7 +1,7 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #4
-# Image Tag: pr-4-6ea2543
-# Updated: 2026-01-10T09:45:47Z
+# Image Tag: pr-4-ab27369
+# Updated: 2026-01-10T09:59:48Z
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -17,8 +17,10 @@ resources:
 patches:
   - path: patches/configmap-patch.yaml
   - path: patches/ingress-patch.yaml
-  # Add preview-specific CORS origins
+  # Resource requests/limits lowered for preview to fit preview quota (split into per-target patches)
   - target:
+      group: apps
+      version: v1
       kind: Deployment
       name: api
     patch: |-
@@ -28,14 +30,108 @@ patches:
         name: api
       spec:
         template:
-          spec:
-            containers:
-              - name: api
-                env:
-                  - name: API__CORS_ORIGINS
-                    value: '["https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
-  # Set minimal replicas for preview environments
+spec:
+  containers:
+    - name: api
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: transcribe-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: transcribe-worker
+      spec:
+        template:
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: summarize-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: summarize-worker
+      spec:
+        template:
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: embed-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: embed-worker
+      spec:
+        template:
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: relationships-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: relationships-worker
+      spec:
+        template:
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
+  # Minimal replicas for preview environments (1 replica each)
+  - target:
+      group: apps
+      version: v1
       kind: Deployment
       name: api
     patch: |-
@@ -46,6 +142,8 @@ patches:
       spec:
         replicas: 1
   - target:
+      group: apps
+      version: v1
       kind: Deployment
       name: transcribe-worker
     patch: |-
@@ -56,6 +154,8 @@ patches:
       spec:
         replicas: 1
   - target:
+      group: apps
+      version: v1
       kind: Deployment
       name: summarize-worker
     patch: |-
@@ -66,6 +166,8 @@ patches:
       spec:
         replicas: 1
   - target:
+      group: apps
+      version: v1
       kind: Deployment
       name: embed-worker
     patch: |-
@@ -76,6 +178,8 @@ patches:
       spec:
         replicas: 1
   - target:
+      group: apps
+      version: v1
       kind: Deployment
       name: relationships-worker
     patch: |-
@@ -85,107 +189,7 @@ patches:
         name: relationships-worker
       spec:
         replicas: 1
-  # Set minimal resources for preview environments
-  - target:
-      kind: Deployment
-      name: api
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: api
-      spec:
-        template:
-          spec:
-            containers:
-              - name: api
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
-  - target:
-      kind: Deployment
-      name: transcribe-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: transcribe-worker
-      spec:
-        template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
-  - target:
-      kind: Deployment
-      name: summarize-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: summarize-worker
-      spec:
-        template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
-  - target:
-      kind: Deployment
-      name: embed-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: embed-worker
-      spec:
-        template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
-  - target:
-      kind: Deployment
-      name: relationships-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: relationships-worker
-      spec:
-        template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+  - path: patches/api-deployment-patch.yaml
   # Patch ExternalSecrets to use ClusterSecretStore
   - target:
       group: external-secrets.io
@@ -260,10 +264,10 @@ patches:
 images:
   - name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: "pr-4-6ea2543"
+    newTag: "pr-4-ab27369"
   - name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: "pr-4-6ea2543"
+    newTag: "pr-4-ab27369"
 
 labels:
   - pairs:
