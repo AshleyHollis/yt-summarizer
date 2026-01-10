@@ -3,9 +3,9 @@
 Update production kustomization.yaml with new image tags.
 
 Usage:
-  update_prod_kustomization.py --file <kustomization.yaml> --image-tag <tag>
+  update_prod_kustomization.py --template <template.yaml> --output <kustomization.yaml> --image-tag <tag>
 
-This script updates the image tags in the production kustomization.yaml file.
+This script loads a template and substitutes the image tag.
 """
 import argparse
 import sys
@@ -13,18 +13,18 @@ import yaml
 from datetime import datetime, timezone
 
 
-def update_image_tags(file_path: str, image_tag: str):
-    """Update the image tags in the kustomization file."""
-    with open(file_path, 'r', encoding='utf-8') as f:
+def update_from_template(template_path: str, output_path: str, image_tag: str):
+    """Load template and substitute image tag."""
+    with open(template_path, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
 
-    # Update image tags
+    # Substitute image tags
     for image in data.get('images', []):
-        if image['name'] in ['yt-summarizer-api', 'yt-summarizer-workers']:
-            image['newTag'] = image_tag
+        if '__IMAGE_TAG__' in str(image.get('newTag', '')):
+            image['newTag'] = image['newTag'].replace('__IMAGE_TAG__', image_tag)
 
-    # Write back with proper formatting
-    with open(file_path, 'w', encoding='utf-8') as f:
+    # Write to output with proper formatting
+    with open(output_path, 'w', encoding='utf-8') as f:
         # Write header comments
         f.write('# =============================================================================\n')
         f.write('# Production Overlay Kustomization\n')
@@ -36,17 +36,22 @@ def update_image_tags(file_path: str, image_tag: str):
         # Use yaml.dump with proper formatting
         yaml.dump(data, f, default_flow_style=False, sort_keys=False, indent=2, allow_unicode=True)
 
-    print(f'Updated {file_path} with image tag: {image_tag}')
+    print(f'Generated {output_path} with image tag: {image_tag}')
 
 
 def main():
     parser = argparse.ArgumentParser(description='Update production kustomization.yaml')
-    parser.add_argument('--file', required=True, help='Path to kustomization.yaml')
+    parser.add_argument('--template', required=True, help='Path to template file')
+    parser.add_argument('--output', required=True, help='Output file path')
     parser.add_argument('--image-tag', required=True, help='New image tag')
 
     args = parser.parse_args()
 
-    update_image_tags(args.file, args.image_tag)
+    update_from_template(args.template, args.output, args.image_tag)
+
+
+if __name__ == '__main__':
+    main()
 
 
 if __name__ == '__main__':

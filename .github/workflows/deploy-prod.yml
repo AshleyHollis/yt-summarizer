@@ -206,7 +206,10 @@ jobs:
           IMAGE_TAG="${{ needs.meta.outputs.image_tag }}"
           
           cd k8s/overlays/prod
-          python ../../../scripts/ci/update_prod_kustomization.py --file kustomization.yaml --image-tag "${IMAGE_TAG}"
+          python ../../../scripts/ci/update_prod_kustomization.py \
+            --template ../../../scripts/ci/templates/prod-kustomization-template.yaml \
+            --output kustomization.yaml \
+            --image-tag "${IMAGE_TAG}"
           
           echo "Updated production kustomization with tag: ${IMAGE_TAG}"
           cat kustomization.yaml
