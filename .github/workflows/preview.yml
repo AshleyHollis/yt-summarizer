@@ -352,16 +352,7 @@ jobs:
           kubectl kustomize k8s/overlays/preview > /tmp/preview-manifests.yaml
 
           echo "Checking YAML syntax by parsing manifests..."
-          python - <<PY
-import sys, yaml
-try:
-    with open('/tmp/preview-manifests.yaml') as f:
-        list(yaml.safe_load_all(f))
-except Exception as e:
-    print('YAML parse error:', e)
-    sys.exit(1)
-print('YAML parse OK')
-PY
+          python scripts/ci/parse_yaml.py /tmp/preview-manifests.yaml
 
           echo "Performing server-side dry-run apply to validate against API server..."
           if kubectl apply --server-dry-run=server -f /tmp/preview-manifests.yaml; then
