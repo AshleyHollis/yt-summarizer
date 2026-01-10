@@ -12,12 +12,9 @@ name: Deploy to Production
 
 on:
   workflow_run:
-    workflows:
-      - "CI"
-    types:
-      - completed
-    branches:
-      - main
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: deploy-prod
@@ -280,6 +277,9 @@ jobs:
           commonAnnotations:
             deployment.kubernetes.io/environment: production
           EOF
+          
+          # Remove leading spaces from template
+          sed -i 's/^          //' kustomization.yaml
           
           echo "Updated production kustomization with tag: ${IMAGE_TAG}"
           cat kustomization.yaml
