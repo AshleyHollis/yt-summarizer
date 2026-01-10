@@ -308,10 +308,11 @@ jobs:
                       filepath = os.path.join(root, file)
                       try:
                           with open(filepath, 'r', encoding='utf-8') as f:
-                              list(yaml.safe_load_all(f))
-                          print(f'Checking: {filepath}')
+                              docs = list(yaml.safe_load_all(f))
+                          print(f'✅ {filepath} - OK ({len(docs)} documents)')
                       except Exception as e:
-                          print(f'❌ YAML syntax error in: {filepath} - {e}')
+                          print(f'❌ YAML syntax error in: {filepath}')
+                          print(f'   Error: {e}')
                           exit_code = 1
           
           if exit_code == 0:
