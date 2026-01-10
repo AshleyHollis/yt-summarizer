@@ -6,7 +6,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api
-  namespace: yt-summarizer
+
 spec:
   template:
     spec:
@@ -24,7 +24,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: transcribe-worker
-  namespace: yt-summarizer
+
 spec:
   template:
     spec:
@@ -42,7 +42,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: summarize-worker
-  namespace: yt-summarizer
+
 spec:
   template:
     spec:
@@ -60,7 +60,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: embed-worker
-  namespace: yt-summarizer
+
 spec:
   template:
     spec:
@@ -78,7 +78,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: relationships-worker
-  namespace: yt-summarizer
+
 spec:
   template:
     spec:
