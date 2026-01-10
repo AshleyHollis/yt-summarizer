@@ -126,12 +126,13 @@ function Test-Api {
     $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
     Pop-Location
 
-    if ($failed -eq 0 -and $passed -gt 0) {
-        Write-Host "  [PASS] API Tests: $passed passed" -ForegroundColor Green
-        Add-TestResult -Suite "API" -Passed $passed -Failed 0 -Skipped 0 -Status "PASS" -FailureOutput ""
-    } else {
-        Write-Host "  [FAIL] API Tests: $failed failed, $passed passed" -ForegroundColor Red
-        Add-TestResult -Suite "API" -Passed $passed -Failed $failed -Skipped 0 -Status "FAIL" -FailureOutput $output
+    return [PSCustomObject]@{
+        Suite = "API"
+        Passed = $passed
+        Failed = $failed
+        Skipped = 0
+        Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+        FailureOutput = if ($failed -gt 0) { $output } else { "" }
     }
 }
 
@@ -146,12 +147,13 @@ function Test-Workers {
     $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
     Pop-Location
 
-    if ($failed -eq 0 -and $passed -gt 0) {
-        Write-Host "  [PASS] Worker Tests: $passed passed" -ForegroundColor Green
-        Add-TestResult -Suite "Workers" -Passed $passed -Failed 0 -Skipped 0 -Status "PASS" -FailureOutput ""
-    } else {
-        Write-Host "  [FAIL] Worker Tests: $failed failed, $passed passed" -ForegroundColor Red
-        Add-TestResult -Suite "Workers" -Passed $passed -Failed $failed -Skipped 0 -Status "FAIL" -FailureOutput $output
+    return [PSCustomObject]@{
+        Suite = "Workers"
+        Passed = $passed
+        Failed = $failed
+        Skipped = 0
+        Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+        FailureOutput = if ($failed -gt 0) { $output } else { "" }
     }
 }
 
@@ -166,12 +168,13 @@ function Test-Shared {
     $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
     Pop-Location
 
-    if ($failed -eq 0 -and $passed -gt 0) {
-        Write-Host "  [PASS] Shared Tests: $passed passed" -ForegroundColor Green
-        Add-TestResult -Suite "Shared" -Passed $passed -Failed 0 -Skipped 0 -Status "PASS" -FailureOutput ""
-    } else {
-        Write-Host "  [FAIL] Shared Tests: $failed failed, $passed passed" -ForegroundColor Red
-        Add-TestResult -Suite "Shared" -Passed $passed -Failed $failed -Skipped 0 -Status "FAIL" -FailureOutput $output
+    return [PSCustomObject]@{
+        Suite = "Shared"
+        Passed = $passed
+        Failed = $failed
+        Skipped = 0
+        Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+        FailureOutput = if ($failed -gt 0) { $output } else { "" }
     }
 }
 
@@ -190,16 +193,18 @@ function Test-Web {
     $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
     Pop-Location
 
-    if ($failed -eq 0 -and $passed -gt 0) {
-        Write-Host "  [PASS] Frontend Tests: $passed passed" -ForegroundColor Green
-        Add-TestResult -Suite "Frontend" -Passed $passed -Failed 0 -Skipped 0 -Status "PASS" -FailureOutput ""
-    } else {
-        Write-Host "  [FAIL] Frontend Tests: $failed failed, $passed passed" -ForegroundColor Red
-        Add-TestResult -Suite "Frontend" -Passed $passed -Failed $failed -Skipped 0 -Status "FAIL" -FailureOutput $output
+    return [PSCustomObject]@{
+        Suite = "Frontend"
+        Passed = $passed
+        Failed = $failed
+        Skipped = 0
+        Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+        FailureOutput = if ($failed -gt 0) { $output } else { "" }
     }
 }
 
 function Test-E2E {
+    $startTime = Get-Date
     Write-Host "[E2E] Running E2E Tests (Playwright)..." -ForegroundColor Yellow
     
     # Check if Aspire is running by testing the API endpoint
@@ -237,12 +242,21 @@ function Test-E2E {
     $skipped = if ($skipMatch.Success) { [int]$skipMatch.Groups[1].Value } else { 0 }
     Pop-Location
     
+    $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
     if ($failed -eq 0 -and $passed -gt 0) {
-        Write-Host "  [PASS] E2E Tests: $passed passed, $skipped skipped" -ForegroundColor Green
-        Add-TestResult -Suite "E2E" -Passed $passed -Failed 0 -Skipped $skipped -Status "PASS" -FailureOutput ""
+        Write-Host "  [PASS] E2E Tests: $passed passed, $skipped skipped in ${duration}s" -ForegroundColor Green
     } else {
-        Write-Host "  [FAIL] E2E Tests: $failed failed, $passed passed" -ForegroundColor Red
-        Add-TestResult -Suite "E2E" -Passed $passed -Failed $failed -Skipped $skipped -Status "FAIL" -FailureOutput $output
+        Write-Host "  [FAIL] E2E Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
+    }
+
+    return [PSCustomObject]@{
+        Suite = "E2E"
+        Passed = $passed
+        Failed = $failed
+        Skipped = $skipped
+        Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+        FailureOutput = if ($failed -gt 0) { $output } else { "" }
+        Duration = $duration
     }
 }
 
@@ -257,22 +271,276 @@ $runE2E = ($SkipE2E -eq $false) -and ($Component -eq 'all' -or $Component -eq 'e
 
 switch ($Component) {
     'all' {
-        Test-Shared
-        Test-Workers
-        Test-Api
-        Test-Web
+        # Run unit/integration tests in parallel
+        Write-Host "Running unit/integration tests in parallel..." -ForegroundColor Yellow
+        
+        # Define script blocks for parallel execution
+        $sharedScript = {
+            param($repoRoot)
+            $startTime = Get-Date
+            Write-Host "[SHARED] Running Shared Package Tests..." -ForegroundColor Yellow
+            Push-Location "$repoRoot\services\shared"
+            $pythonExe = if (Test-Path "$repoRoot\.venv\Scripts\python.exe") { "$repoRoot\.venv\Scripts\python.exe" } else { "python" }
+            $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
+            $passMatch = [regex]::Match($output, "(\d+) passed")
+            $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
+            $failMatch = [regex]::Match($output, "(\d+) failed")
+            $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
+            Pop-Location
+            
+            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
+            if ($failed -eq 0 -and $passed -gt 0) {
+                Write-Host "  [PASS] Shared Tests: $passed passed in ${duration}s" -ForegroundColor Green
+            } else {
+                Write-Host "  [FAIL] Shared Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
+            }
+            
+            return [PSCustomObject]@{
+                Suite = "Shared"
+                Passed = $passed
+                Failed = $failed
+                Skipped = 0
+                Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+                FailureOutput = if ($failed -gt 0) { $output } else { "" }
+                Duration = $duration
+            }
+        }
+        
+        $workersScript = {
+            param($repoRoot)
+            $startTime = Get-Date
+            Write-Host "[WORKERS] Running Worker Tests..." -ForegroundColor Yellow
+            Push-Location "$repoRoot\services\workers"
+            $pythonExe = if (Test-Path "$repoRoot\.venv\Scripts\python.exe") { "$repoRoot\.venv\Scripts\python.exe" } else { "python" }
+            
+            # Try to use pytest-xdist if available for parallel execution
+            $xdistAvailable = $false
+            try {
+                & $pythonExe -c "import pytest_xdist" 2>$null
+                $xdistAvailable = $true
+            } catch {}
+            
+            if ($xdistAvailable) {
+                Write-Host "  Using pytest-xdist for parallel test execution" -ForegroundColor Cyan
+                $output = & $pythonExe -m pytest -n auto tests/ -v --tb=short 2>&1 | Out-String
+            } else {
+                Write-Host "  Installing pytest-xdist for parallel execution..." -ForegroundColor Yellow
+                & $pythonExe -m pip install pytest-xdist --quiet 2>$null
+                try {
+                    & $pythonExe -c "import pytest_xdist" 2>$null
+                    Write-Host "  Using pytest-xdist for parallel test execution" -ForegroundColor Cyan
+                    $output = & $pythonExe -m pytest -n auto tests/ -v --tb=short 2>&1 | Out-String
+                } catch {
+                    Write-Host "  pytest-xdist installation failed, running sequentially" -ForegroundColor Yellow
+                    $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
+                }
+            }
+            
+            $passMatch = [regex]::Match($output, "(\d+) passed")
+            $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
+            $failMatch = [regex]::Match($output, "(\d+) failed")
+            $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
+            Pop-Location
+            
+            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
+            if ($failed -eq 0 -and $passed -gt 0) {
+                Write-Host "  [PASS] Worker Tests: $passed passed in ${duration}s" -ForegroundColor Green
+            } else {
+                Write-Host "  [FAIL] Worker Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
+            }
+            
+            return [PSCustomObject]@{
+                Suite = "Workers"
+                Passed = $passed
+                Failed = $failed
+                Skipped = 0
+                Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+                FailureOutput = if ($failed -gt 0) { $output } else { "" }
+                Duration = $duration
+            }
+        }
+        
+        $apiScript = {
+            param($repoRoot)
+            $startTime = Get-Date
+            Write-Host "[API] Running API Tests..." -ForegroundColor Yellow
+            Push-Location "$repoRoot\services\api"
+            $pythonExe = if (Test-Path "$repoRoot\.venv\Scripts\python.exe") { "$repoRoot\.venv\Scripts\python.exe" } else { "python" }
+            
+            # Try to use pytest-xdist if available for parallel execution
+            $xdistAvailable = $false
+            try {
+                & $pythonExe -c "import pytest_xdist" 2>$null
+                $xdistAvailable = $true
+            } catch {}
+            
+            if ($xdistAvailable) {
+                Write-Host "  Using pytest-xdist for parallel test execution" -ForegroundColor Cyan
+                $output = & $pythonExe -m pytest -n auto tests/ -v --tb=short 2>&1 | Out-String
+            } else {
+                Write-Host "  Installing pytest-xdist for parallel execution..." -ForegroundColor Yellow
+                & $pythonExe -m pip install pytest-xdist --quiet 2>$null
+                try {
+                    & $pythonExe -c "import pytest_xdist" 2>$null
+                    Write-Host "  Using pytest-xdist for parallel test execution" -ForegroundColor Cyan
+                    $output = & $pythonExe -m pytest -n auto tests/ -v --tb=short 2>&1 | Out-String
+                } catch {
+                    Write-Host "  pytest-xdist installation failed, running sequentially" -ForegroundColor Yellow
+                    $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
+                }
+            }
+            
+            $passMatch = [regex]::Match($output, "(\d+) passed")
+            $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
+            $failMatch = [regex]::Match($output, "(\d+) failed")
+            $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
+            Pop-Location
+            
+            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
+            if ($failed -eq 0 -and $passed -gt 0) {
+                Write-Host "  [PASS] API Tests: $passed passed in ${duration}s" -ForegroundColor Green
+            } else {
+                Write-Host "  [FAIL] API Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
+            }
+            
+            return [PSCustomObject]@{
+                Suite = "API"
+                Passed = $passed
+                Failed = $failed
+                Skipped = 0
+                Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+                FailureOutput = if ($failed -gt 0) { $output } else { "" }
+                Duration = $duration
+            }
+        }
+        
+        $webScript = {
+            param($repoRoot)
+            $startTime = Get-Date
+            Write-Host "[WEB] Running Frontend Tests (Vitest)..." -ForegroundColor Yellow
+            Push-Location "$repoRoot\apps\web"
+            $output = npm run test:run 2>&1 | Out-String
+            $allPassedMatches = [regex]::Matches($output, "(\d+) passed")
+            $passed = if ($allPassedMatches.Count -ge 2) { 
+                [int]$allPassedMatches[$allPassedMatches.Count - 1].Groups[1].Value 
+            } elseif ($allPassedMatches.Count -eq 1) {
+                [int]$allPassedMatches[0].Groups[1].Value
+            } else { 0 }
+            $failMatch = [regex]::Match($output, "(\d+) failed")
+            $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
+            Pop-Location
+            
+            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
+            if ($failed -eq 0 -and $passed -gt 0) {
+                Write-Host "  [PASS] Frontend Tests: $passed passed in ${duration}s" -ForegroundColor Green
+            } else {
+                Write-Host "  [FAIL] Frontend Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
+            }
+            
+            return [PSCustomObject]@{
+                Suite = "Frontend"
+                Passed = $passed
+                Failed = $failed
+                Skipped = 0
+                Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
+                FailureOutput = if ($failed -gt 0) { $output } else { "" }
+                Duration = $duration
+            }
+        }
+        
+        $jobs = @()
+        $jobs += Start-Job -ScriptBlock $sharedScript -ArgumentList $repoRoot -Name "Shared"
+        $jobs += Start-Job -ScriptBlock $workersScript -ArgumentList $repoRoot -Name "Workers"
+        $jobs += Start-Job -ScriptBlock $apiScript -ArgumentList $repoRoot -Name "API"
+        $jobs += Start-Job -ScriptBlock $webScript -ArgumentList $repoRoot -Name "Web"
+        
+        # Wait for all jobs to complete and show results progressively
+        $completedJobs = @{}
+        while ($jobs.Count -gt 0) {
+            $finishedJobs = $jobs | Where-Object { $_.State -eq 'Completed' }
+            foreach ($job in $finishedJobs) {
+                $result = Receive-Job -Job $job
+                $completedJobs[$job.Name] = $result
+                $jobs = $jobs | Where-Object { $_.Id -ne $job.Id }
+                Remove-Job -Job $job
+                
+                # Add to results
+                if ($result.Failed -gt 0) {
+                    $script:allPassed = $false
+                    $script:failures += @{
+                        Suite = $result.Suite
+                        Output = $result.FailureOutput
+                    }
+                }
+                $script:results += $result
+            }
+            
+            if ($finishedJobs.Count -eq 0) {
+                Start-Sleep -Milliseconds 500  # Wait a bit before checking again
+            }
+        }
+        # Run E2E tests sequentially after unit tests
         if ($runE2E) {
-            Test-E2E
+            $e2eResult = Test-E2E
+            if ($e2eResult.Failed -gt 0) {
+                $script:allPassed = $false
+                $script:failures += @{
+                    Suite = $e2eResult.Suite
+                    Output = $e2eResult.FailureOutput
+                }
+            }
+            $script:results += $e2eResult
         } else {
+            $script:results += [PSCustomObject]@{
+                Suite = "E2E"
+                Passed = 0
+                Failed = 0
+                Skipped = 0
+                Status = "SKIPPED"
+            }
             Write-Host "[E2E] Skipped (use without -SkipE2E to include)" -ForegroundColor Yellow
-            Add-TestResult -Suite "E2E" -Passed 0 -Failed 0 -Skipped 0 -Status "SKIPPED" -FailureOutput ""
         }
     }
-    'api' { Test-Api }
-    'workers' { Test-Workers }
-    'shared' { Test-Shared }
-    'web' { Test-Web }
-    'e2e' { Test-E2E }
+    'api' { 
+        $result = Test-Api
+        if ($result.Failed -gt 0) {
+            $script:allPassed = $false
+            $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
+        }
+        $script:results += $result
+    }
+    'workers' { 
+        $result = Test-Workers
+        if ($result.Failed -gt 0) {
+            $script:allPassed = $false
+            $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
+        }
+        $script:results += $result
+    }
+    'shared' { 
+        $result = Test-Shared
+        if ($result.Failed -gt 0) {
+            $script:allPassed = $false
+            $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
+        }
+        $script:results += $result
+    }
+    'web' { 
+        $result = Test-Web
+        if ($result.Failed -gt 0) {
+            $script:allPassed = $false
+            $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
+        }
+        $script:results += $result
+    }
+    'e2e' { 
+        $result = Test-E2E
+        if ($result.Failed -gt 0) {
+            $script:allPassed = $false
+            $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
+        }
+        $script:results += $result
+    }
 }
 
 # Summary
