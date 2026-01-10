@@ -1,23 +1,22 @@
 # =============================================================================
-# Preview API Deployment Patch
+# Preview API Deployment Patch (strategic merge)
 # =============================================================================
-# Adds preview-specific configuration for CORS origins
+# Adds preview-specific configuration for CORS origins as a strategic-merge
+# patch so kustomize can apply it when referenced in the overlay `patches:` list.
 #
-# CRITICAL: CORS Configuration for Azure Static Web Apps
-# -------------------------------------------------------
-# - Frontend is deployed to Azure Static Web Apps (SWA)
-# - SWA serves the frontend over HTTPS from *.azurestaticapps.net
-# - Backend must allow CORS requests from the SWA origin
-# - Without this, browser blocks all API requests with CORS errors
-#
-# Preview Environment:
-# - Frontend URL: https://red-grass-06d413100-*.eastasia.6.azurestaticapps.net
-# - Backend URL: https://api.preview-pr-<num>.<ip-dashed>.nip.io
-# - Must allow wildcard for SWA preview URLs since they include deployment ID
+# This patch targets the `Deployment` named `api` and appends an env var that
+# sets API__CORS_ORIGINS (JSON array string) so the service allows the SWA origin.
 # =============================================================================
-- op: add
-  path: /spec/template/spec/containers/0/env/-
-  value:
-    name: API__CORS_ORIGINS
-    # JSON array string - no spaces after commas to avoid parsing issues
-    value: '["https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: API__CORS_ORIGINS
+              # JSON array string - keep no spaces after commas
+              value: '["https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
