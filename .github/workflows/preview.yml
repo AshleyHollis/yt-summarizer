@@ -195,7 +195,7 @@ jobs:
       tls_secret: ${{ steps.preview.outputs.tls_secret }}
     steps:
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -266,7 +266,7 @@ jobs:
           pip install pyyaml
 
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -348,6 +348,11 @@ jobs:
           echo "Updated preview overlay at ${OVERLAY_FILE}"
           cat "$OVERLAY_FILE"
 
+      - name: Install kustomize
+        uses: imranismail/setup-kustomize@v3
+        with:
+          kustomize-version: '5.8.0'
+
       - name: Validate generated overlay (kustomize + dry-run)
         run: |
           set -eo pipefail
@@ -381,7 +386,7 @@ jobs:
           git show HEAD:$OVERLAY_FILE || echo "(no file in HEAD at path)"
 
           echo "Building manifests with kustomize..."
-          if ! kubectl kustomize k8s/overlays/preview > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
+          if ! kustomize build k8s/overlays/preview > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
             echo "::error::kustomize build FAILED for overlay 'preview'"
             echo "--- kustomize stderr ---"
             sed -n '1,200p' "$ERR_FILE" || true
@@ -469,7 +474,7 @@ jobs:
     needs: [update-overlay, check-concurrency]
     steps:
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
