@@ -1,7 +1,7 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #4
 # Image Tag: 
-# Updated: 2026-01-10T07:30:44Z
+# Updated: 2026-01-10T07:40:01Z
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -17,7 +17,6 @@ resources:
 patches:
   - path: patches/configmap-patch.yaml
   - path: patches/ingress-patch.yaml
-  - path: patches/api-deployment-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
   # Patch ExternalSecrets to use ClusterSecretStore
