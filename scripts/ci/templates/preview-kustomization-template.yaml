@@ -213,63 +213,10 @@ patches:
         template:
           spec:
             serviceAccountName: default
-  - target:
-      group: external-secrets.io
-      version: v1beta1
-      kind: ExternalSecret
-      name: db-credentials
-      namespace: preview-pr-__PR_NUMBER__
-    patch: |
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
-      metadata:
-        name: db-credentials
-      spec:
-        secretStoreRef:
-          kind: ClusterSecretStore
-          name: azure-keyvault-cluster
-  - target:
-      group: external-secrets.io
-      version: v1beta1
-      kind: ExternalSecret
-      name: openai-credentials
-      namespace: preview-pr-__PR_NUMBER__
-    patch: |
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
-      metadata:
-        name: openai-credentials
-      spec:
-        secretStoreRef:
-          kind: ClusterSecretStore
-          name: azure-keyvault-cluster
-  - target:
-      group: external-secrets.io
-      version: v1beta1
-      kind: ExternalSecret
-      name: storage-credentials
-      namespace: preview-pr-__PR_NUMBER__
-    patch: |
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
-      metadata:
-        name: storage-credentials
-      spec:
-        secretStoreRef:
-          kind: ClusterSecretStore
-          name: azure-keyvault-cluster
-  - target:
-      group: external-secrets.io
-      version: v1beta1
-      kind: SecretStore
-      name: azure-keyvault
-      namespace: preview-pr-__PR_NUMBER__
-    patch: |
-      $patch: delete
-      apiVersion: external-secrets.io/v1beta1
-      kind: SecretStore
-      metadata:
-        name: azure-keyvault
+  - path: patches/externalsecret-db-patch.yaml
+  - path: patches/externalsecret-openai-patch.yaml
+  - path: patches/externalsecret-storage-patch.yaml
+  - path: patches/secretstore-delete-patch.yaml
   - path: patches/configmap-patch.yaml
   - path: patches/ingress-patch.yaml
   - path: patches/resources-patch.yaml
