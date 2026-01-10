@@ -559,10 +559,13 @@ jobs:
           production_branch: main
 
   # ---------------------------------------------------------------------------
-  # Post Preview Status
+  # Post Preview Comment
   # ---------------------------------------------------------------------------
-  post-status:
-    name: Post Preview Status
+  # Posts preview information to the PR for reviewers (human-facing).
+  # This is intentionally separate from the preview status check to avoid
+  # blocking merges if posting a comment fails.
+  post-preview-comment:
+    name: Post Preview Comment
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend-preview]
     steps:
@@ -661,7 +664,7 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [update-overlay, deploy-frontend-preview, post-status]
+    needs: [update-overlay, deploy-frontend-preview, post-preview-comment]
     # Skip E2E tests if no API URL is configured
     if: needs.get-ingress.outputs.preview_url != ''
     outputs:
@@ -779,14 +782,14 @@ jobs:
             }
 
   # ---------------------------------------------------------------------------
-  # Preview Status - Required Check for Merge
+  # Preview Status Check - Required Check for Merge
   # ---------------------------------------------------------------------------
-  # This job provides a single status check that deploy-prod can gate on.
-  # It only succeeds if all preview steps completed successfully.
+  # Aggregates preview job results and produces a single, deterministic
+  # required check used to gate merges (machine-facing/gating).
   # E2E tests are optional (skipped if no backend API URL is configured).
   # ---------------------------------------------------------------------------
-  preview-status:
-    name: Preview Status
+  preview-status-check:
+    name: Preview Status Check
     runs-on: ubuntu-latest
     needs: [detect-changes, update-overlay, deploy-frontend-preview, e2e-tests]
     if: always()
