@@ -245,7 +245,10 @@ jobs:
       - name: Install kustomize
         uses: imranismail/setup-kustomize@v2
         with:
-          kustomize-version: '5.1.1'
+          # Use a newer kustomize release to match local dev tooling and
+          # avoid parser regression with multi-document strategic merge
+          # patches. Bump if needed in future.
+          kustomize-version: '5.8.0'
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -335,8 +338,28 @@ jobs:
           if ! kustomize build "$OVERLAY_DIR" > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
             echo "::error::kustomize build FAILED for overlay 'preview'"
             echo "--- kustomize stderr ---"
-            sed -n '1,200p' "$ERR_FILE" || true
+            sed -n '1,400p' "$ERR_FILE" || true
             echo "--- end kustomize stderr ---"
+
+            # Try to extract any 'path: <file>' lines from kustomize stderr which
+            # will identify the problematic patch files and print them for easier
+            # debugging in CI logs.
+            echo "Searching for reported patch paths in kustomize stderr..."
+            PATCH_PATHS=$(grep -oP 'path:\s*\K.*' "$ERR_FILE" || true)
+            if [ -n "$PATCH_PATHS" ]; then
+              echo "Identified patch(s): $PATCH_PATHS"
+              for p in $PATCH_PATHS; do
+                FULL="$OVERLAY_DIR/$p"
+                if [ -f "$FULL" ]; then
+                  echo "--- $FULL (first 400 lines) ---"
+                  sed -n '1,400p' "$FULL" || true
+                else
+                  echo "(file not found: $FULL)"
+                fi
+              done
+            else
+              echo "(no 'path:' entries found in stderr)"
+            fi
 
             echo "--- Overlay file (again) ---"
             if [ -f "$OVERLAY_FILE" ]; then
