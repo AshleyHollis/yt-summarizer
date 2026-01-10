@@ -263,7 +263,7 @@ jobs:
           # Find all YAML files in k8s/ directory
           while IFS= read -r file; do
             echo "Checking: $file"
-            if ! python -c "import yaml; yaml.safe_load(open('$file'))" 2>&1; then
+            if ! python -c "import yaml; list(yaml.safe_load_all(open('$file')))" 2>&1; then
               echo "❌ YAML syntax error in: $file"
               EXIT_CODE=1
             fi
