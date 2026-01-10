@@ -49,4 +49,4 @@ jobs:
     - name: Test Kustomize builds
       run: |
         # Test all kustomization builds
-        find k8s -name "kustomization.yaml" -execdir kustomize build . --dry-run \;
+        find k8s -name "kustomization.yaml" -execdir kustomize build . \;
