@@ -90,8 +90,13 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-api:latest
+            type=gha
+          cache-to: |
+            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-api:${{ needs.meta.outputs.image_tag }},mode=max
+            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-api:latest,mode=max
+            type=gha,mode=max
           platforms: linux/amd64
 
   build-workers:
@@ -131,8 +136,13 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-workers:latest
+            type=gha
+          cache-to: |
+            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-workers:${{ needs.meta.outputs.image_tag }},mode=max
+            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-workers:latest,mode=max
+            type=gha,mode=max
           platforms: linux/amd64
 
   # ---------------------------------------------------------------------------
