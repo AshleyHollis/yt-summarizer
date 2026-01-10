@@ -119,6 +119,13 @@ jobs:
           # CI uses this tag format for PRs
           SHORT_SHA=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7)
           IMAGE_TAG="pr-${{ github.event.pull_request.number }}-${SHORT_SHA}"
+
+          # Fail if for some reason the image tag couldn't be computed
+          if [ -z "${IMAGE_TAG}" ]; then
+            echo "::error::Computed IMAGE_TAG is empty; aborting"
+            exit 1
+          fi
+
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
           echo "Using image tag from CI: ${IMAGE_TAG}"
 
@@ -277,6 +284,17 @@ jobs:
             echo "::error::Ensure k8s/overlays/preview/ exists in your PR branch"
             exit 1
           fi
+
+          # Fail early if IMAGE_TAG is empty - prevents committing empty newTag values
+          # and avoids Argo CD deploying images without tags.
+          if [ -z "${IMAGE_TAG}" ]; then
+            echo "::error::IMAGE_TAG is empty. Aborting to avoid committing empty tags into ${OVERLAY_FILE}"
+            echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Debug: show the computed image tag
+          echo "Using IMAGE_TAG=${IMAGE_TAG}"
           
           # Update image tags in kustomization.yaml
           # Write template first, then substitute variables
@@ -432,6 +450,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Sanity: ensure generated overlay contains a non-empty newTag
+          if grep -q "newTag: \"\"" k8s/overlays/preview/kustomization.yaml; then
+            echo "::error::Generated overlay has empty newTag - aborting commit"
+            echo "--- overlay ---"
+            cat k8s/overlays/preview/kustomization.yaml
+            echo "--- end overlay ---"
+            exit 1
+          fi
+
           git add k8s/overlays/preview/
           
           if git diff --staged --quiet; then
