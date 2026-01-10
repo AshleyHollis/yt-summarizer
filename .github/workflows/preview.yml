@@ -343,13 +343,21 @@ jobs:
             PREVIEW_URL="${{ env.PREVIEW_API_URL }}"
             echo "✅ Using configured API URL: ${PREVIEW_URL}"
           elif [ -n "$INGRESS_IP" ]; then
-            PREVIEW_URL="https://${INGRESS_IP}/api"
+            # Use HTTP for preview to avoid self-signed cert errors in SWA proxy
+            PREVIEW_URL="http://${INGRESS_IP}/api"
             echo "✅ Using dynamic Ingress URL: ${PREVIEW_URL}"
           else
             PREVIEW_URL=""
             echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
             echo "::warning::Backend connectivity may be broken"
           fi
+          
+          # SAFETY: Ensure URL ends with /api (unless empty)
+          if [ -n "$PREVIEW_URL" ] && [[ "$PREVIEW_URL" != */api ]]; then
+            echo "⚠️ URL missing /api suffix, appending it..."
+            PREVIEW_URL="${PREVIEW_URL}/api"
+          fi
+
           echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
           
           echo "Updated preview overlay at ${OVERLAY_FILE}"
@@ -434,7 +442,10 @@ jobs:
         id: deploy
         uses: Azure/static-web-apps-deploy@v1
         env:
-          NEXT_PUBLIC_API_URL: ${{ needs.update-overlay.outputs.preview_url || '' }}
+          # Use proxy route for client-side requests
+          NEXT_PUBLIC_API_URL: /api/proxy
+          # Configure proxy to talk to actual backend
+          API_BASE_URL: ${{ needs.update-overlay.outputs.preview_url || '' }}
           NEXT_PUBLIC_ENVIRONMENT: preview
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}

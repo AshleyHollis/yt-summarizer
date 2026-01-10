@@ -241,8 +241,9 @@
 - [ ] T090 Validate PR preview deploy end-to-end (open PR → preview URL works)
   - ⚠️ **Issue Found**: Frontend was hardcoded to `localhost:8000`, then later failed to receive API URL due to pipeline script error.
   - ✅ **Fix Implemented**: Updated `preview.yml` to inject Ingress URL and fixed heredoc syntax (`bd2d032`).
-  - 🐛 **Bug Fix 3 (Mixed Content)**: Frontend blocked HTTP requesting backend IP. Implemented rewrite proxy in `next.config.ts` and injected backend IP via `preview.yml`.
-  - ⏳ **Verification**: Waiting for new pipeline run to deploy mixed content fix.
+  - 🐛 **Bug Fix 3 (Mixed Content)**: Frontend blocked HTTP requesting backend IP. Implemented Server-Side Proxy (`route.ts`) to bridge HTTPS frontend to HTTP backend.
+  - 🐛 **Bug Fix 4 (Config Injection)**: SWA Runtime couldn't find `backend-config.json` or received incomplete URL. Fixed `package.json` to copy config to standalone build and `preview.yml` to enforce `/api` suffix.
+  - ⏳ **Verification**: Waiting for new pipeline run in PR #4.
 - [ ] T091 Validate PR preview cleanup (close PR → namespace deleted)
   - Close or merge the test PR
   - Verify preview-cleanup workflow runs
