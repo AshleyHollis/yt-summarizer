@@ -8,7 +8,7 @@ kind: Kustomization
 namespace: preview-pr-4
 
 resources:
-  - ../../base
+  - ../../base-preview
   - resource-quota.yaml
   - limit-range.yaml
   # Note: SecretStore and ServiceAccount from base are replaced by patches

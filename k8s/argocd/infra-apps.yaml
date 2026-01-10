@@ -225,3 +225,34 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+
+---
+# -----------------------------------------------------------------------------
+# ClusterSecretStore for Azure Key Vault
+# Shared across all namespaces for preview environments
+# -----------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: eso-cluster-secretstore
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Deploy after ESO is installed
+    argocd.argoproj.io/sync-wave: ""2""
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    targetRevision: main
+    path: k8s/cluster-resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yt-summarizer
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
