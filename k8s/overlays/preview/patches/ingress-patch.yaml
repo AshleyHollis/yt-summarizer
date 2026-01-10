@@ -14,8 +14,9 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /api/$2
 spec:
   rules:
-    # Catch-all rule for preview environment
-    - http:
+    # Scope this ingress to the cluster LB IP used by previews so it takes precedence over the production ingress
+    - host: 20.255.113.149
+      http:
         paths:
           - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
