@@ -1,0 +1,23 @@
+# =============================================================================
+# Preview API Deployment Patch
+# =============================================================================
+# Adds preview-specific configuration for CORS origins
+#
+# CRITICAL: CORS Configuration for Azure Static Web Apps
+# -------------------------------------------------------
+# - Frontend is deployed to Azure Static Web Apps (SWA)
+# - SWA serves the frontend over HTTPS from *.azurestaticapps.net
+# - Backend must allow CORS requests from the SWA origin
+# - Without this, browser blocks all API requests with CORS errors
+#
+# Preview Environment:
+# - Frontend URL: https://red-grass-06d413100-*.eastasia.6.azurestaticapps.net
+# - Backend URL: https://api.preview-pr-<num>.<ip-dashed>.nip.io
+# - Must allow wildcard for SWA preview URLs since they include deployment ID
+# =============================================================================
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: API__CORS_ORIGINS
+    # JSON array string - no spaces after commas to avoid parsing issues
+    value: '["https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net","http://localhost:3000"]'

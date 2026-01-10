@@ -19,7 +19,7 @@ patches:
   - path: patches/ingress-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
-  # Add CORS origins for Azure Static Web Apps and disable database requirement
+  # Add CORS origins for Azure Static Web Apps
   - target:
       kind: Deployment
       name: api
@@ -29,11 +29,6 @@ patches:
         value:
           name: API__CORS_ORIGINS
           value: "[\"https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net\",\"http://localhost:3000\"]"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: DISABLE_DATABASE
-          value: "true"
   # Patch ExternalSecrets to use ClusterSecretStore
   - target:
       group: external-secrets.io

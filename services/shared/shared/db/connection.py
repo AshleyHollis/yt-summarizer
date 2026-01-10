@@ -101,9 +101,10 @@ def convert_ado_connection_string(ado_string: str) -> str:
     encoded_password = quote_plus(password)
 
     # Build SQLAlchemy URL
-    # Note: SQL Server ODBC uses comma for port (e.g., localhost,1433), not colon
-    url = f"mssql+aioodbc://{user}:{encoded_password}@{host},{port}/{database}"
-    url += "?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+    # For SQL Server, the port goes in the query string, not in the host
+    # Format: mssql+aioodbc://user:pass@host/database?driver=...&port=1433
+    url = f"mssql+aioodbc://{user}:{encoded_password}@{host}/{database}"
+    url += f"?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes&port={port}"
 
     return url
 
