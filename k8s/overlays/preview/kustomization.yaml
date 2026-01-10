@@ -17,6 +17,7 @@ resources:
 patches:
   - path: patches/configmap-patch.yaml
   - path: patches/ingress-patch.yaml
+  - path: patches/api-deployment-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
   # Patch ExternalSecrets to use ClusterSecretStore
