@@ -23,10 +23,6 @@ env:
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
   MAX_PREVIEWS: 3
-  # Backend API URL for previews - configure via repository variable
-  # Set PREVIEW_API_URL in repo settings > Secrets and variables > Variables
-  # Leave empty to skip backend connection (frontend-only preview)
-  PREVIEW_API_URL: ${{ vars.PREVIEW_API_URL || '' }}
 
 permissions:
   id-token: write
@@ -206,14 +202,11 @@ jobs:
 
       - name: Compute preview host + URL + TLS secret
         id: preview
+        env:
+          INGRESS_IP: ${{ steps.ingress-ip.outputs.ip }}
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          if [ -n "${{ env.PREVIEW_API_URL }}" ]; then
-            PREVIEW_URL="${{ env.PREVIEW_API_URL }}"
-            PREVIEW_HOST=$(echo "$PREVIEW_URL" | sed -E 's|https?://||; s|/.*$||')
-            TLS_SECRET=""
-            echo "✅ Using configured API URL: ${PREVIEW_URL}"
-          elif [ -n "$INGRESS_IP" ]; then
+          if [ -n "$INGRESS_IP" ]; then
             IP_DASHED=$(echo "$INGRESS_IP" | tr '.' '-')
             PREVIEW_HOST="api.preview-pr-${PR_NUMBER}.${IP_DASHED}.nip.io"
             PREVIEW_URL="https://${PREVIEW_HOST}"
@@ -223,7 +216,7 @@ jobs:
             PREVIEW_URL=""
             PREVIEW_HOST=""
             TLS_SECRET=""
-            echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
+            echo "⚠️ Ingress IP not found"
           fi
           echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
           echo "preview_host=${PREVIEW_HOST}" >> $GITHUB_OUTPUT
@@ -604,8 +597,8 @@ jobs:
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **PR** | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Preview URL** | ${{ needs.get-ingress.outputs.preview_url }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Image Tag** | \`\${{ needs.update-overlay.outputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Commit** | \`\${{ github.event.pull_request.head.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image Tag** | \`${{ needs.update-overlay.outputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.event.pull_request.head.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
           echo "- [Preview Site](${{ needs.get-ingress.outputs.preview_url }})" >> $GITHUB_STEP_SUMMARY
