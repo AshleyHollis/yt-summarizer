@@ -1,0 +1,56 @@
+# =============================================================================
+# ArgoCD Resource Customizations
+# =============================================================================
+# Patches the argocd-cm ConfigMap to add resource customizations that prevent
+# spurious OutOfSync/Unknown status for resources with expected drift.
+#
+# Apply with: kubectl apply -f k8s/argocd/resource-customizations.yaml
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # -------------------------------------------------------------------------
+  # Ignore differences for cert-manager ValidatingWebhookConfiguration
+  # -------------------------------------------------------------------------
+  # cert-manager's webhook creates/updates its own ValidatingWebhookConfiguration
+  # with caBundle and other fields that cause OutOfSync status.
+  # These are managed by cert-manager's webhook controller and are expected.
+  resource.customizations.ignoreDifferences.admissionregistration.k8s.io_ValidatingWebhookConfiguration: |
+    jqPathExpressions:
+    - .webhooks[].clientConfig.caBundle
+    - .webhooks[].failurePolicy
+    - .webhooks[].namespaceSelector
+    - .webhooks[].rules
+    - .webhooks[].timeoutSeconds
+  
+  # -------------------------------------------------------------------------
+  # Ignore differences for LoadBalancer Service status
+  # -------------------------------------------------------------------------
+  # Azure Load Balancer adds fields like .status.loadBalancer.ingress[].ipMode
+  # which are not in the Kubernetes schema and cause comparison errors.
+  resource.customizations.ignoreDifferences.v1_Service: |
+    jqPathExpressions:
+    - .status.loadBalancer.ingress
+  
+  # -------------------------------------------------------------------------
+  # Health check for cert-manager ValidatingWebhookConfiguration
+  # -------------------------------------------------------------------------
+  # Override health status to Healthy if webhooks are configured
+  resource.customizations.health.admissionregistration.k8s.io_ValidatingWebhookConfiguration: |
+    hs = {}
+    if obj.webhooks ~= nil and #obj.webhooks > 0 then
+      hs.status = "Healthy"
+      hs.message = "Webhook configured"
+    else
+      hs.status = "Progressing"
+      hs.message = "Webhook not configured"
+    end
+    return hs

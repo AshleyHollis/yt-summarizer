@@ -225,15 +225,14 @@ jobs:
         run: npm run test:run
 
   # ---------------------------------------------------------------------------
-  # Kustomize validation + Preview quota check
+  # Kubernetes Validation (YAML, Kustomize, ArgoCD)
   # ---------------------------------------------------------------------------
-  # Validate that kustomize builds overlays and that preview overlay CPU
-  # requests fit within the configured preview quota (prevents rollout blocks).
+  # Validates Kubernetes manifests, kustomize builds, and ArgoCD Applications
+  # to catch configuration errors before deployment.
   # ---------------------------------------------------------------------------
-  kustomize-validate:
-    name: Kustomize & Preview Quota Validate
+  kubernetes-validate:
+    name: Kubernetes Validation
     runs-on: ubuntu-latest
-    # Run in parallel with other checks
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -248,47 +247,136 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install Python deps
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml
 
-      - name: Build preview overlay
+      # -----------------------------------------------------------------------
+      # Step 1: YAML Syntax Validation
+      # -----------------------------------------------------------------------
+      - name: Validate YAML syntax (all K8s manifests)
+        run: |
+          echo "::group::Validating YAML syntax"
+          EXIT_CODE=0
+          
+          # Find all YAML files in k8s/ directory
+          while IFS= read -r file; do
+            echo "Checking: $file"
+            if ! python -c "import yaml; yaml.safe_load(open('$file'))" 2>&1; then
+              echo "❌ YAML syntax error in: $file"
+              EXIT_CODE=1
+            fi
+          done < <(find k8s/ -type f \( -name '*.yaml' -o -name '*.yml' \))
+          
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ All YAML files have valid syntax"
+          else
+            echo "::error::YAML syntax validation failed"
+          fi
+          echo "::endgroup::"
+          exit $EXIT_CODE
+
+      # -----------------------------------------------------------------------
+      # Step 2: Kustomize Build Validation
+      # -----------------------------------------------------------------------
+      - name: Validate kustomize build (preview overlay)
         run: |
           echo "::group::kustomize build preview"
           if ! kustomize build k8s/overlays/preview > /tmp/preview.yaml; then
-            echo "ERROR: kustomize build failed for overlay 'preview'"
+            echo "::error::kustomize build failed for overlay 'preview'"
             echo "Showing kustomize build debug output:"
             kustomize build k8s/overlays/preview || true
             echo "::endgroup::"
             exit 1
           fi
           echo "::endgroup::"
-          echo "Built preview overlay: $(wc -c /tmp/preview.yaml) bytes"
+          echo "✅ Built preview overlay: $(wc -c /tmp/preview.yaml | cut -d' ' -f1) bytes"
 
       - name: Validate preview CPU within quota
         run: |
           if ! python scripts/ci/validate_kustomize.py --file /tmp/preview.yaml --max-cpu 1500 --name preview; then
-            echo "Validation failed for preview overlay (CPU quota). Showing head of rendered manifest:"
+            echo "::error::Preview overlay CPU requests exceed quota (1500m)"
             head -n 200 /tmp/preview.yaml || true
             exit 1
           fi
 
-      - name: Build prod overlay
+      - name: Validate kustomize build (prod overlay)
         run: |
           echo "::group::kustomize build prod"
           if ! kustomize build k8s/overlays/prod > /tmp/prod.yaml; then
-            echo "WARNING: kustomize build failed for overlay 'prod' (non-fatal)"
+            echo "::warning::kustomize build failed for overlay 'prod' (non-fatal)"
             kustomize build k8s/overlays/prod || true
+            echo "::endgroup::"
+          else
+            echo "::endgroup::"
+            echo "✅ Built prod overlay: $(wc -c /tmp/prod.yaml | cut -d' ' -f1) bytes"
+          fi
+
+      - name: Validate kustomize build (prod-secretstore overlay)
+        run: |
+          echo "::group::kustomize build prod-secretstore"
+          if ! kustomize build k8s/overlays/prod-secretstore > /tmp/prod-secretstore.yaml; then
+            echo "::error::kustomize build failed for overlay 'prod-secretstore'"
+            kustomize build k8s/overlays/prod-secretstore || true
+            echo "::endgroup::"
+            exit 1
           fi
           echo "::endgroup::"
+          echo "✅ Built prod-secretstore overlay: $(wc -c /tmp/prod-secretstore.yaml | cut -d' ' -f1) bytes"
 
-      - name: Validate prod overlay (non-fatal)
+      # -----------------------------------------------------------------------
+      # Step 3: ArgoCD Application Path Validation
+      # -----------------------------------------------------------------------
+      - name: Validate ArgoCD Application paths exist
         run: |
-          if ! python scripts/ci/validate_kustomize.py --file /tmp/prod.yaml --max-cpu 8000 --name prod; then
-            echo "Prod validation failed, but continuing (non-fatal)."
-            head -n 200 /tmp/prod.yaml || true
+          echo "::group::Validating ArgoCD Application source paths"
+          EXIT_CODE=0
+          
+          # Extract all ArgoCD Applications and check their source paths
+          for app_file in k8s/argocd/*.yaml; do
+            echo "Checking ArgoCD Applications in: $app_file"
+            
+            # Use Python to parse YAML and extract source.path for git repos
+            python3 << 'PYEOF'
+          import yaml
+          import sys
+          import os
+          
+          app_file = sys.argv[1]
+          exit_code = 0
+          
+          with open(app_file, 'r') as f:
+              docs = list(yaml.safe_load_all(f))
+          
+          for doc in docs:
+              if not doc or doc.get('kind') != 'Application':
+                  continue
+              
+              app_name = doc.get('metadata', {}).get('name', 'unknown')
+              source = doc.get('spec', {}).get('source', {})
+              repo_url = source.get('repoURL', '')
+              path = source.get('path', '')
+              
+              # Only check paths for this repo (not Helm charts)
+              if 'github.com' in repo_url and 'yt-summarizer' in repo_url and path:
+                  if not os.path.exists(path):
+                      print(f"❌ Application '{app_name}': path '{path}' does not exist")
+                      exit_code = 1
+                  else:
+                      print(f"✅ Application '{app_name}': path '{path}' exists")
+          
+          sys.exit(exit_code)
+          PYEOF "$app_file" || EXIT_CODE=1
+          done
+          
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ All ArgoCD Application paths exist"
+          else
+            echo "::error::Some ArgoCD Applications reference non-existent paths"
           fi
+          echo "::endgroup::"
+          exit $EXIT_CODE
 
   # ---------------------------------------------------------------------------
   # Build Docker Images
@@ -513,6 +601,7 @@ jobs:
       - build-images-validate
       - validate-terraform
       - validate-kustomize
+      - kubernetes-validate
       - secret-scanning
     if: always()
     steps:
@@ -525,6 +614,7 @@ jobs:
              [ "${{ needs.test-frontend.result }}" != "success" ] ||
              [ "${{ needs.validate-terraform.result }}" != "success" ] ||
              [ "${{ needs.validate-kustomize.result }}" != "success" ] ||
+             [ "${{ needs.kubernetes-validate.result }}" != "success" ] ||
              [ "${{ needs.secret-scanning.result }}" != "success" ]; then
             echo "One or more required jobs failed"
             exit 1
