@@ -173,10 +173,66 @@ jobs:
   # ---------------------------------------------------------------------------
   # Update Preview Overlay in PR Branch
   # ---------------------------------------------------------------------------
+  get-ingress:
+    name: Get Ingress Info
+    runs-on: ubuntu-latest
+    needs: check-concurrency
+    if: needs.check-concurrency.outputs.can_deploy == 'true'
+    outputs:
+      ingress_ip: ${{ steps.ingress-ip.outputs.ip }}
+      preview_url: ${{ steps.preview.outputs.preview_url }}
+      preview_host: ${{ steps.preview.outputs.preview_host }}
+      tls_secret: ${{ steps.preview.outputs.tls_secret }}
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
+      - name: Get Ingress Controller IP
+        id: ingress-ip
+        run: |
+          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Found Ingress IP: $INGRESS_IP"
+          echo "ip=$INGRESS_IP" >> $GITHUB_OUTPUT
+
+      - name: Compute preview host + URL + TLS secret
+        id: preview
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          if [ -n "${{ env.PREVIEW_API_URL }}" ]; then
+            PREVIEW_URL="${{ env.PREVIEW_API_URL }}"
+            PREVIEW_HOST=$(echo "$PREVIEW_URL" | sed -E 's|https?://||; s|/.*$||')
+            TLS_SECRET=""
+            echo "✅ Using configured API URL: ${PREVIEW_URL}"
+          elif [ -n "$INGRESS_IP" ]; then
+            IP_DASHED=$(echo "$INGRESS_IP" | tr '.' '-')
+            PREVIEW_HOST="api.preview-pr-${PR_NUMBER}.${IP_DASHED}.nip.io"
+            PREVIEW_URL="https://${PREVIEW_HOST}"
+            TLS_SECRET="preview-pr-${PR_NUMBER}-tls"
+            echo "✅ Using dynamic Preview Host: ${PREVIEW_HOST} -> ${PREVIEW_URL}"
+          else
+            PREVIEW_URL=""
+            PREVIEW_HOST=""
+            TLS_SECRET=""
+            echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
+          fi
+          echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
+          echo "preview_host=${PREVIEW_HOST}" >> $GITHUB_OUTPUT
+          echo "tls_secret=${TLS_SECRET}" >> $GITHUB_OUTPUT
+
   update-overlay:
     name: Update Preview Overlay
     runs-on: ubuntu-latest
-    needs: check-concurrency
+    needs: get-ingress
     if: needs.check-concurrency.outputs.can_deploy == 'true'
     outputs:
       preview_url: ${{ steps.overlay.outputs.preview_url }}
@@ -346,25 +402,19 @@ jobs:
               "${OVERLAY_FILE}.template" > "$OVERLAY_FILE"
           rm "${OVERLAY_FILE}.template"
           
-          # Generate preview host + URL
-          # Priority: 1. Repo Variable (PREVIEW_API_URL) 2. Dynamic Ingress IP (nip.io)
-          if [ -n "${{ env.PREVIEW_API_URL }}" ]; then
-            PREVIEW_URL="${{ env.PREVIEW_API_URL }}"
-            PREVIEW_HOST=$(echo "$PREVIEW_URL" | sed -E 's|https?://||; s|/.*$||')
-            echo "✅ Using configured API URL: ${PREVIEW_URL}"
-          elif [ -n "$INGRESS_IP" ]; then
-            # Construct nip.io host that resolves to the ingress IP
-            IP_DASHED=$(echo "$INGRESS_IP" | tr '.' '-')
-            PREVIEW_HOST="api.preview-pr-${PR_NUMBER}.${IP_DASHED}.nip.io"
-            PREVIEW_URL="https://${PREVIEW_HOST}"
-            echo "✅ Using dynamic Preview Host: ${PREVIEW_HOST} -> ${PREVIEW_URL}"
-
-            # Substitute placeholders in ingress patch with actual host and TLS secret name
-            TLS_SECRET="preview-pr-${PR_NUMBER}-tls"
-            sed -i "s/__PREVIEW_HOST__/${PREVIEW_HOST}/g" k8s/overlays/preview/patches/ingress-patch.yaml
-            sed -i "s/__TLS_SECRET__/${TLS_SECRET}/g" k8s/overlays/preview/patches/ingress-patch.yaml
+          # Use preview info from get-ingress job outputs
+          PREVIEW_URL="${{ needs.get-ingress.outputs.preview_url }}"
+          PREVIEW_HOST="${{ needs.get-ingress.outputs.preview_host }}"
+          TLS_SECRET="${{ needs.get-ingress.outputs.tls_secret }}"
+          if [ -n "$PREVIEW_URL" ]; then
+            echo "✅ Using Preview URL: ${PREVIEW_URL}"
+            if [ -n "$PREVIEW_HOST" ]; then
+              sed -i "s/__PREVIEW_HOST__/${PREVIEW_HOST}/g" k8s/overlays/preview/patches/ingress-patch.yaml
+            fi
+            if [ -n "$TLS_SECRET" ]; then
+              sed -i "s/__TLS_SECRET__/${TLS_SECRET}/g" k8s/overlays/preview/patches/ingress-patch.yaml
+            fi
           else
-            PREVIEW_URL=""
             echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
             echo "::warning::Backend connectivity may be broken"
           fi
@@ -406,9 +456,44 @@ jobs:
   deploy-frontend-preview:
     name: Deploy Frontend Preview
     runs-on: ubuntu-latest
-    needs: update-overlay
+    needs: get-ingress
     outputs:
       frontend_preview_url: ${{ steps.deploy.outputs.static_web_app_url }}
+    
+@@
+       - name: Build frontend for preview
+         working-directory: apps/web
+         env:
+           # Use relative path via proxy for mixed content support
+           NEXT_PUBLIC_API_URL: /api/proxy
+           # Direct backend URL for server-side proxying
+-          REAL_BACKEND_URL: ${{ needs.update-overlay.outputs.preview_url }}
++          REAL_BACKEND_URL: ${{ needs.get-ingress.outputs.preview_url }}
+           NEXT_PUBLIC_ENVIRONMENT: preview
+         run: |
+@@
+       - name: Deploy to SWA staging environment
+         id: deploy
+         uses: Azure/static-web-apps-deploy@v1
+         env:
+           # Use proxy route for client-side requests
+           NEXT_PUBLIC_API_URL: /api/proxy
+           # Configure proxy to talk to actual backend
+-          API_BASE_URL: ${{ needs.update-overlay.outputs.preview_url || '' }}
++          API_BASE_URL: ${{ needs.get-ingress.outputs.preview_url || '' }}
+           NEXT_PUBLIC_ENVIRONMENT: preview
+         with:
+           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+           repo_token: ${{ secrets.GITHUB_TOKEN }}
+           action: upload
+           # For Next.js hybrid, app_location is the Next.js app root
+           app_location: apps/web
+           # For Next.js hybrid, output_location MUST be empty
+           # SWA handles the .next folder internally
+           output_location: ""
+           skip_app_build: true
+           # Deploying to a PR creates a staging environment automatically
+           production_branch: main
     steps:
       - name: Verify SWA token is configured
         env:
@@ -437,7 +522,7 @@ jobs:
           # Use relative path via proxy for mixed content support
           NEXT_PUBLIC_API_URL: /api/proxy
           # Direct backend URL for server-side proxying
-          REAL_BACKEND_URL: ${{ needs.update-overlay.outputs.preview_url }}
+          REAL_BACKEND_URL: ${{ needs.get-ingress.outputs.preview_url }}
           NEXT_PUBLIC_ENVIRONMENT: preview
         run: |
           # Inject backend URL into config file for next.config.ts to read
@@ -458,7 +543,7 @@ jobs:
           # Use proxy route for client-side requests
           NEXT_PUBLIC_API_URL: /api/proxy
           # Configure proxy to talk to actual backend
-          API_BASE_URL: ${{ needs.update-overlay.outputs.preview_url || '' }}
+          API_BASE_URL: ${{ needs.get-ingress.outputs.preview_url || '' }}
           NEXT_PUBLIC_ENVIRONMENT: preview
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
@@ -485,7 +570,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const backendUrl = '${{ needs.update-overlay.outputs.preview_url }}';
+            const backendUrl = '${{ needs.get-ingress.outputs.preview_url }}';
             const frontendUrl = '${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}' || 'Deploying...';
             const imageTag = '${{ needs.update-overlay.outputs.image_tag }}';
             const sha = '${{ github.event.pull_request.head.sha }}'.substring(0, 7);
@@ -558,12 +643,12 @@ jobs:
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **PR** | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Preview URL** | ${{ needs.update-overlay.outputs.preview_url }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Image Tag** | \`${{ needs.update-overlay.outputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Commit** | \`${{ github.event.pull_request.head.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Preview URL** | ${{ needs.get-ingress.outputs.preview_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image Tag** | \`\${{ needs.update-overlay.outputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`\${{ github.event.pull_request.head.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
-          echo "- [Preview Site](${{ needs.update-overlay.outputs.preview_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Preview Site](${{ needs.get-ingress.outputs.preview_url }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ℹ️ Architecture" >> $GITHUB_STEP_SUMMARY
           echo "This preview uses Argo CD ApplicationSet with Pull Request Generator." >> $GITHUB_STEP_SUMMARY
@@ -578,7 +663,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend-preview, post-status]
     # Skip E2E tests if no API URL is configured
-    if: needs.update-overlay.outputs.preview_url != ''
+    if: needs.get-ingress.outputs.preview_url != ''
     outputs:
       result: ${{ steps.run-tests.outcome }}
     steps:
@@ -602,7 +687,7 @@ jobs:
 
       - name: Wait for preview environment to be ready
         env:
-          PREVIEW_URL: ${{ needs.update-overlay.outputs.preview_url }}
+          PREVIEW_URL: ${{ needs.get-ingress.outputs.preview_url }}
           FRONTEND_URL: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}
         run: |
           # Determine which URL to use for frontend
@@ -635,9 +720,9 @@ jobs:
         working-directory: apps/web
         env:
           USE_EXTERNAL_SERVER: "true"
-          BASE_URL: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url || needs.update-overlay.outputs.preview_url }}
-          NEXT_PUBLIC_API_URL: ${{ needs.update-overlay.outputs.preview_url }}
-          API_URL: ${{ needs.update-overlay.outputs.preview_url }}
+          BASE_URL: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url || needs.get-ingress.outputs.preview_url }}
+          NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url }}
+          API_URL: ${{ needs.get-ingress.outputs.preview_url }}
         run: npx playwright test --reporter=html
 
       - name: Upload Playwright report
@@ -673,7 +758,7 @@ jobs:
               `| Property | Value |\n` +
               `|----------|-------|\n` +
               `| **Status** | ${status} |\n` +
-              `| **Environment** | ${{ needs.update-overlay.outputs.preview_url }} |\n` +
+              `| **Environment** | ${{ needs.get-ingress.outputs.preview_url }} |\n` +
               `| **Commit** | \`${{ github.event.pull_request.head.sha }}\` |\n\n` +
               `[📊 View Playwright Report](${reportUrl})`;
             
@@ -708,7 +793,7 @@ jobs:
     steps:
       - name: Check preview pipeline status
         env:
-          API_URL_CONFIGURED: ${{ needs.update-overlay.outputs.preview_url }}
+          API_URL_CONFIGURED: ${{ needs.get-ingress.outputs.preview_url }}
         run: |
           echo "## Preview Pipeline Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
