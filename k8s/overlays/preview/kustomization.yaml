@@ -13,8 +13,8 @@ resources:
   - ../../base
   - resource-quota.yaml
   - limit-range.yaml
-patches:
-  - path: patches/configmap-patch.yaml
-  - path: patches/ingress-patch.yaml
-  - path: patches/resources-patch.yaml
-  - path: patches/replicas-patch.yaml
+patchesStrategicMerge:
+  - patches/configmap-patch.yaml
+  - patches/ingress-patch.yaml
+  - patches/resources-patch.yaml
+  - patches/replicas-patch.yaml
