@@ -22,9 +22,10 @@ metadata:
   annotations:
     # IMPORTANT: ssl-redirect must be "true" for HTTPS (prevents mixed content errors)
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    # CRITICAL: Use letsencrypt-prod for browser-trusted certificates
-    # letsencrypt-staging creates untrusted certs that cause ERR_CERT_AUTHORITY_INVALID
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # TEMPORARY: Using letsencrypt-staging due to rate limiting on production
+    # TODO: Switch back to letsencrypt-prod once rate limit resets
+    # letsencrypt-staging creates untrusted certs, but allows testing HTTPS
+    cert-manager.io/cluster-issuer: letsencrypt-staging
 spec:
   rules:
     # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
