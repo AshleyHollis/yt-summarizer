@@ -8,5 +8,5 @@ spec:
   dnsNames:
     - api.preview-pr-4.20-255-113-149.nip.io
   issuerRef:
-    name: letsencrypt-staging
+    name: letsencrypt-prod
     kind: ClusterIssuer
