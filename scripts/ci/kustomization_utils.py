@@ -111,59 +111,63 @@ def write_patch_item(f, patch_item, indent):
         f.write(f'{indent_str}- path: {patch_item["path"]}\n')
     elif 'target' in patch_item:
         # This is a target-based patch
+        # Print list item and nest the target fields under it
         f.write(f'{indent_str}- target:\n')
-        # Write target fields in specific order without sorting
         target = patch_item['target']
         target_order = ['group', 'version', 'apiVersion', 'kind', 'name', 'namespace']
+        # Use extra indentation so fields become children of 'target' (list item uses '- ') 
+        child_indent = '  ' * (indent + 2)
         for key in target_order:
             if key in target:
-                f.write(f'{indent_str}  {key}: {target[key]}\n')
+                f.write(f'{child_indent}{key}: {target[key]}\n')
         # Write any remaining keys
         for key, value in target.items():
             if key not in target_order:
-                f.write(f'{indent_str}  {key}: {value}\n')
+                f.write(f'{child_indent}{key}: {value}\n')
         if 'patch' in patch_item:
             patch_content = patch_item['patch']
+            # patch should be a sibling of 'target' (not a child) - compute a shallower indent
+            patch_indent = '  ' * (indent + 1)
             if isinstance(patch_content, str):
                 # Check if it's a special delete patch
                 if patch_content.strip() == '$patch: delete':
-                    f.write(f'{indent_str}  patch: |\n')
-                    f.write(f'{indent_str}    $patch: delete\n')
+                    f.write(f'{patch_indent}patch: |\n')
+                    f.write(f'{patch_indent}  $patch: delete\n')
                     # Add the apiVersion and kind for delete patches
                     if 'target' in patch_item:
                         target = patch_item['target']
                         if 'apiVersion' in target and 'kind' in target and 'name' in target:
-                            f.write(f'{indent_str}    apiVersion: {target["apiVersion"]}\n')
-                            f.write(f'{indent_str}    kind: {target["kind"]}\n')
-                            f.write(f'{indent_str}    metadata:\n')
-                            f.write(f'{indent_str}      name: {target["name"]}\n')
+                            f.write(f'{patch_indent}  apiVersion: {target["apiVersion"]}\n')
+                            f.write(f'{patch_indent}  kind: {target["kind"]}\n')
+                            f.write(f'{patch_indent}  metadata:\n')
+                            f.write(f'{patch_indent}    name: {target["name"]}\n')
                 elif patch_content.startswith('- op:'):
                     # This is a JSON patch as a literal block
-                    f.write(f'{indent_str}  patch: |\n')
+                    f.write(f'{patch_indent}patch: |\n')
                     for line in patch_content.split('\n'):
                         if line.strip():
-                            f.write(f'{indent_str}    {line}\n')
+                            f.write(f'{patch_indent}  {line}\n')
                 else:
                     # This is a strategic merge patch as a literal block
-                    f.write(f'{indent_str}  patch: |\n')
+                    f.write(f'{patch_indent}patch: |\n')
                     for line in patch_content.split('\n'):
                         if line.strip():
-                            f.write(f'{indent_str}    {line}\n')
+                            f.write(f'{patch_indent}  {line}\n')
             elif isinstance(patch_content, list):
                 # This is a list of patch operations (JSON patches)
-                f.write(f'{indent_str}  patch:\n')
+                f.write(f'{patch_indent}patch:\n')
                 for op in patch_content:
-                    f.write(f'{indent_str}  - op: {op["op"]}\n')
-                    f.write(f'{indent_str}    path: {op["path"]}\n')
+                    f.write(f'{patch_indent}- op: {op["op"]}\n')
+                    f.write(f'{patch_indent}  path: {op["path"]}\n')
                     if 'value' in op:
-                        f.write(f'{indent_str}    value:')
+                        f.write(f'{patch_indent}  value:')
                         if isinstance(op['value'], (dict, list)):
                             f.write('\n')
                             write_yaml_with_literal_blocks(f, op['value'], indent + 2)
                         else:
                             f.write(f' {op["value"]}\n')
             else:
-                f.write(f'{indent_str}  patch:\n')
+                f.write(f'{patch_indent}patch:\n')
                 write_yaml_with_literal_blocks(f, patch_content, indent + 1)
     else:
         # Fallback for other patch types
