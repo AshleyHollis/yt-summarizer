@@ -243,6 +243,7 @@
   - ✅ **Fix Implemented**: Updated `preview.yml` to inject Ingress URL and fixed heredoc syntax (`bd2d032`).
   - 🐛 **Bug Fix 3 (Mixed Content)**: Frontend blocked HTTP requesting backend IP. Implemented Server-Side Proxy (`route.ts`) to bridge HTTPS frontend to HTTP backend.
   - 🐛 **Bug Fix 4 (Config Injection)**: SWA Runtime couldn't find `backend-config.json` or received incomplete URL. Fixed `package.json` to copy config to standalone build and `preview.yml` to enforce `/api` suffix.
+  - 🐛 **Bug Fix 5 (Double Suffix)**: The forced `/api` suffix caused 404s (e.g. `/api/api/v1/threads`). Removed suffix logic from `preview.yml` to allow correct path construction.
   - ⏳ **Verification**: Waiting for new pipeline run in PR #4.
 - [ ] T091 Validate PR preview cleanup (close PR → namespace deleted)
   - Close or merge the test PR

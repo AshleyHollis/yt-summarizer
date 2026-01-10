@@ -344,18 +344,12 @@ jobs:
             echo "✅ Using configured API URL: ${PREVIEW_URL}"
           elif [ -n "$INGRESS_IP" ]; then
             # Use HTTP for preview to avoid self-signed cert errors in SWA proxy
-            PREVIEW_URL="http://${INGRESS_IP}/api"
+            PREVIEW_URL="http://${INGRESS_IP}"
             echo "✅ Using dynamic Ingress URL: ${PREVIEW_URL}"
           else
             PREVIEW_URL=""
             echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
             echo "::warning::Backend connectivity may be broken"
-          fi
-          
-          # SAFETY: Ensure URL ends with /api (unless empty)
-          if [ -n "$PREVIEW_URL" ] && [[ "$PREVIEW_URL" != */api ]]; then
-            echo "⚠️ URL missing /api suffix, appending it..."
-            PREVIEW_URL="${PREVIEW_URL}/api"
           fi
 
           echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
