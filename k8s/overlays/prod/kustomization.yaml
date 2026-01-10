@@ -12,21 +12,23 @@ resources:
   - priority-class.yaml
 
 # Exclude ServiceAccount and SecretStore - managed by eso-secretstore application
-patchesStrategicMerge:
-  - |-
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
+patches:
+  - target:
+      group: ""
+      version: v1
+      kind: ServiceAccount
       name: yt-summarizer-sa
       namespace: yt-summarizer
-    $patch: delete
-  - |-
-    apiVersion: external-secrets.io/v1beta1
-    kind: SecretStore
-    metadata:
+    patch: |-
+      $patch: delete
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: SecretStore
       name: azure-keyvault
       namespace: yt-summarizer
-    $patch: delete
+    patch: |-
+      $patch: delete
 
 # Image tags - updated by deploy-prod.yml workflow on merge
 # Using digest pinning for immutable deployments
