@@ -8,7 +8,7 @@ kind: Kustomization
 namespace: yt-summarizer
 
 resources:
-  - ../../base-app
+  - ../../base
   - priority-class.yaml
 
 # Application resources only - SecretStore and ServiceAccount managed by eso-secretstore application
