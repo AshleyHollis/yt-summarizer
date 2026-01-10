@@ -1,275 +1,214 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #4
-# Image Tag: pr-4-7c258f0
-# Updated: 2026-01-10T13:06:04Z
+# Image Tag: pr-4-2d51cda
+# Updated: 2026-01-10T13:20:52Z
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
+metadata:
+  annotations:
+    config.kubernetes.io/local-config: 'true'
 namespace: preview-pr-4
-
 resources:
-  - ../../base
-  - resource-quota.yaml
-  - limit-range.yaml
-  # Note: SecretStore and ServiceAccount from base are replaced by patches
-  # Preview uses ClusterSecretStore which references production namespace's SA
-
+- ../../base
+- resource-quota.yaml
+- limit-range.yaml
 patches:
-  - path: patches/configmap-patch.yaml
-  - path: patches/ingress-patch.yaml
-  # Resource requests/limits lowered for preview to fit preview quota (split into per-target patches)
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: api
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: api
-      spec:
-        template:
-spec:
-  containers:
-    - name: api
-      resources:
-        requests:
-          cpu: 25m
-          memory: 64Mi
-        limits:
-          cpu: 150m
-          memory: 256Mi
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: transcribe-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: transcribe-worker
-      spec:
-        template:
-spec:
-  containers:
-    - name: worker
-      resources:
-        requests:
-          cpu: 25m
-          memory: 64Mi
-        limits:
-          cpu: 150m
-          memory: 256Mi
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: summarize-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: summarize-worker
-      spec:
-        template:
-spec:
-  containers:
-    - name: worker
-      resources:
-        requests:
-          cpu: 25m
-          memory: 64Mi
-        limits:
-          cpu: 150m
-          memory: 256Mi
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: embed-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: embed-worker
-      spec:
-        template:
-spec:
-  containers:
-    - name: worker
-      resources:
-        requests:
-          cpu: 25m
-          memory: 64Mi
-        limits:
-          cpu: 150m
-          memory: 256Mi
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: relationships-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: relationships-worker
-      spec:
-        template:
-spec:
-  containers:
-    - name: worker
-      resources:
-        requests:
-          cpu: 25m
-          memory: 64Mi
-        limits:
-          cpu: 150m
-          memory: 256Mi
-  # Minimal replicas for preview environments (1 replica each)
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: api
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: api
-      spec:
-        replicas: 1
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: transcribe-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: transcribe-worker
-      spec:
-        replicas: 1
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: summarize-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: summarize-worker
-      spec:
-        replicas: 1
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: embed-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: embed-worker
-      spec:
-        replicas: 1
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: relationships-worker
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: relationships-worker
-      spec:
-        replicas: 1
-  - path: patches/api-deployment-patch.yaml
-  # Patch ExternalSecrets to use ClusterSecretStore
-  - target:
-      group: external-secrets.io
-      version: v1beta1
-      kind: ExternalSecret
-      name: db-credentials
-    patch: |-
-      - op: replace
-        path: /spec/secretStoreRef/kind
-        value: ClusterSecretStore
-      - op: replace
-        path: /spec/secretStoreRef/name
-        value: azure-keyvault-cluster
-  - target:
-      group: external-secrets.io
-      version: v1beta1
-      kind: ExternalSecret
-      name: openai-credentials
-    patch: |-
-      - op: replace
-        path: /spec/secretStoreRef/kind
-        value: ClusterSecretStore
-      - op: replace
-        path: /spec/secretStoreRef/name
-        value: azure-keyvault-cluster
-  - target:
-      group: external-secrets.io
-      version: v1beta1
-      kind: ExternalSecret
-      name: storage-credentials
-    patch: |-
-      - op: replace
-        path: /spec/secretStoreRef/kind
-        value: ClusterSecretStore
-      - op: replace
-        path: /spec/secretStoreRef/name
-        value: azure-keyvault-cluster
-  # Delete SecretStore (preview uses ClusterSecretStore)
-  - target:
-      group: external-secrets.io
-      version: v1beta1
-      kind: SecretStore
+- path: patches/configmap-patch.yaml
+- path: patches/ingress-patch.yaml
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: api
+  patch:
+  - op: replace
+    path: /spec/template/spec/containers/0/resources
+    value:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 256Mi
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: transcribe-worker
+  patch:
+  - op: replace
+    path: /spec/template/spec/containers/0/resources
+    value:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 256Mi
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: summarize-worker
+  patch:
+  - op: replace
+    path: /spec/template/spec/containers/0/resources
+    value:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 256Mi
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: embed-worker
+  patch:
+  - op: replace
+    path: /spec/template/spec/containers/0/resources
+    value:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 256Mi
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: relationships-worker
+  patch:
+  - op: replace
+    path: /spec/template/spec/containers/0/resources
+    value:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 256Mi
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: api
+  patch:
+  - op: replace
+    path: /spec/replicas
+    value: 1
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: transcribe-worker
+  patch:
+  - op: replace
+    path: /spec/replicas
+    value: 1
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: summarize-worker
+  patch:
+  - op: replace
+    path: /spec/replicas
+    value: 1
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: embed-worker
+  patch:
+  - op: replace
+    path: /spec/replicas
+    value: 1
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: relationships-worker
+  patch:
+  - op: replace
+    path: /spec/replicas
+    value: 1
+- path: patches/api-deployment-patch.yaml
+- target:
+    group: external-secrets.io
+    version: v1beta1
+    kind: ExternalSecret
+    name: db-credentials
+  patch:
+  - op: replace
+    path: /spec/secretStoreRef/kind
+    value: ClusterSecretStore
+  - op: replace
+    path: /spec/secretStoreRef/name
+    value: azure-keyvault-cluster
+- target:
+    group: external-secrets.io
+    version: v1beta1
+    kind: ExternalSecret
+    name: openai-credentials
+  patch:
+  - op: replace
+    path: /spec/secretStoreRef/kind
+    value: ClusterSecretStore
+  - op: replace
+    path: /spec/secretStoreRef/name
+    value: azure-keyvault-cluster
+- target:
+    group: external-secrets.io
+    version: v1beta1
+    kind: ExternalSecret
+    name: storage-credentials
+  patch:
+  - op: replace
+    path: /spec/secretStoreRef/kind
+    value: ClusterSecretStore
+  - op: replace
+    path: /spec/secretStoreRef/name
+    value: azure-keyvault-cluster
+- target:
+    group: external-secrets.io
+    version: v1beta1
+    kind: SecretStore
+    name: azure-keyvault
+  patch:
+    $patch: delete
+    apiVersion: external-secrets.io/v1beta1
+    kind: SecretStore
+    metadata:
       name: azure-keyvault
-    patch: |-
-      $patch: delete
-      apiVersion: external-secrets.io/v1beta1
-      kind: SecretStore
-      metadata:
-        name: azure-keyvault
-  # Strip federated identity annotations from ServiceAccount
-  # (Preview uses ClusterSecretStore with production SA for Key Vault access,
-  # but we still need the SA for pods to run)
-  - target:
-      kind: ServiceAccount
-      name: yt-summarizer-sa
-    patch: |-
-      - op: remove
-        path: /metadata/annotations/azure.workload.identity~1client-id
-      - op: remove
-        path: /metadata/annotations/azure.workload.identity~1tenant-id
-  # Use default SA for migration job (avoids circular dependency with SA sync wave)
-  - target:
-      group: batch
-      version: v1
-      kind: Job
-      name: db-migration
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/serviceAccountName
-        value: default
-
+- target:
+    kind: ServiceAccount
+    name: yt-summarizer-sa
+  patch:
+  - op: remove
+    path: /metadata/annotations/azure.workload.identity~1client-id
+  - op: remove
+    path: /metadata/annotations/azure.workload.identity~1tenant-id
+- target:
+    group: batch
+    version: v1
+    kind: Job
+    name: db-migration
+  patch:
+  - op: replace
+    path: /spec/template/spec/serviceAccountName
+    value: default
 images:
-  - name: yt-summarizer-api
-    newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: "pr-4-7c258f0"
-  - name: yt-summarizer-workers
-    newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: "pr-4-7c258f0"
-
+- name: yt-summarizer-api
+  newName: acrytsummprd.azurecr.io/yt-summarizer-api
+  newTag: pr-4-2d51cda
+- name: yt-summarizer-workers
+  newName: acrytsummprd.azurecr.io/yt-summarizer-workers
+  newTag: pr-4-2d51cda
 labels:
-  - pairs:
-      app.kubernetes.io/part-of: yt-summarizer-preview
-      preview.pr-number: "4"
+- pairs:
+    app.kubernetes.io/part-of: yt-summarizer-preview
+    preview.pr-number: '4'
