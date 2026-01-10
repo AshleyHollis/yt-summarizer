@@ -218,7 +218,7 @@ jobs:
           
           # Update image tags in kustomization.yaml
           # Write template first, then substitute variables
-          cat > "${OVERLAY_FILE}.template" << '          EOF'
+          cat > "${OVERLAY_FILE}.template" << 'EOF'
           # Preview overlay - updated by GitHub Actions
           # PR: #__PR_NUMBER__
           # Image Tag: __IMAGE_TAG__
