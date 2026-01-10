@@ -218,7 +218,22 @@ async function request<T>(
   
   // If we never got a response, throw the last network error
   if (!response) {
-    throw lastError || new Error('Failed to connect to API');
+    const error = lastError || new Error('Failed to connect to API');
+    
+    // Check for certificate-related errors
+    if (error.message.includes('certificate') || 
+        error.message.includes('SSL') || 
+        error.message.includes('ERR_CERT') ||
+        error.message.includes('SEC_ERROR')) {
+      throw new ApiClientError(
+        'Backend certificate is invalid or untrusted. This may be a temporary deployment issue. Please try again later or contact support if the problem persists.',
+        0,
+        generateCorrelationId(),
+        undefined
+      );
+    }
+    
+    throw error;
   }
 
   // Get correlation ID from response

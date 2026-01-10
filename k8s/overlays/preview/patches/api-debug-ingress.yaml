@@ -7,7 +7,7 @@ metadata:
     kubernetes.io/ingress.class: nginx
 spec:
   rules:
-    - host: api.preview-pr-4.20-255-113-149.nip.io
+    - host: api.preview-pr-4-20260110.20-255-113-149.nip.io
       http:
         paths:
           - path: /debug
@@ -19,5 +19,5 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - api.preview-pr-4.20-255-113-149.nip.io
+        - api.preview-pr-4-20260110.20-255-113-149.nip.io
       secretName: preview-pr-4-tls
