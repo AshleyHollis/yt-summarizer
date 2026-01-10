@@ -11,7 +11,7 @@ resources:
   - ../../base
   - resource-quota.yaml
   - limit-range.yaml
-  - patches/api-host-ingress.yaml
+
   # Note: SecretStore and ServiceAccount from base are replaced by patches
   # Preview uses ClusterSecretStore which references production namespace's SA
 
