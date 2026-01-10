@@ -54,3 +54,12 @@ data:
       hs.message = "Webhook not configured"
     end
     return hs
+  
+  # -------------------------------------------------------------------------
+  # Ignore differences for ExternalSecret status
+  # -------------------------------------------------------------------------
+  # External Secrets Operator manages the status field and binding information.
+  # These are expected to drift from the original manifest.
+  resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
+    jsonPointers:
+    - /status
