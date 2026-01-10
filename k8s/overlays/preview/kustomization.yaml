@@ -23,12 +23,12 @@ patches:
   - target:
       kind: Deployment
       name: api
-    patch: |-
+    patch: |
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
           name: API__CORS_ORIGINS
-          value: '["https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
+          value: "[\"https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net\",\"http://localhost:3000\"]"
   # Patch ExternalSecrets to use ClusterSecretStore
   - target:
       group: external-secrets.io
