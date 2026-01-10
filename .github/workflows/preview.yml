@@ -209,6 +209,10 @@ jobs:
           if [ -n "$INGRESS_IP" ]; then
             IP_DASHED=$(echo "$INGRESS_IP" | tr '.' '-')
             PREVIEW_HOST="api.preview-pr-${PR_NUMBER}.${IP_DASHED}.nip.io"
+            # CRITICAL: Must use HTTPS to avoid mixed content errors
+            # Frontend is served over HTTPS from Azure Static Web Apps
+            # Browsers block HTTP requests from HTTPS pages
+            # Ensure ingress uses cert-manager.io/cluster-issuer: letsencrypt-prod (not staging!)
             PREVIEW_URL="https://${PREVIEW_HOST}"
             TLS_SECRET="preview-pr-${PR_NUMBER}-tls"
             echo "✅ Using dynamic Preview Host: ${PREVIEW_HOST} -> ${PREVIEW_URL}"

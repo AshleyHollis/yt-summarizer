@@ -1,17 +1,30 @@
 # =============================================================================
 # Preview Ingress Patch
 # =============================================================================
-# Routes traffic to preview API - uses path-based routing without specific domain
-# Access via: http://<ingress-ip>/api/
+# Routes traffic to preview API pods via nip.io wildcard DNS
+# 
+# CRITICAL: TLS/HTTPS REQUIREMENTS
+# ---------------------------------
+# - Frontend served from Azure Static Web Apps over HTTPS
+# - Backend MUST also use HTTPS to avoid mixed content errors
+# - Browsers block HTTP requests from HTTPS pages (mixed content policy)
+# - cert-manager.io/cluster-issuer MUST use "letsencrypt-prod" for trusted certs
+# - NEVER use "letsencrypt-staging" - it creates untrusted certs that browsers reject
+#
+# Access URL: https://api.preview-pr-<num>.<ip-dashed>.nip.io
+# Example: https://api.preview-pr-4.20-255-113-149.nip.io
+# =============================================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-ingress
   namespace: yt-summarizer
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    # Tell cert-manager to issue a cert using the staging ClusterIssuer
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    # IMPORTANT: ssl-redirect must be "true" for HTTPS (prevents mixed content errors)
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # CRITICAL: Use letsencrypt-prod for browser-trusted certificates
+    # letsencrypt-staging creates untrusted certs that cause ERR_CERT_AUTHORITY_INVALID
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   rules:
     # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
