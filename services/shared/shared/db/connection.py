@@ -1,4 +1,8 @@
-"""Database connection factory with retry logic."""
+"""Database connection factory with retry logic.
+
+This module handles database connections for SQL Server (both local and Azure SQL)
+with support for ADO.NET style connection strings and connection pooling.
+"""
 
 import os
 from collections.abc import AsyncGenerator
