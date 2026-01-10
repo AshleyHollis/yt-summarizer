@@ -1,7 +1,7 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #4
-# Image Tag: pr-4-7f97ff3
-# Updated: 2026-01-10T09:05:42Z
+# Image Tag: pr-4-c3e52ae
+# Updated: 2026-01-10T09:16:41Z
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -19,12 +19,7 @@ patches:
   - path: patches/ingress-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: api
-    path: patches/api-deployment-patch.yaml
+  - path: patches/api-deployment-patch.yaml
   # Patch ExternalSecrets to use ClusterSecretStore
   - target:
       group: external-secrets.io
@@ -99,10 +94,10 @@ patches:
 images:
   - name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: "pr-4-7f97ff3"
+    newTag: "pr-4-c3e52ae"
   - name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: "pr-4-7f97ff3"
+    newTag: "pr-4-c3e52ae"
 
 labels:
   - pairs:
