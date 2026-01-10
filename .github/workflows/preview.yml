@@ -448,6 +448,137 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
+  # Verify Deployment
+  # ---------------------------------------------------------------------------
+  # Waits for Argo CD to sync and verifies pods are running the correct images
+  verify-deployment:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: [update-overlay, check-concurrency]
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
+      - name: Wait for Argo CD to sync
+        env:
+          NAMESPACE: preview-pr-${{ github.event.pull_request.number }}
+          EXPECTED_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
+        run: |
+          echo "Waiting for Argo CD to sync preview environment..."
+          echo "Expected image tag: ${EXPECTED_TAG}"
+          echo "Namespace: ${NAMESPACE}"
+          
+          # Wait up to 3 minutes for Argo CD to create/update the namespace
+          for i in {1..36}; do
+            if kubectl get namespace ${NAMESPACE} 2>/dev/null; then
+              echo "✅ Namespace ${NAMESPACE} exists"
+              break
+            fi
+            echo "  Attempt $i/36 - Namespace not found, waiting 5s..."
+            sleep 5
+          done
+          
+          if ! kubectl get namespace ${NAMESPACE} 2>/dev/null; then
+            echo "::error::Namespace ${NAMESPACE} was not created by Argo CD after 3 minutes"
+            exit 1
+          fi
+
+      - name: Verify API deployment image
+        env:
+          NAMESPACE: preview-pr-${{ github.event.pull_request.number }}
+          EXPECTED_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
+          REGISTRY: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+        run: |
+          echo "Waiting for API deployment to be ready..."
+          
+          # Wait up to 5 minutes for the deployment to exist and be ready
+          for i in {1..60}; do
+            if kubectl get deployment api -n ${NAMESPACE} 2>/dev/null; then
+              echo "✅ API deployment exists"
+              
+              # Get the current image
+              CURRENT_IMAGE=$(kubectl get deployment api -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[0].image}')
+              echo "Current image: ${CURRENT_IMAGE}"
+              echo "Expected: ${REGISTRY}/yt-summarizer-api:${EXPECTED_TAG}"
+              
+              # Check if it matches expected tag
+              if [[ "${CURRENT_IMAGE}" == "${REGISTRY}/yt-summarizer-api:${EXPECTED_TAG}" ]]; then
+                echo "✅ API deployment is using the correct image tag"
+                
+                # Wait for deployment to be ready
+                if kubectl rollout status deployment/api -n ${NAMESPACE} --timeout=120s; then
+                  echo "✅ API deployment is ready"
+                  exit 0
+                fi
+              else
+                echo "⚠️ Image tag mismatch - Argo CD may still be syncing"
+              fi
+            fi
+            
+            echo "  Attempt $i/60 - Waiting for deployment, 5s..."
+            sleep 5
+          done
+          
+          echo "::error::API deployment did not reach ready state with correct image after 5 minutes"
+          kubectl get deployment api -n ${NAMESPACE} -o yaml || true
+          exit 1
+
+      - name: Verify workers deployment image
+        env:
+          NAMESPACE: preview-pr-${{ github.event.pull_request.number }}
+          EXPECTED_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
+          REGISTRY: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+        run: |
+          echo "Verifying worker deployments..."
+          
+          for WORKER in transcribe-worker summarize-worker embed-worker relationships-worker; do
+            echo "Checking ${WORKER}..."
+            
+            CURRENT_IMAGE=$(kubectl get deployment ${WORKER} -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[0].image}')
+            echo "  Current image: ${CURRENT_IMAGE}"
+            
+            if [[ "${CURRENT_IMAGE}" == "${REGISTRY}/yt-summarizer-workers:${EXPECTED_TAG}" ]]; then
+              echo "  ✅ ${WORKER} is using the correct image tag"
+            else
+              echo "  ::warning::${WORKER} image mismatch: ${CURRENT_IMAGE}"
+            fi
+          done
+
+      - name: Run basic API health check
+        env:
+          NAMESPACE: preview-pr-${{ github.event.pull_request.number }}
+          API_URL: ${{ needs.update-overlay.outputs.preview_url }}
+        run: |
+          if [ -n "$API_URL" ]; then
+            echo "Running health check against ${API_URL}/health/live"
+            
+            # Try health check with retries
+            for i in {1..10}; do
+              if curl -sf "${API_URL}/health/live" | grep -q "ok"; then
+                echo "✅ API health check passed"
+                exit 0
+              fi
+              echo "  Attempt $i/10 - API not ready, waiting 10s..."
+              sleep 10
+            done
+            
+            echo "::warning::API health check failed after 10 attempts"
+            echo "This may be a transient issue - check logs in the pod"
+          else
+            echo "::warning::No API URL configured - skipping health check"
+          fi
+
+  # ---------------------------------------------------------------------------
   # Deploy Frontend Preview to SWA
   # ---------------------------------------------------------------------------
   deploy-frontend-preview:
@@ -521,7 +652,7 @@ jobs:
   post-preview-comment:
     name: Post Preview Comment
     runs-on: ubuntu-latest
-    needs: [update-overlay, deploy-frontend-preview]
+    needs: [update-overlay, verify-deployment, deploy-frontend-preview]
     steps:
       - name: Post preview URL to PR
         uses: actions/github-script@v7
@@ -618,7 +749,7 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [update-overlay, deploy-frontend-preview, post-preview-comment]
+    needs: [update-overlay, verify-deployment, deploy-frontend-preview, post-preview-comment]
     # Skip E2E tests if no API URL is configured
     if: needs.get-ingress.outputs.preview_url != ''
     outputs:
@@ -745,7 +876,7 @@ jobs:
   preview-status-check:
     name: Preview Status Check
     runs-on: ubuntu-latest
-    needs: [detect-changes, update-overlay, deploy-frontend-preview, e2e-tests]
+    needs: [detect-changes, update-overlay, verify-deployment, deploy-frontend-preview, e2e-tests]
     if: always()
     steps:
       - name: Check preview pipeline status
@@ -783,6 +914,7 @@ jobs:
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Update Overlay | ${{ needs.update-overlay.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Verify Deployment | ${{ needs.verify-deployment.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy Frontend | ${{ needs.deploy-frontend-preview.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| E2E Tests | ${E2E_STATUS} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -790,6 +922,11 @@ jobs:
           # Required jobs must succeed only if the PR contains code changes
           if [ "${{ needs.detect-changes.outputs.has_code_changes }}" = "true" ] && [ "${{ needs.update-overlay.result }}" != "success" ]; then
             echo "::error::Update overlay failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.has_code_changes }}" = "true" ] && [ "${{ needs.verify-deployment.result }}" != "success" ]; then
+            echo "::error::Deployment verification failed - pods may not be running correct image"
             exit 1
           fi
 
