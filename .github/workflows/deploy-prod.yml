@@ -60,6 +60,7 @@ jobs:
     outputs:
       api_digest: ${{ steps.build.outputs.digest }}
       image_tag: ${{ needs.meta.outputs.image_tag }}
+      api_build_duration: ${{ steps.finish.outputs.build_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -76,6 +77,10 @@ jobs:
 
       - name: Login to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Record build start
+        id: start
+        run: echo "started_at=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Build and push API image
         id: build
@@ -94,10 +99,18 @@ jobs:
             type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-api:latest
             type=gha
           cache-to: |
-            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-api:${{ needs.meta.outputs.image_tag }},mode=max
             type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-api:latest,mode=max
             type=gha,mode=max
           platforms: linux/amd64
+
+      - name: Record build finish
+        id: finish
+        run: |
+          END=$(date +%s)
+          START=${{ steps.start.outputs.started_at }}
+          DURATION=$((END - START))
+          echo "build_duration=${DURATION}" >> $GITHUB_OUTPUT
+          echo "Build duration for api: ${DURATION}s"
 
   build-workers:
     name: Build and push Workers image
@@ -106,6 +119,7 @@ jobs:
     outputs:
       workers_digest: ${{ steps.build.outputs.digest }}
       image_tag: ${{ needs.meta.outputs.image_tag }}
+      workers_build_duration: ${{ steps.finish.outputs.build_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -122,6 +136,10 @@ jobs:
 
       - name: Login to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Record build start
+        id: start
+        run: echo "started_at=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Build and push Workers image
         id: build
@@ -140,10 +158,18 @@ jobs:
             type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-workers:latest
             type=gha
           cache-to: |
-            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-workers:${{ needs.meta.outputs.image_tag }},mode=max
             type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-workers:latest,mode=max
             type=gha,mode=max
           platforms: linux/amd64
+
+      - name: Record build finish
+        id: finish
+        run: |
+          END=$(date +%s)
+          START=${{ steps.start.outputs.started_at }}
+          DURATION=$((END - START))
+          echo "build_duration=${DURATION}" >> $GITHUB_OUTPUT
+          echo "Build duration for workers: ${DURATION}s"
 
   # ---------------------------------------------------------------------------
   # Update Production Overlay

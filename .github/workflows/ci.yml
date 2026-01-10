@@ -223,6 +223,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    outputs:
+      build_duration: ${{ steps.finish.outputs.build_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -240,7 +242,12 @@ jobs:
       - name: Login to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
+      - name: Record build start
+        id: start
+        run: echo "started_at=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Build and push ${{ matrix.service }} image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -255,10 +262,18 @@ jobs:
             type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-${{ matrix.service }}:latest
             type=gha
           cache-to: |
-            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-${{ matrix.service }}:${{ needs.build-images-meta.outputs.image_tag }},mode=max
             type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-${{ matrix.service }}:latest,mode=max
             type=gha,mode=max
           platforms: linux/amd64
+
+      - name: Record build finish
+        id: finish
+        run: |
+          END=$(date +%s)
+          START=${{ steps.start.outputs.started_at }}
+          DURATION=$((END - START))
+          echo "build_duration=${DURATION}" >> $GITHUB_OUTPUT
+          echo "Build duration for ${{ matrix.service }}: ${DURATION}s"
 
   # ---------------------------------------------------------------------------
   # Build Docker Images (Validation Only - No Push)
