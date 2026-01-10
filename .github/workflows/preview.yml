@@ -179,12 +179,33 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
+      - name: Get Ingress Controller IP
+        id: ingress-ip
+        run: |
+          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Found Ingress IP: $INGRESS_IP"
+          echo "ip=$INGRESS_IP" >> $GITHUB_OUTPUT
+
       - name: Update preview overlay with image tags
         id: overlay
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           IMAGE_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
           ACR_SERVER: ${{ env.ACR_LOGIN_SERVER }}
+          INGRESS_IP: ${{ steps.ingress-ip.outputs.ip }}
         run: |
           OVERLAY_FILE="k8s/overlays/preview/kustomization.yaml"
           
@@ -316,16 +337,18 @@ jobs:
               "${OVERLAY_FILE}.template" > "$OVERLAY_FILE"
           rm "${OVERLAY_FILE}.template"
           
-          # Generate preview URL from configured variable or leave empty
-          # If PREVIEW_API_URL is set in repo variables, use it
-          # Otherwise, frontend will work in offline/mock mode
+          # Generate preview URL
+          # Priority: 1. Repo Variable (PREVIEW_API_URL) 2. Dynamic Ingress IP
           if [ -n "${{ env.PREVIEW_API_URL }}" ]; then
             PREVIEW_URL="${{ env.PREVIEW_API_URL }}"
             echo "✅ Using configured API URL: ${PREVIEW_URL}"
+          elif [ -n "$INGRESS_IP" ]; then
+            PREVIEW_URL="https://${INGRESS_IP}/api"
+            echo "✅ Using dynamic Ingress URL: ${PREVIEW_URL}"
           else
             PREVIEW_URL=""
-            echo "⚠️ PREVIEW_API_URL not configured - frontend will run without backend"
-            echo "::warning::Set PREVIEW_API_URL in repository variables to enable backend API"
+            echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
+            echo "::warning::Backend connectivity may be broken"
           fi
           echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
           
