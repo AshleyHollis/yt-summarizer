@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-host-ingress
+  namespace: yt-summarizer
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+    - host: api.preview-pr-4.20-255-113-149.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - api.preview-pr-4.20-255-113-149.nip.io
+      secretName: preview-pr-4-tls
