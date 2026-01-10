@@ -14,6 +14,7 @@ patches:
   - target:
       kind: ServiceAccount
       name: yt-summarizer-sa
+      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /metadata/annotations/azure.workload.identity~1client-id

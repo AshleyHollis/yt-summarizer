@@ -23,6 +23,7 @@ patches:
       version: v1
       kind: Deployment
       name: api
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -45,6 +46,7 @@ patches:
       version: v1
       kind: Deployment
       name: transcribe-worker
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -67,6 +69,7 @@ patches:
       version: v1
       kind: Deployment
       name: summarize-worker
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -89,6 +92,7 @@ patches:
       version: v1
       kind: Deployment
       name: embed-worker
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -111,6 +115,7 @@ patches:
       version: v1
       kind: Deployment
       name: relationships-worker
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -134,6 +139,7 @@ patches:
       version: v1
       kind: Deployment
       name: api
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -146,6 +152,7 @@ patches:
       version: v1
       kind: Deployment
       name: transcribe-worker
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -158,6 +165,7 @@ patches:
       version: v1
       kind: Deployment
       name: summarize-worker
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -170,6 +178,7 @@ patches:
       version: v1
       kind: Deployment
       name: embed-worker
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -182,6 +191,7 @@ patches:
       version: v1
       kind: Deployment
       name: relationships-worker
+      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -196,6 +206,7 @@ patches:
       version: v1beta1
       kind: ExternalSecret
       name: db-credentials
+      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /spec/secretStoreRef/kind
@@ -208,6 +219,7 @@ patches:
       version: v1beta1
       kind: ExternalSecret
       name: openai-credentials
+      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /spec/secretStoreRef/kind
@@ -220,6 +232,7 @@ patches:
       version: v1beta1
       kind: ExternalSecret
       name: storage-credentials
+      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /spec/secretStoreRef/kind
@@ -233,6 +246,7 @@ patches:
       version: v1beta1
       kind: SecretStore
       name: azure-keyvault
+      namespace: yt-summarizer
     patch: |-
       $patch: delete
       apiVersion: external-secrets.io/v1beta1
@@ -245,6 +259,7 @@ patches:
   - target:
       kind: ServiceAccount
       name: yt-summarizer-sa
+      namespace: yt-summarizer
     patch: |-
       - op: remove
         path: /metadata/annotations/azure.workload.identity~1client-id
@@ -256,6 +271,7 @@ patches:
       version: v1
       kind: Job
       name: db-migration
+      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /spec/template/spec/serviceAccountName
