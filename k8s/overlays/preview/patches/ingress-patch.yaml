@@ -15,7 +15,7 @@ metadata:
 spec:
   rules:
     # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
-    - host: __PREVIEW_HOST__
+    - host: api.preview-pr-4.20-255-113-149.nip.io
       http:
         paths:
           - path: /api(/|$)(.*)
@@ -28,4 +28,4 @@ spec:
   tls:
     - hosts:
         - __PREVIEW_HOST__
-      secretName: __TLS_SECRET__
+      secretName: preview-pr-4-tls
