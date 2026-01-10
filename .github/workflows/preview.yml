@@ -327,12 +327,15 @@ jobs:
           TLS_SECRET="${{ needs.get-ingress.outputs.tls_secret }}"
           if [ -n "$PREVIEW_URL" ]; then
             echo "✅ Using Preview URL: ${PREVIEW_URL}"
-            if [ -n "$PREVIEW_HOST" ]; then
-              sed -i "s/__PREVIEW_HOST__/${PREVIEW_HOST}/g" k8s/overlays/preview/patches/ingress-patch.yaml
-            fi
-            if [ -n "$TLS_SECRET" ]; then
-              sed -i "s/__TLS_SECRET__/${TLS_SECRET}/g" k8s/overlays/preview/patches/ingress-patch.yaml
-            fi
+            # Pass preview details into the generator so it can substitute placeholders in patches
+            python scripts/ci/generate_preview_kustomization.py \
+              --template scripts/ci/templates/preview-kustomization-template.yaml \
+              --output "$OVERLAY_FILE" \
+              --pr-number "${PR_NUMBER}" \
+              --image-tag "${IMAGE_TAG}" \
+              --acr-server "${ACR_SERVER}" \
+              --preview-host "${PREVIEW_HOST}" \
+              --tls-secret "${TLS_SECRET}" || true
           else
             echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
             echo "::warning::Backend connectivity may be broken"
@@ -347,20 +350,51 @@ jobs:
 
       - name: Validate generated overlay (kustomize + dry-run)
         run: |
-          set -e
+          set -eo pipefail
+          OVERLAY_FILE="k8s/overlays/preview/kustomization.yaml"
+          TMP_MANIFEST="/tmp/preview-manifests.yaml"
+          ERR_FILE="/tmp/kustomize.err"
+
           echo "Building manifests with kustomize..."
-          kubectl kustomize k8s/overlays/preview > /tmp/preview-manifests.yaml
+          if ! kubectl kustomize k8s/overlays/preview > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
+            echo "::error::kustomize build FAILED for overlay 'preview'"
+            echo "--- kustomize stderr ---"
+            sed -n '1,200p' "$ERR_FILE" || true
+            echo "--- end kustomize stderr ---"
+
+            echo "--- Generated overlay file: $OVERLAY_FILE ---"
+            if [ -f "$OVERLAY_FILE" ]; then
+              nl -ba "$OVERLAY_FILE" | sed -n '1,200p' || true
+            else
+              echo "(overlay file not found)"
+            fi
+
+            echo "--- Listing patch files (k8s/overlays/preview/patches) ---"
+            ls -la k8s/overlays/preview/patches || true
+            for f in k8s/overlays/preview/patches/*; do
+              echo "--- $f (first 200 lines) ---"
+              nl -ba "$f" | sed -n '1,200p' || true
+            done || true
+
+            echo "Searching for 'group:' occurrences (common cause of 'unknown field \"group\"')"
+            grep -n "^\s*group:\s" -n "$OVERLAY_FILE" || true
+            grep -n "^\s*group:\s" -n k8s/overlays/preview/patches/* || true
+
+            echo "::error::kustomize build failed for overlay 'preview' - see log and files above for diagnostics"
+            exit 1
+          fi
 
           echo "Checking YAML syntax by parsing manifests..."
-          python scripts/ci/parse_yaml.py /tmp/preview-manifests.yaml
+          python scripts/ci/parse_yaml.py "$TMP_MANIFEST"
 
           echo "Performing server-side dry-run apply to validate against API server..."
-          if kubectl apply --server-dry-run=server -f /tmp/preview-manifests.yaml; then
+          if kubectl apply --server-dry-run=server -f "$TMP_MANIFEST"; then
             echo "Server dry-run OK"
           else
             echo "::error::Server dry-run failed - printing manifest and exiting"
-            kubectl kustomize k8s/overlays/preview || true
-            cat /tmp/preview-manifests.yaml || true
+            sed -n '1,200p' "$ERR_FILE" || true
+            nl -ba "$OVERLAY_FILE" | sed -n '1,200p' || true
+            cat "$TMP_MANIFEST" | sed -n '1,200p' || true
             exit 1
           fi
 
