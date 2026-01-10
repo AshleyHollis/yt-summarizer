@@ -12,6 +12,8 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     # Preserve the /api prefix when forwarding to the backend so router prefixes remain intact
     nginx.ingress.kubernetes.io/rewrite-target: /api/$2
+    # Tell cert-manager to issue a cert using the staging ClusterIssuer
+    cert-manager.io/cluster-issuer: letsencrypt-staging
 spec:
   rules:
     # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
