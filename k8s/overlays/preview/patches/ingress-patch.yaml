@@ -14,13 +14,6 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /api/$2
     # Tell cert-manager to issue a cert using the staging ClusterIssuer
     cert-manager.io/cluster-issuer: letsencrypt-staging
-    nginx.ingress.kubernetes.io/server-snippet: |
-      location = /debug {
-        proxy_pass http://api.preview-pr-4.svc.cluster.local/debug;
-      }
-      location = /health {
-        proxy_pass http://api.preview-pr-4.svc.cluster.local/health;
-      }
 spec:
   rules:
     # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
