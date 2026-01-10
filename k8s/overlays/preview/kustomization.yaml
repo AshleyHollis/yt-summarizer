@@ -19,6 +19,16 @@ patches:
   - path: patches/ingress-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
+  # Add CORS origins for Azure Static Web Apps
+  - target:
+      kind: Deployment
+      name: api
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: API__CORS_ORIGINS
+          value: '["https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
   # Patch ExternalSecrets to use ClusterSecretStore
   - target:
       group: external-secrets.io
