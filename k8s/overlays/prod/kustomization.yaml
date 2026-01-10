@@ -141,7 +141,82 @@ patches:
                   limits:
                     cpu: 500m
                     memory: 512Mi
-  - path: patches/priority-class-patch.yaml
+  # Priority class patches for all deployments
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: api
+      namespace: yt-summarizer
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        template:
+          spec:
+            priorityClassName: production-critical
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: transcribe-worker
+      namespace: yt-summarizer
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: transcribe-worker
+      spec:
+        template:
+          spec:
+            priorityClassName: production-critical
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: summarize-worker
+      namespace: yt-summarizer
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: summarize-worker
+      spec:
+        template:
+          spec:
+            priorityClassName: production-critical
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: embed-worker
+      namespace: yt-summarizer
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: embed-worker
+      spec:
+        template:
+          spec:
+            priorityClassName: production-critical
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: relationships-worker
+      namespace: yt-summarizer
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: relationships-worker
+      spec:
+        template:
+          spec:
+            priorityClassName: production-critical
 
 labels:
   - pairs:
