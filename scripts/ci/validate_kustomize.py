@@ -44,7 +44,7 @@ def validate_manifest(path: Path) -> (int, dict):
     total_cpu = 0
     per_kind = {}
 
-    docs = list(yaml.safe_load_all(path.read_text()))
+    docs = list(yaml.safe_load_all(path.read_text(encoding='utf-8')))
     for doc in docs:
         if not isinstance(doc, dict):
             continue
