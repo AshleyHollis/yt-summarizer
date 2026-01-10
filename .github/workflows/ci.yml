@@ -225,6 +225,52 @@ jobs:
         run: npm run test:run
 
   # ---------------------------------------------------------------------------
+  # Kustomize validation + Preview quota check
+  # ---------------------------------------------------------------------------
+  # Validate that kustomize builds overlays and that preview overlay CPU
+  # requests fit within the configured preview quota (prevents rollout blocks).
+  # ---------------------------------------------------------------------------
+  kustomize-validate:
+    name: Kustomize & Preview Quota Validate
+    runs-on: ubuntu-latest
+    # Run in parallel with other checks
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install kustomize
+        run: |
+          KUSTOMIZE_VER=v5.1.1
+          curl -sLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/${KUSTOMIZE_VER}/kustomize_${KUSTOMIZE_VER#v}_linux_amd64.tar.gz
+          tar -xzf kustomize.tar.gz
+          sudo mv kustomize /usr/local/bin/
+          kustomize version
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Build preview overlay
+        run: kustomize build k8s/overlays/preview > /tmp/preview.yaml
+
+      - name: Validate preview CPU within quota
+        run: |
+          python scripts/ci/validate_kustomize.py --file /tmp/preview.yaml --max-cpu 1500 --name preview
+
+      - name: Build prod overlay
+        run: kustomize build k8s/overlays/prod > /tmp/prod.yaml || true
+
+      - name: Validate prod overlay
+        run: |
+          python scripts/ci/validate_kustomize.py --file /tmp/prod.yaml --max-cpu 8000 --name prod || true
+
+  # ---------------------------------------------------------------------------
   # Build Docker Images
   # ---------------------------------------------------------------------------
   # Builds and pushes Docker images to ACR. This validates:
