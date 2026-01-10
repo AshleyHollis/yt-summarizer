@@ -2,17 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs'; // Required for fetch with duplex option if needed, though Next.js 13+ handles web standard fetch
 
-async function handler(req: NextRequest, props: { params: { path: string[] } }) {
-  // Handle params consistently (support frameworks that pass a Promise or direct value)
-  const p = props.params as unknown;
-  let paramsValue: { path: string[] };
-  const maybePromise = p as { then?: unknown };
-  if (maybePromise && typeof maybePromise.then === 'function') {
-    // If a Promise-like was provided (older Next compat), await it
-    paramsValue = await (p as Promise<{ path: string[] }>);
-  } else {
-    paramsValue = p as { path: string[] };
-  }
+async function handler(req: NextRequest, props: { params: Promise<{ path: string[] }> }) {
+  // Next.js provides `context.params` as a Promise<{ path: string[] }>, so await it
+  const paramsValue = await props.params;
   const path = (paramsValue?.path || []).join('/');
   const query = req.nextUrl.search;
   
@@ -118,26 +110,26 @@ async function handler(req: NextRequest, props: { params: { path: string[] } }) 
   }
 }
 
-export async function GET(req: NextRequest, props: { params: { path: string[] } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ path: string[] }> }) {
   return handler(req, props);
 }
 
-export async function POST(req: NextRequest, props: { params: { path: string[] } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ path: string[] }> }) {
   return handler(req, props);
 }
 
-export async function PUT(req: NextRequest, props: { params: { path: string[] } }) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ path: string[] }> }) {
   return handler(req, props);
 }
 
-export async function DELETE(req: NextRequest, props: { params: { path: string[] } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ path: string[] }> }) {
   return handler(req, props);
 }
 
-export async function PATCH(req: NextRequest, props: { params: { path: string[] } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ path: string[] }> }) {
   return handler(req, props);
 }
 
-export async function HEAD(req: NextRequest, props: { params: { path: string[] } }) {
+export async function HEAD(req: NextRequest, props: { params: Promise<{ path: string[] }> }) {
   return handler(req, props);
 }
