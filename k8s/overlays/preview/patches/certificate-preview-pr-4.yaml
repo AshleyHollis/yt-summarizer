@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: preview-pr-4-cert
+  namespace: preview-pr-4
+spec:
+  secretName: preview-pr-4-tls
+  dnsNames:
+    - api.preview-pr-4.20-255-113-149.nip.io
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
