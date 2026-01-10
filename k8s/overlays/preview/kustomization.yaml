@@ -1,20 +1,272 @@
 # Preview overlay - updated by GitHub Actions
-# PR: #123
-# Image Tag: test
-# Updated: 2026-01-10T13:32:47Z
+# PR: #4
+# Image Tag: pr-4-d9848a0
+# Updated: 2026-01-10T13:42:21Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 metadata:
   annotations:
     config.kubernetes.io/local-config: "true"
-namespace: preview-pr-123
+namespace: preview-pr-4
 resources:
   - ../../base
   - resource-quota.yaml
   - limit-range.yaml
-patchesStrategicMerge:
-  - patches/configmap-patch.yaml
-  - patches/ingress-patch.yaml
-  - patches/resources-patch.yaml
-  - patches/replicas-patch.yaml
+patches:
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: api
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        template:
+          spec:
+            containers:
+            - name: api
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 150m
+                  memory: 256Mi
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: transcribe-worker
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: transcribe-worker
+      spec:
+        template:
+          spec:
+            containers:
+            - name: worker
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 150m
+                  memory: 256Mi
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: summarize-worker
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: summarize-worker
+      spec:
+        template:
+          spec:
+            containers:
+            - name: worker
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 150m
+                  memory: 256Mi
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: embed-worker
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: embed-worker
+      spec:
+        template:
+          spec:
+            containers:
+            - name: worker
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 150m
+                  memory: 256Mi
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: relationships-worker
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: relationships-worker
+      spec:
+        template:
+          spec:
+            containers:
+            - name: worker
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 150m
+                  memory: 256Mi
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: api
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        replicas: 1
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: transcribe-worker
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: transcribe-worker
+      spec:
+        replicas: 1
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: summarize-worker
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: summarize-worker
+      spec:
+        replicas: 1
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: embed-worker
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: embed-worker
+      spec:
+        replicas: 1
+  - target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: relationships-worker
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: relationships-worker
+      spec:
+        replicas: 1
+  - target:
+    group: batch
+    version: v1
+    kind: Job
+    name: db-migration
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: db-migration
+      spec:
+        template:
+          spec:
+            serviceAccountName: default
+  - target:
+    group: external-secrets.io
+    version: v1beta1
+    kind: ExternalSecret
+    name: db-credentials
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: db-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+  - target:
+    group: external-secrets.io
+    version: v1beta1
+    kind: ExternalSecret
+    name: openai-credentials
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: openai-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+  - target:
+    group: external-secrets.io
+    version: v1beta1
+    kind: ExternalSecret
+    name: storage-credentials
+    namespace: preview-pr-4
+    patch: |
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: storage-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+  - target:
+    group: external-secrets.io
+    version: v1beta1
+    kind: SecretStore
+    name: azure-keyvault
+    namespace: preview-pr-4
+    patch: |
+      $patch: delete
+      apiVersion: external-secrets.io/v1beta1
+      kind: SecretStore
+      metadata:
+        name: azure-keyvault
+  - path: patches/configmap-patch.yaml
+  - path: patches/ingress-patch.yaml
+  - path: patches/resources-patch.yaml
+  - path: patches/replicas-patch.yaml
