@@ -138,7 +138,7 @@ jobs:
     needs: wait-for-ci
     outputs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
-      image_tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+      image_tag: ${{ steps.export-image.outputs.image_tag }}
     steps:
       - name: Count active previews via GitHub API
         id: check
@@ -160,6 +160,13 @@ jobs:
             echo "::warning::Maximum previews reached (${OPEN_PRS}/${{ env.MAX_PREVIEWS }}). Waiting for slot..."
             echo "can_deploy=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Export computed image tag
+        id: export-image
+        run: |
+          # Ensure we explicitly expose the image tag (propagates across jobs reliably)
+          echo "image_tag=${{ needs.wait-for-ci.outputs.image_tag }}" >> $GITHUB_OUTPUT
+          echo "Exported image tag: ${{ needs.wait-for-ci.outputs.image_tag }}"
 
       - name: Post queue status
         if: steps.check.outputs.can_deploy == 'false'
