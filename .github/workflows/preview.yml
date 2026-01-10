@@ -345,6 +345,34 @@ jobs:
           echo "Updated preview overlay at ${OVERLAY_FILE}"
           cat "$OVERLAY_FILE"
 
+      - name: Validate generated overlay (kustomize + dry-run)
+        run: |
+          set -e
+          echo "Building manifests with kustomize..."
+          kubectl kustomize k8s/overlays/preview > /tmp/preview-manifests.yaml
+
+          echo "Checking YAML syntax by parsing manifests..."
+          python - <<'PY'
+import sys, yaml
+try:
+    with open('/tmp/preview-manifests.yaml') as f:
+        list(yaml.safe_load_all(f))
+except Exception as e:
+    print('YAML parse error:', e)
+    sys.exit(1)
+print('YAML parse OK')
+PY
+
+          echo "Performing server-side dry-run apply to validate against API server..."
+          if kubectl apply --server-dry-run=server -f /tmp/preview-manifests.yaml; then
+            echo "Server dry-run OK"
+          else
+            echo "::error::Server dry-run failed - printing manifest and exiting"
+            kubectl kustomize k8s/overlays/preview || true
+            cat /tmp/preview-manifests.yaml || true
+            exit 1
+          fi
+
       - name: Commit and push overlay update
         env:
           IMAGE_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
@@ -421,6 +449,18 @@ jobs:
           
           if ! kubectl get namespace ${NAMESPACE} 2>/dev/null; then
             echo "::error::Namespace ${NAMESPACE} was not created by Argo CD after 3 minutes"
+
+            # Try to gather Argo CD Application status for diagnostics
+            APP_NAME="preview-pr-${{ github.event.pull_request.number }}"
+            echo "Attempting to fetch Argo CD Application status for ${APP_NAME} (namespace: argocd)"
+            echo "--- Argo CD Application (yaml) ---"
+            kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o yaml || echo "No Argo CD application named ${APP_NAME} found in namespace 'argocd'"
+            echo "--- Argo CD application events / status (describe) ---"
+            kubectl describe application ${APP_NAME} -n argocd || true
+
+            echo "--- Argo CD applications matching preview-pr-${{ github.event.pull_request.number }} (all namespaces) ---"
+            kubectl get applications.argoproj.io --all-namespaces | grep "preview-pr-${{ github.event.pull_request.number }}" || true
+
             exit 1
           fi
 
