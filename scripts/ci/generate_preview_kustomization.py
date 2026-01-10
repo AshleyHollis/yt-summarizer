@@ -10,44 +10,9 @@ This script loads a template and substitutes variables for the preview overlay.
 import argparse
 import sys
 from datetime import datetime, timezone
-import yaml
 
-
-def generate_from_template(template_path: str, output_path: str, pr_number: str, image_tag: str, acr_server: str):
-    """Load template and substitute variables."""
-    with open(template_path, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-    # Substitute variables
-    if 'namespace' in data and '__PR_NUMBER__' in data['namespace']:
-        data['namespace'] = data['namespace'].replace('__PR_NUMBER__', pr_number)
-
-    # Substitute in images
-    for image in data.get('images', []):
-        if '__ACR_SERVER__' in str(image.get('newName', '')):
-            image['newName'] = image['newName'].replace('__ACR_SERVER__', acr_server)
-        if '__IMAGE_TAG__' in str(image.get('newTag', '')):
-            image['newTag'] = image['newTag'].replace('__IMAGE_TAG__', image_tag)
-
-    # Substitute in labels
-    for label_group in data.get('labels', []):
-        pairs = label_group.get('pairs', {})
-        if '__PR_NUMBER__' in str(pairs.get('preview.pr-number', '')):
-            pairs['preview.pr-number'] = pairs['preview.pr-number'].replace('__PR_NUMBER__', pr_number)
-
-    # Write to output with proper formatting
-    with open(output_path, 'w', encoding='utf-8') as f:
-        # Write header comments
-        f.write('# Preview overlay - updated by GitHub Actions\n')
-        f.write(f'# PR: #{pr_number}\n')
-        f.write(f'# Image Tag: {image_tag}\n')
-        f.write(f'# Updated: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}\n')
-        f.write('\n')
-
-        # Use yaml.dump with proper formatting
-        yaml.dump(data, f, default_flow_style=False, sort_keys=False, indent=2, allow_unicode=True)
-
-    print(f'Generated {output_path} for PR #{pr_number} with image tag: {image_tag}')
+# Import shared utilities
+from kustomization_utils import generate_from_template
 
 
 def main():
@@ -60,7 +25,24 @@ def main():
 
     args = parser.parse_args()
 
-    generate_from_template(args.template, args.output, args.pr_number, args.image_tag, args.acr_server)
+    # Define variables for substitution
+    variables = {
+        'PR_NUMBER': args.pr_number,
+        'IMAGE_TAG': args.image_tag,
+        'ACR_SERVER': args.acr_server
+    }
+
+    # Define header comments
+    header_comments = [
+        'Preview overlay - updated by GitHub Actions',
+        f'PR: #{args.pr_number}',
+        f'Image Tag: {args.image_tag}',
+        f'Updated: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}'
+    ]
+
+    generate_from_template(args.template, args.output, variables, header_comments)
+
+    print(f'Generated {args.output} for PR #{args.pr_number} with image tag: {args.image_tag}')
 
 
 if __name__ == '__main__':

@@ -9,34 +9,10 @@ This script loads a template and substitutes the image tag.
 """
 import argparse
 import sys
-import yaml
 from datetime import datetime, timezone
 
-
-def update_from_template(template_path: str, output_path: str, image_tag: str):
-    """Load template and substitute image tag."""
-    with open(template_path, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-    # Substitute image tags
-    for image in data.get('images', []):
-        if '__IMAGE_TAG__' in str(image.get('newTag', '')):
-            image['newTag'] = image['newTag'].replace('__IMAGE_TAG__', image_tag)
-
-    # Write to output with proper formatting
-    with open(output_path, 'w', encoding='utf-8') as f:
-        # Write header comments
-        f.write('# =============================================================================\n')
-        f.write('# Production Overlay Kustomization\n')
-        f.write('# =============================================================================\n')
-        f.write(f'# Single production environment - auto-synced by Argo CD on merge to main\n')
-        f.write(f'# Last updated: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}\n')
-        f.write('\n')
-
-        # Use yaml.dump with proper formatting
-        yaml.dump(data, f, default_flow_style=False, sort_keys=False, indent=2, allow_unicode=True)
-
-    print(f'Generated {output_path} with image tag: {image_tag}')
+# Import shared utilities
+from kustomization_utils import generate_from_template
 
 
 def main():
@@ -47,7 +23,23 @@ def main():
 
     args = parser.parse_args()
 
-    update_from_template(args.template, args.output, args.image_tag)
+    # Define variables for substitution
+    variables = {
+        'IMAGE_TAG': args.image_tag
+    }
+
+    # Define header comments
+    header_comments = [
+        '=============================================================================',
+        'Production Overlay Kustomization',
+        '=============================================================================',
+        'Single production environment - auto-synced by Argo CD on merge to main',
+        f'Last updated: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}'
+    ]
+
+    generate_from_template(args.template, args.output, variables, header_comments)
+
+    print(f'Generated {args.output} with image tag: {args.image_tag}')
 
 
 if __name__ == '__main__':
