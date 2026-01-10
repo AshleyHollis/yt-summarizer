@@ -116,16 +116,18 @@ sed -e "s/__PR_NUMBER__/${PR_NUMBER}/g" \
     "${OVERLAY_FILE}.template" > "$OVERLAY_FILE"
 rm "${OVERLAY_FILE}.template"
 
-# Generate preview URL from configured variable or leave empty
-# If PREVIEW_API_URL is set in repo variables, use it
-# Otherwise, frontend will work in offline/mock mode
+# Generate preview URL
+# Priority: 1. Repo Variable (PREVIEW_API_URL) 2. Dynamic Ingress IP
 if [ -n "http://20.255.113.149" ]; then
   PREVIEW_URL="http://20.255.113.149"
   echo "✅ Using configured API URL: ${PREVIEW_URL}"
+elif [ -n "$INGRESS_IP" ]; then
+  PREVIEW_URL="https://${INGRESS_IP}/api"
+  echo "✅ Using dynamic Ingress URL: ${PREVIEW_URL}"
 else
   PREVIEW_URL=""
-  echo "⚠️ PREVIEW_API_URL not configured - frontend will run without backend"
-  echo "::warning::Set PREVIEW_API_URL in repository variables to enable backend API"
+  echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
+  echo "::warning::Backend connectivity may be broken"
 fi
 echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
 
