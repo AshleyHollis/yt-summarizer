@@ -256,6 +256,7 @@ spec:
 
 - **Ingress approach**: Each preview namespace gets an Ingress with subdomain routing
 - **Pattern**: `pr-<number>.preview.ytsummarizer.dev` (or path-based: `preview.ytsummarizer.dev/pr-<number>/`)
+- **TLS & free hostname (preview)**: For PR previews we will use a free IP-to-hostname resolver (e.g., `nip.io` or `sslip.io`) and `cert-manager` with Let's Encrypt to provide HTTPS for preview hosts without a paid DNS provider. This encodes the LB IP into the hostname (e.g., `api.preview-pr-<num>.<ingress-ip-dashed>.nip.io`) and allows cert-manager to provision TLS via HTTP-01.
 - **Status posting**: `preview.yml` posts a PR comment with:
   - Deploy status (deploying/ready/failed)
   - Preview URL
