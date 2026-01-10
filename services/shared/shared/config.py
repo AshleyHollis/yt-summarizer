@@ -100,8 +100,9 @@ class DatabaseSettings(BaseSettings):
             port = "1433"
 
         # Build SQLAlchemy URL
+        # Note: SQL Server ODBC uses comma for port (e.g., localhost,1433), not colon
         encoded_password = quote_plus(password)
-        return f"mssql+pyodbc://{user}:{encoded_password}@{host}:{port}/{database}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+        return f"mssql+pyodbc://{user}:{encoded_password}@{host},{port}/{database}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
 
 
 class AzureStorageSettings(BaseSettings):
