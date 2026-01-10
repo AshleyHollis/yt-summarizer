@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs'; // Required for fetch with duplex option if needed, though Next.js 13+ handles web standard fetch
 
-async function handler(req: NextRequest, props: { params: Promise<{ path: string[] }> }) {
-  // Await params for Next.js 15 compatibility
-  const params = await props.params;
-  const path = params.path.join('/');
+async function handler(req: NextRequest, props: { params: { path: string[] } }) {
+  // Handle params consistently (support frameworks that pass a Promise or direct value)
+  const p = props.params as unknown;
+  let paramsValue: { path: string[] };
+  const maybePromise = p as { then?: unknown };
+  if (maybePromise && typeof maybePromise.then === 'function') {
+    // If a Promise-like was provided (older Next compat), await it
+    paramsValue = await (p as Promise<{ path: string[] }>);
+  } else {
+    paramsValue = p as { path: string[] };
+  }
+  const path = (paramsValue?.path || []).join('/');
   const query = req.nextUrl.search;
   
   // URL priority:
@@ -100,35 +108,36 @@ async function handler(req: NextRequest, props: { params: Promise<{ path: string
       headers: responseHeaders
     });
 
-  } catch (error: any) {
-    console.error('Proxy Request Failed:', error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Proxy Request Failed:', message);
     return NextResponse.json(
-      { error: 'Proxy Request Failed', details: error.message }, 
+      { error: 'Proxy Request Failed', details: message }, 
       { status: 502 }
     );
   }
 }
 
-export async function GET(req: NextRequest, props: any) {
+export async function GET(req: NextRequest, props: { params: { path: string[] } }) {
   return handler(req, props);
 }
 
-export async function POST(req: NextRequest, props: any) {
+export async function POST(req: NextRequest, props: { params: { path: string[] } }) {
   return handler(req, props);
 }
 
-export async function PUT(req: NextRequest, props: any) {
+export async function PUT(req: NextRequest, props: { params: { path: string[] } }) {
   return handler(req, props);
 }
 
-export async function DELETE(req: NextRequest, props: any) {
+export async function DELETE(req: NextRequest, props: { params: { path: string[] } }) {
   return handler(req, props);
 }
 
-export async function PATCH(req: NextRequest, props: any) {
+export async function PATCH(req: NextRequest, props: { params: { path: string[] } }) {
   return handler(req, props);
 }
 
-export async function HEAD(req: NextRequest, props: any) {
+export async function HEAD(req: NextRequest, props: { params: { path: string[] } }) {
   return handler(req, props);
 }
