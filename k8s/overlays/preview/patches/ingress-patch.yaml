@@ -14,8 +14,8 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /api/$2
 spec:
   rules:
-    # Scope this ingress to the cluster LB IP used by previews so it takes precedence over the production ingress
-    - host: 20.255.113.149
+    # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
+    - host: __PREVIEW_HOST__
       http:
         paths:
           - path: /api(/|$)(.*)
@@ -25,3 +25,7 @@ spec:
                 name: api
                 port:
                   number: 80
+  tls:
+    - hosts:
+        - __PREVIEW_HOST__
+      secretName: __TLS_SECRET__

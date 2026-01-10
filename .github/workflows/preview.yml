@@ -337,15 +337,23 @@ jobs:
               "${OVERLAY_FILE}.template" > "$OVERLAY_FILE"
           rm "${OVERLAY_FILE}.template"
           
-          # Generate preview URL
-          # Priority: 1. Repo Variable (PREVIEW_API_URL) 2. Dynamic Ingress IP
+          # Generate preview host + URL
+          # Priority: 1. Repo Variable (PREVIEW_API_URL) 2. Dynamic Ingress IP (nip.io)
           if [ -n "${{ env.PREVIEW_API_URL }}" ]; then
             PREVIEW_URL="${{ env.PREVIEW_API_URL }}"
+            PREVIEW_HOST=$(echo "$PREVIEW_URL" | sed -E 's|https?://||; s|/.*$||')
             echo "✅ Using configured API URL: ${PREVIEW_URL}"
           elif [ -n "$INGRESS_IP" ]; then
-            # Use HTTP for preview to avoid self-signed cert errors in SWA proxy
-            PREVIEW_URL="http://${INGRESS_IP}"
-            echo "✅ Using dynamic Ingress URL: ${PREVIEW_URL}"
+            # Construct nip.io host that resolves to the ingress IP
+            IP_DASHED=$(echo "$INGRESS_IP" | tr '.' '-')
+            PREVIEW_HOST="api.preview-pr-${PR_NUMBER}.${IP_DASHED}.nip.io"
+            PREVIEW_URL="https://${PREVIEW_HOST}"
+            echo "✅ Using dynamic Preview Host: ${PREVIEW_HOST} -> ${PREVIEW_URL}"
+
+            # Substitute placeholders in ingress patch with actual host and TLS secret name
+            TLS_SECRET="preview-pr-${PR_NUMBER}-tls"
+            sed -i "s/__PREVIEW_HOST__/${PREVIEW_HOST}/g" k8s/overlays/preview/patches/ingress-patch.yaml
+            sed -i "s/__TLS_SECRET__/${TLS_SECRET}/g" k8s/overlays/preview/patches/ingress-patch.yaml
           else
             PREVIEW_URL=""
             echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
@@ -353,6 +361,8 @@ jobs:
           fi
 
           echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
+          echo "preview_host=${PREVIEW_HOST:-}" >> $GITHUB_OUTPUT
+          echo "tls_secret=${TLS_SECRET:-}" >> $GITHUB_OUTPUT
           
           echo "Updated preview overlay at ${OVERLAY_FILE}"
           cat "$OVERLAY_FILE"
