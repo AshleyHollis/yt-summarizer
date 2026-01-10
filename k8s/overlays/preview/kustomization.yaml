@@ -1,7 +1,7 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #4
-# Image Tag: pr-4-ab27369
-# Updated: 2026-01-10T09:59:48Z
+# Image Tag: pr-4-41ed923
+# Updated: 2026-01-10T11:00:06Z
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -11,8 +11,6 @@ resources:
   - ../../base
   - resource-quota.yaml
   - limit-range.yaml
-  - patches/certificate-preview-pr-4.yaml
-  - patches/api-debug-ingress.yaml
   # Note: SecretStore and ServiceAccount from base are replaced by patches
   # Preview uses ClusterSecretStore which references production namespace's SA
 
@@ -25,7 +23,6 @@ patches:
       version: v1
       kind: Deployment
       name: api
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -33,22 +30,21 @@ patches:
         name: api
       spec:
         template:
-          spec:
-            containers:
-              - name: api
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: api
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: transcribe-worker
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -56,22 +52,21 @@ patches:
         name: transcribe-worker
       spec:
         template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: summarize-worker
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -79,22 +74,21 @@ patches:
         name: summarize-worker
       spec:
         template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: embed-worker
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -102,22 +96,21 @@ patches:
         name: embed-worker
       spec:
         template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: relationships-worker
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -125,23 +118,22 @@ patches:
         name: relationships-worker
       spec:
         template:
-          spec:
-            containers:
-              - name: worker
-                resources:
-                  requests:
-                    cpu: 25m
-                    memory: 64Mi
-                  limits:
-                    cpu: 150m
-                    memory: 256Mi
+spec:
+  containers:
+    - name: worker
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 150m
+          memory: 256Mi
   # Minimal replicas for preview environments (1 replica each)
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: api
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -154,7 +146,6 @@ patches:
       version: v1
       kind: Deployment
       name: transcribe-worker
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -167,7 +158,6 @@ patches:
       version: v1
       kind: Deployment
       name: summarize-worker
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -180,7 +170,6 @@ patches:
       version: v1
       kind: Deployment
       name: embed-worker
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -193,7 +182,6 @@ patches:
       version: v1
       kind: Deployment
       name: relationships-worker
-      namespace: yt-summarizer
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
@@ -208,7 +196,6 @@ patches:
       version: v1beta1
       kind: ExternalSecret
       name: db-credentials
-      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /spec/secretStoreRef/kind
@@ -221,7 +208,6 @@ patches:
       version: v1beta1
       kind: ExternalSecret
       name: openai-credentials
-      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /spec/secretStoreRef/kind
@@ -234,7 +220,6 @@ patches:
       version: v1beta1
       kind: ExternalSecret
       name: storage-credentials
-      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /spec/secretStoreRef/kind
@@ -248,7 +233,6 @@ patches:
       version: v1beta1
       kind: SecretStore
       name: azure-keyvault
-      namespace: yt-summarizer
     patch: |-
       $patch: delete
       apiVersion: external-secrets.io/v1beta1
@@ -261,7 +245,6 @@ patches:
   - target:
       kind: ServiceAccount
       name: yt-summarizer-sa
-      namespace: yt-summarizer
     patch: |-
       - op: remove
         path: /metadata/annotations/azure.workload.identity~1client-id
@@ -273,7 +256,6 @@ patches:
       version: v1
       kind: Job
       name: db-migration
-      namespace: yt-summarizer
     patch: |-
       - op: replace
         path: /spec/template/spec/serviceAccountName
@@ -282,10 +264,10 @@ patches:
 images:
   - name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: "pr-4-ab27369"
+    newTag: "pr-4-41ed923"
   - name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: "pr-4-ab27369"
+    newTag: "pr-4-41ed923"
 
 labels:
   - pairs:
