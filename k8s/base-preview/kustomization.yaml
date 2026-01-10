@@ -7,19 +7,19 @@ kind: Kustomization
 namespace: yt-summarizer
 
 resources:
-  - ../base/namespace.yaml
-  - ../base/configmap.yaml
-  - ../base/api-deployment.yaml
-  - ../base/api-service.yaml
-  - ../base/api-ingress.yaml
-  - ../base/transcribe-worker-deployment.yaml
-  - ../base/summarize-worker-deployment.yaml
-  - ../base/embed-worker-deployment.yaml
-  - ../base/relationships-worker-deployment.yaml
-  - ../base/externalsecret-db.yaml
-  - ../base/externalsecret-openai.yaml
-  - ../base/externalsecret-storage.yaml
-  - ../base/migration-job.yaml
+  - namespace.yaml
+  - configmap.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - api-ingress.yaml
+  - transcribe-worker-deployment.yaml
+  - summarize-worker-deployment.yaml
+  - embed-worker-deployment.yaml
+  - relationships-worker-deployment.yaml
+  - externalsecret-db.yaml
+  - externalsecret-openai.yaml
+  - externalsecret-storage.yaml
+  - migration-job.yaml
 
 labels:
   - pairs:
