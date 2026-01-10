@@ -239,12 +239,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install kustomize
-        run: |
-          KUSTOMIZE_VER=v5.1.1
-          curl -sLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/${KUSTOMIZE_VER}/kustomize_${KUSTOMIZE_VER#v}_linux_amd64.tar.gz
-          tar -xzf kustomize.tar.gz
-          sudo mv kustomize /usr/local/bin/
-          kustomize version
+        uses: imranismail/setup-kustomize@v3
+        with:
+          kustomize-version: '5.1.1'
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -257,18 +254,41 @@ jobs:
           pip install pyyaml
 
       - name: Build preview overlay
-        run: kustomize build k8s/overlays/preview > /tmp/preview.yaml
+        run: |
+          echo "::group::kustomize build preview"
+          if ! kustomize build k8s/overlays/preview > /tmp/preview.yaml; then
+            echo "ERROR: kustomize build failed for overlay 'preview'"
+            echo "Showing kustomize build debug output:"
+            kustomize build k8s/overlays/preview || true
+            echo "::endgroup::"
+            exit 1
+          fi
+          echo "::endgroup::"
+          echo "Built preview overlay: $(wc -c /tmp/preview.yaml) bytes"
 
       - name: Validate preview CPU within quota
         run: |
-          python scripts/ci/validate_kustomize.py --file /tmp/preview.yaml --max-cpu 1500 --name preview
+          if ! python scripts/ci/validate_kustomize.py --file /tmp/preview.yaml --max-cpu 1500 --name preview; then
+            echo "Validation failed for preview overlay (CPU quota). Showing head of rendered manifest:"
+            head -n 200 /tmp/preview.yaml || true
+            exit 1
+          fi
 
       - name: Build prod overlay
-        run: kustomize build k8s/overlays/prod > /tmp/prod.yaml || true
-
-      - name: Validate prod overlay
         run: |
-          python scripts/ci/validate_kustomize.py --file /tmp/prod.yaml --max-cpu 8000 --name prod || true
+          echo "::group::kustomize build prod"
+          if ! kustomize build k8s/overlays/prod > /tmp/prod.yaml; then
+            echo "WARNING: kustomize build failed for overlay 'prod' (non-fatal)"
+            kustomize build k8s/overlays/prod || true
+          fi
+          echo "::endgroup::"
+
+      - name: Validate prod overlay (non-fatal)
+        run: |
+          if ! python scripts/ci/validate_kustomize.py --file /tmp/prod.yaml --max-cpu 8000 --name prod; then
+            echo "Prod validation failed, but continuing (non-fatal)."
+            head -n 200 /tmp/prod.yaml || true
+          fi
 
   # ---------------------------------------------------------------------------
   # Build Docker Images
