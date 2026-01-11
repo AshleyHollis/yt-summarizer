@@ -40,6 +40,9 @@ inputs:
   build-images-validate-result:
     description: 'Result of build-images-validate job'
     required: true
+  acr-configured:
+    description: 'Whether ACR is configured (vars.ACR_NAME is set)'
+    required: true
 
 runs:
   using: composite
@@ -87,7 +90,9 @@ runs:
               [[ "$areas" =~ k8s ]]
               ;;
             "build-images")
-              [[ "$areas" =~ services/api ]] || [[ "$areas" =~ services/workers ]] || [[ "$areas" =~ services/shared ]] || [[ "$areas" =~ apps/web ]] || [[ "$areas" =~ docker ]]
+              # Must have ACR configured AND changes to buildable areas
+              [[ "${{ inputs.acr-configured }}" == "true" ]] && \
+              ([[ "$areas" =~ services/api ]] || [[ "$areas" =~ services/workers ]] || [[ "$areas" =~ services/shared ]] || [[ "$areas" =~ apps/web ]] || [[ "$areas" =~ docker ]] || [[ "$areas" =~ k8s ]])
               ;;
             *)
               return 1

@@ -545,4 +545,5 @@ jobs:
           secret-scanning-should-run: ${{ needs.detect-changes.outputs.has_code_changes }}
           build-images-result: ${{ needs.build-images.result }}
           build-images-validate-result: ${{ needs.build-images-validate.result }}
+          acr-configured: ${{ vars.ACR_NAME != '' }}
 
