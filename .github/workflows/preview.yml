@@ -42,15 +42,6 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-  # Allow manual triggering for testing from any branch
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: 'PR number to deploy preview for (optional - will use latest commit)'
-        required: false
-      force_deploy:
-        description: 'Force deployment even without code changes'
-        required: false
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('preview-{0}', github.event.pull_request.number) || format('preview-{0}', github.run_id) }}
