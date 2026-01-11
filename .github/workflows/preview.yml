@@ -115,11 +115,20 @@ jobs:
             fi
           fi
 
+      - name: Set base SHA for comparison
+        id: base-sha
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base_sha=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "base_sha=origin/main" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check if commit has code changes
         id: check
         uses: ./.github/actions/detect-pr-code-changes
         with:
-          base-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'origin/main' }}
+          base-sha: ${{ steps.base-sha.outputs.base_sha }}
           head-sha: ${{ steps.set-pr.outputs.pr_head_sha }}
           pr-number: ${{ steps.set-pr.outputs.pr_number }}
           force-deploy: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_deploy }}
