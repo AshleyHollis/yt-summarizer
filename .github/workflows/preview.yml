@@ -41,7 +41,7 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-  # Allow manual triggering for testing
+  # Allow manual triggering for testing from any branch
   workflow_dispatch:
     inputs:
       pr_number:
@@ -179,6 +179,67 @@ jobs:
 
       # Image tag is provided by CI via artifact and validated by `validate-image-tag`. No local generation here.
 
+  # ---------------------------------------------------------------------------  
+  # Build Images for Manual Triggers (workflow_dispatch)
+  # ---------------------------------------------------------------------------
+  build-images-manual:
+    name: Build Images (Manual)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.event_name == 'workflow_dispatch' && needs.detect-changes.outputs.has_code_changes == 'true'
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image-tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: tag
+        uses: ./.github/actions/generate-image-tag
+        with:
+          pr-number: ${{ needs.detect-changes.outputs.pr_number || github.run_number }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
+
+      - name: Login to Azure Container Registry
+        uses: ./.github/actions/azure-acr-login
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
+
+      - name: Build and push API image
+        uses: ./.github/actions/docker-build-push
+        with:
+          dockerfile: services/api/Dockerfile
+          image-name: yt-summarizer-api
+          image-tag: ${{ steps.tag.outputs.image-tag }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          cache-name: api
+
+      - name: Build and push Workers image
+        uses: ./.github/actions/docker-build-push
+        with:
+          dockerfile: services/workers/Dockerfile
+          image-name: yt-summarizer-workers
+          image-tag: ${{ steps.tag.outputs.image-tag }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          cache-name: workers
+
+      - name: Build and push Shared image
+        uses: ./.github/actions/docker-build-push
+        with:
+          dockerfile: services/shared/Dockerfile
+          image-name: yt-summarizer-shared
+          image-tag: ${{ steps.tag.outputs.image-tag }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          cache-name: shared
+
+      - name: Publish image tag artifact
+        uses: ./.github/actions/publish-image-tag
+        with:
+          image-tag: ${{ steps.tag.outputs.image-tag }}
+
   # ---------------------------------------------------------------------------
   # Check Active Preview Count (prevents resource exhaustion from too many previews)
   # ---------------------------------------------------------------------------
@@ -186,7 +247,7 @@ jobs:
     name: Check Preview Limit
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
-    needs: [wait-for-ci, detect-changes]
+    needs: [wait-for-ci, build-images-manual, detect-changes]
     outputs:
       can_deploy: ${{ steps.validate-tag.outputs.can_deploy }}
       image_tag: ${{ steps.export-image.outputs.image_tag }}
@@ -207,14 +268,14 @@ jobs:
         id: validate-tag
         uses: ./.github/actions/validate-image-tag-availability
         with:
-          image_tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          image_tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}
           concurrency_check_result: ${{ steps.check.outputs.can_deploy }}
 
       - name: Export computed image tag
         id: export-image
         uses: ./.github/actions/export-image-tag
         with:
-          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          image-tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}
 
 
       - name: Post queue status
@@ -222,7 +283,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const reason = "${{ needs.wait-for-ci.outputs.image_tag }}" === "" 
+            const reason = "${{ needs.wait-for-ci.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}" === "" 
               ? "No image tag available from CI. This may indicate CI did not build images for this PR."
               : `Maximum concurrent previews (${{ env.MAX_PREVIEWS }}) reached. Your preview will deploy when a slot becomes available.\n\nClose another PR or wait for an existing preview to be cleaned up.`;
             
