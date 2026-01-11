@@ -506,7 +506,7 @@ jobs:
   preview-status-check:
     name: Preview Status Check
     runs-on: ubuntu-latest
-    needs: [detect-changes, update-overlay, verify-deployment, deploy-frontend-preview, e2e-tests, get-ingress]
+    needs: [detect-changes, wait-for-ci, update-overlay, verify-deployment, deploy-frontend-preview, e2e-tests, get-ingress]
     if: always()
     steps:
       - name: Checkout code
@@ -517,6 +517,7 @@ jobs:
         with:
           needs-image-build: ${{ needs.detect-changes.outputs.needs_image_build }}
           needs-deployment: ${{ needs.detect-changes.outputs.needs_deployment }}
+          wait-for-ci-result: ${{ needs.wait-for-ci.result }}
           update-overlay-result: ${{ needs.update-overlay.result }}
           verify-deployment-result: ${{ needs.verify-deployment.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend-preview.result }}
