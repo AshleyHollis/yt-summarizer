@@ -29,7 +29,6 @@ patches:
   - path: patches/externalsecret-db-patch.yaml
   - path: patches/externalsecret-openai-patch.yaml
   - path: patches/externalsecret-storage-patch.yaml
-  - path: patches/secretstore-delete-patch.yaml
   - path: patches/configmap-patch.yaml
   - path: patches/ingress-delete-patch.yaml
   - path: patches/httproute-patch.yaml
