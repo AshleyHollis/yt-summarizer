@@ -15,7 +15,7 @@
 # TRIGGER CHOICE: pull_request ensures the workflow runs from feature branches and waits for CI completion.
 # This is the industry-standard pattern for PR-based preview deployments.
 
-name: Preview
+name: Preview Deployment
 
 on:
   pull_request:

@@ -4,7 +4,7 @@
 # Runs Playwright E2E tests against a deployed preview environment.
 # Triggered after Argo CD deploys a PR preview environment.
 
-name: E2E Preview
+name: Preview E2E Tests
 
 on:
   # Triggered by deployment workflow or manually
