@@ -1,8 +1,8 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #6
 # Image Tag: latest
-# Commit: e71c9631b41c766470f8dac31f088d0155f3f631
-# Updated: 2026-01-11T15:39:47Z
+# Commit: 17465aa8d7163c72f29c979a354957abea87de54
+# Updated: 2026-01-11T15:45:25Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -11,14 +11,13 @@ metadata:
     config.kubernetes.io/local-config: "true"
 namespace: preview-pr-6
 resources:
-  - ../../base
+  - ../../base-preview
   - resource-quota.yaml
   - limit-range.yaml
 patches:
   - path: patches/externalsecret-db-patch.yaml
   - path: patches/externalsecret-openai-patch.yaml
   - path: patches/externalsecret-storage-patch.yaml
-  - path: patches/secretstore-delete-patch.yaml
   - path: patches/configmap-patch.yaml
   - path: patches/ingress-delete-patch.yaml
   - path: patches/httproute-patch.yaml
