@@ -1,0 +1,88 @@
+name: 'Health Check Preview Environment'
+description: 'Performs health checks on preview environment API (internal cluster + external ingress)'
+inputs:
+  namespace:
+    description: 'Kubernetes namespace for the preview environment'
+    required: true
+  external-url:
+    description: 'External URL to check (e.g., https://api.preview-pr-4.example.com)'
+    required: true
+  max-attempts:
+    description: 'Maximum number of health check attempts'
+    required: false
+    default: '10'
+  interval-seconds:
+    description: 'Seconds to wait between attempts'
+    required: false
+    default: '10'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check internal cluster health
+      shell: bash
+      run: |
+        NAMESPACE="${{ inputs.namespace }}"
+        MAX_ATTEMPTS="${{ inputs.max-attempts }}"
+        INTERVAL="${{ inputs.interval-seconds }}"
+        
+        echo "🔍 Checking API health from within cluster..."
+        echo "Namespace: ${NAMESPACE}"
+        
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+          echo "Attempt $i/$MAX_ATTEMPTS (internal)..."
+          
+          # Run curl from within the cluster to check internal service
+          if kubectl run curl-test-internal-${i} \
+            --image=curlimages/curl:latest \
+            --rm -i --restart=Never \
+            --namespace=${NAMESPACE} \
+            --timeout=15s \
+            -- curl -s --max-time 5 http://api/health/live 2>/dev/null | grep -q "ok"; then
+            echo "✅ Internal API health check passed"
+            break
+          fi
+          
+          if [ $i -lt $MAX_ATTEMPTS ]; then
+            echo "  ⏳ Waiting ${INTERVAL}s before retry..."
+            sleep $INTERVAL
+          else
+            echo "::error::Internal API health check failed after $MAX_ATTEMPTS attempts"
+            exit 1
+          fi
+        done
+
+    - name: Check external ingress health
+      shell: bash
+      run: |
+        EXTERNAL_URL="${{ inputs.external-url }}"
+        MAX_ATTEMPTS="${{ inputs.max-attempts }}"
+        INTERVAL="${{ inputs.interval-seconds }}"
+        
+        echo "🌐 Checking API health via external ingress..."
+        echo "URL: ${EXTERNAL_URL}/health/live"
+        
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+          echo "Attempt $i/$MAX_ATTEMPTS (external)..."
+          
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" || echo "000")
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ External API health check passed (HTTP $HTTP_CODE)"
+            exit 0
+          else
+            echo "  ❌ Status: $HTTP_CODE (expected: 200)"
+          fi
+          
+          if [ $i -lt $MAX_ATTEMPTS ]; then
+            echo "  ⏳ Waiting ${INTERVAL}s before retry..."
+            sleep $INTERVAL
+          fi
+        done
+        
+        echo "::error::External API health check failed after $MAX_ATTEMPTS attempts"
+        echo "::notice::The API is healthy internally but not accessible via ingress. This may indicate:"
+        echo "::notice::- DNS propagation delay for nip.io"
+        echo "::notice::- Ingress configuration issues"
+        echo "::notice::- Network policy restrictions"
+        exit 1
