@@ -32,10 +32,36 @@ except ImportError:
 requires_agent_framework = pytest.mark.skipif(
     not HAS_AGENT_FRAMEWORK, reason="agent_framework package not installed (optional dependency)"
 )
+# CRITICAL: Don't skip AG-UI tests - they should FAIL if dependency is missing
+# This ensures we catch missing dependencies in CI before deployment
 requires_agent_framework_ag_ui = pytest.mark.skipif(
-    not HAS_AGENT_FRAMEWORK_AG_UI,
-    reason="agent_framework_ag_ui package not installed (optional dependency)",
+    False,  # Never skip - always run these tests
+    reason="agent_framework_ag_ui is REQUIRED for CopilotKit integration",
 )
+
+
+# =============================================================================
+# Test: Agent Framework Availability (REQUIRED for CopilotKit)
+# =============================================================================
+
+
+class TestAgentFrameworkDependencies:
+    """Test that required agent framework dependencies are installed."""
+
+    def test_agent_framework_installed(self):
+        """CRITICAL: Verify agent_framework is installed."""
+        assert HAS_AGENT_FRAMEWORK, (
+            "agent_framework package is REQUIRED but not installed. "
+            "Add 'agent-framework' to pyproject.toml dependencies."
+        )
+
+    def test_agent_framework_ag_ui_installed(self):
+        """CRITICAL: Verify agent_framework_ag_ui is installed."""
+        assert HAS_AGENT_FRAMEWORK_AG_UI, (
+            "agent_framework_ag_ui package is REQUIRED but not installed. "
+            "Add 'agent-framework-ag-ui' to pyproject.toml dependencies. "
+            "Without this, the /api/copilotkit endpoint will not be registered!"
+        )
 
 
 # =============================================================================
@@ -433,9 +459,12 @@ class TestAzureEndpointURLBuilding:
 # =============================================================================
 
 
-@requires_agent_framework_ag_ui
 class TestAGUIEndpointRegistration:
-    """Test that AG-UI endpoints are properly registered on FastAPI app."""
+    """Test that AG-UI endpoints are properly registered on FastAPI app.
+    
+    CRITICAL: These tests should FAIL if dependencies are missing.
+    This catches missing dependencies in CI before deployment.
+    """
 
     def test_agui_endpoint_registers_routes(self, monkeypatch):
         """Verify AG-UI endpoint registers both POST and GET routes."""
@@ -516,9 +545,11 @@ class TestAGUIEndpointRegistration:
 # =============================================================================
 
 
-@requires_agent_framework_ag_ui
 class TestAGUIEndpointHTTPHandlers:
-    """Test AG-UI endpoint HTTP request handling."""
+    """Test AG-UI endpoint HTTP request handling.
+    
+    CRITICAL: These tests should FAIL if dependencies are missing.
+    """
 
     @pytest.fixture
     def configured_app(self, monkeypatch):
@@ -602,9 +633,12 @@ class TestAGUIEndpointHTTPHandlers:
 # =============================================================================
 
 
-@requires_agent_framework_ag_ui
 class TestFullApplicationIntegration:
-    """Test AG-UI endpoint integration with full FastAPI application."""
+    """Test AG-UI endpoint integration with full FastAPI application.
+    
+    CRITICAL: These tests should FAIL if dependencies are missing.
+    This ensures we catch deployment issues in CI before they reach production.
+    """
 
     def test_main_app_registers_agui_endpoint(self, monkeypatch):
         """Verify main app registers AG-UI endpoint when configured."""

@@ -170,6 +170,14 @@ jobs:
           service-package: services/api
           install-pytest-xdist: 'true'
 
+      - name: Validate critical dependencies are installed
+        run: |
+          python .github/scripts/validate-python-deps.py \
+            services/api/src/api \
+            services/api/pyproject.toml \
+            --critical-only
+        shell: bash
+
       - name: Record tests start
         id: start
         uses: ./.github/actions/record-test-duration
