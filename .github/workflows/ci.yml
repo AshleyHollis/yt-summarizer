@@ -357,6 +357,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-images-meta]
     if: |
+      always() &&
+      needs.build-images-meta.result == 'success' &&
       vars.ACR_NAME != '' &&
       (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
