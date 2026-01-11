@@ -35,12 +35,12 @@ runs:
         MAX_ATTEMPTS="${{ inputs.max-attempts }}"
         INTERVAL="${{ inputs.interval-seconds }}"
         
-        echo "🔍 Checking API health from within cluster..."
+        echo "::group::🔍 Internal Cluster Health Check"
         echo "Namespace: ${NAMESPACE}"
         
         INTERNAL_HEALTHY=false
         for i in $(seq 1 $MAX_ATTEMPTS); do
-          echo "Attempt $i/$MAX_ATTEMPTS (internal)..."
+          echo "Attempt $i/$MAX_ATTEMPTS..."
           
           # Run curl from within the cluster to check internal service
           if kubectl run curl-test-internal-${i} \
@@ -58,12 +58,14 @@ runs:
             echo "  ⏳ Waiting ${INTERVAL}s before retry..."
             sleep $INTERVAL
           else
+            echo "::endgroup::"
             echo "::error::Internal API health check failed after $MAX_ATTEMPTS attempts"
             echo "healthy=false" >> $GITHUB_OUTPUT
             exit 1
           fi
         done
         
+        echo "::endgroup::"
         echo "healthy=${INTERNAL_HEALTHY}" >> $GITHUB_OUTPUT
 
     - name: Check DNS resolution
@@ -74,7 +76,7 @@ runs:
         # Extract hostname from URL
         HOSTNAME=$(echo "$EXTERNAL_URL" | sed -E 's|https?://([^/]+).*|\1|')
         
-        echo "🌐 Checking DNS resolution..."
+        echo "::group::🌐 DNS Resolution Check"
         echo "Hostname: ${HOSTNAME}"
         
         # Try to resolve the hostname
@@ -95,13 +97,14 @@ runs:
         else
           echo "::warning::Failed to resolve hostname"
         fi
+        echo "::endgroup::"
 
     - name: Check TLS certificate status
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
         
-        echo "🔐 Checking TLS certificate status..."
+        echo "::group::🔐 TLS Certificate Status"
         
         # Check for Gateway API wildcard certificate in gateway-system namespace
         WILDCARD_CERT="yt-summarizer-wildcard"
@@ -124,13 +127,14 @@ runs:
             echo "::notice::Rate limit: 5 certificates per exact domain set per 168 hours"
           fi
         fi
+        echo "::endgroup::"
 
     - name: Check Gateway API HTTPRoute configuration
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
         
-        echo "🔧 Checking Gateway API HTTPRoute configuration..."
+        echo "::group::🔧 HTTPRoute Configuration"
         
         # Get HTTPRoute details
         kubectl get httproute -n ${NAMESPACE} -o wide || echo "::warning::Failed to get HTTPRoute"
@@ -148,13 +152,14 @@ runs:
         else
           echo "::warning::No HTTPRoute found"
         fi
+        echo "::endgroup::"
 
     - name: Check service and endpoints
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
         
-        echo "🔌 Checking service and endpoints..."
+        echo "::group::🔌 Service and Endpoints"
         
         # Check service
         kubectl get svc api -n ${NAMESPACE} -o wide || echo "::warning::Service not found"
@@ -170,6 +175,7 @@ runs:
         else
           echo "::error::Service has no endpoints - pods may not be ready"
         fi
+        echo "::endgroup::"
 
     - name: Check external ingress health
       id: external-check
@@ -180,7 +186,7 @@ runs:
         INTERVAL="${{ inputs.interval-seconds }}"
         NAMESPACE="${{ inputs.namespace }}"
         
-        echo "🌐 Checking API health via external ingress..."
+        echo "::group::🌐 External Ingress Health Check"
         echo "URL: ${EXTERNAL_URL}/health/live"
         
         # Check certificate status first - FAIL FAST if not ready
@@ -237,6 +243,7 @@ runs:
         
         # If external check passed, we're done
         if [ "$EXTERNAL_HEALTHY" = "true" ]; then
+          echo "::endgroup::"
           echo "healthy=true" >> $GITHUB_OUTPUT
           exit 0
         fi
@@ -266,5 +273,6 @@ runs:
         echo "::notice::- Backend service port mismatch"
         
         # ALWAYS fail if external check fails
+        echo "::endgroup::"
         echo "healthy=false" >> $GITHUB_OUTPUT
         exit 1
