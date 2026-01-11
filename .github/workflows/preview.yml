@@ -374,6 +374,9 @@ jobs:
 
       - name: Validate generated overlay (kustomize + dry-run)
         uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/preview
+          overlay-name: preview
 
       - name: Commit and push overlay update
         uses: ./.github/actions/commit-overlay-changes
