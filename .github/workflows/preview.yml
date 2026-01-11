@@ -21,10 +21,15 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
+  # Allow manual triggering for testing
+  workflow_dispatch:
 
 concurrency:
-  group: preview-${{ env.PR_NUMBER }}
+  group: preview-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
+
+# Only run on pull_request events or manual dispatch
+if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
 
 env:
   # PR_NUMBER: Critical for workflow_run compatibility - extracts PR number from either
