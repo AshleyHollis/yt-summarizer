@@ -65,7 +65,6 @@ jobs:
         with:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          event-name: ${{ github.event_name }}
           pr-number: ${{ env.PR_NUMBER }}
 
 
@@ -134,6 +133,9 @@ jobs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
       image_tag: ${{ steps.export-image.outputs.image_tag }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Check preview concurrency limit
         id: check
         uses: ./.github/actions/check-preview-concurrency

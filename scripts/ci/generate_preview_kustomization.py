@@ -9,7 +9,11 @@ This script loads a template and substitutes variables for the preview overlay.
 """
 import argparse
 import sys
+import os
 from datetime import datetime, timezone
+
+# Add current directory to path for imports
+sys.path.insert(0, os.path.dirname(__file__))
 
 # Import shared utilities
 from kustomization_utils import generate_from_template
