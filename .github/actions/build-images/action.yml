@@ -15,33 +15,12 @@ inputs:
     required: false
     default: 'true'
     type: boolean
-  azure-client-id:
-    description: Azure client ID for ACR login
-    required: false
-    type: string
-  azure-tenant-id:
-    description: Azure tenant ID for ACR login
-    required: false
-    type: string
-  azure-subscription-id:
-    description: Azure subscription ID for ACR login
-    required: false
-    type: string
 
 runs:
   using: composite
   steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Login to Azure Container Registry
-      if: inputs.push == 'true'
-      uses: ./.github/actions/azure-acr-login
-      with:
-        azure-client-id: ${{ inputs.azure-client-id }}
-        azure-tenant-id: ${{ inputs.azure-tenant-id }}
-        azure-subscription-id: ${{ inputs.azure-subscription-id }}
-        acr-name: ${{ env.ACR_NAME }}
 
     - name: Build image
       shell: bash
@@ -58,10 +37,6 @@ runs:
           workers)
             dockerfile="services/workers/Dockerfile"
             image_name="yt-summarizer-workers"
-            ;;
-          shared)
-            dockerfile="services/shared/Dockerfile"
-            image_name="yt-summarizer-shared"
             ;;
           *)
             echo "Unknown service: $service"
