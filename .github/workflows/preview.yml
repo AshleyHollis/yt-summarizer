@@ -10,7 +10,6 @@ name: Deploy Preview
 
 on:
   workflow_run:
-    workflows: ['CI']
     types: [completed]
   workflow_dispatch:
 
