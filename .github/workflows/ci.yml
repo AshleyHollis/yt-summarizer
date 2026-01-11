@@ -313,7 +313,8 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
+       contains(needs.detect-changes.outputs.changed_areas, 'docker') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'k8s')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
       (needs.test-shared.result == 'success' || needs.test-shared.result == 'skipped') &&
@@ -360,7 +361,8 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker'))
+       contains(needs.detect-changes.outputs.changed_areas, 'docker') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'k8s'))
     strategy:
       matrix:
         include:

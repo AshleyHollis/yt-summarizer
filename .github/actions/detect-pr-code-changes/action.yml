@@ -108,7 +108,7 @@ runs:
 
         # Check if any file would trigger image building in CI
         # CRITICAL FIX: Only return true for changes that actually build images in CI workflow
-        # This prevents preview deployments when no images are available
+        # This prevents preview deployments when no images are available (except for k8s changes which rebuild images)
         #
         # CI BUILD TRIGGERS (build-images-meta job):
         # - services/api/** (API service)
@@ -118,6 +118,7 @@ runs:
         # - **/Dockerfile* (Docker files)
         # - docker-compose*.yml (compose files)
         # - .dockerignore (docker config)
+        # - k8s/** (Kubernetes manifests - rebuilds images for deployment)
         #
         # ROOT CAUSE: Previously checked for ANY non-docs change, causing preview to run
         # even when CI skipped image building (e.g., workflow-only changes)
@@ -128,7 +129,7 @@ runs:
             if [[ "$file" == docs/* ]] || [[ "$file" == specs/* ]] || [[ "$file" == *.md ]]; then
               echo "  [skip] $file (docs/specs/markdown)"
             # Check if file is in areas that trigger image building
-            elif [[ "$file" == services/api/** ]] || [[ "$file" == services/workers/** ]] || [[ "$file" == services/shared/** ]] || [[ "$file" == apps/web/** ]] || [[ "$file" == **/Dockerfile* ]] || [[ "$file" == docker-compose*.yml ]] || [[ "$file" == .dockerignore ]]; then
+            elif [[ "$file" == services/api/** ]] || [[ "$file" == services/workers/** ]] || [[ "$file" == services/shared/** ]] || [[ "$file" == apps/web/** ]] || [[ "$file" == **/Dockerfile* ]] || [[ "$file" == docker-compose*.yml ]] || [[ "$file" == .dockerignore ]] || [[ "$file" == k8s/** ]]; then
               echo "  [BUILD] $file (triggers image build)"
               HAS_CODE=true
             else
