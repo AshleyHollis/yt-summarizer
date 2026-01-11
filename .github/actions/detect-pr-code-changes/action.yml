@@ -97,34 +97,51 @@ runs:
           exit 0
         fi
         
-        # Get all changed files using git diff
-        # Try multiple approaches since shallow clones may not have full history
-        echo "🔍 Attempting to detect changed files..."
-        echo "   BASE_SHA: $BASE_SHA"
-        echo "   HEAD_SHA: $HEAD_SHA"
-        
-        # For PRs, ensure base branch is fetched
-        if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [[ "$BASE_SHA" == origin/* ]]; then
-          BASE_BRANCH="${BASE_SHA#origin/}"
-          echo "   Fetching base branch: origin/$BASE_BRANCH"
-          git fetch origin "$BASE_BRANCH" || echo "Failed to fetch base branch"
-        fi
-        
-        FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
-        echo "   git diff result: $(echo "$FILES" | wc -l) files found"
-        
-        # If git diff failed, try comparing with HEAD
-        if [ -z "$FILES" ]; then
-          echo "   git diff failed, trying git diff with HEAD..."
-          FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || echo "")
-          echo "   git diff HEAD result: $(echo "$FILES" | wc -l) files found"
-        fi
-        
-        # If still empty, try git show for the commit
-        if [ -z "$FILES" ]; then
-          echo "   git diff still failed, trying git show..."
-          FILES=$(git show --name-only --pretty=format: "$HEAD_SHA" 2>/dev/null || echo "")
-          echo "   git show result: $(echo "$FILES" | wc -l) files found"
+        # For PRs, use GitHub API to get all changed files reliably
+        if [ -n "$PR_NUMBER" ] && [ -n "$GITHUB_TOKEN" ]; then
+          echo "   Using GitHub API for PR #$PR_NUMBER to get changed files..."
+          API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files"
+          
+          # Handle pagination
+          FILES=""
+          PAGE=1
+          while true; do
+            PAGE_URL="$API_URL?page=$PAGE&per_page=100"
+            PAGE_FILES=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$PAGE_URL" | jq -r '.[].filename' 2>/dev/null || echo "")
+            if [ -z "$PAGE_FILES" ]; then
+              break
+            fi
+            FILES="$FILES"$'\n'"$PAGE_FILES"
+            PAGE=$((PAGE + 1))
+          done
+          
+          FILES=$(echo "$FILES" | sed '/^$/d')  # Remove empty lines
+          echo "   GitHub API result: $(echo "$FILES" | wc -l) files found"
+        else
+          # For non-PR events, use git diff
+          # For PRs, ensure base branch is fetched
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [[ "$BASE_SHA" == origin/* ]]; then
+            BASE_BRANCH="${BASE_SHA#origin/}"
+            echo "   Fetching base branch: origin/$BASE_BRANCH"
+            git fetch origin "$BASE_BRANCH" || echo "Failed to fetch base branch"
+          fi
+          
+          FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
+          echo "   git diff result: $(echo "$FILES" | wc -l) files found"
+          
+          # If git diff failed, try comparing with HEAD
+          if [ -z "$FILES" ]; then
+            echo "   git diff failed, trying git diff with HEAD..."
+            FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || echo "")
+            echo "   git diff HEAD result: $(echo "$FILES" | wc -l) files found"
+          fi
+          
+          # If still empty, try git show for the commit
+          if [ -z "$FILES" ]; then
+            echo "   git diff still failed, trying git show..."
+            FILES=$(git show --name-only --pretty=format: "$HEAD_SHA" 2>/dev/null || echo "")
+            echo "   git show result: $(echo "$FILES" | wc -l) files found"
+          fi
         fi
         
         if [ -z "$FILES" ]; then
