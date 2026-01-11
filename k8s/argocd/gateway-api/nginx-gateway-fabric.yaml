@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-gateway-fabric
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/nginxinc/nginx-gateway-fabric
+    targetRevision: v1.5.0
+    path: deploy/helm-chart
+    helm:
+      releaseName: nginx-gateway-fabric
+      values: |
+        nginxGateway:
+          replicaCount: 1
+          image:
+            repository: ghcr.io/nginxinc/nginx-gateway-fabric
+            tag: 1.5.0
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          service:
+            type: LoadBalancer
+            annotations:
+              service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /health
+              service.beta.kubernetes.io/azure-load-balancer-ipv4: "20.255.113.149"
+        nginx:
+          image:
+            repository: ghcr.io/nginxinc/nginx-gateway-fabric/nginx
+            tag: 1.5.0
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
