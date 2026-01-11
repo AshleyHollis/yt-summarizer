@@ -163,6 +163,9 @@ jobs:
     needs: [check-changes, terraform]
     if: always()
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Summary
         uses: ./.github/actions/create-infra-summary
         with:

@@ -488,6 +488,9 @@ jobs:
       - secret-scanning
     if: always()
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results
         with:

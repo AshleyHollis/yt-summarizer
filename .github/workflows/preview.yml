@@ -44,6 +44,9 @@ jobs:
     outputs:
       has_code_changes: ${{ steps.check.outputs.has_code_changes }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Check if commit has code changes
         id: check
         uses: ./.github/actions/detect-pr-code-changes
@@ -458,6 +461,9 @@ jobs:
     needs: [detect-changes, update-overlay, verify-deployment, deploy-frontend-preview, e2e-tests]
     if: always()
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Check preview pipeline status
         uses: ./.github/actions/check-preview-status
         with:
