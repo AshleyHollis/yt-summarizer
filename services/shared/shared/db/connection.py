@@ -107,7 +107,7 @@ def convert_ado_connection_string(ado_string: str) -> str:
     # Build SQLAlchemy URL
     # Format: mssql+aioodbc://user:pass@host:port/database?driver=...
     url = f"mssql+aioodbc://{user}:{encoded_password}@{host}:{port}/{database}"
-    url += f"?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+    url += "?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
 
     return url
 
