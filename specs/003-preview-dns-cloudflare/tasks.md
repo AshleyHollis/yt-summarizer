@@ -91,17 +91,17 @@
 ### GitHub Actions Updates
 
 - [X] T030 [US1] Update compute-preview-urls action to use new hostname scheme in .github/actions/compute-preview-urls/action.yml
-- [ ] T031 [US1] Create HTTPRoute generation in preview overlay script in scripts/ci/generate_preview_kustomization.py
-- [ ] T032 [P] [US1] Update preview-kustomization-template.yaml to include HTTPRoute patch in scripts/ci/templates/preview-kustomization-template.yaml
-- [ ] T033 [US1] Update update-preview-overlay action to generate HTTPRoute patch in .github/actions/update-preview-overlay/action.yml
-- [ ] T034 [US1] Update preview.yml workflow to remove Ingress references in .github/workflows/preview.yml
-- [ ] T035 [US1] Update post-preview-comment action with new URL format in .github/actions/post-preview-comment/action.yml
+- [X] T031 [US1] Create HTTPRoute generation in preview overlay script in scripts/ci/generate_preview_kustomization.py (already supports this)
+- [X] T032 [P] [US1] Update preview-kustomization-template.yaml to include HTTPRoute patch in scripts/ci/templates/preview-kustomization-template.yaml
+- [X] T033 [US1] Update update-preview-overlay action to generate HTTPRoute patch in .github/actions/update-preview-overlay/action.yml (already supports this)
+- [X] T034 [US1] Update preview.yml workflow to remove Ingress IP lookups in .github/workflows/preview.yml
+- [X] T035 [US1] Update post-preview-comment action with new URL format in .github/actions/post-preview-comment/action.yml (already URL-agnostic)
 
 ### Production and Staging Routes
 
-- [ ] T036 [P] [US1] Create production HTTPRoute in k8s/base/api-httproute.yaml
-- [ ] T037 [P] [US1] Create production HTTPRoute patch in k8s/overlays/prod/patches/httproute-patch.yaml
-- [ ] T038 [US1] Update prod overlay kustomization to include HTTPRoute in k8s/overlays/prod/kustomization.yaml
+- [X] T036 [P] [US1] Create production HTTPRoute in k8s/base/api-httproute.yaml
+- [X] T037 [P] [US1] Create production HTTPRoute patch in k8s/overlays/prod/patches/httproute-patch.yaml
+- [X] T038 [US1] Update prod overlay kustomization to include HTTPRoute in k8s/overlays/prod/kustomization.yaml
 
 ### Validation
 

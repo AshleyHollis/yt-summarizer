@@ -181,12 +181,11 @@ jobs:
             })
 
   get-ingress:
-    name: Get Ingress Info
+    name: Prepare Preview URLs
     runs-on: ubuntu-latest
     if: always() && !cancelled() && needs.check-concurrency.result == 'success' && needs.check-concurrency.outputs.can_deploy == 'true'
     needs: [check-concurrency, detect-changes]
     outputs:
-      ingress_ip: ${{ steps.get-ip.outputs.ingress-ip }}
       preview_url: ${{ steps.compute.outputs.preview-url }}
       preview_host: ${{ steps.compute.outputs.preview-host }}
       tls_secret: ${{ steps.compute.outputs.tls-secret }}
@@ -194,23 +193,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get Ingress Controller IP
-        id: get-ip
-        uses: ./.github/actions/get-aks-ingress-ip
-        with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
       - name: Compute Preview URLs
         id: compute
         uses: ./.github/actions/compute-preview-urls
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          ingress-ip: ${{ steps.get-ip.outputs.ingress-ip }}
           app-name: 'yt-summarizer'
+          base-domain: 'yt-summarizer.apps.ashleyhollis.com'
 
   update-overlay:
     name: Update Preview Overlay
