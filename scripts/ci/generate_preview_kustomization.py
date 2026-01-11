@@ -52,7 +52,31 @@ def main():
 
     generate_from_template(args.template, args.output, variables, header_comments)
 
-    # Optionally substitute placeholders in overlay patch files (ingress patch and __PR_NUMBER__ placeholders)
+    # Substitute placeholders in base-preview files (needed for HTTPRoute and other resources)
+    base_preview_dir = 'k8s/base-preview'
+    try:
+        import os
+        for filename in os.listdir(base_preview_dir):
+            file_path = os.path.join(base_preview_dir, filename)
+            # Only process YAML files
+            if not os.path.isfile(file_path) or not filename.endswith(('.yaml', '.yml')):
+                continue
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            # Global substitutions
+            content = content.replace('__PR_NUMBER__', args.pr_number)
+            # Optional values
+            if args.preview_host:
+                content = content.replace('__PREVIEW_HOST__', args.preview_host)
+            if args.tls_secret:
+                content = content.replace('__TLS_SECRET__', args.tls_secret)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f'Patched {file_path} (placeholders substituted)')
+    except FileNotFoundError:
+        print(f'Base preview directory not found: {base_preview_dir} (skipping base substitutions)')
+
+    # Substitute placeholders in overlay patch files (ingress patch and __PR_NUMBER__ placeholders)
     patch_dir = 'k8s/overlays/preview/patches'
     try:
         import os

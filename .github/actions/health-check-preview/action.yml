@@ -195,6 +195,10 @@ runs:
         CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
         
+        # DNS propagation can take a few minutes - always give it some time
+        echo "::notice::Waiting 30 seconds for DNS propagation..."
+        sleep 30
+        
         if [ "$CERT_READY" != "True" ]; then
           echo "::warning::Gateway API wildcard TLS certificate is not ready - external health check will likely fail"
           

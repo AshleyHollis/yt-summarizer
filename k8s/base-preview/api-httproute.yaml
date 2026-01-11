@@ -7,14 +7,15 @@ metadata:
     app.kubernetes.io/component: api
   annotations:
     # ExternalDNS watches this annotation to create DNS records
-    external-dns.alpha.kubernetes.io/hostname: api.yt-summarizer.apps.ashleyhollis.com
+    # Placeholder will be replaced by preview overlay patch
+    external-dns.alpha.kubernetes.io/hostname: __PREVIEW_HOST__
 spec:
   parentRefs:
   - name: main-gateway
     namespace: gateway-system
     sectionName: https
   hostnames:
-  - "api.yt-summarizer.apps.ashleyhollis.com"
+  - "__PREVIEW_HOST__"
   rules:
   - matches:
     - path:
