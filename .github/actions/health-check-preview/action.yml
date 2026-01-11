@@ -89,67 +89,48 @@ runs:
         
         echo "🔐 Checking TLS certificate status..."
         
-        # Get certificate status
-        CERT_NAME=$(kubectl get certificate -n ${NAMESPACE} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        # Check for Gateway API wildcard certificate in cert-manager namespace
+        WILDCARD_CERT="wildcard-yt-summarizer-apps-tls"
+        CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         
-        if [ -z "$CERT_NAME" ]; then
-          echo "⚠️  No certificate found in namespace ${NAMESPACE}"
+        if [ "$CERT_READY" = "True" ]; then
+          echo "✅ Gateway API wildcard certificate is ready"
+          CERT_NOT_AFTER=$(kubectl get secret ${WILDCARD_CERT} -n gateway-system -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || echo "")
+          echo "  Certificate: ${WILDCARD_CERT}"
         else
-          echo "Certificate: $CERT_NAME"
+          echo "::warning::Wildcard TLS certificate not ready in cert-manager namespace"
+          CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "Unknown")
+          echo "  Message: ${CERT_MESSAGE}"
           
-          # Get certificate ready status
-          CERT_READY=$(kubectl get certificate ${CERT_NAME} -n ${NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
-          CERT_REASON=$(kubectl get certificate ${CERT_NAME} -n ${NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].reason}' 2>/dev/null || echo "Unknown")
-          CERT_MESSAGE=$(kubectl get certificate ${CERT_NAME} -n ${NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "Unknown")
-          
-          echo "  Ready: ${CERT_READY}"
-          echo "  Reason: ${CERT_REASON}"
-          
-          if [ "$CERT_READY" != "True" ]; then
-            echo "::warning::TLS certificate is not ready"
-            echo "  Message: ${CERT_MESSAGE}"
-            
-            # Check if it's a rate limit issue
-            if echo "$CERT_MESSAGE" | grep -q "rateLimited"; then
-              echo "::error::Let's Encrypt rate limit detected!"
-              echo "::notice::The domain has exceeded Let's Encrypt's certificate issuance limit"
-              echo "::notice::Rate limit: 5 certificates per exact domain set per 168 hours"
-              echo "::notice::Options:"
-              echo "::notice::  1. Wait for the rate limit window to expire"
-              echo "::notice::  2. Use a different domain/subdomain"
-              echo "::notice::  3. Temporarily use letsencrypt-staging issuer"
-              
-              # Extract retry time if available
-              RETRY_AFTER=$(echo "$CERT_MESSAGE" | grep -oP 'retry after \K[^:]+' || echo "")
-              if [ -n "$RETRY_AFTER" ]; then
-                echo "::notice::Rate limit resets: ${RETRY_AFTER}"
-              fi
-            fi
-          else
-            echo "✅ Certificate is ready"
+          # Check for rate limiting
+          if echo "$CERT_MESSAGE" | grep -q "rateLimited"; then
+            echo "::error::Let's Encrypt rate limit detected!"
+            echo "::notice::Rate limit: 5 certificates per exact domain set per 168 hours"
           fi
         fi
 
-    - name: Check ingress configuration
+    - name: Check Gateway API HTTPRoute configuration
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
         
-        echo "🔧 Checking ingress configuration..."
+        echo "🔧 Checking Gateway API HTTPRoute configuration..."
         
-        # Get ingress details
-        kubectl get ingress -n ${NAMESPACE} -o wide || echo "::warning::Failed to get ingress"
+        # Get HTTPRoute details
+        kubectl get httproute -n ${NAMESPACE} -o wide || echo "::warning::Failed to get HTTPRoute"
         
-        # Check ingress backend status
-        echo "--- Ingress Backend Status ---"
-        kubectl describe ingress -n ${NAMESPACE} | grep -A 5 "Backend:" || true
-        
-        # Check if ingress has an address
-        INGRESS_ADDRESS=$(kubectl get ingress -n ${NAMESPACE} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-        if [ -n "$INGRESS_ADDRESS" ]; then
-          echo "✅ Ingress has address: ${INGRESS_ADDRESS}"
+        # Check HTTPRoute status
+        echo "--- HTTPRoute Status ---"
+        HTTPROUTE_NAME=$(kubectl get httproute -n ${NAMESPACE} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$HTTPROUTE_NAME" ]; then
+          echo "HTTPRoute: $HTTPROUTE_NAME"
+          kubectl get httproute $HTTPROUTE_NAME -n ${NAMESPACE} -o jsonpath='{.status}' | jq '.' 2>/dev/null || echo "No status available"
+          
+          # Get hostname
+          HOSTNAME=$(kubectl get httproute $HTTPROUTE_NAME -n ${NAMESPACE} -o jsonpath='{.spec.hostnames[0]}' 2>/dev/null || echo "")
+          echo "✅ HTTPRoute configured for: ${HOSTNAME}"
         else
-          echo "::warning::Ingress does not have an assigned address yet"
+          echo "::warning::No HTTPRoute found"
         fi
 
     - name: Check service and endpoints
@@ -210,18 +191,18 @@ runs:
         echo "URL: ${EXTERNAL_URL}/health/live"
         
         # Check certificate status first
-        CERT_READY=$(kubectl get certificate -n ${NAMESPACE} -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
-        CERT_MESSAGE=$(kubectl get certificate -n ${NAMESPACE} -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
+        WILDCARD_CERT="wildcard-yt-summarizer-apps-tls"
+        CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+        CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
         
         if [ "$CERT_READY" != "True" ]; then
-          echo "::warning::TLS certificate is not ready - external health check will likely fail"
+          echo "::warning::Gateway API wildcard TLS certificate is not ready - external health check will likely fail"
           
-          # Check if it's the DNS provider global rate limit
-          if echo "$CERT_MESSAGE" | grep -qi "too many certificates.*sslip.io\|too many certificates.*nip.io"; then
-            echo "::warning::DNS provider has hit its global rate limit (25,000 certs per 168 hours)"
-            echo "::notice::This is a shared rate limit across all users of the DNS provider globally"
+          # Check if it's rate limited
+          if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
+            echo "::warning::Certificate provisioning failed due to Let's Encrypt rate limiting"
             echo "::notice::The preview environment is fully functional on internal cluster network"
-            echo "::notice::External HTTPS access is temporarily unavailable due to DNS provider limitations"
+            echo "::notice::External HTTPS access is temporarily unavailable"
             echo "::notice::Skipping external health check - internal checks passed"
             exit 0
           fi
@@ -258,10 +239,6 @@ runs:
           # Check cert status again for detailed error
           if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
             echo "::notice::Certificate provisioning failed due to Let's Encrypt rate limiting"
-            if echo "$CERT_MESSAGE" | grep -qi "sslip.io\|nip.io\|xip.io"; then
-              echo "::notice::The wildcard DNS provider has exceeded its global rate limit"
-              echo "::notice::Consider using a custom domain or switching DNS providers"
-            fi
             echo "::notice::Treating as non-critical - deployment is functional on internal network"
             exit 0
           fi
@@ -271,8 +248,8 @@ runs:
         
         echo "::error::External API health check failed after $MAX_ATTEMPTS attempts"
         echo "::notice::Possible causes:"
-        echo "::notice::- DNS propagation delay for sslip.io (usually resolves in 1-2 minutes)"
-        echo "::notice::- TLS certificate provisioning in progress"
-        echo "::notice::- Ingress controller configuration issues"
-        echo "::notice::- Network policy restrictions"
+        echo "::notice::- DNS propagation delay for Cloudflare (usually resolves in 1-2 minutes)"
+        echo "::notice::- Gateway API HTTPRoute not configured correctly"
+        echo "::notice::- Gateway not routing traffic"
+        echo "::notice::- Service/pod readiness issues"
         exit 1
