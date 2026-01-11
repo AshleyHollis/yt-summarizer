@@ -17,6 +17,14 @@ resources:
   - resource-quota.yaml
   - limit-range.yaml
 
+images:
+  - name: yt-summarizer-api
+    newName: __ACR_SERVER__/yt-summarizer-api
+    newTag: __IMAGE_TAG__
+  - name: yt-summarizer-workers
+    newName: __ACR_SERVER__/yt-summarizer-workers
+    newTag: __IMAGE_TAG__
+
 patches:
   - path: patches/externalsecret-db-patch.yaml
   - path: patches/externalsecret-openai-patch.yaml
