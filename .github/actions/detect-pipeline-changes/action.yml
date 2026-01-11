@@ -36,4 +36,4 @@ runs:
     - name: Detect changes
       id: detect
       shell: pwsh
-      run: .\scripts\ci\detect-changes-v2.ps1 -OutputFormat github-actions
+      run: .\scripts\ci\detect-changes.ps1 -OutputFormat github-actions
