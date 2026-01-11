@@ -16,10 +16,19 @@ inputs:
     required: false
     default: '10'
 
+outputs:
+  external-healthy:
+    description: 'Whether external health check passed'
+    value: ${{ steps.external-check.outputs.healthy }}
+  internal-healthy:
+    description: 'Whether internal health check passed'
+    value: ${{ steps.internal-check.outputs.healthy }}
+
 runs:
   using: 'composite'
   steps:
     - name: Check internal cluster health
+      id: internal-check
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
@@ -29,6 +38,7 @@ runs:
         echo "🔍 Checking API health from within cluster..."
         echo "Namespace: ${NAMESPACE}"
         
+        INTERNAL_HEALTHY=false
         for i in $(seq 1 $MAX_ATTEMPTS); do
           echo "Attempt $i/$MAX_ATTEMPTS (internal)..."
           
@@ -40,6 +50,7 @@ runs:
             --timeout=15s \
             -- curl -s --max-time 5 http://api/health/live 2>/dev/null | grep -q "ok"; then
             echo "✅ Internal API health check passed"
+            INTERNAL_HEALTHY=true
             break
           fi
           
@@ -48,9 +59,12 @@ runs:
             sleep $INTERVAL
           else
             echo "::error::Internal API health check failed after $MAX_ATTEMPTS attempts"
+            echo "healthy=false" >> $GITHUB_OUTPUT
             exit 1
           fi
         done
+        
+        echo "healthy=${INTERNAL_HEALTHY}" >> $GITHUB_OUTPUT
 
     - name: Check DNS resolution
       shell: bash
@@ -176,12 +190,7 @@ runs:
         echo "HTTP Status (with -k): ${INSECURE_CODE}"
         
         if [ "$INSECURE_CODE" = "200" ]; then
-          echo "::warning::API is accessible when SSL verification is bypassed"
-          echo "::notice::This confirms the issue is TLS certificate related"
-          echo "::notice::The ingress is working, but the certificate is invalid/missing"
-        fi
-
-    - name: Check external ingress health
+      id: external-check
       shell: bash
       run: |
         EXTERNAL_URL="${{ inputs.external-url }}"
@@ -202,6 +211,8 @@ runs:
         echo "::notice::Waiting 30 seconds for DNS propagation..."
         sleep 30
         
+        # IMPORTANT: Only skip external check if cert is rate-limited AND not ready
+        # If cert is ready, we MUST perform external health check and fail on errors
         if [ "$CERT_READY" != "True" ]; then
           echo "::warning::Gateway API wildcard TLS certificate is not ready - external health check will likely fail"
           
@@ -211,10 +222,14 @@ runs:
             echo "::notice::The preview environment is fully functional on internal cluster network"
             echo "::notice::External HTTPS access is temporarily unavailable"
             echo "::notice::Skipping external health check - internal checks passed"
-            exit 0
-          fi
-        fi
-        
+            echo "healthy=skipped-rate-limited" >> $GITHUB_OUTPUT
+          # Check if it's rate limited
+          if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
+            echo "::warning::Certificate provisioning failed due to Let's Encrypt rate limiting"
+            echo "::notice::The preview environment is fully functional on internal cluster network"
+            echo "::notice::External HTTPS access is temporarily unavailable"
+            echo "::notice::Skipping external health check - internal checks passed"
+        EXTERNAL_HEALTHY=false
         for i in $(seq 1 $MAX_ATTEMPTS); do
           echo "Attempt $i/$MAX_ATTEMPTS (external)..."
           
@@ -222,7 +237,8 @@ runs:
           
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ External API health check passed (HTTP $HTTP_CODE)"
-            exit 0
+            EXTERNAL_HEALTHY=true
+            break
           else
             echo "  ❌ Status: $HTTP_CODE (expected: 200)"
           fi
@@ -233,28 +249,38 @@ runs:
           fi
         done
         
-        # Final diagnostics before failing
-        echo ""
-        
-        # Check if it's a cert issue
-        INSECURE_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" 2>/dev/null || echo "000")
-        if [ "$INSECURE_CODE" = "200" ]; then
-          echo "::warning::External API health check failed due to TLS certificate issue"
-          echo "::notice::The preview environment is deployed and healthy (works with -k flag)"
-          echo "::notice::External HTTPS access is blocked by invalid/missing TLS certificate"
-          
-          # Check cert status again for detailed error
-          if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
-            echo "::notice::Certificate provisioning failed due to Let's Encrypt rate limiting"
-            echo "::notice::Treating as non-critical - deployment is functional on internal network"
-            exit 0
-          fi
-          
-          exit 1
+        # If external check passed, we're done
+        if [ "$EXTERNAL_HEALTHY" = "true" ]; then
+          echo "healthy=true" >> $GITHUB_OUTPUT
+          exit 0
         fi
         
+        # External check failed - perform diagnostics
+        echo ""
         echo "::error::External API health check failed after $MAX_ATTEMPTS attempts"
+        
+        # Check if it's a cert issue (diagnostic only)
+        INSECURE_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" 2>/dev/null || echo "000")
+        if [ "$INSECURE_CODE" = "200" ]; then
+          echo "::warning::API responds successfully when bypassing SSL verification (-k flag)"
+          echo "::notice::This indicates a TLS certificate configuration issue"
+        fi
+        
+        # Provide diagnostic information
+        echo "::notice::Diagnostic information:"
+        echo "::notice::- External check: $MAX_ATTEMPTS attempts failed (HTTP $HTTP_CODE)"
+        echo "::notice::- Insecure check: HTTP $INSECURE_CODE"
+        echo "::notice::- Certificate ready: $CERT_READY"
+        echo "::notice::"
         echo "::notice::Possible causes:"
+        echo "::notice::- DNS propagation delay (wait a few minutes and retry)"
+        echo "::notice::- Gateway API HTTPRoute misconfiguration"
+        echo "::notice::- Gateway not routing traffic correctly"
+        echo "::notice::- Service/pod not ready or unhealthy"
+        echo "::notice::- Backend service port mismatch"
+        
+        # ALWAYS fail if external check fails (no exceptions for rate limiting here)
+        echo "healthy=false" >> $GITHUB_OUTPUT
         echo "::notice::- DNS propagation delay for Cloudflare (usually resolves in 1-2 minutes)"
         echo "::notice::- Gateway API HTTPRoute not configured correctly"
         echo "::notice::- Gateway not routing traffic"
