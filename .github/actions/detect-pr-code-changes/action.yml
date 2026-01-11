@@ -92,8 +92,9 @@ runs:
         fi
         
         if [ "$FORCE_DEPLOY" = "true" ]; then
-          echo "has_code_changes=true" >> $GITHUB_OUTPUT
-          echo "🚀 Force deploying due to label"
+          echo "needs_image_build=false" >> $GITHUB_OUTPUT
+          echo "needs_deployment=true" >> $GITHUB_OUTPUT
+          echo "🚀 Force deploying - using existing images"
           exit 0
         fi
         
@@ -180,3 +181,6 @@ runs:
         echo "   needs_image_build=$HAS_IMAGE_BUILD"
         echo "   needs_deployment=$HAS_DEPLOYMENT"
         
+        # Set outputs
+        echo "needs_image_build=$HAS_IMAGE_BUILD" >> $GITHUB_OUTPUT
+        echo "needs_deployment=$HAS_DEPLOYMENT" >> $GITHUB_OUTPUT
