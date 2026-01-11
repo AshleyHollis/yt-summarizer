@@ -146,7 +146,12 @@ jobs:
   check-concurrency:
     name: Check Preview Limit
     runs-on: ubuntu-latest
-    if: needs.detect-changes.outputs.needs_deployment == 'true'
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.needs_deployment == 'true' &&
+      needs.compute-image-tag.result == 'success'
     needs: [detect-changes, compute-image-tag]
     outputs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
