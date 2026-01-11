@@ -40,16 +40,7 @@ inputs:
   build-images-validate-result:
     description: 'Result of build-images-validate job'
     required: true
-  # Build job results
-  build-images-result:
-    description: 'Result of build-images job'
-    required: true
-  build-images-validate-result:
-    description: 'Result of build-images-validate job'
-    required: true
-  build-images-should-run:
-    description: 'Whether build jobs should have run'
-    required: true
+
 runs:
   using: composite
   steps:
