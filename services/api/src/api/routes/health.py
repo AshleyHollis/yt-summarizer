@@ -185,6 +185,21 @@ async def liveness_check() -> dict[str, str]:
 
 
 @router.get(
+    "/healthz",
+    summary="Load Balancer Health Check",
+    description="Simple health check endpoint for Azure Load Balancer probes",
+    include_in_schema=False,  # Don't show in API docs
+)
+async def load_balancer_health() -> dict[str, str]:
+    """Health check endpoint specifically for Azure Load Balancer.
+
+    Azure LB health probes expect a 200 OK response on /healthz.
+    This is separate from Kubernetes readiness/liveness probes.
+    """
+    return {"status": "ok"}
+
+
+@router.get(
     "/health/debug",
     summary="Database Debug (Deprecated)",
     description="Database diagnostics. Prefer /debug for comprehensive info or /debug/connectivity for all service checks.",

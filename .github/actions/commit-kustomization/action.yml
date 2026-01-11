@@ -1,0 +1,38 @@
+name: 'Commit Kustomization Changes'
+description: 'Commits and pushes kustomization changes to the repository'
+inputs:
+  file-path:
+    description: 'Path to the kustomization file to commit (relative to repo root)'
+    required: true
+  commit-message:
+    description: 'Commit message to use'
+    required: true
+  git-branch:
+    description: 'Branch to push to'
+    required: false
+    default: 'main'
+outputs:
+  committed:
+    description: 'Whether changes were committed (true/false)'
+    value: ${{ steps.commit.outputs.committed }}
+runs:
+  using: composite
+  steps:
+    - name: Commit and push changes
+      id: commit
+      shell: bash
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        git add "${{ inputs.file-path }}"
+        
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+          echo "committed=false" >> $GITHUB_OUTPUT
+        else
+          git commit -m "${{ inputs.commit-message }}"
+          git push origin "${{ inputs.git-branch }}"
+          echo "✅ Committed and pushed changes"
+          echo "committed=true" >> $GITHUB_OUTPUT
+        fi

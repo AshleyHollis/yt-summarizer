@@ -1,0 +1,39 @@
+name: Validate Image Tag Availability
+description: |
+  Validates that an image tag is available from CI and determines if deployment can proceed.
+  This is a safety check to prevent deployment when CI didn't build images.
+
+  CONTEXT: Preview workflow waits for CI completion, but CI may succeed without building
+  images (e.g., docs-only changes). This action ensures we don't attempt deployment
+  without available images, providing clear error messages when this occurs.
+
+inputs:
+  image_tag:
+    description: The image tag to validate
+    required: true
+  concurrency_check_result:
+    description: Result from concurrency check (can_deploy value)
+    required: true
+
+outputs:
+  can_deploy:
+    description: Whether deployment can proceed
+    value: ${{ steps.validate.outputs.can_deploy }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate image tag is available
+      id: validate
+      shell: bash
+      run: |
+        IMAGE_TAG="${{ inputs.image_tag }}"
+        CONCURRENCY_RESULT="${{ inputs.concurrency_check_result }}"
+
+        if [ -z "$IMAGE_TAG" ]; then
+          echo "::error::No image tag available from CI. This may indicate CI did not build images for this PR."
+          echo "can_deploy=false" >> $GITHUB_OUTPUT
+        else
+          echo "✅ Image tag available: $IMAGE_TAG"
+          echo "can_deploy=$CONCURRENCY_RESULT" >> $GITHUB_OUTPUT
+        fi

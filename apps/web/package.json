@@ -2,10 +2,14 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "dev:webpack": "next dev --webpack",
-    "build": "next build",
+    "build": "next build && node -e \"const fs=require('fs');const path=require('path');function cpR(s,d){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).forEach(f=>{const sp=path.join(s,f),dp=path.join(d,f);fs.statSync(sp).isDirectory()?cpR(sp,dp):fs.copyFileSync(sp,dp)})};cpR('.next/static','.next/standalone/.next/static');cpR('public','.next/standalone/public');if(fs.existsSync('staticwebapp.config.json'))fs.copyFileSync('staticwebapp.config.json','.next/standalone/staticwebapp.config.json');if(fs.existsSync('backend-config.json'))fs.copyFileSync('backend-config.json','.next/standalone/backend-config.json')\"",
+    "build:dev": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",

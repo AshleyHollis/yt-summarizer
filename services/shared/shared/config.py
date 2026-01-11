@@ -51,8 +51,13 @@ class DatabaseSettings(BaseSettings):
         mssql+pyodbc://sa:password@localhost:port/database?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
         """
 
-        # Return direct URL if set
+        # Check if DATABASE_URL is set and if it's in ADO.NET format
         if self.url:
+            # ADO.NET format starts with "Server=" or contains semicolons with key=value pairs
+            if self.url.startswith("Server=") or (
+                ";" in self.url and "=" in self.url and "://" not in self.url
+            ):
+                return self._convert_ado_to_sqlalchemy(self.url)
             return self.url
 
         # Check Aspire-injected connection strings
@@ -79,13 +84,15 @@ class DatabaseSettings(BaseSettings):
                 key, value = part.split("=", 1)
                 parts[key.strip().lower()] = value.strip()
 
-        # Extract components
+        # Extract components - support both "Database" and "Initial Catalog"
         server = parts.get("server", "localhost")
-        database = parts.get("database", "ytsummarizer")
+        database = parts.get("database") or parts.get("initial catalog", "ytsummarizer")
         user = parts.get("user id", "sa")
         password = parts.get("password", "")
 
-        # Server might be in format "host,port" - convert to "host:port"
+        # Server might be in format "tcp:host,port" or "host,port" - extract host and port
+        if server.startswith("tcp:"):
+            server = server[4:]  # Remove "tcp:" prefix
         if "," in server:
             host, port = server.split(",", 1)
         else:
@@ -93,8 +100,10 @@ class DatabaseSettings(BaseSettings):
             port = "1433"
 
         # Build SQLAlchemy URL
+        # For SQL Server, the port goes in the query string, not in the host
+        # Format: mssql+pyodbc://user:pass@host/database?driver=...&port=1433
         encoded_password = quote_plus(password)
-        return f"mssql+pyodbc://{user}:{encoded_password}@{host}:{port}/{database}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+        return f"mssql+pyodbc://{user}:{encoded_password}@{host}/{database}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes&port={port}"
 
 
 class AzureStorageSettings(BaseSettings):

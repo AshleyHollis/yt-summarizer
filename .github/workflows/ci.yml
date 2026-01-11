@@ -2,6 +2,7 @@
 # CI Workflow - Automated Testing on Pull Request
 # =============================================================================
 # Runs all tests when a PR is created or updated
+# Builds Docker images to validate Dockerfile and catch build errors
 # User Story 1: Automated Testing on PR
 
 name: CI
@@ -16,19 +17,49 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
+  ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+
+defaults:
+  run:
+    shell: bash -e {0}  # Exit immediately if any command fails
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Detect Changes - Smart pipeline execution
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed_areas: ${{ steps.changes.outputs.changed_areas }}
+      has_code_changes: ${{ steps.changes.outputs.has_code_changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        uses: ./.github/actions/detect-pipeline-changes
+
   # ---------------------------------------------------------------------------
   # Linting
   # ---------------------------------------------------------------------------
   lint-python:
     name: Lint Python
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+      contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+      contains(needs.detect-changes.outputs.changed_areas, 'services/shared')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,18 +70,14 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           working-directory: services/shared
 
-      - name: Install ruff
-        run: pip install ruff
-
-      - name: Run ruff linter
-        run: ruff check services/
-
-      - name: Run ruff formatter check
-        run: ruff format --check services/
+      - name: Run ruff checks
+        uses: ./.github/actions/run-ruff-check
 
   lint-frontend:
     name: Lint Frontend
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,10 +95,19 @@ jobs:
   # ---------------------------------------------------------------------------
   # Python Tests
   # ---------------------------------------------------------------------------
+  # BEST PRACTICE: Job conditions check changed_areas directly
+  # - Use contains() to check if relevant area changed
+  # - Combine multiple areas with || for OR logic
+  # - Enforce fail-fast by checking lint result (no always())
+  # Example: API tests run if services/api OR services/shared changed
+  # ---------------------------------------------------------------------------
   test-shared:
     name: Test Shared Package
     runs-on: ubuntu-latest
-    needs: [lint-python]
+    needs: [detect-changes, lint-python]
+    if: |
+      contains(needs.detect-changes.outputs.changed_areas, 'services/shared') &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -83,66 +119,88 @@ jobs:
           working-directory: services/shared
 
       - name: Run shared tests
-        working-directory: services/shared
-        run: python -m pytest tests/ -v --tb=short
+        uses: ./.github/actions/run-pytest
+        with:
+          working-directory: services/shared
 
   test-api:
     name: Test API
     runs-on: ubuntu-latest
-    needs: [lint-python]
+    needs: [detect-changes, lint-python]
+    if: |
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+    outputs:
+      test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          service-package: services/api
+          install-pytest-xdist: 'true'
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
+      - name: Record tests start
+        id: start
+        uses: ./.github/actions/record-test-duration
         with:
-          enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
+          test-name: API Tests
 
-      - name: Install shared package
-        run: uv pip install --system -e "services/shared[dev]"
+      - name: Run API tests (parallel)
+        uses: ./.github/actions/run-pytest
+        with:
+          working-directory: services/api
+          parallel: 'true'
+          pytest-args: '-v --tb=short -m "not integration and not live"'
 
-      - name: Install API package
-        run: uv pip install --system -e "services/api[dev]"
-
-      - name: Run API tests
-        working-directory: services/api
-        run: python -m pytest tests/ -v --tb=short -m 'not integration and not live'
+      - name: Record tests finish
+        id: finish
+        uses: ./.github/actions/record-test-duration
+        with:
+          start-time: ${{ steps.start.outputs.started_at }}
+          test-name: API Tests
 
   test-workers:
     name: Test Workers
     runs-on: ubuntu-latest
-    needs: [lint-python]
+    needs: [detect-changes, lint-python]
+    if: |
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/workers') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+    outputs:
+      test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          service-package: services/workers
+          install-pytest-xdist: 'true'
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
+      - name: Record tests start
+        id: start
+        uses: ./.github/actions/record-test-duration
         with:
-          enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
+          test-name: Workers Tests
 
-      - name: Install shared package
-        run: uv pip install --system -e "services/shared[dev]"
+      - name: Run workers tests (parallel)
+        uses: ./.github/actions/run-pytest
+        with:
+          working-directory: services/workers
+          parallel: 'true'
 
-      - name: Install Workers package
-        run: uv pip install --system -e "services/workers[dev]"
-
-      - name: Run workers tests
-        working-directory: services/workers
-        run: python -m pytest tests/ -v --tb=short
+      - name: Record tests finish
+        id: finish
+        uses: ./.github/actions/record-test-duration
+        with:
+          start-time: ${{ steps.start.outputs.started_at }}
+          test-name: Workers Tests
 
   # ---------------------------------------------------------------------------
   # Frontend Tests
@@ -150,7 +208,10 @@ jobs:
   test-frontend:
     name: Test Frontend
     runs-on: ubuntu-latest
-    needs: [lint-frontend]
+    needs: [detect-changes, lint-frontend]
+    if: |
+      contains(needs.detect-changes.outputs.changed_areas, 'apps/web') &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -162,8 +223,214 @@ jobs:
           working-directory: apps/web
 
       - name: Run Vitest
-        working-directory: apps/web
-        run: npm run test:run
+        uses: ./.github/actions/run-frontend-tests
+
+  # ---------------------------------------------------------------------------
+  # Kubernetes Validation (YAML, Kustomize, ArgoCD)
+  # ---------------------------------------------------------------------------
+  # Validates Kubernetes manifests, kustomize builds, and ArgoCD Applications
+  # to catch configuration errors before deployment.
+  # ---------------------------------------------------------------------------
+  kubernetes-validate:
+    name: Kubernetes Validation
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: contains(needs.detect-changes.outputs.changed_areas, 'k8s')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Kustomize
+        uses: ./.github/actions/setup-kustomize
+        with:
+          kustomize-version: '5.8.0'
+
+      # -----------------------------------------------------------------------
+      # Step 1: YAML Syntax Validation
+      # -----------------------------------------------------------------------
+      - name: Validate YAML syntax (all K8s manifests)
+        uses: ./.github/actions/validate-k8s-yaml
+        with:
+          directory: k8s
+
+      # -----------------------------------------------------------------------
+      # Step 2: Kustomize Build Validation (using composite action)
+      # -----------------------------------------------------------------------
+      - name: Validate preview overlay
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/preview
+          overlay-name: preview
+          max-cpu: '1500'
+          output-file: /tmp/preview.yaml
+
+      - name: Validate prod overlay
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/prod
+          overlay-name: prod
+
+      - name: Validate prod-secretstore overlay
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/prod-secretstore
+          overlay-name: prod-secretstore
+
+      # -----------------------------------------------------------------------
+      # Step 3: ArgoCD Application Path Validation
+      # -----------------------------------------------------------------------
+      - name: Validate ArgoCD Application paths exist
+        uses: ./.github/actions/validate-argocd-paths
+
+
+  # ---------------------------------------------------------------------------
+  # Build Docker Images (conditional - only when image-building changes detected)
+  # ---------------------------------------------------------------------------
+  # CRITICAL: This job ONLY runs when specific areas change that require image building.
+  # The conditions here MUST match what detect-pr-code-changes checks in preview workflow.
+  # If they don't match, preview will run but no images will be available (causing failures).
+  # ---------------------------------------------------------------------------
+  # Builds and pushes Docker images to ACR. This validates:
+  # - Dockerfile syntax and build steps
+  # - Frontend npm run build (catches TypeScript errors)
+  # - All dependencies install correctly
+  # 
+  # Images are pushed with tags that can be used by preview/prod workflows:
+  # - PRs: pr-<number>-<sha>
+  # - Main: sha-<sha>
+  # ---------------------------------------------------------------------------
+  build-images-meta:
+    name: Prepare Image Tag
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-python, lint-frontend, test-shared, test-api, test-workers, test-frontend]
+    # CONDITIONAL IMAGE BUILDING: Only runs when changes require new images
+    # vars.ACR_NAME != '': Azure Container Registry must be configured
+    # changed_areas contains: Only these areas trigger image builds (MUST match preview workflow logic)
+    # lint and test results: Ensure code passes basic checks before building images
+    if: |
+      vars.ACR_NAME != '' &&
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'docker') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'k8s')) &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
+      (needs.test-shared.result == 'success' || needs.test-shared.result == 'skipped') &&
+      (needs.test-api.result == 'success' || needs.test-api.result == 'skipped') &&
+      (needs.test-workers.result == 'success' || needs.test-workers.result == 'skipped') &&
+      (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped')
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image-tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: tag
+        uses: ./.github/actions/generate-image-tag
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Publish image tag artifact
+        if: steps.tag.outputs.image-tag != ''
+        uses: ./.github/actions/publish-image-tag
+        with:
+          image-tag: ${{ steps.tag.outputs.image-tag }}
+
+      - name: Verify image-tag artifact is available
+        if: steps.tag.outputs.image-tag != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: image-tag
+          path: ./downloaded-artifacts
+
+      - name: Assert downloaded image tag
+        if: steps.tag.outputs.image-tag != ''
+        uses: ./.github/actions/assert-image-tag-artifact
+
+  build-images:
+    name: Build Images (parallel)
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-images-meta]
+    if: |
+      vars.ACR_NAME != '' &&
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'docker') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'k8s'))
+    strategy:
+      matrix:
+        include:
+          - service: api
+            dockerfile: services/api/Dockerfile
+            image: yt-summarizer-api
+          - service: workers
+            dockerfile: services/workers/Dockerfile
+            image: yt-summarizer-workers
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure Container Registry
+        uses: ./.github/actions/azure-acr-login
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
+
+      - name: Build and push ${{ matrix.service }} image
+        uses: ./.github/actions/build-images
+        with:
+          service: ${{ matrix.service }}
+          image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
+          push: true
+
+
+  # Build Docker Images (Validation Only - No Push)
+  # ---------------------------------------------------------------------------
+  # When ACR is not configured, still validate that Docker images build
+  # This catches Dockerfile errors without requiring Azure credentials
+  # ---------------------------------------------------------------------------
+  build-images-validate:
+    name: Build Images (Validate - parallel)
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-python, lint-frontend]
+    # Only run if ACR is NOT configured (validation mode)
+    if: |
+      vars.ACR_NAME == '' &&
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'docker'))
+    strategy:
+      matrix:
+        include:
+          - service: api
+            dockerfile: services/api/Dockerfile
+            image: yt-summarizer-api
+          - service: workers
+            dockerfile: services/workers/Dockerfile
+            image: yt-summarizer-workers
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.service }} image (no push)
+        uses: ./.github/actions/build-images
+        with:
+          service: ${{ matrix.service }}
+          image-tag: validate
+          push: false
 
   # ---------------------------------------------------------------------------
   # E2E Tests - Run against Preview Environment
@@ -181,6 +448,8 @@ jobs:
   validate-terraform:
     name: Validate Terraform
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -190,17 +459,15 @@ jobs:
         with:
           terraform_version: "1.5"
 
-      - name: Terraform Init (prod)
-        working-directory: infra/terraform/environments/prod
-        run: terraform init -backend=false
-
-      - name: Terraform Validate (prod)
-        working-directory: infra/terraform/environments/prod
-        run: terraform validate
+      - name: Validate Terraform configuration
+        uses: ./.github/actions/validate-terraform-config
+        with:
+          working-directory: infra/terraform/environments/prod
 
   validate-kustomize:
     name: Validate Kustomize
     runs-on: ubuntu-latest
+    needs: [lint-python]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -209,10 +476,16 @@ jobs:
         uses: imranismail/setup-kustomize@v2
 
       - name: Validate base manifests
-        run: kustomize build k8s/base > /dev/null
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/base
+          overlay-name: base
 
       - name: Validate prod overlay
-        run: kustomize build k8s/overlays/prod > /dev/null
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/prod
+          overlay-name: prod
 
   # ---------------------------------------------------------------------------
   # Security Scanning
@@ -220,6 +493,8 @@ jobs:
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.has_code_changes == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -239,25 +514,35 @@ jobs:
     name: CI Status
     runs-on: ubuntu-latest
     needs:
+      - detect-changes
       - test-shared
       - test-api
       - test-workers
       - test-frontend
+      - build-images
+      - build-images-validate
       - validate-terraform
       - validate-kustomize
+      - kubernetes-validate
       - secret-scanning
     if: always()
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Check all jobs passed
-        run: |
-          if [ "${{ needs.test-shared.result }}" != "success" ] ||
-             [ "${{ needs.test-api.result }}" != "success" ] ||
-             [ "${{ needs.test-workers.result }}" != "success" ] ||
-             [ "${{ needs.test-frontend.result }}" != "success" ] ||
-             [ "${{ needs.validate-terraform.result }}" != "success" ] ||
-             [ "${{ needs.validate-kustomize.result }}" != "success" ] ||
-             [ "${{ needs.secret-scanning.result }}" != "success" ]; then
-            echo "One or more jobs failed"
-            exit 1
-          fi
-          echo "All CI checks passed! ✅"
+        uses: ./.github/actions/validate-ci-results
+        with:
+          changed-areas: ${{ needs.detect-changes.outputs.changed_areas }}
+          test-shared-result: ${{ needs.test-shared.result }}
+          test-api-result: ${{ needs.test-api.result }}
+          test-workers-result: ${{ needs.test-workers.result }}
+          test-frontend-result: ${{ needs.test-frontend.result }}
+          validate-terraform-result: ${{ needs.validate-terraform.result }}
+          validate-kustomize-result: ${{ needs.validate-kustomize.result }}
+          kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
+          secret-scanning-result: ${{ needs.secret-scanning.result }}
+          secret-scanning-should-run: ${{ needs.detect-changes.outputs.has_code_changes }}
+          build-images-result: ${{ needs.build-images.result }}
+          build-images-validate-result: ${{ needs.build-images-validate.result }}
+

@@ -1,0 +1,30 @@
+name: 'Verify Secret Configured'
+description: 'Verifies that a required secret is configured before proceeding'
+inputs:
+  secret-name:
+    description: 'Display name of the secret being verified'
+    required: true
+  secret-value:
+    description: 'Value of the secret to check (should be passed from secrets context)'
+    required: true
+  error-message:
+    description: 'Custom error message to display if secret is missing'
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Verify secret is configured
+      shell: bash
+      env:
+        SECRET_VALUE: ${{ inputs.secret-value }}
+      run: |
+        if [ -z "$SECRET_VALUE" ]; then
+          if [ -n "${{ inputs.error-message }}" ]; then
+            echo "::error::${{ inputs.error-message }}"
+          else
+            echo "::error::${{ inputs.secret-name }} is not configured. Please add it to repository secrets."
+          fi
+          exit 1
+        fi
+        echo "✅ ${{ inputs.secret-name }} is configured"

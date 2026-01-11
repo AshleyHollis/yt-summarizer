@@ -1,0 +1,77 @@
+name: Verify Worker Deployments
+description: Verifies that all worker deployments are using the expected image tag
+
+inputs:
+  namespace:
+    description: Kubernetes namespace
+    required: true
+  expected-tag:
+    description: Expected image tag
+    required: true
+  registry:
+    description: Container registry
+    required: true
+  image-name:
+    description: Image name (e.g., yt-summarizer-workers)
+    required: true
+  workers:
+    description: Comma-separated list of worker deployment names
+    required: false
+    default: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+  fail-on-mismatch:
+    description: Whether to fail if any worker has a mismatched image
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Verify worker deployments
+      shell: bash
+      run: |
+        NAMESPACE="${{ inputs.namespace }}"
+        EXPECTED_TAG="${{ inputs.expected-tag }}"
+        REGISTRY="${{ inputs.registry }}"
+        IMAGE_NAME="${{ inputs.image-name }}"
+        WORKERS="${{ inputs.workers }}"
+        FAIL_ON_MISMATCH="${{ inputs.fail-on-mismatch }}"
+        
+        echo "Verifying worker deployments in namespace: ${NAMESPACE}"
+        echo "Expected image: ${REGISTRY}/${IMAGE_NAME}:${EXPECTED_TAG}"
+        
+        HAS_MISMATCH=false
+        
+        IFS=',' read -ra WORKER_ARRAY <<< "$WORKERS"
+        for WORKER in "${WORKER_ARRAY[@]}"; do
+          WORKER=$(echo "$WORKER" | xargs)  # Trim whitespace
+          echo "Checking ${WORKER}..."
+          
+          if ! kubectl get deployment "${WORKER}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+            echo "  ⚠️ Deployment ${WORKER} not found in namespace ${NAMESPACE}"
+            if [ "$FAIL_ON_MISMATCH" = "true" ]; then
+              HAS_MISMATCH=true
+            fi
+            continue
+          fi
+          
+          CURRENT_IMAGE=$(kubectl get deployment "${WORKER}" -n "${NAMESPACE}" -o jsonpath='{.spec.template.spec.containers[0].image}')
+          echo "  Current image: ${CURRENT_IMAGE}"
+          
+          if [[ "${CURRENT_IMAGE}" == "${REGISTRY}/${IMAGE_NAME}:${EXPECTED_TAG}" ]]; then
+            echo "  ✅ ${WORKER} is using the correct image tag"
+          else
+            echo "  ⚠️ ${WORKER} image mismatch"
+            echo "    Expected: ${REGISTRY}/${IMAGE_NAME}:${EXPECTED_TAG}"
+            echo "    Got: ${CURRENT_IMAGE}"
+            if [ "$FAIL_ON_MISMATCH" = "true" ]; then
+              HAS_MISMATCH=true
+            fi
+          fi
+        done
+        
+        if [ "$HAS_MISMATCH" = "true" ]; then
+          echo "::error::One or more worker deployments have mismatched images"
+          exit 1
+        fi
+        
+        echo "✅ All worker deployments verified"

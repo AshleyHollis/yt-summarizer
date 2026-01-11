@@ -1,4 +1,8 @@
-"""Database connection factory with retry logic."""
+"""Database connection factory with retry logic.
+
+This module handles database connections for SQL Server (both local and Azure SQL)
+with support for ADO.NET style connection strings and connection pooling.
+"""
 
 import os
 from collections.abc import AsyncGenerator
@@ -67,8 +71,9 @@ def convert_ado_connection_string(ado_string: str) -> str:
 
     Converts strings like:
         Server=localhost,1433;Database=ytsummarizer;User Id=sa;Password=xxx;TrustServerCertificate=True
+        Server=tcp:sql-server.database.windows.net,1433;Initial Catalog=db;...
     To:
-        mssql+aioodbc://sa:xxx@localhost:1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+        mssql+aioodbc://sa:xxx@localhost,1433/ytsummarizer?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
     """
     parts = {}
     for part in ado_string.split(";"):
@@ -81,6 +86,10 @@ def convert_ado_connection_string(ado_string: str) -> str:
     database = parts.get("database", parts.get("initial catalog", ""))
     user = parts.get("user id", parts.get("uid", "sa"))
     password = parts.get("password", parts.get("pwd", ""))
+
+    # Strip "tcp:" prefix if present (Azure SQL uses this format)
+    if server.lower().startswith("tcp:"):
+        server = server[4:]
 
     # Handle port in server (e.g., "localhost,1433" or "localhost:1433")
     if "," in server:
@@ -96,9 +105,10 @@ def convert_ado_connection_string(ado_string: str) -> str:
     encoded_password = quote_plus(password)
 
     # Build SQLAlchemy URL
-    # Note: SQL Server ODBC uses comma for port (e.g., localhost,1433), not colon
-    url = f"mssql+aioodbc://{user}:{encoded_password}@{host},{port}/{database}"
-    url += "?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+    # For SQL Server, the port goes in the query string, not in the host
+    # Format: mssql+aioodbc://user:pass@host/database?driver=...&port=1433
+    url = f"mssql+aioodbc://{user}:{encoded_password}@{host}/{database}"
+    url += f"?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes&port={port}"
 
     return url
 

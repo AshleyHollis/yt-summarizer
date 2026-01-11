@@ -1,0 +1,167 @@
+# Reusable Kustomize validation action
+# Validates Kustomize builds with comprehensive error diagnostics
+
+name: 'Validate Kustomize Build'
+description: 'Build and validate Kustomize overlay with detailed error reporting'
+
+inputs:
+  overlay-path:
+    description: 'Path to kustomize overlay directory (e.g., k8s/overlays/preview)'
+    required: true
+  overlay-name:
+    description: 'Name of the overlay for error messages (e.g., preview, prod)'
+    required: true
+  dry-run:
+    description: 'Perform kubectl server-side dry-run validation'
+    required: false
+    default: 'false'
+  max-cpu:
+    description: 'Maximum CPU quota in millicores (optional)'
+    required: false
+    default: ''
+  output-file:
+    description: 'Output file path for built manifests'
+    required: false
+    default: ''
+
+outputs:
+  manifest-path:
+    description: 'Path to the generated manifest file'
+    value: ${{ steps.build.outputs.manifest_path }}
+  manifest-size:
+    description: 'Size of the generated manifest in bytes'
+    value: ${{ steps.build.outputs.manifest_size }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Build Kustomize overlay
+      id: build
+      shell: bash
+      run: |
+        set -eo pipefail
+        
+        OVERLAY_DIR="${{ inputs.overlay-path }}"
+        OVERLAY_NAME="${{ inputs.overlay-name }}"
+        OVERLAY_FILE="$OVERLAY_DIR/kustomization.yaml"
+        
+        # Determine output file
+        if [ -n "${{ inputs.output-file }}" ]; then
+          TMP_MANIFEST="${{ inputs.output-file }}"
+        else
+          TMP_MANIFEST="/tmp/${OVERLAY_NAME}-manifest.yaml"
+        fi
+        
+        ERR_FILE="/tmp/kustomize-${OVERLAY_NAME}.err"
+        
+        echo "::group::Building $OVERLAY_NAME overlay"
+        
+        # Display git context for debugging
+        echo "--- Git Context ---"
+        git rev-parse --abbrev-ref HEAD 2>&1 || true
+        git log -1 --oneline 2>&1 || true
+        
+        # Display overlay file for debugging
+        echo "--- Overlay File ---"
+        if [ -f "$OVERLAY_FILE" ]; then
+          echo "File: $OVERLAY_FILE"
+          echo "Size: $(wc -c < "$OVERLAY_FILE") bytes"
+          head -n 50 "$OVERLAY_FILE" || true
+        else
+          echo "⚠️  Overlay file not found: $OVERLAY_FILE"
+        fi
+        
+        # Display patch files
+        if [ -d "$OVERLAY_DIR/patches" ]; then
+          echo "--- Patch Files ---"
+          ls -lh "$OVERLAY_DIR/patches" || true
+        fi
+        
+        # Build with kustomize
+        echo "--- Building manifests ---"
+        if ! kustomize build "$OVERLAY_DIR" > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
+          echo "::error::kustomize build FAILED for overlay '$OVERLAY_NAME'"
+          echo "--- Error Output ---"
+          cat "$ERR_FILE" || true
+          
+          # Try to identify problematic patch files
+          if grep -q "path:" "$ERR_FILE"; then
+            echo "--- Problematic Files ---"
+            grep "path:" "$ERR_FILE" | while read -r line; do
+              PATCH_PATH=$(echo "$line" | sed -n 's/.*path:\s*\(.*\)/\1/p')
+              if [ -n "$PATCH_PATH" ]; then
+                FULL_PATH="$OVERLAY_DIR/$PATCH_PATH"
+                if [ -f "$FULL_PATH" ]; then
+                  echo "File: $FULL_PATH"
+                  head -n 30 "$FULL_PATH" || true
+                fi
+              fi
+            done
+          fi
+          
+          echo "::endgroup::"
+          exit 1
+        fi
+        
+        # Get manifest size
+        MANIFEST_SIZE=$(wc -c < "$TMP_MANIFEST")
+        echo "✅ Built $OVERLAY_NAME overlay: $MANIFEST_SIZE bytes"
+        echo "::endgroup::"
+        
+        # Output for next steps
+        echo "manifest_path=$TMP_MANIFEST" >> $GITHUB_OUTPUT
+        echo "manifest_size=$MANIFEST_SIZE" >> $GITHUB_OUTPUT
+
+    - name: Validate YAML syntax
+      shell: bash
+      run: |
+        MANIFEST="${{ steps.build.outputs.manifest_path }}"
+        
+        echo "::group::Validating YAML syntax"
+        if ! python3 scripts/ci/parse_yaml.py "$MANIFEST" 2>&1; then
+          echo "::error::YAML validation failed"
+          echo "--- First 100 lines of manifest ---"
+          head -n 100 "$MANIFEST" || true
+          echo "::endgroup::"
+          exit 1
+        fi
+        echo "✅ YAML syntax valid"
+        echo "::endgroup::"
+
+    - name: Validate CPU quotas
+      if: inputs.max-cpu != ''
+      shell: bash
+      run: |
+        MANIFEST="${{ steps.build.outputs.manifest_path }}"
+        MAX_CPU="${{ inputs.max-cpu }}"
+        OVERLAY_NAME="${{ inputs.overlay-name }}"
+        
+        echo "::group::Validating CPU quotas (max: ${MAX_CPU}m)"
+        if ! python3 scripts/ci/validate_kustomize.py \
+          --file "$MANIFEST" \
+          --max-cpu "$MAX_CPU" \
+          --name "$OVERLAY_NAME" 2>&1; then
+          echo "::error::CPU quota validation failed for $OVERLAY_NAME"
+          echo "::endgroup::"
+          exit 1
+        fi
+        echo "✅ CPU quotas within limits"
+        echo "::endgroup::"
+
+    - name: Server-side dry-run
+      if: inputs.dry-run == 'true'
+      shell: bash
+      run: |
+        MANIFEST="${{ steps.build.outputs.manifest_path }}"
+        OVERLAY_NAME="${{ inputs.overlay-name }}"
+        
+        echo "::group::Kubernetes server-side dry-run"
+        if ! kubectl apply --server-dry-run=server -f "$MANIFEST" 2>&1; then
+          echo "::error::Server dry-run failed for $OVERLAY_NAME"
+          echo "--- Manifest Preview ---"
+          head -n 100 "$MANIFEST" || true
+          echo "::endgroup::"
+          exit 1
+        fi
+        echo "✅ Server-side validation passed"
+        echo "::endgroup::"

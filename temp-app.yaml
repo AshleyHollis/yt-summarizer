@@ -1,0 +1,43 @@
+﻿apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: preview-pr-4
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/instance: pr-4
+    app.kubernetes.io/component: preview
+    app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    preview.yt-summarizer/pr-number: '4'
+    preview.yt-summarizer/pr-branch: fix/cicd-improvements
+    preview.yt-summarizer/pr-head-sha: 302a6a6b7b8e4b8b9c4b8b9c4b8b9c4b8b9c4b8b9c4
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+    targetRevision: 302a6a6b7b8e4b8b9c4b8b9c4b8b9c4b8b9c4b8b9c4
+    path: k8s/overlays/preview
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: preview-pr-4
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - Replace=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+  revisionHistoryLimit: 3

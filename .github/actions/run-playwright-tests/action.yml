@@ -1,0 +1,34 @@
+name: Run Playwright Tests
+description: Installs Playwright browsers and runs E2E tests
+
+inputs:
+  working-directory:
+    description: Directory containing Playwright tests
+    required: false
+    default: 'apps/web'
+  playwright-args:
+    description: Additional Playwright test arguments
+    required: false
+    default: '--reporter=html'
+  install-deps:
+    description: Install system dependencies with browsers
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Install Playwright browsers
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ "${{ inputs.install-deps }}" = "true" ]; then
+          npx playwright install --with-deps chromium
+        else
+          npx playwright install chromium
+        fi
+
+    - name: Run Playwright tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npx playwright test ${{ inputs.playwright-args }}

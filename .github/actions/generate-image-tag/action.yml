@@ -1,0 +1,87 @@
+# Reusable image tag generator
+# Creates consistent image tags based on PR number, commit SHA, or branch
+
+name: 'Generate Image Tag'
+description: 'Generate image tag from PR number and commit SHA'
+
+inputs:
+  pr-number:
+    description: 'Pull request number'
+    required: false
+    default: ''
+  commit-sha:
+    description: 'Commit SHA'
+    required: false
+    default: ''
+  branch-name:
+    description: 'Branch name'
+    required: false
+    default: ''
+  tag-prefix:
+    description: 'Tag prefix (e.g., pr, sha, branch)'
+    required: false
+    default: 'auto'
+
+outputs:
+  image-tag:
+    description: 'Generated image tag'
+    value: ${{ steps.generate.outputs.image_tag }}
+  short-sha:
+    description: 'Short commit SHA (7 characters)'
+    value: ${{ steps.generate.outputs.short_sha }}
+  tag-type:
+    description: 'Type of tag generated (pr, sha, branch)'
+    value: ${{ steps.generate.outputs.tag_type }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Generate image tag
+      id: generate
+      shell: bash
+      run: |
+        PR_NUMBER="${{ inputs.pr-number }}"
+        COMMIT_SHA="${{ inputs.commit-sha }}"
+        BRANCH_NAME="${{ inputs.branch-name }}"
+        TAG_PREFIX="${{ inputs.tag-prefix }}"
+        
+        # Derive short SHA from provided commit-sha if given, otherwise fall back to HEAD
+        if [ -n "$COMMIT_SHA" ] && [ "$COMMIT_SHA" != "null" ]; then
+          SHORT_SHA=$(git rev-parse --short=7 "$COMMIT_SHA")
+        else
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+        fi
+        
+        # Determine tag type and generate tag
+        if [ "$TAG_PREFIX" = "auto" ]; then
+          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+            IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
+            TAG_TYPE="pr"
+          elif [ -n "$BRANCH_NAME" ] && [ "$BRANCH_NAME" != "main" ] && [ "$BRANCH_NAME" != "master" ]; then
+            # Sanitize branch name for Docker tag
+            CLEAN_BRANCH=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g' | cut -c1-128)
+            IMAGE_TAG="branch-${CLEAN_BRANCH}-${SHORT_SHA}"
+            TAG_TYPE="branch"
+          else
+            IMAGE_TAG="sha-${SHORT_SHA}"
+            TAG_TYPE="sha"
+          fi
+        else
+          # Use explicit prefix
+          if [ "$TAG_PREFIX" = "pr" ] && [ -n "$PR_NUMBER" ]; then
+            IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
+            TAG_TYPE="pr"
+          elif [ "$TAG_PREFIX" = "branch" ] && [ -n "$BRANCH_NAME" ]; then
+            CLEAN_BRANCH=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g' | cut -c1-128)
+            IMAGE_TAG="branch-${CLEAN_BRANCH}-${SHORT_SHA}"
+            TAG_TYPE="branch"
+          else
+            IMAGE_TAG="sha-${SHORT_SHA}"
+            TAG_TYPE="sha"
+          fi
+        fi
+        
+        echo "Generated image tag: $IMAGE_TAG (type: $TAG_TYPE)"
+        echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+        echo "tag_type=$TAG_TYPE" >> $GITHUB_OUTPUT

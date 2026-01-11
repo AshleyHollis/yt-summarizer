@@ -1,0 +1,21 @@
+name: Assert Image Tag Artifact
+description: Verifies that the image-tag artifact was downloaded correctly
+
+inputs:
+  artifact_path:
+    description: Path to the downloaded artifact file
+    required: true
+    default: './downloaded-artifacts/image-tag.txt'
+
+runs:
+  using: composite
+  steps:
+    - name: Assert downloaded image tag
+      shell: bash
+      run: |
+        if [ ! -f ${{ inputs.artifact_path }} ]; then
+          echo "::error::${{ inputs.artifact_path }} not found in artifact"
+          exit 1
+        fi
+        echo "Verified image tag artifact:"
+        cat ${{ inputs.artifact_path }}

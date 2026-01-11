@@ -5,34 +5,44 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: api
+
 spec:
   replicas: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: transcribe-worker
+
 spec:
   replicas: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: summarize-worker
+
 spec:
   replicas: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: embed-worker
+
 spec:
   replicas: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: relationships-worker
+
 spec:
   replicas: 1

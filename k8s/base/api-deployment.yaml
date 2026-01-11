@@ -10,6 +10,9 @@ metadata:
     app.kubernetes.io/name: api
     app.kubernetes.io/component: backend
     app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    # Test change to verify K8s-only deployments work - 2026-01-11
 spec:
   replicas: 1
   selector:
@@ -25,13 +28,17 @@ spec:
       serviceAccountName: yt-summarizer-sa
       containers:
         - name: api
-          image: ACR_LOGIN_SERVER/yt-summarizer-api:latest
+          image: yt-summarizer-api
           imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8000
               protocol: TCP
           env:
+            # Explicitly set API_PORT to prevent collision with Kubernetes service env vars
+            # K8s auto-creates API_PORT=tcp://... which breaks pydantic int parsing
+            - name: API_PORT
+              value: "8000"
             - name: ENVIRONMENT
               valueFrom:
                 configMapKeyRef:

@@ -9,6 +9,8 @@ metadata:
   labels:
     app.kubernetes.io/name: yt-summarizer
     app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    # Test change to verify K8s-only deployments work - 2026-01-11
 data:
   ENVIRONMENT: "staging"
   LOG_LEVEL: "INFO"

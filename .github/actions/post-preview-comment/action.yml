@@ -1,0 +1,107 @@
+name: Post Preview Comment
+description: Post or update preview environment comment on PR
+
+inputs:
+  github-token:
+    description: GitHub token for API access
+    required: true
+  pr-number:
+    description: Pull request number
+    required: true
+  preview-url:
+    description: Preview environment URL
+    required: true
+  image-tag:
+    description: Docker image tag deployed
+    required: true
+  commit-sha:
+    description: Commit SHA deployed
+    required: true
+  frontend-url:
+    description: Frontend preview URL
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Post/update PR comment
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const previewUrl = '${{ inputs.preview-url }}';
+          const frontendUrl = '${{ inputs.frontend-url }}';
+          const imageTag = '${{ inputs.image-tag }}';
+          const commitSha = '${{ inputs.commit-sha }}';
+          
+          const body = `## 🚀 Preview Environment Ready\n\n` +
+            `| Property | Value |\n` +
+            `|----------|-------|\n` +
+            `| **Preview URL** | ${previewUrl} |\n` +
+            (frontendUrl ? `| **Frontend Preview** | ${frontendUrl} |\n` : '') +
+            `| **Image Tag** | \`${imageTag}\` |\n` +
+            `| **Commit** | \`${commitSha}\` |\n\n` +
+            `### 🔗 Quick Links\n` +
+            `- [API Health Check](${previewUrl}/health/live)\n` +
+            `- [API Documentation](${previewUrl}/docs)\n` +
+            (frontendUrl ? `- [Frontend Preview](${frontendUrl})\n` : '') +
+            `\n` +
+            `### ℹ️ Architecture\n` +
+            `This preview uses Argo CD ApplicationSet with Pull Request Generator.\n` +
+            `The overlay at \`k8s/overlays/preview/\` lives in your PR branch.\n` +
+            `Argo CD automatically discovers open PRs and creates preview environments.`;
+          
+          // Find existing preview comment to update
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: ${{ inputs.pr-number }},
+          });
+          
+          const previewComment = comments.find(c => 
+            c.user.type === 'Bot' && 
+            c.body.includes('Preview Environment Ready')
+          );
+          
+          if (previewComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: previewComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              issue_number: ${{ inputs.pr-number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+          }
+
+    - name: Create deployment summary
+      shell: bash
+      run: |
+        echo "## 🚀 Preview Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **PR** | #${{ inputs.pr-number }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Preview URL** | ${{ inputs.preview-url }} |" >> $GITHUB_STEP_SUMMARY
+        if [ -n "${{ inputs.frontend-url }}" ]; then
+          echo "| **Frontend** | ${{ inputs.frontend-url }} |" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "| **Image Tag** | \`${{ inputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Commit** | \`${{ inputs.commit-sha }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [Preview Site](${{ inputs.preview-url }})" >> $GITHUB_STEP_SUMMARY
+        if [ -n "${{ inputs.frontend-url }}" ]; then
+          echo "- [Frontend Preview](${{ inputs.frontend-url }})" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ℹ️ Architecture" >> $GITHUB_STEP_SUMMARY
+        echo "This preview uses Argo CD ApplicationSet with Pull Request Generator." >> $GITHUB_STEP_SUMMARY
+        echo "The overlay at \`k8s/overlays/preview/\` lives in your PR branch." >> $GITHUB_STEP_SUMMARY
+        echo "Argo CD automatically discovers open PRs and creates preview environments." >> $GITHUB_STEP_SUMMARY

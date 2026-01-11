@@ -10,6 +10,8 @@ metadata:
     app.kubernetes.io/name: api
     app.kubernetes.io/component: backend
     app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    # Test change to verify K8s-only deployments work - 2026-01-11
 spec:
   type: ClusterIP
   selector:

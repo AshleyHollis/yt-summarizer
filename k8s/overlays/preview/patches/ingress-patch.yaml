@@ -1,18 +1,48 @@
 # =============================================================================
 # Preview Ingress Patch
 # =============================================================================
-# Routes traffic via path-based routing (no dynamic subdomain needed)
-# Preview URL: https://preview.yt-summarizer.example.com/api
+# Routes traffic to preview API pods via sslip.io wildcard DNS
+# 
+# CRITICAL: TLS/HTTPS REQUIREMENTS
+# ---------------------------------
+# - Frontend served from Azure Static Web Apps over HTTPS
+# - Backend MUST also use HTTPS to avoid mixed content errors
+# - Browsers block HTTP requests from HTTPS pages (mixed content policy)
+# - cert-manager.io/cluster-issuer MUST use "letsencrypt-prod" for trusted certs
+# - NEVER use "letsencrypt-staging" - it creates untrusted certs that browsers reject
+#
+# DNS PROVIDER: sslip.io
+# ----------------------
+# - Switched from nip.io to sslip.io to avoid global rate limit issues
+# - sslip.io uses dotted IP format: {subdomain}.{ip}.sslip.io
+# - Example: yt-summarizer-api.preview-pr-4.20.255.113.149.sslip.io
+#
+# RATE LIMIT PREVENTION:
+# ----------------------
+# - Uses PR-specific TLS secret name (preview-pr-{NUMBER}-tls) to persist certificates
+# - Each PR gets its own certificate that survives workflow re-runs
+# - Prevents hitting Let's Encrypt rate limit (5 certs per exact domain set per 168 hours)
+# - Domain includes app name (yt-summarizer) to prevent conflicts with other apps on same AKS
+# - yt-summarizer-api.preview-pr-4.20.255.113.149.sslip.io and preview-pr-4-tls are substituted by CI workflow
+#
+# Access URL: https://{app-name}-api.preview-pr-<num>.{ip}.sslip.io
+# Example: https://yt-summarizer-api.preview-pr-4.20.255.113.149.sslip.io
+# =============================================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-ingress
+  namespace: yt-summarizer
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # IMPORTANT: ssl-redirect must be "true" for HTTPS (prevents mixed content errors)
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Using letsencrypt-prod with new domain to avoid rate limits
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   rules:
-    - host: preview.yt-summarizer.example.com
+    # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
+    # Dynamic hostname prevents Let's Encrypt rate limits by using PR-specific domains
+    - host: yt-summarizer-api.preview-pr-4.20-255-113-149.nip.io
       http:
         paths:
           - path: /api(/|$)(.*)
@@ -22,3 +52,14 @@ spec:
                 name: api
                 port:
                   number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - yt-summarizer-api.preview-pr-4.20-255-113-149.nip.io
+      secretName: preview-pr-4-tls

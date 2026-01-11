@@ -177,6 +177,14 @@ npx playwright test --ui
 .\.specify\scripts\powershell\run-test-gate.ps1
 ```
 
+## CI: Kustomize validation and preview quota check
+
+The CI pipeline now validates that Kustomize can build overlays and that the preview overlay's total CPU requests fit within a configured quota to prevent preview rollouts from being blocked by ResourceQuota limits.
+
+Key points:
+- The workflow job `Kustomize & Preview Quota Validate` runs on PRs and will fail the build if `kustomize build` errors for an overlay or if the preview overlay exceeds the configured CPU threshold (currently 1500m).
+- Validation logic is implemented in `scripts/ci/validate_kustomize.py` which parses the rendered manifests and sums CPU requests across deployments.
+
 ## Adding New Features
 
 ### Adding a New API Endpoint

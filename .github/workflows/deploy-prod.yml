@@ -32,74 +32,91 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Build and Push Production Images
+  # Build and Push Production Images (split)
   # ---------------------------------------------------------------------------
-  build:
-    name: Build Production Images
+  meta:
+    name: Prepare image tag
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.image_tag }}
-      api_digest: ${{ steps.build-api.outputs.digest }}
-      workers_digest: ${{ steps.build-workers.outputs.digest }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
+      - name: Generate image tag
+        id: tag
+        uses: ./.github/actions/generate-image-tag
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          commit-sha: ${{ github.sha }}
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image-tag }}
+      short_sha: ${{ steps.tag.outputs.short-sha }}
 
-      - name: Login to ACR
-        run: az acr login --name ${{ env.ACR_NAME }}
+  build-api:
+    name: Build and push API image
+    runs-on: ubuntu-latest
+    needs: [meta]
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      api_digest: ${{ steps.build.outputs.digest }}
+      image_tag: ${{ needs.meta.outputs.image_tag }}
+      api_build_duration: ${{ steps.build.outputs.build_duration }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Generate image metadata
-        id: meta
-        run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          IMAGE_TAG="sha-${SHORT_SHA}"
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "Generated image tag: ${IMAGE_TAG}"
+      - name: Azure ACR Login
+        uses: ./.github/actions/azure-acr-login
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
 
       - name: Build and push API image
-        id: build-api
-        uses: docker/build-push-action@v5
+        id: build
+        uses: ./.github/actions/docker-build-push
         with:
-          context: .
-          file: services/api/Dockerfile
-          push: true
-          tags: |
-            ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-api:${{ steps.meta.outputs.image_tag }}
-            ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-api:latest
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
+          dockerfile: services/api/Dockerfile
+          image-name: yt-summarizer-api
+          image-tag: ${{ needs.meta.outputs.image_tag }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          cache-name: api
+          add-latest-tag: 'true'
+
+  build-workers:
+    name: Build and push Workers image
+    runs-on: ubuntu-latest
+    needs: [meta]
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      workers_digest: ${{ steps.build.outputs.digest }}
+      image_tag: ${{ needs.meta.outputs.image_tag }}
+      workers_build_duration: ${{ steps.build.outputs.build_duration }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure ACR Login
+        uses: ./.github/actions/azure-acr-login
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
 
       - name: Build and push Workers image
-        id: build-workers
-        uses: docker/build-push-action@v5
+        id: build
+        uses: ./.github/actions/docker-build-push
         with:
-          context: .
-          file: services/workers/Dockerfile
-          push: true
-          tags: |
-            ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-workers:${{ steps.meta.outputs.image_tag }}
-            ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-workers:latest
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
+          dockerfile: services/workers/Dockerfile
+          image-name: yt-summarizer-workers
+          image-tag: ${{ needs.meta.outputs.image_tag }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          cache-name: workers
+          add-latest-tag: 'true'
 
   # ---------------------------------------------------------------------------
   # Update Production Overlay
@@ -107,7 +124,7 @@ jobs:
   update-overlay:
     name: Update Production Overlay
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build-api, build-workers, meta]
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -121,85 +138,33 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Setup Python with dependencies
+        uses: ./.github/actions/setup-kustomize
+        with:
+          install-python: 'true'
+
       - name: Update production kustomization
-        run: |
-          IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
-          API_DIGEST="${{ needs.build.outputs.api_digest }}"
-          WORKERS_DIGEST="${{ needs.build.outputs.workers_digest }}"
-          ACR_URL="${{ env.ACR_LOGIN_SERVER }}"
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
-          cd k8s/overlays/prod
-          
-          # Update kustomization.yaml with new image tags/digests
-          cat > kustomization.yaml << EOF
-          # =============================================================================
-          # Production Overlay Kustomization
-          # =============================================================================
-          # Single production environment - auto-synced by Argo CD on merge to main
-          # Last updated: ${TIMESTAMP}
-          # Commit: ${{ github.sha }}
-          apiVersion: kustomize.config.k8s.io/v1beta1
-          kind: Kustomization
-          
-          namespace: yt-summarizer
-          
-          resources:
-            - ../../base
-            - priority-class.yaml
-          
-          # Image tags - pinned to specific digests for immutable deployments
-          images:
-            - name: yt-summarizer-api
-              newName: ${ACR_URL}/yt-summarizer-api
-              newTag: ${IMAGE_TAG}
-              # digest: ${API_DIGEST}
-            - name: yt-summarizer-workers
-              newName: ${ACR_URL}/yt-summarizer-workers
-              newTag: ${IMAGE_TAG}
-              # digest: ${WORKERS_DIGEST}
-          
-          # Production-specific patches
-          patches:
-            - path: patches/configmap-patch.yaml
-            - path: patches/ingress-patch.yaml
-            - path: patches/resources-patch.yaml
-            - path: patches/priority-class-patch.yaml
-          
-          labels:
-            - pairs:
-                environment: production
-                app.kubernetes.io/part-of: yt-summarizer
-          
-          commonAnnotations:
-            deployment.kubernetes.io/environment: production
-          EOF
-          
-          echo "Updated production kustomization with tag: ${IMAGE_TAG}"
-          cat kustomization.yaml
+        uses: ./.github/actions/update-prod-kustomization
+        with:
+          image-tag: ${{ needs.meta.outputs.image_tag }}
+
 
       - name: Commit and push changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git add k8s/overlays/prod/kustomization.yaml
-          
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore(prod): deploy ${{ needs.build.outputs.image_tag }} to production
+        uses: ./.github/actions/commit-kustomization
+        with:
+          file-path: 'k8s/overlays/prod/kustomization.yaml'
+          commit-message: |
+            chore(prod): deploy ${{ needs.meta.outputs.image_tag }} to production
             
-            API Image: ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-api:${{ needs.build.outputs.image_tag }}
-            Workers Image: ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-workers:${{ needs.build.outputs.image_tag }}
+            API Image: ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-api:${{ needs.meta.outputs.image_tag }}
+            Workers Image: ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-workers:${{ needs.meta.outputs.image_tag }}
             
             Commit: ${{ github.sha }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             
-            [skip ci]"
-            
-            git push origin main
-          fi
+            [skip ci]
+          git-branch: 'main'
+
 
   # ---------------------------------------------------------------------------
   # Deploy Frontend to SWA
@@ -207,7 +172,7 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build-api, build-workers]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -221,12 +186,16 @@ jobs:
       - name: Build frontend
         working-directory: apps/web
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.PRODUCTION_API_URL }}
+          # Use proxy route for client-side requests
+          NEXT_PUBLIC_API_URL: /api/proxy
           NEXT_PUBLIC_ENVIRONMENT: production
         run: npm run build
 
       - name: Deploy to Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
+        env:
+          # Configure proxy to talk to actual backend
+          API_BASE_URL: ${{ vars.PRODUCTION_API_URL }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_PRODUCTION_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -244,39 +213,25 @@ jobs:
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend]
     steps:
-      - name: Wait for Argo CD sync
-        run: |
-          echo "Waiting 90 seconds for Argo CD to sync and pods to be ready..."
-          sleep 90
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for ArgoCD sync
+        uses: ./.github/actions/wait-for-argocd-sync
+        with:
+          namespace: prod
+          pr-number: '0'
+          timeout-seconds: '90'
 
       - name: Check API health
-        run: |
-          MAX_ATTEMPTS=10
-          ATTEMPT=1
-          
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "Health check attempt $ATTEMPT of $MAX_ATTEMPTS..."
-            
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              "${{ env.PRODUCTION_URL }}/health" \
-              --connect-timeout 10 \
-              --max-time 30 || echo "000")
-            
-            if [ "$HTTP_STATUS" = "200" ]; then
-              echo "✅ API health check passed (HTTP $HTTP_STATUS)"
-              break
-            fi
-            
-            echo "⚠️ API returned HTTP $HTTP_STATUS, retrying in 15s..."
-            ATTEMPT=$((ATTEMPT + 1))
-            sleep 15
-          done
-          
-          if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-            echo "::error::API health check failed after $MAX_ATTEMPTS attempts"
-            echo "Consider rolling back with: git revert HEAD && git push"
-            exit 1
-          fi
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ env.PRODUCTION_URL }}/health
+          max-attempts: '10'
+          interval-seconds: '15'
+          timeout-seconds: '30'
+          expected-status: '200'
+          service-name: 'Production API'
 
   # ---------------------------------------------------------------------------
   # Deployment Summary
@@ -284,42 +239,15 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [build, update-overlay, deploy-frontend, health-check]
+    needs: [update-overlay, deploy-frontend, health-check]
     if: always()
     steps:
       - name: Generate summary
-        run: |
-          echo "# 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Deployment Details" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Image Tag** | \`${{ needs.build.outputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Timestamp** | $(date -u +"%Y-%m-%d %H:%M:%S UTC") |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "## Job Status" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Build | ${{ needs.build.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Update Overlay | ${{ needs.update-overlay.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Deploy Frontend | ${{ needs.deploy-frontend.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Health Check | ${{ needs.health-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "## Quick Links" >> $GITHUB_STEP_SUMMARY
-          echo "- 🌐 [Production Site](${{ env.PRODUCTION_URL }})" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔄 [Argo CD Dashboard](https://argocd.yt-summarizer.example.com)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ needs.health-check.result }}" = "failure" ]; then
-            echo "## ⚠️ Rollback Instructions" >> $GITHUB_STEP_SUMMARY
-            echo "If you need to rollback, use git revert:" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-            echo "git revert HEAD" >> $GITHUB_STEP_SUMMARY
-            echo "git push origin main" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Argo CD will automatically sync to the previous state." >> $GITHUB_STEP_SUMMARY
-          fi
+        uses: ./.github/actions/create-prod-summary
+        with:
+          image-tag: ${{ needs.meta.outputs.image_tag }}
+          commit-sha: ${{ github.sha }}
+          update-overlay-result: ${{ needs.update-overlay.result }}
+          deploy-frontend-result: ${{ needs.deploy-frontend.result }}
+          health-check-result: ${{ needs.health-check.result }}
+

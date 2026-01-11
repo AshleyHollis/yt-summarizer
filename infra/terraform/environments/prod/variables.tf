@@ -40,7 +40,7 @@ variable "kubernetes_version" {
 variable "aks_node_size" {
   description = "VM size for AKS nodes"
   type        = string
-  default     = "Standard_B2s"
+  default     = "Standard_B4als_v2"  # 4 vCPUs, 8GB RAM, 100 max pods
 }
 
 variable "domain" {

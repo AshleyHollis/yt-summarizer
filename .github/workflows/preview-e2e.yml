@@ -4,7 +4,7 @@
 # Runs Playwright E2E tests against a deployed preview environment.
 # Triggered after Argo CD deploys a PR preview environment.
 
-name: E2E Preview
+name: Preview E2E Tests
 
 on:
   # Triggered by deployment workflow or manually
@@ -51,49 +51,38 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: apps/web/package-lock.json
+          working-directory: apps/web
 
-      - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci
+      - name: Wait for Frontend to be ready
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ inputs.environment_url }}
+          max-attempts: '30'
+          interval-seconds: '10'
+          timeout-seconds: '5'
+          expected-status: '200'
+          service-name: 'Preview Frontend'
 
-      - name: Install Playwright browsers
-        working-directory: apps/web
-        run: npx playwright install --with-deps chromium
-
-      - name: Wait for environment to be ready
-        run: |
-          echo "Waiting for preview environment to be ready..."
-          for i in {1..30}; do
-            if curl -sf "${{ inputs.environment_url }}" > /dev/null 2>&1; then
-              echo "✓ Frontend is ready"
-              break
-            fi
-            echo "  Attempt $i/30 - Frontend not ready, waiting 10s..."
-            sleep 10
-          done
-          
-          for i in {1..30}; do
-            if curl -sf "${{ inputs.api_url }}/health/live" > /dev/null 2>&1; then
-              echo "✓ API is ready"
-              break
-            fi
-            echo "  Attempt $i/30 - API not ready, waiting 10s..."
-            sleep 10
-          done
+      - name: Wait for API to be ready
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ inputs.api_url }}/health/live
+          max-attempts: '30'
+          interval-seconds: '10'
+          timeout-seconds: '5'
+          expected-status: '200'
+          service-name: 'Preview API'
 
       - name: Run E2E tests
-        working-directory: apps/web
+        uses: ./.github/actions/run-playwright-tests
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ inputs.environment_url }}
           NEXT_PUBLIC_API_URL: ${{ inputs.api_url }}
           API_URL: ${{ inputs.api_url }}
-        run: npx playwright test --reporter=html
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

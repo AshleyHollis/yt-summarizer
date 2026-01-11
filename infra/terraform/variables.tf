@@ -67,7 +67,7 @@ variable "aks_subnet_prefix" {
 variable "aks_node_size" {
   description = "VM size for AKS nodes"
   type        = string
-  default     = "Standard_B2s"  # ~$30/month, suitable for hobby project
+  default     = "Standard_B4als_v2"  # 4 vCPUs, 8GB RAM, ~$97/month
 }
 
 variable "aks_node_count" {

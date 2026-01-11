@@ -121,9 +121,82 @@ spec:
 
 ---
 # -----------------------------------------------------------------------------
+# Cert-Manager (Helm)
+# Installs cert-manager to provide ACME certificate management
+# -----------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.14.0
+    helm:
+      valuesObject:
+        installCRDs: true
+        webhook:
+          enabled: true
+        cainjector:
+          enabled: true
+        # Cost-optimized resources for single-node cluster
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+---
+# -----------------------------------------------------------------------------
+# Apply cert-manager ClusterIssuer manifests (staging + prod)
+# -----------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-clusterissuers
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    targetRevision: main
+    path: k8s/argocd/cert-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+---
+# -----------------------------------------------------------------------------
 # SecretStore for Azure Key Vault
 # Configures External Secrets to connect to Azure Key Vault
 # Note: Requires AKS Workload Identity to be configured
+# The ServiceAccount must have the correct azure.workload.identity annotations
 # -----------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -139,10 +212,41 @@ spec:
   project: default
   source:
     repoURL: https://github.com/AshleyHollis/yt-summarizer
+    # TODO: Change to 'main' after prod-secretstore overlay is merged
+    targetRevision: fix/cicd-improvements
+    path: k8s/overlays/prod-secretstore
+    # Use Kustomize to apply Workload Identity patches
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yt-summarizer
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+# -----------------------------------------------------------------------------
+# ClusterSecretStore for Azure Key Vault
+# Shared across all namespaces for preview environments
+# -----------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: eso-cluster-secretstore
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Deploy after ESO is installed
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer
     targetRevision: main
-    path: k8s/base
-    directory:
-      include: "secretstore.yaml"
+    path: k8s/cluster-resources
   destination:
     server: https://kubernetes.default.svc
     namespace: yt-summarizer

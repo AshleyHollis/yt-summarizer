@@ -148,27 +148,29 @@ metadata:
   name: preview-environments
 spec:
   generators:
-  - git:
-      repoURL: https://github.com/AshleyHollis/yt-summarizer.git
-      revision: main
-      directories:
-      - path: k8s/overlays/previews/pr-*
+  - pullRequest:
+      github:
+        owner: AshleyHollis
+        repo: yt-summarizer
+      requeueAfterSeconds: 60
   template:
     metadata:
-      name: '{{path.basename}}'
+      name: 'preview-pr-{{number}}'
     spec:
-      project: yt-summarizer
+      project: default
       source:
         repoURL: https://github.com/AshleyHollis/yt-summarizer.git
-        targetRevision: main
-        path: '{{path}}'
+        targetRevision: '{{head_sha}}'
+        path: k8s/overlays/preview
       destination:
         server: https://kubernetes.default.svc
-        namespace: '{{path.basename}}'
+        namespace: 'preview-pr-{{number}}'
       syncPolicy:
         automated:
           prune: true
           selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
 ```
 
 ### Deploy Production Application
