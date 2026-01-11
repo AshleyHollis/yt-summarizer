@@ -120,6 +120,14 @@ runs:
           echo "   git show result: $(echo "$FILES" | wc -l) files found"
         fi
         
+        # If still empty and we have a PR number, try GitHub API
+        if [ -z "$FILES" ] && [ -n "$PR_NUMBER" ] && [ -n "$GITHUB_TOKEN" ]; then
+          echo "   git methods failed, trying GitHub API for PR #$PR_NUMBER..."
+          API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files"
+          FILES=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$API_URL" | jq -r '.[].filename' 2>/dev/null || echo "")
+          echo "   GitHub API result: $(echo "$FILES" | wc -l) files found"
+        fi
+        
         if [ -z "$FILES" ]; then
           echo "⚠️ Could not fetch changed files - assuming no deployment needed for safety"
           echo "needs_image_build=false" >> $GITHUB_OUTPUT
