@@ -461,7 +461,7 @@ class TestAzureEndpointURLBuilding:
 
 class TestAGUIEndpointRegistration:
     """Test that AG-UI endpoints are properly registered on FastAPI app.
-    
+
     CRITICAL: These tests should FAIL if dependencies are missing.
     This catches missing dependencies in CI before deployment.
     """
@@ -547,7 +547,7 @@ class TestAGUIEndpointRegistration:
 
 class TestAGUIEndpointHTTPHandlers:
     """Test AG-UI endpoint HTTP request handling.
-    
+
     CRITICAL: These tests should FAIL if dependencies are missing.
     """
 
@@ -635,7 +635,7 @@ class TestAGUIEndpointHTTPHandlers:
 
 class TestFullApplicationIntegration:
     """Test AG-UI endpoint integration with full FastAPI application.
-    
+
     CRITICAL: These tests should FAIL if dependencies are missing.
     This ensures we catch deployment issues in CI before they reach production.
     """
