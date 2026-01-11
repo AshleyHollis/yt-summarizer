@@ -27,6 +27,11 @@ inputs:
     required: false
     default: 'false'
     type: boolean
+  push:
+    description: Whether to push images to registry (false for validation only)
+    required: false
+    default: 'true'
+    type: boolean
 
 outputs:
   image-tag:
@@ -55,6 +60,7 @@ runs:
         echo "image-tag=${{ inputs.image-tag }}" >> $GITHUB_OUTPUT
 
     - name: Login to Azure Container Registry
+      if: inputs.push == 'true'
       uses: ./.github/actions/azure-acr-login
       with:
         azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -67,6 +73,7 @@ runs:
       run: |
         services='${{ inputs.services }}'
         image_tag='${{ steps.tag.outputs.image-tag || steps.provided-tag.outputs.image-tag }}'
+        push_flag='${{ inputs.push }}'
         
         for service in $(echo "$services" | jq -r '.[]'); do
           case $service in
@@ -89,17 +96,22 @@ runs:
           esac
           
           echo "Building $service image..."
-          # Use the docker-build-push composite action
-          echo "::group::Build and push $service image"
-          # Since this is a composite action, we can't call another composite action directly
-          # So we inline the docker buildx command
-          docker buildx build \
-            --file "$dockerfile" \
-            --tag "${{ env.ACR_LOGIN_SERVER }}/$image_name:$image_tag" \
-            --cache-from "type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service" \
-            --cache-to "type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service,mode=max" \
-            --push \
-            .
+          echo "::group::Build $service image"
+          
+          # Build command
+          build_cmd="docker buildx build --file \"$dockerfile\""
+          
+          if [ "$push_flag" = "true" ]; then
+            build_cmd="$build_cmd --tag \"${{ env.ACR_LOGIN_SERVER }}/$image_name:$image_tag\""
+            build_cmd="$build_cmd --cache-from \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service\""
+            build_cmd="$build_cmd --cache-to \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service,mode=max\""
+            build_cmd="$build_cmd --push"
+          else
+            # For validation, just build without pushing
+            build_cmd="$build_cmd --tag \"local/$image_name:validate\""
+          fi
+          
+          eval "$build_cmd ."
           echo "::endgroup::"
         done
 

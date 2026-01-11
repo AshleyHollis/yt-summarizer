@@ -340,7 +340,7 @@ jobs:
   # This catches Dockerfile errors without requiring Azure credentials
   # ---------------------------------------------------------------------------
   build-images-validate:
-    name: Build Images (Validate - parallel)
+    name: Build Images (Validate)
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python, lint-frontend]
     # Only run if ACR is NOT configured (validation mode)
@@ -351,28 +351,15 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
        contains(needs.detect-changes.outputs.changed_areas, 'docker'))
-    strategy:
-      matrix:
-        include:
-          - service: api
-            dockerfile: services/api/Dockerfile
-            image: yt-summarizer-api
-          - service: workers
-            dockerfile: services/workers/Dockerfile
-            image: yt-summarizer-workers
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build ${{ matrix.service }} image (no push)
-        uses: ./.github/actions/docker-build-push
+      - name: Build images (validation only)
+        uses: ./.github/actions/build-images
         with:
-          dockerfile: ${{ matrix.dockerfile }}
-          image-name: ${{ matrix.image }}
+          generate-tag: false
           image-tag: validate
-          registry: local
-          cache-name: ${{ matrix.service }}
-          push: 'false'
+          services: '["api", "workers"]'
+          publish-artifact: false
+          push: false
 
   # ---------------------------------------------------------------------------
   # E2E Tests - Run against Preview Environment
