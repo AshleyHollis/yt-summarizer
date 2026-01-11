@@ -324,15 +324,37 @@ jobs:
           fail-on-mismatch: 'false'
 
       - name: Run basic API health check
-        if: needs.get-ingress.outputs.preview_url != ''
-        uses: ./.github/actions/health-check
-        with:
-          url: ${{ needs.get-ingress.outputs.preview_url }}/health/live
-          max-attempts: '10'
-          interval-seconds: '10'
-          timeout-seconds: '5'
-          expected-status: '200'
-          service-name: 'Preview API'
+        shell: bash
+        run: |
+          NAMESPACE="preview-pr-${{ needs.detect-changes.outputs.pr_number }}"
+          MAX_ATTEMPTS=10
+          INTERVAL=10
+          
+          echo "Checking API health from within cluster..."
+          echo "Namespace: ${NAMESPACE}"
+          
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $i/$MAX_ATTEMPTS..."
+            
+            # Run curl from within the cluster to check internal service
+            if kubectl run curl-test-${i} \
+              --image=curlimages/curl:latest \
+              --rm -i --restart=Never \
+              --namespace=${NAMESPACE} \
+              --timeout=15s \
+              -- curl -s --max-time 5 http://api/health/live 2>/dev/null | grep -q "ok"; then
+              echo "✅ API is healthy"
+              exit 0
+            fi
+            
+            if [ $i -lt $MAX_ATTEMPTS ]; then
+              echo "  Waiting ${INTERVAL}s before retry..."
+              sleep $INTERVAL
+            fi
+          done
+          
+          echo "::error::API health check failed after $MAX_ATTEMPTS attempts"
+          exit 1
 
       - name: Verify API Certificate
         uses: ./.github/actions/verify-tls-certificate
