@@ -22,6 +22,9 @@ runs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Build image
       shell: bash
       run: |
@@ -53,7 +56,7 @@ runs:
         if [ "$push_flag" = "true" ]; then
           build_cmd="$build_cmd --tag \"${{ env.ACR_LOGIN_SERVER }}/$image_name:$image_tag\""
           build_cmd="$build_cmd --cache-from \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service\""
-          build_cmd="$build_cmd --cache-to \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service,mode=max\""
+          # build_cmd="$build_cmd --cache-to \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service,mode=max\""
           build_cmd="$build_cmd --push"
         else
           # For validation, just build without pushing
