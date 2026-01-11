@@ -195,7 +195,6 @@ jobs:
 
       - name: Generate image tag
         id: tag
-        if: matrix.service == 'api'
         uses: ./.github/actions/generate-image-tag
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
