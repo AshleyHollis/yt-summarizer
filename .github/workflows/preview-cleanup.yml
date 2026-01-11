@@ -6,7 +6,7 @@
 # - No overlay files need to be deleted (they were in PR branch, not main)
 # - Argo CD automatically deletes Application when PR closes
 
-name: Preview Cleanup
+name: PR Cleanup
 
 on:
   pull_request:

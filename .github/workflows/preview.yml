@@ -6,7 +6,7 @@
 # Runs E2E tests after deployment to validate changes
 # Runs on PR opened/synchronize/reopened after CI passes
 
-name: Preview
+name: Deploy Preview
 
 on:
   # IMPORTANT: Only workflow_run trigger, NO pull_request trigger
