@@ -1,12 +1,12 @@
-# HTTPRoute patch for PR #5
-# Generated for Gateway API testing
+# HTTPRoute patch for preview environment
+# Placeholders are substituted by GitHub Actions workflow
 
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: api-httproute
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: api-pr-5.yt-summarizer.apps.ashleyhollis.com
+    external-dns.alpha.kubernetes.io/hostname: __PREVIEW_HOST__
 spec:
   hostnames:
-  - "api-pr-5.yt-summarizer.apps.ashleyhollis.com"
+  - "__PREVIEW_HOST__"
