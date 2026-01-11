@@ -89,17 +89,19 @@ runs:
         
         echo "🔐 Checking TLS certificate status..."
         
-        # Check for Gateway API wildcard certificate in cert-manager namespace
-        WILDCARD_CERT="wildcard-yt-summarizer-apps-tls"
-        CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+        # Check for Gateway API wildcard certificate in gateway-system namespace
+        WILDCARD_CERT="yt-summarizer-wildcard"
+        CERT_NAMESPACE="gateway-system"
+        CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         
         if [ "$CERT_READY" = "True" ]; then
           echo "✅ Gateway API wildcard certificate is ready"
-          CERT_NOT_AFTER=$(kubectl get secret ${WILDCARD_CERT} -n gateway-system -o jsonpath='{.metadata.annotations.cert-manager\.io/certificate-name}' 2>/dev/null || echo "")
-          echo "  Certificate: ${WILDCARD_CERT}"
+          CERT_NOT_AFTER=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.notAfter}' 2>/dev/null || echo "")
+          echo "  Certificate: ${WILDCARD_CERT} (namespace: ${CERT_NAMESPACE})"
+          echo "  Expires: ${CERT_NOT_AFTER}"
         else
-          echo "::warning::Wildcard TLS certificate not ready in cert-manager namespace"
-          CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "Unknown")
+          echo "::warning::Wildcard TLS certificate not ready in ${CERT_NAMESPACE} namespace"
+          CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "Unknown")
           echo "  Message: ${CERT_MESSAGE}"
           
           # Check for rate limiting
@@ -191,9 +193,10 @@ runs:
         echo "URL: ${EXTERNAL_URL}/health/live"
         
         # Check certificate status first
-        WILDCARD_CERT="wildcard-yt-summarizer-apps-tls"
-        CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
-        CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n cert-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
+        WILDCARD_CERT="yt-summarizer-wildcard"
+        CERT_NAMESPACE="gateway-system"
+        CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+        CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
         
         # DNS propagation can take a few minutes - always give it some time
         echo "::notice::Waiting 30 seconds for DNS propagation..."
