@@ -43,6 +43,16 @@ on:
     types: [opened, synchronize, reopened]
   # Allow manual triggering for testing
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to deploy preview for (optional - will use latest commit)'
+        required: false
+        type: string
+      force_deploy:
+        description: 'Force deployment even without code changes'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: preview-${{ github.event.pull_request.number || github.run_id }}
@@ -75,23 +85,52 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     outputs:
       has_code_changes: ${{ steps.check.outputs.has_code_changes }}
-      pr_number: ${{ steps.pr-meta.outputs.pr_number }}
-      pr_head_ref: ${{ steps.pr-meta.outputs.pr_head_ref }}
-      pr_head_sha: ${{ steps.pr-meta.outputs.pr_head_sha }}
+      pr_number: ${{ steps.set-pr.outputs.pr_number }}
+      pr_head_ref: ${{ steps.set-pr.outputs.pr_head_ref }}
+      pr_head_sha: ${{ steps.set-pr.outputs.pr_head_sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Emit PR metadata
-        id: pr-meta
-        uses: ./.github/actions/emit-pr-metadata
+      - name: Set PR metadata
+        id: set-pr
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "pr_head_ref=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+            echo "pr_head_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUM="${{ inputs.pr_number }}"
+            if [ -n "$PR_NUM" ]; then
+              # Fetch PR details using API
+              if [ -n "$GITHUB_TOKEN" ]; then
+                API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUM"
+                PR_DATA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$API_URL")
+                HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head.sha')
+                HEAD_REF=$(echo "$PR_DATA" | jq -r '.head.ref')
+                echo "pr_number=$PR_NUM" >> $GITHUB_OUTPUT
+                echo "pr_head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
+                echo "pr_head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
+              else
+                echo "No GITHUB_TOKEN for API calls"
+                exit 1
+              fi
+            else
+              # No PR specified, use current commit
+              echo "pr_number=" >> $GITHUB_OUTPUT
+              echo "pr_head_ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+              echo "pr_head_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+            fi
+          fi
 
       - name: Check if commit has code changes
         id: check
         uses: ./.github/actions/detect-pr-code-changes
         with:
           base-sha: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.event.pull_request.base.ref) || 'origin/main' }}
-          head-sha: ${{ steps.pr-meta.outputs.pr_head_sha }}
+          head-sha: ${{ steps.set-pr.outputs.pr_head_sha }}
+          pr-number: ${{ steps.set-pr.outputs.pr_number }}
+          force-deploy: ${{ github.event_name == 'workflow_dispatch' && inputs.force_deploy }}
 
 
   # ---------------------------------------------------------------------------
