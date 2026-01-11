@@ -767,9 +767,18 @@ else:
 
 summary_lines.append('| Job | Status |')
 summary_lines.append('|-----|--------|')
-summary_lines.append(f"| Update Overlay | {'✅ Success' if update_overlay == 'success' else ('⏭️ Skipped' if update_overlay=='skipped' else '❌ Failed')} |")
-summary_lines.append(f"| Verify Deployment | {'✅ Success' if verify_deployment == 'success' else ('⏭️ Skipped' if verify_deployment=='skipped' else '❌ Failed')} |")
-summary_lines.append(f"| Deploy Frontend | {'✅ Success' if deploy_frontend == 'success' else ('⏭️ Skipped' if deploy_frontend=='skipped' else '❌ Failed')} |")
+
+# Helper to format job results safely
+def fmt_result(res):
+    if res == 'success':
+        return '✅ Success'
+    if res == 'skipped':
+        return '⏭️ Skipped'
+    return '❌ Failed'
+
+summary_lines.append(f"| Update Overlay | {fmt_result(update_overlay)} |")
+summary_lines.append(f"| Verify Deployment | {fmt_result(verify_deployment)} |")
+summary_lines.append(f"| Deploy Frontend | {fmt_result(deploy_frontend)} |")
 summary_lines.append(f"| E2E Tests | {e2e_status} |")
 
 print('\n'.join(summary_lines))
