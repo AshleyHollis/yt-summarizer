@@ -201,7 +201,6 @@ jobs:
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
 
       - name: Login to Azure Container Registry
-        if: matrix.service == 'api'
         uses: ./.github/actions/azure-acr-login
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
