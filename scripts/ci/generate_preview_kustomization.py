@@ -29,8 +29,16 @@ def main():
     parser.add_argument('--preview-host', required=False, help='Preview host (replaces __PREVIEW_HOST__ in patches)')
     parser.add_argument('--tls-secret', required=False, help='TLS secret name (replaces __TLS_SECRET__ in patches)')
     parser.add_argument('--commit-sha', required=False, help='Commit SHA for uniqueness')
+    parser.add_argument('--swa-url', required=False, help='Azure Static Web App URL (replaces __SWA_URL__ in patches)')
 
     args = parser.parse_args()
+
+    # Generate SWA URL if not provided (using known pattern from SWA deployment)
+    swa_url = args.swa_url
+    if not swa_url:
+        # Azure Static Web Apps URL pattern: https://red-grass-06d413100-{PR}.eastasia.6.azurestaticapps.net
+        swa_url = f'https://red-grass-06d413100-{args.pr_number}.eastasia.6.azurestaticapps.net'
+        print(f'Generated SWA URL: {swa_url}')
 
     # Define variables for substitution
     variables = {
@@ -38,7 +46,8 @@ def main():
         'IMAGE_TAG': args.image_tag,
         'ACR_SERVER': args.acr_server,
         'PREVIEW_HOST': args.preview_host or '',
-        'TLS_SECRET': args.tls_secret or ''
+        'TLS_SECRET': args.tls_secret or '',
+        'SWA_URL': swa_url
     }
 
     # Define header comments
@@ -70,6 +79,9 @@ def main():
                 content = content.replace('__PREVIEW_HOST__', args.preview_host)
             if args.tls_secret:
                 content = content.replace('__TLS_SECRET__', args.tls_secret)
+            # Always replace SWA URL (generated or provided)
+            if swa_url:
+                content = content.replace('__SWA_URL__', swa_url)
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             print(f'Patched {file_path} (placeholders substituted)')
@@ -94,6 +106,9 @@ def main():
                 content = content.replace('__PREVIEW_HOST__', args.preview_host)
             if args.tls_secret:
                 content = content.replace('__TLS_SECRET__', args.tls_secret)
+            # Always replace SWA URL (generated or provided)
+            if swa_url:
+                content = content.replace('__SWA_URL__', swa_url)
             with open(patch_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             print(f'Patched {patch_path} (placeholders substituted)')
