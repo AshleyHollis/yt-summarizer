@@ -17,7 +17,20 @@ else
 fi
 ```
 
-### 2. Unclear Output Format
+### 2. Deptry False Positives
+**Problem**: Deptry reports DEP003 (transitive dependency) warnings for editable local packages like `yt-summarizer-shared`, and DEP002 (unused) for dev/test dependencies.
+
+**Solution**: Configure deptry to ignore these specific error codes:
+```bash
+deptry "$SRC_DIR" --extend-exclude "test.*" --ignore DEP003,DEP002
+```
+
+**Rationale**:
+- **DEP003**: Editable local packages (`-e services/shared`) appear as transitive dependencies to deptry, but we intentionally import from them directly
+- **DEP002**: Dev dependencies (`pytest`, `ruff`), test fixtures, and infrastructure packages are declared in `pyproject.toml` but may not be imported in application code
+- Focus remains on **DEP001** (actual missing dependencies) which catches real import issues
+
+### 3. Unclear Output Format
 **Problem**: Scanner outputs were intermingled with GitHub Actions logs, making it hard to identify:
 - Which scanner is running
 - What the results mean
@@ -28,7 +41,7 @@ fi
 - Emoji icons for quick scanning (🔍 = scanning, ✅ = pass, ❌ = fail, 📋 = action required)
 - Explicit action guidance sections
 
-### 3. Information Overload
+### 4. Information Overload
 **Problem**: Full dependency trees with 100+ packages made logs verbose and hard to scan.
 
 **Solution**: Truncate verbose output to first 50 lines with clear indication:
