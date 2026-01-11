@@ -16,10 +16,11 @@
 # - Uses PR-specific TLS secret name (preview-pr-{NUMBER}-tls) to persist certificates
 # - Each PR gets its own certificate that survives workflow re-runs
 # - Prevents hitting Let's Encrypt rate limit (5 certs per exact domain set per 168 hours)
-# - api.preview-pr-4.20-255-113-149.nip.io and preview-pr-4-tls are substituted by CI workflow
+# - Domain includes app name (yt-summarizer) to prevent conflicts with other apps on same AKS
+# - __PREVIEW_HOST__ and __TLS_SECRET__ are substituted by CI workflow
 #
-# Access URL: https://api.preview-pr-<num>.<ip-dashed>.nip.io
-# Example: https://api.preview-pr-4.20-255-113-149.nip.io
+# Access URL: https://{app-name}-api.preview-pr-<num>.<ip-dashed>.nip.io
+# Example: https://yt-summarizer-api.preview-pr-4.20-255-113-149.nip.io
 # =============================================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -35,7 +36,7 @@ spec:
   rules:
     # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
     # Dynamic hostname prevents Let's Encrypt rate limits by using PR-specific domains
-    - host: api.preview-pr-4.20-255-113-149.nip.io
+    - host: __PREVIEW_HOST__
       http:
         paths:
           - path: /api(/|$)(.*)
@@ -54,5 +55,5 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - api.preview-pr-4.20-255-113-149.nip.io
-      secretName: preview-pr-4-tls
+        - __PREVIEW_HOST__
+      secretName: __TLS_SECRET__
