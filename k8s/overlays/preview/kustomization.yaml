@@ -1,14 +1,14 @@
 # Preview overlay - updated by GitHub Actions
-# PR: #
-# Image Tag: sha-174c427
-# Updated: 2026-01-11T06:08:00Z
+# PR: #4
+# Image Tag: pr-4-afb9a26
+# Updated: 2026-01-11T06:15:11Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 metadata:
   annotations:
     config.kubernetes.io/local-config: "true"
-namespace: preview-pr-
+namespace: preview-pr-4
 resources:
   - ../../base
   - resource-quota.yaml
