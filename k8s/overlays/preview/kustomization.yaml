@@ -1,32 +1,35 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #6
 # Image Tag: latest
-# Commit: 17465aa8d7163c72f29c979a354957abea87de54
-# Updated: 2026-01-11T15:45:25Z
+# Commit: ef3f417adb9d39192cd9fd1d48108a77e62c0bd9
+# Updated: 2026-01-11T15:48:46Z
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 metadata:
   annotations:
-    config.kubernetes.io/local-config: 'true'
+    config.kubernetes.io/local-config: "true"
 namespace: preview-pr-6
 resources:
-- ../../base-preview
-- resource-quota.yaml
-- limit-range.yaml
+  - ../../base-preview
+  - resource-quota.yaml
+  - limit-range.yaml
 patches:
-- path: patches/externalsecret-db-patch.yaml
-- path: patches/externalsecret-openai-patch.yaml
-- path: patches/externalsecret-storage-patch.yaml
-- path: patches/configmap-patch.yaml
-- path: patches/ingress-delete-patch.yaml
-- path: patches/httproute-patch.yaml
-- path: patches/resources-patch.yaml
-- path: patches/replicas-patch.yaml
-- path: patches/migration-job-patch.yaml
+  - path: patches/externalsecret-db-patch.yaml
+  - path: patches/externalsecret-openai-patch.yaml
+  - path: patches/externalsecret-storage-patch.yaml
+  - path: patches/configmap-patch.yaml
+  - path: patches/ingress-delete-patch.yaml
+  - path: patches/httproute-patch.yaml
+  - path: patches/resources-patch.yaml
+  - path: patches/replicas-patch.yaml
+  - path: patches/migration-job-patch.yaml
 images:
-- name: yt-summarizer-api
-  newName: acrytsummprd.azurecr.io/yt-summarizer-api
-  newTag: latest
-- name: yt-summarizer-workers
-  newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-  newTag: latest
+  - 
+    name: yt-summarizer-api
+    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newTag: latest
+  - 
+    name: yt-summarizer-workers
+    newName: acrytsummprd.azurecr.io/yt-summarizer-workers
+    newTag: latest
