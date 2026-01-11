@@ -118,7 +118,15 @@ jobs:
     name: Compute Image Tag
     runs-on: ubuntu-latest
     needs: [detect-changes, wait-for-ci, get-existing-image-tag]
-    if: needs.detect-changes.outputs.needs_deployment == 'true'
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.needs_deployment == 'true' &&
+      (
+        needs.wait-for-ci.result == 'success' ||
+        needs.get-existing-image-tag.result == 'success'
+      )
     outputs:
       image_tag: ${{ steps.compute.outputs.image_tag }}
       source: ${{ steps.compute.outputs.source }}
