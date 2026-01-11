@@ -5,17 +5,13 @@ inputs:
   github-token:
     description: GitHub token for API access
     required: true
-  check-name:
-    description: Name of the CI check to wait for
-    required: false
-    default: 'CI Status'
   commit-sha:
     description: Commit SHA to check
     required: true
   timeout-seconds:
     description: Maximum time to wait in seconds
     required: false
-    default: '900'
+    default: '1800'
   interval-seconds:
     description: Interval between checks in seconds
     required: false
@@ -24,22 +20,59 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Wait for CI workflow
-      uses: fountainhead/action-wait-for-check@v1.2.0
-      id: wait-for-ci
-      shell: bash
-      with:
-        token: ${{ inputs.github-token }}
-        checkName: ${{ inputs.check-name }}
-        ref: ${{ inputs.commit-sha }}
-        timeoutSeconds: ${{ inputs.timeout-seconds }}
-        intervalSeconds: ${{ inputs.interval-seconds }}
-
-    - name: Verify CI passed
+    - name: Wait for CI workflow (exit early on failure)
       shell: bash
       run: |
-        if [ "${{ steps.wait-for-ci.outputs.conclusion }}" != "success" ]; then
-          echo "::error::CI workflow did not pass. Preview deployment blocked."
-          exit 1
-        fi
-        echo "✅ CI workflow passed successfully"
+        # Exit early on CI failure to avoid wasting CPU cycles
+        # This polls GitHub API and stops immediately when CI concludes with failure/cancelled
+
+        GITHUB_TOKEN="${{ inputs.github-token }}"
+        COMMIT_SHA="${{ inputs.commit-sha }}"
+        TIMEOUT_SECONDS="${{ inputs.timeout-seconds }}"
+        INTERVAL_SECONDS="${{ inputs.interval-seconds }}"
+
+        echo "⏳ Waiting for CI workflow to complete..."
+        echo "   Commit: $COMMIT_SHA"
+        echo "   Timeout: $TIMEOUT_SECONDS seconds"
+        echo "   Check interval: $INTERVAL_SECONDS seconds"
+
+        start_time=$(date +%s)
+        end_time=$((start_time + TIMEOUT_SECONDS))
+
+        while [ $(date +%s) -lt $end_time ]; do
+          # Get CI workflow runs for this commit
+          response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$COMMIT_SHA&event=push")
+
+          # Extract the most recent CI workflow run
+          run_id=$(echo "$response" | jq -r '.workflow_runs[0].id // empty')
+          run_status=$(echo "$response" | jq -r '.workflow_runs[0].status // empty')
+          run_conclusion=$(echo "$response" | jq -r '.workflow_runs[0].conclusion // empty')
+
+          if [ -z "$run_id" ]; then
+            echo "   No CI workflow run found yet for commit $COMMIT_SHA"
+          elif [ "$run_status" = "completed" ]; then
+            if [ "$run_conclusion" = "success" ]; then
+              echo "✅ CI workflow completed successfully"
+              exit 0
+            elif [ "$run_conclusion" = "failure" ]; then
+              echo "::error::CI workflow failed. Stopping preview deployment."
+              exit 1
+            elif [ "$run_conclusion" = "cancelled" ]; then
+              echo "::error::CI workflow was cancelled. Stopping preview deployment."
+              exit 1
+            else
+              echo "::error::CI workflow completed with unexpected conclusion: $run_conclusion"
+              exit 1
+            fi
+          else
+            echo "   CI workflow status: $run_status (conclusion: $run_conclusion)"
+          fi
+
+          # Wait before next check
+          sleep $INTERVAL_SECONDS
+        done
+
+        echo "::error::Timeout waiting for CI workflow to complete ($TIMEOUT_SECONDS seconds)"
+        exit 1

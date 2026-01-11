@@ -99,7 +99,8 @@ jobs:
 
       - name: Wait for CI workflow to complete
         # Wait for CI: Polls GitHub API for CI workflow status, ensuring preview only deploys
-        # after successful CI completion. Uses 30-minute timeout to prevent infinite waiting.
+        # after successful CI completion. EXITS EARLY on CI failure/cancellation to avoid
+        # wasting CPU cycles. Uses 30-minute timeout to prevent infinite waiting on stuck CI.
         # Only runs on pull_request events (workflow_run events would use different logic).
         if: ${{ github.event_name == 'pull_request' }}
         uses: ./.github/actions/wait-for-ci
