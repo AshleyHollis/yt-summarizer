@@ -4,7 +4,16 @@
 # Deploys preview environment using images already built by CI workflow
 # Argo CD ApplicationSet with Pull Request Generator picks up the changes
 # Runs E2E tests after deployment to validate changes
-# Runs on PR opened/synchronize/reopened after CI passes
+#
+# IMPORTANT: Uses pull_request trigger instead of workflow_run due to GitHub limitation
+# See: https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#workflow_run
+#
+# WORKFLOW_RUN LIMITATION: workflow_run triggers ONLY work if the workflow file exists on the default branch (main).
+# This creates a chicken-and-egg problem: you can't test workflow_run triggers before merging to main.
+# Therefore, we use pull_request trigger with wait-for-ci logic instead.
+#
+# TRIGGER CHOICE: pull_request ensures the workflow runs from feature branches and waits for CI completion.
+# This is the industry-standard pattern for PR-based preview deployments.
 
 name: Deploy Preview
 
@@ -18,10 +27,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # PR_NUMBER: Critical for workflow_run compatibility - extracts PR number from either
+  # pull_request events (github.event.pull_request.number) or workflow_run events
+  # (github.event.workflow_run.pull_requests[0].number). Used throughout workflow
+  # to avoid repeating this complex expression 15+ times.
+  PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
   MAX_PREVIEWS: 3
-  PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
 
 permissions:
   id-token: write
@@ -53,7 +66,16 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
-  # Wait for CI to Pass (CI builds and pushes images) or verify CI result when triggered by workflow_run
+  # Wait for CI to Pass
+  # ---------------------------------------------------------------------------
+  # Ensures CI workflow completes successfully before proceeding with preview deployment.
+  # This prevents deploying with broken code and ensures images are built and available.
+  #
+  # WHY THIS PATTERN: We use pull_request trigger + wait-for-ci instead of workflow_run
+  # because workflow_run requires the workflow file to exist on the default branch first,
+  # creating a testing paradox for new features.
+  # ---------------------------------------------------------------------------
+  # Wait for CI (30-minute timeout prevents infinite waiting on stuck CI jobs)
   # ---------------------------------------------------------------------------
   wait-for-ci:
     name: Wait for CI
@@ -66,30 +88,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Verify CI workflow passed (workflow_run trigger)
+      # NOTE: workflow_run logic kept for future reference but not currently used
+      # due to GitHub's requirement that workflow_run triggers only work from default branch
+      - name: Verify CI workflow passed (workflow_run trigger - NOT USED)
         if: ${{ github.event_name == 'workflow_run' }}
         uses: ./.github/actions/verify-ci-workflow
         with:
           workflow-conclusion: ${{ github.event.workflow_run.conclusion }}
           workflow-name: ${{ github.event.workflow_run.name }}
 
-
-      - name: Wait for CI workflow (pull_request trigger)
+      - name: Wait for CI workflow to complete
+        # Wait for CI: Polls GitHub API for CI workflow status, ensuring preview only deploys
+        # after successful CI completion. Uses 30-minute timeout to prevent infinite waiting.
+        # Only runs on pull_request events (workflow_run events would use different logic).
         if: ${{ github.event_name == 'pull_request' }}
         uses: ./.github/actions/wait-for-ci
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ github.event.pull_request.head.sha }}
+          timeout-seconds: '1800'  # 30 minutes timeout
 
       - name: Determine image tag from CI
+        # Generate image tag: Creates unique image tag using PR number for preview isolation.
+        # Uses env.PR_NUMBER variable to avoid repeating complex expression.
         id: image-tag
         uses: ./.github/actions/generate-image-tag
         with:
-          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+          commit-sha: ${{ github.event.pull_request.head.sha }}
           pr-number: ${{ env.PR_NUMBER }}
 
   # ---------------------------------------------------------------------------
-  # Check Active Preview Count
+  # Check Active Preview Count (prevents resource exhaustion from too many previews)
   # ---------------------------------------------------------------------------
   check-concurrency:
     name: Check Preview Limit
@@ -128,7 +157,7 @@ jobs:
             })
 
   # ---------------------------------------------------------------------------
-  # Update Preview Overlay in PR Branch
+  # Get Ingress Info (retrieves cluster ingress IP for preview URL computation)
   # ---------------------------------------------------------------------------
   get-ingress:
     name: Get Ingress Info
@@ -161,14 +190,10 @@ jobs:
           pr-number: ${{ env.PR_NUMBER }}
           ingress-ip: ${{ steps.get-ip.outputs.ingress-ip }}
 
+  # ---------------------------------------------------------------------------
+  # Update Preview Overlay (modifies Kustomize overlay with PR-specific image tags and URLs)
+  # ---------------------------------------------------------------------------
   update-overlay:
-    name: Update Preview Overlay
-    runs-on: ubuntu-latest
-    needs: [check-concurrency, get-ingress]
-    if: needs.check-concurrency.outputs.can_deploy == 'true'
-    outputs:
-      preview_url: ${{ steps.overlay.outputs.preview_url }}
-      image_tag: ${{ needs.check-concurrency.outputs.image_tag }}
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -232,6 +257,9 @@ jobs:
   # Verify Deployment
   # ---------------------------------------------------------------------------
   # Waits for Argo CD to sync and verifies pods are running the correct images
+  # ---------------------------------------------------------------------------
+  # Verify Deployment (ensures preview environment is healthy and using correct images)
+  # ---------------------------------------------------------------------------
   verify-deployment:
     name: Verify Deployment
     runs-on: ubuntu-latest
@@ -290,7 +318,7 @@ jobs:
           host: ${{ needs.get-ingress.outputs.preview_host }}
 
   # ---------------------------------------------------------------------------
-  # Deploy Frontend Preview to SWA
+  # Deploy Frontend Preview to SWA (Static Web App for fast frontend previews)
   # ---------------------------------------------------------------------------
   deploy-frontend-preview:
     name: Deploy Frontend Preview
@@ -375,7 +403,7 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
-  # E2E Tests on Preview Environment
+  # E2E Tests on Preview Environment (validates complete user journey in deployed preview)
   # ---------------------------------------------------------------------------
   e2e-tests:
     name: E2E Tests
@@ -449,9 +477,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # Preview Status Check - Required Check for Merge
   # ---------------------------------------------------------------------------
-  # Aggregates preview job results and produces a single, deterministic
-  # required check used to gate merges (machine-facing/gating).
-  # E2E tests are optional (skipped if no backend API URL is configured).
+  # Preview Status Check (aggregates all job results into single required check for merge gating)
   # ---------------------------------------------------------------------------
   preview-status-check:
     name: Preview Status Check
