@@ -68,11 +68,11 @@
 
 - [X] T023 [US3] Verify Certificate shows READY=True and has valid dates (Valid: 2026-01-11 to 2026-04-11)
 - [X] T024 [US3] Verify Secret `yt-summarizer-wildcard-tls` exists with tls.crt and tls.key (Type: kubernetes.io/tls, 2 keys)
-- [ ] T025a [US3] Update Cloudflare DNS: `*.yt-summarizer.apps.ashleyhollis.com` A record from 20.255.113.149 → 20.187.186.135
-- [ ] T025 [US3] Test TLS termination with `curl -v https://api.yt-summarizer.apps.ashleyhollis.com` (expect cert valid)
+- [X] T025a [US3] Update Cloudflare DNS: `*.yt-summarizer.apps.ashleyhollis.com` A record from 20.255.113.149 → 20.187.186.135 ✅ DNS UPDATED
+- [X] T025 [US3] Test TLS termination with `curl -v https://api.yt-summarizer.apps.ashleyhollis.com` (cert valid: CN=*.yt-summarizer.apps.ashleyhollis.com, Issuer: Let's Encrypt R12)
 - [X] T026 [US3] Document certificate renewal process in docs/runbooks/cert-manager-dns01-troubleshooting.md
 
-**Checkpoint**: Wildcard certificate issued and serving TLS - rate limit problem solved
+**Checkpoint**: ✅ Wildcard certificate issued and serving TLS - rate limit problem solved
 
 ---
 
