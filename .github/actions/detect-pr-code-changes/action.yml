@@ -159,15 +159,15 @@ runs:
           if [[ -n "$file" ]]; then
             echo "  📄 Processing: $file"
             # Skip docs, specs, and markdown files
-            if [[ "$file" == docs/* ]] || [[ "$file" == specs/* ]] || [[ "$file" == *.md ]]; then
+            if [[ "$file" =~ ^docs/ ]] || [[ "$file" =~ ^specs/ ]] || [[ "$file" =~ \.md$ ]]; then
               echo "     [skip] docs/specs/markdown"
             # Check if file triggers image building
-            elif [[ "$file" == services/api/** ]] || [[ "$file" == services/workers/** ]] || [[ "$file" == services/shared/** ]] || [[ "$file" == apps/web/** ]] || [[ "$file" == **/Dockerfile* ]] || [[ "$file" == docker-compose*.yml ]] || [[ "$file" == .dockerignore ]]; then
+            elif [[ "$file" =~ ^services/api/ ]] || [[ "$file" =~ ^services/workers/ ]] || [[ "$file" =~ ^services/shared/ ]] || [[ "$file" =~ ^apps/web/ ]] || [[ "$file" =~ /Dockerfile ]] || [[ "$file" =~ ^docker-compose.*\.yml$ ]] || [[ "$file" == .dockerignore ]]; then
               echo "     [BUILD] triggers image build"
               HAS_IMAGE_BUILD=true
               HAS_DEPLOYMENT=true
             # Check if file triggers deployment (but not image build)
-            elif [[ "$file" == k8s/** ]]; then
+            elif [[ "$file" =~ ^k8s/ ]]; then
               echo "     [DEPLOY] triggers deployment (K8s config)"
               HAS_DEPLOYMENT=true
             else
