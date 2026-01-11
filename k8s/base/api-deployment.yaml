@@ -12,6 +12,7 @@ metadata:
     app.kubernetes.io/part-of: yt-summarizer
   annotations:
     argocd.argoproj.io/sync-wave: "2"
+    # Test change to verify K8s-only deployments work - 2026-01-11
 spec:
   replicas: 1
   selector:
