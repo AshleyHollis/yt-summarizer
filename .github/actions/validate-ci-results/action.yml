@@ -56,6 +56,23 @@ runs:
     - name: Validate CI results
       shell: bash
       run: |
+        # =====================================================================
+        # DESIGN DECISION: Replicate job logic here for validation
+        # =====================================================================
+        # This action checks if jobs passed OR were correctly skipped.
+        # It replicates the same changed_areas logic as job conditions.
+        #
+        # WHY?
+        # - Validates that the pipeline executed correctly
+        # - Ensures jobs didn't run when they shouldn't (waste CI time)
+        # - Ensures jobs DID run when they should (catch missing tests)
+        #
+        # MAINTENANCE: When adding a new job to ci.yml, add its logic here
+        # Example: if you add "test-new-service" with condition
+        #   contains(changed_areas, 'services/new')
+        # Then add a case in should_run_job() for "test-new-service"
+        # =====================================================================
+        
         # Helper to check if job should have run based on changed areas
         should_run_job() {
           local areas="${{ inputs.changed-areas }}"

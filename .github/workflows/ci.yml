@@ -95,6 +95,12 @@ jobs:
   # ---------------------------------------------------------------------------
   # Python Tests
   # ---------------------------------------------------------------------------
+  # BEST PRACTICE: Job conditions check changed_areas directly
+  # - Use contains() to check if relevant area changed
+  # - Combine multiple areas with || for OR logic
+  # - Enforce fail-fast by checking lint result (no always())
+  # Example: API tests run if services/api OR services/shared changed
+  # ---------------------------------------------------------------------------
   test-shared:
     name: Test Shared Package
     runs-on: ubuntu-latest

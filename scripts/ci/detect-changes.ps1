@@ -45,8 +45,25 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Define detectable areas - jobs will check against these
-# To add new areas, just add them here - no other changes needed!
+# =============================================================================
+# Area Detection Patterns
+# =============================================================================
+# Define detectable areas that jobs can check against.
+# 
+# ADDING A NEW AREA:
+# 1. Add pattern here (e.g., 'services/new' = @('services/new/**'))
+# 2. Jobs can immediately check: contains(changed_areas, 'services/new')
+# 3. Add to validate-ci-results action if validation needed
+#
+# PATTERN SYNTAX:
+# - **/ matches zero or more path segments
+# - * matches anything except /
+# - Multiple patterns per area (e.g., docker matches Dockerfiles everywhere)
+#
+# BEST PRACTICE: Use hierarchical names matching directory structure
+# - Good: 'services/api', 'apps/web', 'infra/terraform'
+# - Avoid: 'backend', 'frontend' (ambiguous)
+# =============================================================================
 $areaPatterns = @{
     'services/api'        = @('services/api/**')
     'services/workers'    = @('services/workers/**')
@@ -151,6 +168,22 @@ else {
         Write-Host "  + $area" -ForegroundColor Green
     }
 }
+
+# =============================================================================
+# IMPORTANT: Output Strategy
+# =============================================================================
+# This script outputs ONLY:
+#   1. changed_areas - space-separated list of changed areas
+#   2. has_code_changes - boolean flag (excludes docs-only changes)
+#
+# WHY NOT stage_* OUTPUTS?
+# - Too brittle: every new job requires script changes
+# - Harder to maintain: decision logic spread across script and workflows
+# - Less flexible: can't easily create complex conditions in workflows
+#
+# BEST PRACTICE: Let jobs decide for themselves using contains() checks
+# Example: if: contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
+# =============================================================================
 
 # Output in requested format
 switch ($OutputFormat) {
