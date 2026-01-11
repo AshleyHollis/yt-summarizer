@@ -307,7 +307,9 @@ jobs:
     # vars.ACR_NAME != '': Azure Container Registry must be configured
     # changed_areas contains: Only these areas trigger image builds (MUST match preview workflow logic)
     # lint and test results: Ensure code passes basic checks before building images
+    # always(): Run even if some dependencies were skipped, then check their results
     if: |
+      always() &&
       vars.ACR_NAME != '' &&
       (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
