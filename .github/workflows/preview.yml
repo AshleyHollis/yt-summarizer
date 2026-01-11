@@ -312,6 +312,8 @@ jobs:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           deployment-name: api
           expected-tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          image-name: yt-summarizer-api
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-worker-deployments
         with:
