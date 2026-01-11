@@ -13,7 +13,7 @@ metadata:
 namespace: preview-pr-__PR_NUMBER__
 
 resources:
-  - ../../base
+  - ../../base-preview
   - resource-quota.yaml
   - limit-range.yaml
 
