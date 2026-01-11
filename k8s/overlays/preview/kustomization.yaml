@@ -20,7 +20,6 @@ patches:
   - path: patches/externalsecret-storage-patch.yaml
   - path: patches/secretstore-delete-patch.yaml
   - path: patches/configmap-patch.yaml
-  - path: patches/ingress-patch.yaml
   - path: patches/httproute-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
