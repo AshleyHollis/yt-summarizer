@@ -28,7 +28,7 @@ spec:
   rules:
     # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
     # Modified domain to avoid Let's Encrypt rate limits
-    - host: test.example
+    - host: __PREVIEW_HOST__
       http:
         paths:
           - path: /api(/|$)(.*)
@@ -47,5 +47,5 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - test.example
+        - __PREVIEW_HOST__
       secretName: tls-secret
