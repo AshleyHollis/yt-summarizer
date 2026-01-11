@@ -9,12 +9,6 @@ inputs:
     description: Maximum number of concurrent previews allowed
     required: false
     default: '10'
-  repository:
-    description: GitHub repository (owner/repo)
-    required: true
-  pr-number:
-    description: Pull request number
-    required: true
 
 outputs:
   can_deploy:
@@ -31,7 +25,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
       run: |
         # Count open PRs (each gets a preview via ApplicationSet PR Generator)
-        OPEN_PRS=$(gh api repos/${{ inputs.repository }}/pulls --jq 'length')
+        OPEN_PRS=$(gh api repos/$GITHUB_REPOSITORY/pulls --jq 'length')
         
         echo "Open PRs: ${OPEN_PRS}"
         echo "Max previews: ${{ inputs.max-previews }}"
