@@ -98,11 +98,25 @@ runs:
         fi
         
         # Get all changed files using git diff
+        # Try multiple approaches since shallow clones may not have full history
         FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
         
+        # If git diff failed, try comparing with HEAD
         if [ -z "$FILES" ]; then
-          echo "⚠️ Could not fetch changed files using git diff - assuming no code changes"
-          echo "has_code_changes=false" >> $GITHUB_OUTPUT
+          echo "git diff failed, trying alternative approach..."
+          FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || echo "")
+        fi
+        
+        # If still empty, try git show for the commit
+        if [ -z "$FILES" ]; then
+          echo "git diff still failed, trying git show..."
+          FILES=$(git show --name-only --pretty=format: "$HEAD_SHA" 2>/dev/null || echo "")
+        fi
+        
+        if [ -z "$FILES" ]; then
+          echo "⚠️ Could not fetch changed files - assuming no deployment needed for safety"
+          echo "needs_image_build=false" >> $GITHUB_OUTPUT
+          echo "needs_deployment=false" >> $GITHUB_OUTPUT
           exit 0
         fi
 
