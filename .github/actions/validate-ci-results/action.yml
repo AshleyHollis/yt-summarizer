@@ -1,37 +1,25 @@
 name: 'Validate CI Pipeline Results'
 description: 'Checks all CI job results and validates pipeline completion'
 inputs:
+  changed-areas:
+    description: 'Space-separated list of changed areas from detect-changes'
+    required: true
   # Test job results
   test-shared-result:
     description: 'Result of test-shared job'
     required: true
-  test-shared-should-run:
-    description: 'Whether test-shared should have run'
-    required: true
   test-api-result:
     description: 'Result of test-api job'
-    required: true
-  test-api-should-run:
-    description: 'Whether test-api should have run'
     required: true
   test-workers-result:
     description: 'Result of test-workers job'
     required: true
-  test-workers-should-run:
-    description: 'Whether test-workers should have run'
-    required: true
   test-frontend-result:
     description: 'Result of test-frontend job'
-    required: true
-  test-frontend-should-run:
-    description: 'Whether test-frontend should have run'
     required: true
   # Validation job results
   validate-terraform-result:
     description: 'Result of validate-terraform job'
-    required: true
-  validate-terraform-should-run:
-    description: 'Whether validate-terraform should have run'
     required: true
   validate-kustomize-result:
     description: 'Result of validate-kustomize job'
@@ -39,14 +27,18 @@ inputs:
   kubernetes-validate-result:
     description: 'Result of kubernetes-validate job'
     required: true
-  kubernetes-validate-should-run:
-    description: 'Whether kubernetes-validate should have run'
-    required: true
   secret-scanning-result:
     description: 'Result of secret-scanning job'
     required: true
   secret-scanning-should-run:
     description: 'Whether secret-scanning should have run'
+    required: true
+  # Build job results
+  build-images-result:
+    description: 'Result of build-images job'
+    required: true
+  build-images-validate-result:
+    description: 'Result of build-images-validate job'
     required: true
   # Build job results
   build-images-result:
@@ -64,13 +56,43 @@ runs:
     - name: Validate CI results
       shell: bash
       run: |
+        # Helper to check if job should have run based on changed areas
+        should_run_job() {
+          local areas="${{ inputs.changed-areas }}"
+          case "$1" in
+            "test-shared")
+              [[ "$areas" =~ services/shared ]]
+              ;;
+            "test-api")
+              [[ "$areas" =~ services/api ]] || [[ "$areas" =~ services/shared ]]
+              ;;
+            "test-workers")
+              [[ "$areas" =~ services/workers ]] || [[ "$areas" =~ services/shared ]]
+              ;;
+            "test-frontend")
+              [[ "$areas" =~ apps/web ]]
+              ;;
+            "validate-terraform")
+              [[ "$areas" =~ infra/terraform ]]
+              ;;
+            "kubernetes-validate")
+              [[ "$areas" =~ k8s ]]
+              ;;
+            "build-images")
+              [[ "$areas" =~ services/api ]] || [[ "$areas" =~ services/workers ]] || [[ "$areas" =~ services/shared ]] || [[ "$areas" =~ apps/web ]] || [[ "$areas" =~ docker ]]
+              ;;
+            *)
+              return 1
+              ;;
+          esac
+        }
+        
         # Helper to check if job passed or was appropriately skipped
         check_job() {
           local name=$1
           local result=$2
-          local should_run=$3
           
-          if [ "$should_run" = "true" ]; then
+          if should_run_job "$name"; then
             if [ "$result" != "success" ]; then
               echo "❌ $name failed (result: $result)"
               return 1
@@ -88,14 +110,14 @@ runs:
         echo ""
         
         # Check test jobs
-        check_job "test-shared" "${{ inputs.test-shared-result }}" "${{ inputs.test-shared-should-run }}" || EXIT_CODE=1
-        check_job "test-api" "${{ inputs.test-api-result }}" "${{ inputs.test-api-should-run }}" || EXIT_CODE=1
-        check_job "test-workers" "${{ inputs.test-workers-result }}" "${{ inputs.test-workers-should-run }}" || EXIT_CODE=1
-        check_job "test-frontend" "${{ inputs.test-frontend-result }}" "${{ inputs.test-frontend-should-run }}" || EXIT_CODE=1
+        check_job "test-shared" "${{ inputs.test-shared-result }}" || EXIT_CODE=1
+        check_job "test-api" "${{ inputs.test-api-result }}" || EXIT_CODE=1
+        check_job "test-workers" "${{ inputs.test-workers-result }}" || EXIT_CODE=1
+        check_job "test-frontend" "${{ inputs.test-frontend-result }}" || EXIT_CODE=1
         
         # Check validation jobs
-        check_job "validate-terraform" "${{ inputs.validate-terraform-result }}" "${{ inputs.validate-terraform-should-run }}" || EXIT_CODE=1
-        check_job "kubernetes-validate" "${{ inputs.kubernetes-validate-result }}" "${{ inputs.kubernetes-validate-should-run }}" || EXIT_CODE=1
+        check_job "validate-terraform" "${{ inputs.validate-terraform-result }}" || EXIT_CODE=1
+        check_job "kubernetes-validate" "${{ inputs.kubernetes-validate-result }}" || EXIT_CODE=1
         check_job "secret-scanning" "${{ inputs.secret-scanning-result }}" "${{ inputs.secret-scanning-should-run }}" || EXIT_CODE=1
         
         # Check validate-kustomize (always required if it ran)
@@ -107,7 +129,7 @@ runs:
         fi
         
         # Check build jobs - one must succeed if builds are required
-        if [ "${{ inputs.build-images-should-run }}" = "true" ]; then
+        if should_run_job "build-images"; then
           BUILD_PUSH="${{ inputs.build-images-result }}"
           BUILD_VALIDATE="${{ inputs.build-images-validate-result }}"
           

@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python]
     if: |
-      needs.detect-changes.outputs.stage_test_shared == 'true' &&
+      contains(needs.detect-changes.outputs.changed_areas, 'services/shared') &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
     steps:
       - name: Checkout code
@@ -122,7 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python]
     if: |
-      needs.detect-changes.outputs.stage_test_api == 'true' &&
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
     outputs:
       test_duration: ${{ steps.finish.outputs.test_duration }}
@@ -162,7 +162,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python]
     if: |
-      needs.detect-changes.outputs.stage_test_workers == 'true' &&
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/workers') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
     outputs:
       test_duration: ${{ steps.finish.outputs.test_duration }}
@@ -204,7 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-frontend]
     if: |
-      needs.detect-changes.outputs.stage_test_frontend == 'true' &&
+      contains(needs.detect-changes.outputs.changed_areas, 'apps/web') &&
       (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
     steps:
       - name: Checkout code
@@ -494,22 +494,16 @@ jobs:
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results
         with:
+          changed-areas: ${{ needs.detect-changes.outputs.changed_areas }}
           test-shared-result: ${{ needs.test-shared.result }}
-          test-shared-should-run: ${{ needs.detect-changes.outputs.stage_test_shared }}
           test-api-result: ${{ needs.test-api.result }}
-          test-api-should-run: ${{ needs.detect-changes.outputs.stage_test_api }}
           test-workers-result: ${{ needs.test-workers.result }}
-          test-workers-should-run: ${{ needs.detect-changes.outputs.stage_test_workers }}
           test-frontend-result: ${{ needs.test-frontend.result }}
-          test-frontend-should-run: ${{ needs.detect-changes.outputs.stage_test_frontend }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
-          validate-terraform-should-run: ${{ needs.detect-changes.outputs.stage_validate_terraform }}
           validate-kustomize-result: ${{ needs.validate-kustomize.result }}
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
-          kubernetes-validate-should-run: ${{ needs.detect-changes.outputs.stage_validate_kubernetes }}
           secret-scanning-result: ${{ needs.secret-scanning.result }}
           secret-scanning-should-run: ${{ needs.detect-changes.outputs.has_code_changes }}
           build-images-result: ${{ needs.build-images.result }}
           build-images-validate-result: ${{ needs.build-images-validate.result }}
-          build-images-should-run: ${{ needs.detect-changes.outputs.stage_build_images }}
 
