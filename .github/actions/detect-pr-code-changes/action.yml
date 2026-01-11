@@ -1,5 +1,11 @@
 name: Detect PR Code Changes
-description: Detects if a PR contains code changes (excluding docs/specs/markdown)
+description: |
+  Detects if a PR contains changes that would trigger image building in CI.
+  Only returns true for changes in: services/api, services/workers, services/shared, apps/web, docker files.
+  This ensures preview deployments only run when images are actually available.
+
+  ROOT CAUSE FIX: Previously returned true for ANY non-docs change, causing preview to run
+  even when CI didn't build images (e.g., workflow changes). Now aligned with CI build triggers.
 
 inputs:
   github-token:
@@ -70,7 +76,20 @@ runs:
         done
 
         # Check if any file would trigger image building in CI
-        # Only these areas cause images to be built: services/api, services/workers, services/shared, apps/web, docker
+        # CRITICAL FIX: Only return true for changes that actually build images in CI workflow
+        # This prevents preview deployments when no images are available
+        #
+        # CI BUILD TRIGGERS (build-images-meta job):
+        # - services/api/** (API service)
+        # - services/workers/** (background workers)
+        # - services/shared/** (shared libraries)
+        # - apps/web/** (frontend application)
+        # - **/Dockerfile* (Docker files)
+        # - docker-compose*.yml (compose files)
+        # - .dockerignore (docker config)
+        #
+        # ROOT CAUSE: Previously checked for ANY non-docs change, causing preview to run
+        # even when CI skipped image building (e.g., workflow-only changes)
         while IFS= read -r file; do
           if [[ -n "$file" ]]; then
             # Skip docs, specs, and markdown files

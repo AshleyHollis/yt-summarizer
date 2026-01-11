@@ -14,6 +14,26 @@
 #
 # TRIGGER CHOICE: pull_request ensures the workflow runs from feature branches and waits for CI completion.
 # This is the industry-standard pattern for PR-based preview deployments.
+#
+# =============================================================================
+# CI/PREVIEW RELATIONSHIP & IMAGE TAG HANDLING
+# =============================================================================
+# ROOT CAUSE (FIXED): Preview workflow was running for ANY code changes, but CI only builds
+# images for specific areas (services/api, services/workers, services/shared, apps/web, docker).
+# When PRs changed other files (like CI workflows), preview would run but fail because no
+# image tag artifact was created by CI.
+#
+# SOLUTION: detect-pr-code-changes now only returns true for changes that actually trigger
+# image building in CI. This ensures preview only runs when images are available.
+#
+# WORKFLOW SEQUENCE:
+# 1. detect-changes: Check if PR contains changes that would build images
+# 2. wait-for-ci: Wait for CI completion and retrieve image_tag from artifact
+# 3. check-concurrency: Validate image_tag exists + check preview limits
+# 4. update-overlay: Generate Kustomize overlay with PR-specific image tags
+# 5. deploy: ArgoCD picks up overlay changes and deploys
+# 6. verify-deployment: Ensure pods are running correct images
+# 7. e2e: Run end-to-end tests against preview environment
 
 name: Preview Deployment
 

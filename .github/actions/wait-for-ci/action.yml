@@ -1,5 +1,11 @@
 name: Wait for CI Workflow
-description: Wait for CI workflow to complete successfully before proceeding with deployment
+description: |
+  Waits for CI workflow to complete successfully and retrieves the image tag artifact.
+  This ensures preview deployments only proceed with successfully built images.
+
+  ARTIFACT RETRIEVAL: Downloads 'image-tag' artifact from CI run containing the
+  Docker image tag. If no artifact exists (CI didn't build images), returns empty string.
+  Preview workflow validates this and skips deployment if no images are available.
 
 inputs:
   github-token:

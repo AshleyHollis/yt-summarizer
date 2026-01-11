@@ -284,7 +284,11 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
-  # Build Docker Images
+  # Build Docker Images (conditional - only when image-building changes detected)
+  # ---------------------------------------------------------------------------
+  # CRITICAL: This job ONLY runs when specific areas change that require image building.
+  # The conditions here MUST match what detect-pr-code-changes checks in preview workflow.
+  # If they don't match, preview will run but no images will be available (causing failures).
   # ---------------------------------------------------------------------------
   # Builds and pushes Docker images to ACR. This validates:
   # - Dockerfile syntax and build steps
@@ -299,7 +303,10 @@ jobs:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python, lint-frontend]
-    # Only prepare tag if Azure secrets are configured and builds are needed
+    # CONDITIONAL IMAGE BUILDING: Only runs when changes require new images
+    # vars.ACR_NAME != '': Azure Container Registry must be configured
+    # changed_areas contains: Only these areas trigger image builds (MUST match preview workflow logic)
+    # lint results: Ensure code passes basic checks before building images
     if: |
       vars.ACR_NAME != '' &&
       (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
