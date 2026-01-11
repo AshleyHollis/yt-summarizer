@@ -103,6 +103,13 @@ runs:
         echo "   BASE_SHA: $BASE_SHA"
         echo "   HEAD_SHA: $HEAD_SHA"
         
+        # For PRs, ensure base branch is fetched
+        if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [[ "$BASE_SHA" == origin/* ]]; then
+          BASE_BRANCH="${BASE_SHA#origin/}"
+          echo "   Fetching base branch: origin/$BASE_BRANCH"
+          git fetch origin "$BASE_BRANCH" || echo "Failed to fetch base branch"
+        fi
+        
         FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
         echo "   git diff result: $(echo "$FILES" | wc -l) files found"
         
@@ -118,14 +125,6 @@ runs:
           echo "   git diff still failed, trying git show..."
           FILES=$(git show --name-only --pretty=format: "$HEAD_SHA" 2>/dev/null || echo "")
           echo "   git show result: $(echo "$FILES" | wc -l) files found"
-        fi
-        
-        # If still empty and we have a PR number, try GitHub API
-        if [ -z "$FILES" ] && [ -n "$PR_NUMBER" ] && [ -n "$GITHUB_TOKEN" ]; then
-          echo "   git methods failed, trying GitHub API for PR #$PR_NUMBER..."
-          API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files"
-          FILES=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$API_URL" | jq -r '.[].filename' 2>/dev/null || echo "")
-          echo "   GitHub API result: $(echo "$FILES" | wc -l) files found"
         fi
         
         if [ -z "$FILES" ]; then
