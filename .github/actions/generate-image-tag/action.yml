@@ -45,12 +45,8 @@ runs:
         BRANCH_NAME="${{ inputs.branch-name }}"
         TAG_PREFIX="${{ inputs.tag-prefix }}"
         
-        # Get short SHA
-        if [ -n "$COMMIT_SHA" ]; then
-          SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-7)
-        else
-          SHORT_SHA=$(git rev-parse --short=7 HEAD)
-        fi
+        # Get short SHA from git (always use current HEAD since we're checked out)
+        SHORT_SHA=$(git rev-parse --short=7 HEAD)
         
         # Determine tag type and generate tag
         if [ "$TAG_PREFIX" = "auto" ]; then
