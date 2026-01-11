@@ -126,7 +126,7 @@ runs:
           
           if [[ "$DRY_RUN" == "true" ]]; then
             echo "  [DRY RUN] Would delete SWA environment for PR #$pr"
-            ((deleted_count++))
+            deleted_count=$((deleted_count + 1))
           else
             echo "  🗑️  Deleting SWA environment for PR #$pr..."
             
@@ -142,7 +142,7 @@ runs:
               -F client_payload[pr_number]=$pr \
               2>&1 | grep -v "HTTP" || echo "    Cleanup dispatched"
             
-            ((deleted_count++))
+            deleted_count=$((deleted_count + 1))
             echo "    ✅ Cleanup initiated"
             
             # Small delay to avoid rate limiting
