@@ -92,7 +92,7 @@ runs:
             "build-images")
               # Must have ACR configured AND changes to buildable areas
               [[ "${{ inputs.acr-configured }}" == "true" ]] && \
-              ([[ "$areas" =~ services/api ]] || [[ "$areas" =~ services/workers ]] || [[ "$areas" =~ services/shared ]] || [[ "$areas" =~ apps/web ]] || [[ "$areas" =~ docker ]] || [[ "$areas" =~ k8s ]])
+              ([[ "$areas" =~ services/api ]] || [[ "$areas" =~ services/workers ]] || [[ "$areas" =~ services/shared ]] || [[ "$areas" =~ apps/web ]] || [[ "$areas" =~ docker ]])
               ;;
             *)
               return 1
