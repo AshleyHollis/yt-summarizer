@@ -1,63 +1,26 @@
 name: Build Images
-description: Build and push Docker images for services
+description: Build and push a single Docker image for a service
 
 inputs:
-  generate-tag:
-    description: Whether to generate the image tag internally
+  service:
+    description: The service to build (api, workers, shared)
     required: true
-    type: boolean
+    type: string
   image-tag:
-    description: The image tag to use (if not generating)
-    required: false
-    type: string
-  pr-number:
-    description: PR number for tag generation
-    required: false
-    type: string
-  commit-sha:
-    description: Commit SHA for tag generation
-    required: false
-    type: string
-  services:
-    description: JSON array of services to build (e.g., '["api", "workers", "shared"]')
+    description: The image tag to use
     required: true
     type: string
-  publish-artifact:
-    description: Whether to publish the image tag as an artifact
-    required: false
-    default: 'false'
-    type: boolean
   push:
     description: Whether to push images to registry (false for validation only)
     required: false
     default: 'true'
     type: boolean
 
-outputs:
-  image-tag:
-    description: The generated or provided image tag
-    value: ${{ steps.tag.outputs.image-tag }}
-
 runs:
   using: composite
   steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Generate image tag
-      id: tag
-      if: inputs.generate-tag == 'true'
-      uses: ./.github/actions/generate-image-tag
-      with:
-        pr-number: ${{ inputs.pr-number }}
-        commit-sha: ${{ inputs.commit-sha }}
-
-    - name: Use provided image tag
-      id: provided-tag
-      if: inputs.generate-tag == 'false'
-      shell: bash
-      run: |
-        echo "image-tag=${{ inputs.image-tag }}" >> $GITHUB_OUTPUT
 
     - name: Login to Azure Container Registry
       if: inputs.push == 'true'
@@ -68,55 +31,47 @@ runs:
         azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         acr-name: ${{ env.ACR_NAME }}
 
-    - name: Build and push images
+    - name: Build image
       shell: bash
       run: |
-        services='${{ inputs.services }}'
-        image_tag='${{ steps.tag.outputs.image-tag || steps.provided-tag.outputs.image-tag }}'
+        service='${{ inputs.service }}'
+        image_tag='${{ inputs.image-tag }}'
         push_flag='${{ inputs.push }}'
         
-        for service in $(echo "$services" | jq -r '.[]'); do
-          case $service in
-            api)
-              dockerfile="services/api/Dockerfile"
-              image_name="yt-summarizer-api"
-              ;;
-            workers)
-              dockerfile="services/workers/Dockerfile"
-              image_name="yt-summarizer-workers"
-              ;;
-            shared)
-              dockerfile="services/shared/Dockerfile"
-              image_name="yt-summarizer-shared"
-              ;;
-            *)
-              echo "Unknown service: $service"
-              exit 1
-              ;;
-          esac
-          
-          echo "Building $service image..."
-          echo "::group::Build $service image"
-          
-          # Build command
-          build_cmd="docker buildx build --file \"$dockerfile\""
-          
-          if [ "$push_flag" = "true" ]; then
-            build_cmd="$build_cmd --tag \"${{ env.ACR_LOGIN_SERVER }}/$image_name:$image_tag\""
-            build_cmd="$build_cmd --cache-from \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service\""
-            build_cmd="$build_cmd --cache-to \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service,mode=max\""
-            build_cmd="$build_cmd --push"
-          else
-            # For validation, just build without pushing
-            build_cmd="$build_cmd --tag \"local/$image_name:validate\""
-          fi
-          
-          eval "$build_cmd ."
-          echo "::endgroup::"
-        done
-
-    - name: Publish image tag artifact
-      if: inputs.publish-artifact == 'true'
-      uses: ./.github/actions/publish-image-tag
-      with:
-        image-tag: ${{ steps.tag.outputs.image-tag || steps.provided-tag.outputs.image-tag }}
+        case $service in
+          api)
+            dockerfile="services/api/Dockerfile"
+            image_name="yt-summarizer-api"
+            ;;
+          workers)
+            dockerfile="services/workers/Dockerfile"
+            image_name="yt-summarizer-workers"
+            ;;
+          shared)
+            dockerfile="services/shared/Dockerfile"
+            image_name="yt-summarizer-shared"
+            ;;
+          *)
+            echo "Unknown service: $service"
+            exit 1
+            ;;
+        esac
+        
+        echo "Building $service image..."
+        echo "::group::Build $service image"
+        
+        # Build command
+        build_cmd="docker buildx build --file \"$dockerfile\""
+        
+        if [ "$push_flag" = "true" ]; then
+          build_cmd="$build_cmd --tag \"${{ env.ACR_LOGIN_SERVER }}/$image_name:$image_tag\""
+          build_cmd="$build_cmd --cache-from \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service\""
+          build_cmd="$build_cmd --cache-to \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service,mode=max\""
+          build_cmd="$build_cmd --push"
+        else
+          # For validation, just build without pushing
+          build_cmd="$build_cmd --tag \"local/$image_name:validate\""
+        fi
+        
+        eval "$build_cmd ."
+        echo "::endgroup::"

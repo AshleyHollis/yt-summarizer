@@ -299,8 +299,8 @@ jobs:
   # - PRs: pr-<number>-<sha>
   # - Main: sha-<sha>
   # ---------------------------------------------------------------------------
-  build-images:
-    name: Build Images
+  build-images-meta:
+    name: Prepare Image Tag
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python, lint-frontend, test-shared, test-api, test-workers, test-frontend]
     # CONDITIONAL IMAGE BUILDING: Only runs when changes require new images
@@ -321,17 +321,65 @@ jobs:
       (needs.test-workers.result == 'success' || needs.test-workers.result == 'skipped') &&
       (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped')
     outputs:
-      image_tag: ${{ steps.build.outputs.image-tag }}
+      image_tag: ${{ steps.tag.outputs.image-tag }}
     steps:
-      - name: Build images
-        id: build
-        uses: ./.github/actions/build-images
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: tag
+        uses: ./.github/actions/generate-image-tag
         with:
-          generate-tag: true
           pr-number: ${{ github.event.pull_request.number }}
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
-          services: '["api", "workers"]'
-          publish-artifact: true
+
+      - name: Publish image tag artifact
+        if: steps.tag.outputs.image-tag != ''
+        uses: ./.github/actions/publish-image-tag
+        with:
+          image-tag: ${{ steps.tag.outputs.image-tag }}
+
+      - name: Verify image-tag artifact is available
+        if: steps.tag.outputs.image-tag != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: image-tag
+          path: ./downloaded-artifacts
+
+      - name: Assert downloaded image tag
+        if: steps.tag.outputs.image-tag != ''
+        uses: ./.github/actions/assert-image-tag-artifact
+
+  build-images:
+    name: Build Images (parallel)
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-images-meta]
+    if: |
+      vars.ACR_NAME != '' &&
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'docker'))
+    strategy:
+      matrix:
+        include:
+          - service: api
+            dockerfile: services/api/Dockerfile
+            image: yt-summarizer-api
+          - service: workers
+            dockerfile: services/workers/Dockerfile
+            image: yt-summarizer-workers
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Build and push ${{ matrix.service }} image
+        uses: ./.github/actions/build-images
+        with:
+          service: ${{ matrix.service }}
+          image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
+          push: true
 
 
   # Build Docker Images (Validation Only - No Push)
@@ -340,7 +388,7 @@ jobs:
   # This catches Dockerfile errors without requiring Azure credentials
   # ---------------------------------------------------------------------------
   build-images-validate:
-    name: Build Images (Validate)
+    name: Build Images (Validate - parallel)
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python, lint-frontend]
     # Only run if ACR is NOT configured (validation mode)
@@ -351,14 +399,21 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
        contains(needs.detect-changes.outputs.changed_areas, 'docker'))
+    strategy:
+      matrix:
+        include:
+          - service: api
+            dockerfile: services/api/Dockerfile
+            image: yt-summarizer-api
+          - service: workers
+            dockerfile: services/workers/Dockerfile
+            image: yt-summarizer-workers
     steps:
-      - name: Build images (validation only)
+      - name: Build ${{ matrix.service }} image (no push)
         uses: ./.github/actions/build-images
         with:
-          generate-tag: false
+          service: ${{ matrix.service }}
           image-tag: validate
-          services: '["api", "workers"]'
-          publish-artifact: false
           push: false
 
   # ---------------------------------------------------------------------------

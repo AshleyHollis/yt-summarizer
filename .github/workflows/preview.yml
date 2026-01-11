@@ -173,22 +173,48 @@ jobs:
   # Build Images for Manual Triggers (workflow_dispatch)
   # ---------------------------------------------------------------------------
   build-images-manual:
-    name: Build Images (Manual)
+    name: Build Images (Manual - parallel)
     runs-on: ubuntu-latest
     needs: detect-changes
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.force_deploy == 'true'
+    strategy:
+      matrix:
+        include:
+          - service: api
+            dockerfile: services/api/Dockerfile
+            image: yt-summarizer-api
+          - service: workers
+            dockerfile: services/workers/Dockerfile
+            image: yt-summarizer-workers
+          - service: shared
+            dockerfile: services/shared/Dockerfile
+            image: yt-summarizer-shared
     outputs:
-      image_tag: ${{ steps.build.outputs.image-tag }}
+      image_tag: ${{ steps.tag.outputs.image-tag }}
     steps:
-      - name: Build images
-        id: build
-        uses: ./.github/actions/build-images
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: tag
+        if: matrix.service == 'api'
+        uses: ./.github/actions/generate-image-tag
         with:
-          generate-tag: true
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
-          services: '["api", "workers", "shared"]'
-          publish-artifact: false
+
+      - name: Build and push ${{ matrix.service }} image
+        uses: ./.github/actions/build-images
+        with:
+          service: ${{ matrix.service }}
+          image-tag: ${{ steps.tag.outputs.image-tag }}
+          push: true
+
+      - name: Publish image tag artifact
+        if: matrix.service == 'api'
+        uses: ./.github/actions/publish-image-tag
+        with:
+          image-tag: ${{ steps.tag.outputs.image-tag }}
 
   # ---------------------------------------------------------------------------
   # Check Active Preview Count (prevents resource exhaustion from too many previews)
