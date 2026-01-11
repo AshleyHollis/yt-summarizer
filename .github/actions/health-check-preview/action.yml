@@ -61,14 +61,11 @@ runs:
         
         echo "🌐 Checking API health via external ingress..."
         echo "URL: ${EXTERNAL_URL}/health/live"
-        echo "Note: Using -k (insecure) for preview environments due to Let's Encrypt rate limits"
         
         for i in $(seq 1 $MAX_ATTEMPTS); do
           echo "Attempt $i/$MAX_ATTEMPTS (external)..."
           
-          # Use -k to skip SSL verification for preview environments
-          # This is acceptable since preview environments are temporary and may hit Let's Encrypt rate limits
-          HTTP_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" || echo "000")
           
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ External API health check passed (HTTP $HTTP_CODE)"
@@ -86,6 +83,7 @@ runs:
         echo "::error::External API health check failed after $MAX_ATTEMPTS attempts"
         echo "::notice::The API is healthy internally but not accessible via ingress. This may indicate:"
         echo "::notice::- DNS propagation delay for nip.io"
+        echo "::notice::- TLS certificate provisioning in progress (check cert-manager logs)"
         echo "::notice::- Ingress configuration issues"
         echo "::notice::- Network policy restrictions"
         exit 1
