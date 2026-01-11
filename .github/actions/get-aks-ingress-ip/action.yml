@@ -1,0 +1,64 @@
+name: 'Get AKS Ingress IP'
+description: 'Gets the external IP of the AKS ingress controller'
+
+inputs:
+  azure-client-id:
+    description: 'Azure Client ID for OIDC'
+    required: true
+  azure-tenant-id:
+    description: 'Azure Tenant ID'
+    required: true
+  azure-subscription-id:
+    description: 'Azure Subscription ID'
+    required: true
+  resource-group:
+    description: 'Azure Resource Group containing AKS cluster'
+    required: false
+    default: 'rg-ytsumm-prd'
+  cluster-name:
+    description: 'AKS Cluster name'
+    required: false
+    default: 'aks-ytsumm-prd'
+  ingress-namespace:
+    description: 'Namespace where ingress controller is deployed'
+    required: false
+    default: 'ingress-nginx'
+  ingress-service:
+    description: 'Ingress controller service name'
+    required: false
+    default: 'ingress-nginx-controller'
+
+outputs:
+  ingress-ip:
+    description: 'External IP address of the ingress controller'
+    value: ${{ steps.get-ip.outputs.ip }}
+
+runs:
+  using: composite
+  steps:
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.azure-client-id }}
+        tenant-id: ${{ inputs.azure-tenant-id }}
+        subscription-id: ${{ inputs.azure-subscription-id }}
+
+    - name: Set AKS Context
+      uses: azure/aks-set-context@v3
+      with:
+        resource-group: ${{ inputs.resource-group }}
+        cluster-name: ${{ inputs.cluster-name }}
+
+    - name: Get Ingress IP
+      id: get-ip
+      shell: bash
+      run: |
+        INGRESS_IP=$(kubectl get svc -n ${{ inputs.ingress-namespace }} ${{ inputs.ingress-service }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        
+        if [ -z "$INGRESS_IP" ]; then
+          echo "::warning::Ingress IP not found"
+          echo "ip=" >> $GITHUB_OUTPUT
+        else
+          echo "Found Ingress IP: $INGRESS_IP"
+          echo "ip=$INGRESS_IP" >> $GITHUB_OUTPUT
+        fi

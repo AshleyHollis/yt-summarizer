@@ -31,11 +31,35 @@ defaults:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Detect Changes - Smart pipeline execution
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed_areas: ${{ steps.changes.outputs.changed_areas }}
+      has_code_changes: ${{ steps.changes.outputs.has_code_changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        uses: ./.github/actions/detect-pipeline-changes
+
+  # ---------------------------------------------------------------------------
   # Linting
   # ---------------------------------------------------------------------------
   lint-python:
     name: Lint Python
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+      contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+      contains(needs.detect-changes.outputs.changed_areas, 'services/shared')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,18 +70,14 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           working-directory: services/shared
 
-      - name: Install ruff
-        run: pip install ruff
-
-      - name: Run ruff linter
-        run: ruff check services/
-
-      - name: Run ruff formatter check
-        run: ruff format --check services/
+      - name: Run ruff checks
+        uses: ./.github/actions/run-ruff-check
 
   lint-frontend:
     name: Lint Frontend
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -78,7 +98,10 @@ jobs:
   test-shared:
     name: Test Shared Package
     runs-on: ubuntu-latest
-    needs: [lint-python]
+    needs: [detect-changes, lint-python]
+    if: |
+      needs.detect-changes.outputs.stage_test_shared == 'true' &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -90,122 +113,88 @@ jobs:
           working-directory: services/shared
 
       - name: Run shared tests
-        working-directory: services/shared
-        run: python -m pytest tests/ -v --tb=short
+        uses: ./.github/actions/run-pytest
+        with:
+          working-directory: services/shared
 
   test-api:
     name: Test API
     runs-on: ubuntu-latest
-    needs: [lint-python]
+    needs: [detect-changes, lint-python]
+    if: |
+      needs.detect-changes.outputs.stage_test_api == 'true' &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
     outputs:
       test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip and uv caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.cache/uv
-          key: ${{ runner.os }}-pip-uv-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-uv-
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
-
-      - name: Install shared package
-        run: uv pip install --system -e "services/shared[dev]"
-
-      - name: Install API package
-        run: uv pip install --system -e "services/api[dev]"
-
-      - name: Install pytest-xdist
-        run: uv pip install --system pytest-xdist
+          service-package: services/api
+          install-pytest-xdist: 'true'
 
       - name: Record tests start
         id: start
-        run: echo "started_at=$(date +%s)" >> $GITHUB_OUTPUT
+        uses: ./.github/actions/record-test-duration
+        with:
+          test-name: API Tests
 
       - name: Run API tests (parallel)
-        working-directory: services/api
-        run: python -m pytest -n auto tests/ -v --tb=short -m 'not integration and not live'
+        uses: ./.github/actions/run-pytest
+        with:
+          working-directory: services/api
+          parallel: 'true'
+          pytest-args: '-v --tb=short -m "not integration and not live"'
 
       - name: Record tests finish
         id: finish
-        run: |
-          END=$(date +%s)
-          START=${{ steps.start.outputs.started_at }}
-          DURATION=$((END - START))
-          echo "test_duration=${DURATION}" >> $GITHUB_OUTPUT
-          echo "Test API duration: ${DURATION}s"
+        uses: ./.github/actions/record-test-duration
+        with:
+          start-time: ${{ steps.start.outputs.started_at }}
+          test-name: API Tests
 
   test-workers:
     name: Test Workers
     runs-on: ubuntu-latest
-    needs: [lint-python]
+    needs: [detect-changes, lint-python]
+    if: |
+      needs.detect-changes.outputs.stage_test_workers == 'true' &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
     outputs:
       test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip and uv caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.cache/uv
-          key: ${{ runner.os }}-pip-uv-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-uv-
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
-
-      - name: Install shared package
-        run: uv pip install --system -e "services/shared[dev]"
-
-      - name: Install Workers package
-        run: uv pip install --system -e "services/workers[dev]"
-
-      - name: Install pytest-xdist
-        run: uv pip install --system pytest-xdist
+          service-package: services/workers
+          install-pytest-xdist: 'true'
 
       - name: Record tests start
         id: start
-        run: echo "started_at=$(date +%s)" >> $GITHUB_OUTPUT
+        uses: ./.github/actions/record-test-duration
+        with:
+          test-name: Workers Tests
 
       - name: Run workers tests (parallel)
-        working-directory: services/workers
-        run: python -m pytest -n auto tests/ -v --tb=short
+        uses: ./.github/actions/run-pytest
+        with:
+          working-directory: services/workers
+          parallel: 'true'
 
       - name: Record tests finish
         id: finish
-        run: |
-          END=$(date +%s)
-          START=${{ steps.start.outputs.started_at }}
-          DURATION=$((END - START))
-          echo "test_duration=${DURATION}" >> $GITHUB_OUTPUT
-          echo "Test Workers duration: ${DURATION}s"
+        uses: ./.github/actions/record-test-duration
+        with:
+          start-time: ${{ steps.start.outputs.started_at }}
+          test-name: Workers Tests
 
   # ---------------------------------------------------------------------------
   # Frontend Tests
@@ -213,7 +202,10 @@ jobs:
   test-frontend:
     name: Test Frontend
     runs-on: ubuntu-latest
-    needs: [lint-frontend]
+    needs: [detect-changes, lint-frontend]
+    if: |
+      needs.detect-changes.outputs.stage_test_frontend == 'true' &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -225,8 +217,7 @@ jobs:
           working-directory: apps/web
 
       - name: Run Vitest
-        working-directory: apps/web
-        run: npm run test:run
+        uses: ./.github/actions/run-frontend-tests
 
   # ---------------------------------------------------------------------------
   # Kubernetes Validation (YAML, Kustomize, ArgoCD)
@@ -237,244 +228,54 @@ jobs:
   kubernetes-validate:
     name: Kubernetes Validation
     runs-on: ubuntu-latest
-    needs: [lint-python]
+    needs: [detect-changes]
+    if: contains(needs.detect-changes.outputs.changed_areas, 'k8s')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install kustomize
-        uses: imranismail/setup-kustomize@v2
+      - name: Setup Kustomize
+        uses: ./.github/actions/setup-kustomize
         with:
-          # Use a newer kustomize release to match local dev tooling and
-          # avoid parser regression with multi-document strategic merge
-          # patches. Bump if needed in future.
           kustomize-version: '5.8.0'
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyyaml
 
       # -----------------------------------------------------------------------
       # Step 1: YAML Syntax Validation
       # -----------------------------------------------------------------------
       - name: Validate YAML syntax (all K8s manifests)
-        run: |
-          echo "::group::Validating YAML syntax"
-          python3 -c "
-          import yaml
-          import os
-          import sys
-          
-          exit_code = 0
-          for root, dirs, files in os.walk('k8s'):
-              for file in files:
-                  if file.endswith(('.yaml', '.yml')):
-                      filepath = os.path.join(root, file)
-                      try:
-                          with open(filepath, 'r', encoding='utf-8') as f:
-                              docs = list(yaml.safe_load_all(f))
-                          print(f'✅ {filepath} - OK ({len(docs)} documents)')
-                      except Exception as e:
-                          print(f'❌ YAML syntax error in: {filepath}')
-                          print(f'   Error: {e}')
-                          exit_code = 1
-          
-          if exit_code == 0:
-              print('✅ All YAML files have valid syntax')
-          else:
-              print('::error::YAML syntax validation failed')
-          
-          sys.exit(exit_code)
-          "
-          echo "::endgroup::"
+        uses: ./.github/actions/validate-k8s-yaml
+        with:
+          directory: k8s
 
       # -----------------------------------------------------------------------
-      # Step 2: Kustomize Build Validation
+      # Step 2: Kustomize Build Validation (using composite action)
       # -----------------------------------------------------------------------
-      - name: Validate kustomize build (preview overlay)
-        run: |
-          set -eo pipefail
-          OVERLAY_DIR="k8s/overlays/preview"
-          OVERLAY_FILE="$OVERLAY_DIR/kustomization.yaml"
-          TMP_MANIFEST="/tmp/preview.yaml"
-          ERR_FILE="/tmp/kustomize-preview.err"
+      - name: Validate preview overlay
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/preview
+          overlay-name: preview
+          max-cpu: '1500'
+          output-file: /tmp/preview.yaml
 
-          echo "::group::kustomize build preview"
+      - name: Validate prod overlay
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/prod
+          overlay-name: prod
 
-          echo "--- Git info ---"
-          git rev-parse --abbrev-ref HEAD || true
-          git status --porcelain -b || true
-          git log -1 --pretty=oneline || true
-
-          echo "--- Overlay file (if present) ---"
-          if [ -f "$OVERLAY_FILE" ]; then
-            echo "file size: $(wc -c < "$OVERLAY_FILE") bytes" || true
-            if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$OVERLAY_FILE" || true; else head -c 32 "$OVERLAY_FILE" | od -An -t x1 || true; fi
-            echo "--- Contents (first 200 lines) ---"
-            cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
-          else
-            echo "(overlay file not found at $OVERLAY_FILE)"
-          fi
-
-          echo "--- Patch files ---"
-          ls -la "$OVERLAY_DIR/patches" || true
-          for f in "$OVERLAY_DIR"/patches/*; do
-            echo "--- $f ---"
-            if [ -f "$f" ]; then
-              if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$f" || true; else head -c 32 "$f" | od -An -t x1 || true; fi
-              cat -n "$f" | sed -n '1,200p' || true
-            else
-              echo "(no patch files found)"
-            fi
-          done || true
-
-          echo "Building manifests with kustomize..."
-          if ! kustomize build "$OVERLAY_DIR" > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
-            echo "::error::kustomize build FAILED for overlay 'preview'"
-            echo "--- kustomize stderr ---"
-            sed -n '1,400p' "$ERR_FILE" || true
-            echo "--- end kustomize stderr ---"
-
-            # Try to extract any 'path: <file>' lines from kustomize stderr which
-            # will identify the problematic patch files and print them for easier
-            # debugging in CI logs.
-            echo "Searching for reported patch paths in kustomize stderr..."
-            PATCH_PATHS=$(grep -oP 'path:\s*\K.*' "$ERR_FILE" || true)
-            if [ -n "$PATCH_PATHS" ]; then
-              echo "Identified patch(s): $PATCH_PATHS"
-              for p in $PATCH_PATHS; do
-                FULL="$OVERLAY_DIR/$p"
-                if [ -f "$FULL" ]; then
-                  echo "--- $FULL (first 400 lines) ---"
-                  sed -n '1,400p' "$FULL" || true
-                else
-                  echo "(file not found: $FULL)"
-                fi
-              done
-            else
-              echo "(no 'path:' entries found in stderr)"
-            fi
-
-            echo "--- Overlay file (again) ---"
-            if [ -f "$OVERLAY_FILE" ]; then
-              echo "file size: $(wc -c < "$OVERLAY_FILE") bytes" || true
-              if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$OVERLAY_FILE" || true; else head -c 32 "$OVERLAY_FILE" | od -An -t x1 || true; fi
-              cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
-            fi
-
-            echo "--- Listing patch files (again) ---"
-            ls -la "$OVERLAY_DIR/patches" || true
-            for f in "$OVERLAY_DIR"/patches/*; do
-              echo "--- $f ---"
-              if [ -f "$f" ]; then
-                if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$f" || true; else head -c 32 "$f" | od -An -t x1 || true; fi
-                cat -n "$f" | sed -n '1,200p' || true
-              fi
-            done || true
-
-            echo "Searching for 'group:' occurrences"
-            grep -n "^\s*group:\s" "$OVERLAY_FILE" || true
-            grep -n "^\s*group:\s" "$OVERLAY_DIR"/patches/* || true
-
-            echo "::error::kustomize build failed for overlay 'preview' - see diagnostics above"
-            echo "::endgroup::"
-            exit 1
-          fi
-
-          echo "::endgroup::"
-          echo "✅ Built preview overlay: $(wc -c "$TMP_MANIFEST" | awk '{print $1}') bytes"
-
-          # Basic YAML parse check
-          python scripts/ci/parse_yaml.py "$TMP_MANIFEST" || (echo "::error::YAML parse failed for rendered preview manifests"; head -n 200 "$TMP_MANIFEST" || true; exit 1)
-
-      - name: Validate preview CPU within quota
-        run: |
-          if ! python scripts/ci/validate_kustomize.py --file /tmp/preview.yaml --max-cpu 1500 --name preview; then
-            echo "::error::Preview overlay CPU requests exceed quota (1500m)"
-            head -n 200 /tmp/preview.yaml || true
-            exit 1
-          fi
-
-      - name: Validate kustomize build (prod overlay)
-        run: |
-          echo "::group::kustomize build prod"
-          if ! kustomize build k8s/overlays/prod > /tmp/prod.yaml; then
-            echo "::error::kustomize build failed for overlay 'prod'"
-            kustomize build k8s/overlays/prod || true
-            echo "::endgroup::"
-            exit 1
-          fi
-          echo "::endgroup::"
-          echo "✅ Built prod overlay: $(wc -c /tmp/prod.yaml | cut -d' ' -f1) bytes"
-
-      - name: Validate kustomize build (prod-secretstore overlay)
-        run: |
-          echo "::group::kustomize build prod-secretstore"
-          if ! kustomize build k8s/overlays/prod-secretstore > /tmp/prod-secretstore.yaml; then
-            echo "::error::kustomize build failed for overlay 'prod-secretstore'"
-            kustomize build k8s/overlays/prod-secretstore || true
-            echo "::endgroup::"
-            exit 1
-          fi
-          echo "::endgroup::"
-          echo "✅ Built prod-secretstore overlay: $(wc -c /tmp/prod-secretstore.yaml | cut -d' ' -f1) bytes"
+      - name: Validate prod-secretstore overlay
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/prod-secretstore
+          overlay-name: prod-secretstore
 
       # -----------------------------------------------------------------------
       # Step 3: ArgoCD Application Path Validation
       # -----------------------------------------------------------------------
       - name: Validate ArgoCD Application paths exist
-        run: |
-          echo "::group::Validating ArgoCD Application source paths"
-          python3 -c "
-          import yaml
-          import os
-          import sys
-          import glob
-          
-          exit_code = 0
-          for app_file in glob.glob('k8s/argocd/*.yaml'):
-              print(f'Checking ArgoCD Applications in: {app_file}')
-              
-              try:
-                  with open(app_file, 'r', encoding='utf-8') as f:
-                      docs = list(yaml.safe_load_all(f))
-                  
-                  for doc in docs:
-                      if not doc or doc.get('kind') != 'Application':
-                          continue
-                      
-                      app_name = doc.get('metadata', {}).get('name', 'unknown')
-                      source = doc.get('spec', {}).get('source', {})
-                      repo_url = source.get('repoURL', '')
-                      path = source.get('path', '')
-                      
-                      # Only check paths for this repo (not Helm charts)
-                      if 'github.com' in repo_url and 'yt-summarizer' in repo_url and path:
-                          if not os.path.exists(path):
-                              print(f'❌ Application \'{app_name}\': path \'{path}\' does not exist')
-                              exit_code = 1
-                          else:
-                              print(f'✅ Application \'{app_name}\': path \'{path}\' exists')
-                      else:
-                          print(f'⏭️  Application \'{app_name}\': skipping (external repo or no path)')
-              except Exception as e:
-                  print(f'❌ Error processing {app_file}: {e}')
-                  exit_code = 1
-          
-          if exit_code == 0:
-              print('✅ All ArgoCD Application paths exist')
-          else:
-              print('::error::Some ArgoCD Applications reference non-existent paths')
-          
-          sys.exit(exit_code)
-          "
-          echo "::endgroup::"
+        uses: ./.github/actions/validate-argocd-paths
+
 
   # ---------------------------------------------------------------------------
   # Build Docker Images
@@ -491,34 +292,36 @@ jobs:
   build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
-    needs: [lint-python, lint-frontend]
-    # Only prepare tag if Azure secrets are configured
-    if: ${{ vars.ACR_NAME != '' }}
+    needs: [detect-changes, lint-python, lint-frontend]
+    # Only prepare tag if Azure secrets are configured and builds are needed
+    if: |
+      vars.ACR_NAME != '' &&
+      needs.detect-changes.outputs.stage_build_images == 'true' &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
     outputs:
-      image_tag: ${{ steps.meta.outputs.image_tag }}
+      image_tag: ${{ steps.tag.outputs.image-tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Generate image metadata
-        id: meta
-        run: |
-          SHORT_SHA=$(echo "${{ github.event.pull_request.head.sha || github.sha }}" | cut -c1-7)
-
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            IMAGE_TAG="pr-${{ github.event.pull_request.number }}-${SHORT_SHA}"
-          else
-            IMAGE_TAG="sha-${SHORT_SHA}"
-          fi
-
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "Generated image tag: ${IMAGE_TAG}"
+      - name: Generate image tag
+        id: tag
+        uses: ./.github/actions/generate-image-tag
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
   build-images:
     name: Build Images (parallel)
     runs-on: ubuntu-latest
-    needs: [build-images-meta]
-    if: ${{ vars.ACR_NAME != '' }}
+    needs: [build-images-meta, test-shared, test-api, test-workers, test-frontend]
+    if: |
+      vars.ACR_NAME != '' &&
+      (needs.test-shared.result == 'success' || needs.test-shared.result == 'skipped') &&
+      (needs.test-api.result == 'success' || needs.test-api.result == 'skipped') &&
+      (needs.test-workers.result == 'success' || needs.test-workers.result == 'skipped') &&
+      (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped')
     strategy:
       matrix:
         include:
@@ -532,56 +335,28 @@ jobs:
       id-token: write
       contents: read
     outputs:
-      build_duration: ${{ steps.finish.outputs.build_duration }}
+      build_duration: ${{ steps.build.outputs.build_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
+      - name: Azure ACR Login
+        uses: ./.github/actions/azure-acr-login
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Login to ACR
-        run: az acr login --name ${{ env.ACR_NAME }}
-
-      - name: Record build start
-        id: start
-        run: echo "started_at=$(date +%s)" >> $GITHUB_OUTPUT
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
 
       - name: Build and push ${{ matrix.service }} image
         id: build
-        uses: docker/build-push-action@v5
+        uses: ./.github/actions/docker-build-push
         with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: true
-          tags: |
-            ${{ env.ACR_LOGIN_SERVER }}/${{ matrix.image }}:${{ needs.build-images-meta.outputs.image_tag }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
-          cache-from: |
-            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-${{ matrix.service }}:latest
-            type=gha
-          cache-to: |
-            type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-cache-${{ matrix.service }}:latest,mode=max
-            type=gha,mode=max
-          platforms: linux/amd64
-
-      - name: Record build finish
-        id: finish
-        run: |
-          END=$(date +%s)
-          START=${{ steps.start.outputs.started_at }}
-          DURATION=$((END - START))
-          echo "build_duration=${DURATION}" >> $GITHUB_OUTPUT
-          echo "Build duration for ${{ matrix.service }}: ${DURATION}s"
+          dockerfile: ${{ matrix.dockerfile }}
+          image-name: ${{ matrix.image }}
+          image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          cache-name: ${{ matrix.service }}
 
   # ---------------------------------------------------------------------------
   # Build Docker Images (Validation Only - No Push)
@@ -600,22 +375,23 @@ jobs:
         include:
           - service: api
             dockerfile: services/api/Dockerfile
+            image: yt-summarizer-api
           - service: workers
             dockerfile: services/workers/Dockerfile
+            image: yt-summarizer-workers
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Build ${{ matrix.service }} image (no push)
-        uses: docker/build-push-action@v5
+        uses: ./.github/actions/docker-build-push
         with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: false
-          platforms: linux/amd64
+          dockerfile: ${{ matrix.dockerfile }}
+          image-name: ${{ matrix.image }}
+          image-tag: validate
+          registry: local
+          cache-name: ${{ matrix.service }}
+          push: 'false'
 
   # ---------------------------------------------------------------------------
   # E2E Tests - Run against Preview Environment
@@ -633,7 +409,8 @@ jobs:
   validate-terraform:
     name: Validate Terraform
     runs-on: ubuntu-latest
-    needs: [lint-python]
+    needs: [detect-changes]
+    if: contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -643,13 +420,10 @@ jobs:
         with:
           terraform_version: "1.5"
 
-      - name: Terraform Init (prod)
-        working-directory: infra/terraform/environments/prod
-        run: terraform init -backend=false
-
-      - name: Terraform Validate (prod)
-        working-directory: infra/terraform/environments/prod
-        run: terraform validate
+      - name: Validate Terraform configuration
+        uses: ./.github/actions/validate-terraform-config
+        with:
+          working-directory: infra/terraform/environments/prod
 
   validate-kustomize:
     name: Validate Kustomize
@@ -663,10 +437,16 @@ jobs:
         uses: imranismail/setup-kustomize@v2
 
       - name: Validate base manifests
-        run: kustomize build k8s/base > /dev/null
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/base
+          overlay-name: base
 
       - name: Validate prod overlay
-        run: kustomize build k8s/overlays/prod > /dev/null
+        uses: ./.github/actions/kustomize-validate
+        with:
+          overlay-path: k8s/overlays/prod
+          overlay-name: prod
 
   # ---------------------------------------------------------------------------
   # Security Scanning
@@ -674,7 +454,8 @@ jobs:
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
-    needs: [lint-python, lint-frontend]
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.has_code_changes == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -694,6 +475,7 @@ jobs:
     name: CI Status
     runs-on: ubuntu-latest
     needs:
+      - detect-changes
       - test-shared
       - test-api
       - test-workers
@@ -707,31 +489,24 @@ jobs:
     if: always()
     steps:
       - name: Check all jobs passed
-        run: |
-          # Check required jobs (tests, validation)
-          if [ "${{ needs.test-shared.result }}" != "success" ] ||
-             [ "${{ needs.test-api.result }}" != "success" ] ||
-             [ "${{ needs.test-workers.result }}" != "success" ] ||
-             [ "${{ needs.test-frontend.result }}" != "success" ] ||
-             [ "${{ needs.validate-terraform.result }}" != "success" ] ||
-             [ "${{ needs.validate-kustomize.result }}" != "success" ] ||
-             [ "${{ needs.kubernetes-validate.result }}" != "success" ] ||
-             [ "${{ needs.secret-scanning.result }}" != "success" ]; then
-            echo "One or more required jobs failed"
-            exit 1
-          fi
-          
-          # Check build jobs - one of them must succeed (based on ACR config)
-          BUILD_PUSH="${{ needs.build-images.result }}"
-          BUILD_VALIDATE="${{ needs.build-images-validate.result }}"
-          
-          # If ACR configured: build-images runs, build-images-validate skipped
-          # If ACR not configured: build-images skipped, build-images-validate runs
-          if [ "$BUILD_PUSH" = "success" ] || [ "$BUILD_PUSH" = "skipped" -a "$BUILD_VALIDATE" = "success" ]; then
-            echo "Build validation passed ✅"
-          else
-            echo "Build jobs failed: build-images=$BUILD_PUSH, build-images-validate=$BUILD_VALIDATE"
-            exit 1
-          fi
-          
-          echo "All CI checks passed! ✅"
+        uses: ./.github/actions/validate-ci-results
+        with:
+          test-shared-result: ${{ needs.test-shared.result }}
+          test-shared-should-run: ${{ needs.detect-changes.outputs.stage_test_shared }}
+          test-api-result: ${{ needs.test-api.result }}
+          test-api-should-run: ${{ needs.detect-changes.outputs.stage_test_api }}
+          test-workers-result: ${{ needs.test-workers.result }}
+          test-workers-should-run: ${{ needs.detect-changes.outputs.stage_test_workers }}
+          test-frontend-result: ${{ needs.test-frontend.result }}
+          test-frontend-should-run: ${{ needs.detect-changes.outputs.stage_test_frontend }}
+          validate-terraform-result: ${{ needs.validate-terraform.result }}
+          validate-terraform-should-run: ${{ needs.detect-changes.outputs.stage_validate_terraform }}
+          validate-kustomize-result: ${{ needs.validate-kustomize.result }}
+          kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
+          kubernetes-validate-should-run: ${{ needs.detect-changes.outputs.stage_validate_kubernetes }}
+          secret-scanning-result: ${{ needs.secret-scanning.result }}
+          secret-scanning-should-run: ${{ needs.detect-changes.outputs.has_code_changes }}
+          build-images-result: ${{ needs.build-images.result }}
+          build-images-validate-result: ${{ needs.build-images-validate.result }}
+          build-images-should-run: ${{ needs.detect-changes.outputs.stage_build_images }}
+

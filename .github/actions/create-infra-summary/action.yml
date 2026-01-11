@@ -1,0 +1,24 @@
+name: 'Create Infrastructure Summary'
+description: 'Creates a GitHub Actions step summary for infrastructure deployments'
+inputs:
+  terraform-changed:
+    description: 'Whether terraform files changed (true/false)'
+    required: true
+  terraform-result:
+    description: 'Result of terraform job'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Create summary
+      shell: bash
+      run: |
+        echo "## 🏗️ Infrastructure Deployment" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ inputs.terraform-changed }}" != "true" ]; then
+          echo "⏭️ **Skipped** - No terraform changes in this commit" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform | ${{ inputs.terraform-result }} |" >> $GITHUB_STEP_SUMMARY
+        fi

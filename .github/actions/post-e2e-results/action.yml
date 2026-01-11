@@ -1,0 +1,73 @@
+name: Post E2E Test Results
+description: Post or update E2E test results comment on PR
+
+inputs:
+  github-token:
+    description: GitHub token for API access
+    required: true
+  pr-number:
+    description: Pull request number
+    required: true
+  test-outcome:
+    description: Test outcome (success/failure)
+    required: true
+  preview-url:
+    description: Preview environment URL where tests ran
+    required: true
+  commit-sha:
+    description: Commit SHA tested
+    required: true
+  run-id:
+    description: GitHub Actions run ID
+    required: true
+  repository:
+    description: GitHub repository (owner/repo)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Post/update E2E results comment
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const status = '${{ inputs.test-outcome }}' === 'success' ? '✅ Passed' : '❌ Failed';
+          const emoji = '${{ inputs.test-outcome }}' === 'success' ? '✅' : '❌';
+          const reportUrl = `https://github.com/${{ inputs.repository }}/actions/runs/${{ inputs.run-id }}`;
+          
+          const body = `## ${emoji} E2E Test Results\n\n` +
+            `| Property | Value |\n` +
+            `|----------|-------|\n` +
+            `| **Status** | ${status} |\n` +
+            `| **Environment** | ${{ inputs.preview-url }} |\n` +
+            `| **Commit** | \`${{ inputs.commit-sha }}\` |\n\n` +
+            `[📊 View Playwright Report](${reportUrl})`;
+          
+          // Find existing E2E comment to update
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: ${{ inputs.pr-number }},
+          });
+          
+          const e2eComment = comments.find(c => 
+            c.user.type === 'Bot' && 
+            c.body.includes('E2E Test Results')
+          );
+          
+          if (e2eComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: e2eComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              issue_number: ${{ inputs.pr-number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+          }

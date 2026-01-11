@@ -1,0 +1,32 @@
+name: 'Update Production Kustomization'
+description: 'Updates production kustomization.yaml with new image tag'
+inputs:
+  image-tag:
+    description: 'Image tag to use for production deployment'
+    required: true
+  kustomization-path:
+    description: 'Path to kustomization overlay'
+    required: false
+    default: 'k8s/overlays/prod'
+  template-path:
+    description: 'Path to kustomization template'
+    required: false
+    default: 'scripts/ci/templates/prod-kustomization-template.yaml'
+runs:
+  using: composite
+  steps:
+    - name: Update kustomization file
+      shell: bash
+      working-directory: ${{ inputs.kustomization-path }}
+      run: |
+        IMAGE_TAG="${{ inputs.image-tag }}"
+        
+        python ../../../scripts/ci/update_prod_kustomization.py \
+          --template ../../../${{ inputs.template-path }} \
+          --output kustomization.yaml \
+          --image-tag "${IMAGE_TAG}"
+        
+        echo "✅ Updated production kustomization with tag: ${IMAGE_TAG}"
+        echo ""
+        echo "--- kustomization.yaml ---"
+        cat kustomization.yaml

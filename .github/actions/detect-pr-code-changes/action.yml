@@ -1,0 +1,91 @@
+name: Detect PR Code Changes
+description: Detects if a PR contains code changes (excluding docs/specs/markdown)
+
+inputs:
+  github-token:
+    description: GitHub token for API access
+    required: true
+  repository:
+    description: GitHub repository (owner/repo)
+    required: true
+  pr-number:
+    description: Pull request number
+    required: true
+  force-preview-labels:
+    description: Comma-separated list of labels that force preview deployment
+    required: false
+    default: 'preview,force-preview'
+
+outputs:
+  has_code_changes:
+    description: Whether the PR contains code changes
+    value: ${{ steps.detect.outputs.has_code_changes }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect code changes
+      id: detect
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        PR_NUMBER="${{ inputs.pr-number }}"
+        
+        echo "Checking PR: ${PR_NUMBER}"
+
+        # Validate PR number
+        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+          echo "No PR number provided (got: ${PR_NUMBER}) - assuming no code changes"
+          echo "has_code_changes=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Fetch all changed files in the PR
+        FILES=$(gh api repos/${{ inputs.repository }}/pulls/${PR_NUMBER}/files --jq '.[] .filename' 2>/dev/null || echo "")
+        
+        if [ -z "$FILES" ]; then
+          echo "⚠️ Could not fetch PR files - assuming code changes for safety"
+          echo "has_code_changes=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        echo "Files changed in this PR:"
+        echo "$FILES"
+
+        # Check for force-preview labels
+        HAS_CODE=false
+        LABELS=$(gh api repos/${{ inputs.repository }}/issues/${PR_NUMBER} --jq '.labels[].name' 2>/dev/null || echo "")
+        
+        IFS=',' read -ra FORCE_LABELS <<< "${{ inputs.force-preview-labels }}"
+        for lbl in $LABELS; do
+          for force_label in "${FORCE_LABELS[@]}"; do
+            force_label=$(echo "$force_label" | xargs)  # Trim whitespace
+            if [[ "$lbl" == "$force_label" ]]; then
+              echo "🔔 Force preview label detected: $lbl"
+              HAS_CODE=true
+              break 2
+            fi
+          done
+        done
+
+        # Check if any file is NOT docs/specs/markdown
+        while IFS= read -r file; do
+          if [[ -n "$file" ]]; then
+            # Skip docs, specs, and markdown files
+            if [[ "$file" == docs/* ]] || [[ "$file" == specs/* ]] || [[ "$file" == *.md ]]; then
+              echo "  [skip] $file (docs/specs/markdown)"
+            else
+              echo "  [CODE] $file"
+              HAS_CODE=true
+            fi
+          fi
+        done <<< "$FILES"
+
+        echo "has_code_changes=$HAS_CODE" >> $GITHUB_OUTPUT
+
+        if [ "$HAS_CODE" = "true" ]; then
+          echo "✅ PR contains code changes or force-preview label"
+        else
+          echo "📝 PR contains only documentation changes"
+        fi

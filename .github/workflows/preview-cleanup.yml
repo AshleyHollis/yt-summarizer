@@ -54,20 +54,10 @@ jobs:
             });
 
       - name: Create cleanup summary
-        run: |
-          echo "## 🗑️ Preview Cleanup Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **PR** | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Merged** | ${{ github.event.pull_request.merged }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ℹ️ Automatic Cleanup" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "With Argo CD ApplicationSet using Pull Request Generator:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Application deleted automatically when PR closes" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Namespace pruned automatically" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ No overlay files to delete (they lived in PR branch)" >> $GITHUB_STEP_SUMMARY
+        uses: ./.github/actions/create-cleanup-summary
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
+          pr-merged: ${{ github.event.pull_request.merged }}
 
   # ---------------------------------------------------------------------------
   # Optional: Clean up ACR images for the PR
@@ -86,36 +76,8 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Delete PR images from ACR
-        env:
-          ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          echo "Cleaning up images for PR #${PR_NUMBER}..."
-          
-          # Delete API images with pr-N- prefix
-          az acr repository show-tags \
-            --name $ACR_NAME \
-            --repository yt-summarizer-api \
-            --query "[?starts_with(@, 'pr-${PR_NUMBER}-')]" \
-            --output tsv | while read tag; do
-              echo "Deleting yt-summarizer-api:${tag}"
-              az acr repository delete \
-                --name $ACR_NAME \
-                --image yt-summarizer-api:${tag} \
-                --yes
-            done
-          
-          # Delete Workers images with pr-N- prefix
-          az acr repository show-tags \
-            --name $ACR_NAME \
-            --repository yt-summarizer-workers \
-            --query "[?starts_with(@, 'pr-${PR_NUMBER}-')]" \
-            --output tsv | while read tag; do
-              echo "Deleting yt-summarizer-workers:${tag}"
-              az acr repository delete \
-                --name $ACR_NAME \
-                --image yt-summarizer-workers:${tag} \
-                --yes
-            done
-          
-          echo "Image cleanup complete"
+        uses: ./.github/actions/cleanup-acr-images
+        with:
+          acr-name: ${{ vars.ACR_NAME || 'acrytsummprd' }}
+          pr-number: ${{ github.event.pull_request.number }}
+

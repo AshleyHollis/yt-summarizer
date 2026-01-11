@@ -14,9 +14,13 @@ on:
     types: [opened, synchronize, reopened]
     # Note: paths-ignore checks entire PR diff, not latest commit
     # We use commit-level detection in detect-changes job for efficiency
+  # Trigger when the CI workflow completes so the preview can start immediately
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
 
 concurrency:
-  group: preview-${{ github.event.pull_request.number }}
+  group: preview-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
   cancel-in-progress: true
 
 env:
@@ -42,52 +46,16 @@ jobs:
     steps:
       - name: Check if commit has code changes
         id: check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Get files changed in the PR (all commits) and allow manual override via label
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          echo "Checking PR: ${PR_NUMBER}"
+        uses: ./.github/actions/detect-pr-code-changes
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          event-name: ${{ github.event_name }}
+          pr-number: ${{ github.event.pull_request.number || '' }}
 
-          # Fetch all changed files in the PR (across all commits)
-          FILES=$(gh api repos/${{ github.repository }}/pulls/${PR_NUMBER}/files --jq '.[] .filename')
-
-          echo "Files changed in this PR:"
-          echo "$FILES"
-
-          # Optional override: if PR has a 'preview' or 'force-preview' label, run preview regardless
-          HAS_CODE=false
-          LABELS=$(gh api repos/${{ github.repository }}/issues/${PR_NUMBER} --jq '.labels[].name') || LABELS=""
-          for lbl in $LABELS; do
-            if [[ "$lbl" == "preview" ]] || [[ "$lbl" == "force-preview" ]]; then
-              echo "🔔 Force preview label detected: $lbl"
-              HAS_CODE=true
-            fi
-          done
-
-          # Check if any file is NOT docs/specs/markdown
-          while IFS= read -r file; do
-            if [[ -n "$file" ]]; then
-              # Skip docs, specs, and markdown files
-              if [[ "$file" == docs/* ]] || [[ "$file" == specs/* ]] || [[ "$file" == *.md ]]; then
-                echo "  [skip] $file (docs/specs/markdown)"
-              else
-                echo "  [CODE] $file"
-                HAS_CODE=true
-              fi
-            fi
-          done <<< "$FILES"
-
-          echo "has_code_changes=$HAS_CODE" >> $GITHUB_OUTPUT
-
-          if [ "$HAS_CODE" = "true" ]; then
-            echo "✅ PR contains code changes or force-preview label - proceeding with preview"
-          else
-            echo "📝 PR only contains docs/specs/markdown - skipping preview"
-          fi
 
   # ---------------------------------------------------------------------------
-  # Wait for CI to Pass (CI builds and pushes images)
+  # Wait for CI to Pass (CI builds and pushes images) or verify CI result when triggered by workflow_run
   # ---------------------------------------------------------------------------
   wait-for-ci:
     name: Wait for CI
@@ -97,37 +65,27 @@ jobs:
     outputs:
       image_tag: ${{ steps.image-tag.outputs.image_tag }}
     steps:
-      - name: Wait for CI workflow
-        uses: fountainhead/action-wait-for-check@v1.2.0
-        id: wait-for-ci
+      - name: Verify CI workflow passed (workflow_run trigger)
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: ./.github/actions/verify-ci-workflow
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          checkName: CI Status
-          ref: ${{ github.event.pull_request.head.sha }}
-          timeoutSeconds: 900
-          intervalSeconds: 30
+          workflow-conclusion: ${{ github.event.workflow_run.conclusion }}
+          workflow-name: ${{ github.event.workflow_run.name }}
 
-      - name: Fail if CI did not pass
-        if: steps.wait-for-ci.outputs.conclusion != 'success'
-        run: |
-          echo "::error::CI workflow did not pass. Preview deployment blocked."
-          exit 1
+
+      - name: Wait for CI workflow (pull_request trigger)
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: ./.github/actions/wait-for-ci
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          commit-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Determine image tag from CI
         id: image-tag
-        run: |
-          # CI uses this tag format for PRs
-          SHORT_SHA=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7)
-          IMAGE_TAG="pr-${{ github.event.pull_request.number }}-${SHORT_SHA}"
-
-          # Fail if for some reason the image tag couldn't be computed
-          if [ -z "${IMAGE_TAG}" ]; then
-            echo "::error::Computed IMAGE_TAG is empty; aborting"
-            exit 1
-          fi
-
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "Using image tag from CI: ${IMAGE_TAG}"
+        uses: ./.github/actions/generate-image-tag
+        with:
+          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
 
   # ---------------------------------------------------------------------------
   # Check Active Preview Count
@@ -140,33 +98,21 @@ jobs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
       image_tag: ${{ steps.export-image.outputs.image_tag }}
     steps:
-      - name: Count active previews via GitHub API
+      - name: Check preview concurrency limit
         id: check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Count open PRs (each gets a preview via ApplicationSet PR Generator)
-          OPEN_PRS=$(gh api repos/${{ github.repository }}/pulls --jq 'length')
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          
-          echo "Open PRs: ${OPEN_PRS}"
-          echo "Max previews: ${{ env.MAX_PREVIEWS }}"
-          
-          # This PR is already counted in open PRs, so we compare with <=
-          if [ "$OPEN_PRS" -le "${{ env.MAX_PREVIEWS }}" ]; then
-            echo "Preview slot available (${OPEN_PRS}/${{ env.MAX_PREVIEWS }})"
-            echo "can_deploy=true" >> $GITHUB_OUTPUT
-          else
-            echo "::warning::Maximum previews reached (${OPEN_PRS}/${{ env.MAX_PREVIEWS }}). Waiting for slot..."
-            echo "can_deploy=false" >> $GITHUB_OUTPUT
-          fi
+        uses: ./.github/actions/check-preview-concurrency
+        with:
+          github-token: ${{ github.token }}
+          max-previews: ${{ env.MAX_PREVIEWS }}
+          repository: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
 
       - name: Export computed image tag
         id: export-image
-        run: |
-          # Ensure we explicitly expose the image tag (propagates across jobs reliably)
-          echo "image_tag=${{ needs.wait-for-ci.outputs.image_tag }}" >> $GITHUB_OUTPUT
-          echo "Exported image tag: ${{ needs.wait-for-ci.outputs.image_tag }}"
+        uses: ./.github/actions/export-image-tag
+        with:
+          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+
 
       - name: Post queue status
         if: steps.check.outputs.can_deploy == 'false'
@@ -189,56 +135,30 @@ jobs:
     needs: check-concurrency
     if: needs.check-concurrency.outputs.can_deploy == 'true'
     outputs:
-      ingress_ip: ${{ steps.ingress-ip.outputs.ip }}
-      preview_url: ${{ steps.preview.outputs.preview_url }}
-      preview_host: ${{ steps.preview.outputs.preview_host }}
-      tls_secret: ${{ steps.preview.outputs.tls_secret }}
+      ingress_ip: ${{ steps.get-ip.outputs.ingress-ip }}
+      preview_url: ${{ steps.compute.outputs.preview-url }}
+      preview_host: ${{ steps.compute.outputs.preview-host }}
+      tls_secret: ${{ steps.compute.outputs.tls-secret }}
     steps:
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Set AKS Context
-        uses: azure/aks-set-context@v3
-        with:
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Get Ingress Controller IP
-        id: ingress-ip
-        run: |
-          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          echo "Found Ingress IP: $INGRESS_IP"
-          echo "ip=$INGRESS_IP" >> $GITHUB_OUTPUT
+        id: get-ip
+        uses: ./.github/actions/get-aks-ingress-ip
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
-      - name: Compute preview host + URL + TLS secret
-        id: preview
-        env:
-          INGRESS_IP: ${{ steps.ingress-ip.outputs.ip }}
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          if [ -n "$INGRESS_IP" ]; then
-            IP_DASHED=$(echo "$INGRESS_IP" | tr '.' '-')
-            PREVIEW_HOST="api.preview-pr-${PR_NUMBER}.${IP_DASHED}.nip.io"
-            # CRITICAL: Must use HTTPS to avoid mixed content errors
-            # Frontend is served over HTTPS from Azure Static Web Apps
-            # Browsers block HTTP requests from HTTPS pages
-            # Ensure ingress uses cert-manager.io/cluster-issuer: letsencrypt-prod (not staging!)
-            PREVIEW_URL="https://${PREVIEW_HOST}"
-            TLS_SECRET="preview-pr-${PR_NUMBER}-tls"
-            echo "✅ Using dynamic Preview Host: ${PREVIEW_HOST} -> ${PREVIEW_URL}"
-          else
-            PREVIEW_URL=""
-            PREVIEW_HOST=""
-            TLS_SECRET=""
-            echo "⚠️ Ingress IP not found"
-          fi
-          echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
-          echo "preview_host=${PREVIEW_HOST}" >> $GITHUB_OUTPUT
-          echo "tls_secret=${TLS_SECRET}" >> $GITHUB_OUTPUT
+      - name: Compute Preview URLs
+        id: compute
+        uses: ./.github/actions/compute-preview-urls
+        with:
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          ingress-ip: ${{ steps.get-ip.outputs.ingress-ip }}
 
   update-overlay:
     name: Update Preview Overlay
@@ -252,25 +172,21 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Python with dependencies
+        uses: ./.github/actions/setup-kustomize
         with:
-          python-version: '3.x'
+          install-python: 'true'
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyyaml
-
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Azure ACR Login
+        uses: ./.github/actions/azure-acr-login
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
 
       - name: Set AKS Context
         uses: azure/aks-set-context@v3
@@ -280,189 +196,36 @@ jobs:
 
       - name: Get Ingress Controller IP
         id: ingress-ip
-        run: |
-          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          echo "Found Ingress IP: $INGRESS_IP"
-          echo "ip=$INGRESS_IP" >> $GITHUB_OUTPUT
+        uses: ./.github/actions/get-aks-ingress-ip
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
 
       - name: Update preview overlay with image tags
         id: overlay
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          IMAGE_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
-          ACR_SERVER: ${{ env.ACR_LOGIN_SERVER }}
-          INGRESS_IP: ${{ steps.ingress-ip.outputs.ip }}
-        run: |
-          OVERLAY_FILE="k8s/overlays/preview/kustomization.yaml"
-          
-          # Check if preview overlay exists
-          if [ ! -f "$OVERLAY_FILE" ]; then
-            echo "::error::Preview overlay not found at ${OVERLAY_FILE}"
-            echo "::error::Ensure k8s/overlays/preview/ exists in your PR branch"
-            exit 1
-          fi
-
-          # Fail early if IMAGE_TAG is empty - prevents committing empty newTag values
-          # and avoids Argo CD deploying images without tags.
-          if [ -z "${IMAGE_TAG}" ]; then
-            echo "::error::IMAGE_TAG is empty. Aborting to avoid committing empty tags into ${OVERLAY_FILE}"
-            echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-
-          # Debug: show the computed image tag
-          echo "Using IMAGE_TAG=${IMAGE_TAG}"
-          
-          # Update image tags in kustomization.yaml using Python script
-          python scripts/ci/generate_preview_kustomization.py \
-            --template scripts/ci/templates/preview-kustomization-template.yaml \
-            --output "$OVERLAY_FILE" \
-            --pr-number "${PR_NUMBER}" \
-            --image-tag "${IMAGE_TAG}" \
-            --acr-server "${ACR_SERVER}"
-          
-          # Use preview info from get-ingress job outputs
-          PREVIEW_URL="${{ needs.get-ingress.outputs.preview_url }}"
-          PREVIEW_HOST="${{ needs.get-ingress.outputs.preview_host }}"
-          TLS_SECRET="${{ needs.get-ingress.outputs.tls_secret }}"
-          if [ -n "$PREVIEW_URL" ]; then
-            echo "✅ Using Preview URL: ${PREVIEW_URL}"
-            # Pass preview details into the generator so it can substitute placeholders in patches
-            python scripts/ci/generate_preview_kustomization.py \
-              --template scripts/ci/templates/preview-kustomization-template.yaml \
-              --output "$OVERLAY_FILE" \
-              --pr-number "${PR_NUMBER}" \
-              --image-tag "${IMAGE_TAG}" \
-              --acr-server "${ACR_SERVER}" \
-              --preview-host "${PREVIEW_HOST}" \
-              --tls-secret "${TLS_SECRET}" || true
-          else
-            echo "⚠️ PREVIEW_API_URL not configured and Ingress IP not found"
-            echo "::warning::Backend connectivity may be broken"
-          fi
-
-          echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
-          echo "preview_host=${PREVIEW_HOST:-}" >> $GITHUB_OUTPUT
-          echo "tls_secret=${TLS_SECRET:-}" >> $GITHUB_OUTPUT
-          
-          echo "Updated preview overlay at ${OVERLAY_FILE}"
-          cat "$OVERLAY_FILE"
-
-      - name: Install kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: ./.github/actions/update-preview-overlay
         with:
-          kustomize-version: '5.8.0'
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
+          acr-server: ${{ env.ACR_LOGIN_SERVER }}
+          preview-host: ${{ needs.get-ingress.outputs.preview_host }}
+          tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
+          preview-url: ${{ needs.get-ingress.outputs.preview_url }}
 
       - name: Validate generated overlay (kustomize + dry-run)
-        run: |
-          set -eo pipefail
-          OVERLAY_FILE="k8s/overlays/preview/kustomization.yaml"
-          TMP_MANIFEST="/tmp/preview-manifests.yaml"
-          ERR_FILE="/tmp/kustomize.err"
-
-          echo "--- Git status / branch / commit ---"
-          git rev-parse --abbrev-ref HEAD || true
-          git status --porcelain -b || true
-          git log -1 --pretty=oneline || true
-
-          echo "--- Overlay file (post-generation) ---"
-          if [ -f "$OVERLAY_FILE" ]; then
-            echo "file size: $(wc -c < "$OVERLAY_FILE") bytes" || true
-            echo "first bytes (hex):"; if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$OVERLAY_FILE" || true; else head -c 32 "$OVERLAY_FILE" | od -An -t x1 || true; fi
-            cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
-          else
-            echo "(overlay file not found)"
-          fi
-
-          echo "--- Listing patch files (k8s/overlays/preview/patches) ---"
-          ls -la k8s/overlays/preview/patches || true
-          for f in k8s/overlays/preview/patches/*; do
-            echo "--- $f (first 200 lines) ---"
-            echo "first bytes (hex):"; if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$f" || true; else head -c 32 "$f" | od -An -t x1 || true; fi
-            cat -n "$f" | sed -n '1,200p' || true
-          done || true
-
-          echo "--- Show overlay file as committed in HEAD (if present) ---"
-          git show HEAD:$OVERLAY_FILE || echo "(no file in HEAD at path)"
-
-          echo "Building manifests with kustomize..."
-          if ! kustomize build k8s/overlays/preview > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
-            echo "::error::kustomize build FAILED for overlay 'preview'"
-            echo "--- kustomize stderr ---"
-            sed -n '1,200p' "$ERR_FILE" || true
-            echo "--- end kustomize stderr ---"
-
-            echo "--- Generated overlay file (again) ---"
-            if [ -f "$OVERLAY_FILE" ]; then
-              echo "file size: $(wc -c < "$OVERLAY_FILE") bytes" || true
-              echo "first bytes (hex):"; if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$OVERLAY_FILE" || true; else head -c 32 "$OVERLAY_FILE" | od -An -t x1 || true; fi
-              cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
-            else
-              echo "(overlay file not found)"
-            fi
-
-            echo "--- Listing patch files (k8s/overlays/preview/patches) ---"
-            ls -la k8s/overlays/preview/patches || true
-            for f in k8s/overlays/preview/patches/*; do
-              echo "--- $f (first 200 lines) ---"
-              echo "first bytes (hex):"; if command -v xxd >/dev/null 2>&1; then xxd -g 1 -l 32 "$f" || true; else head -c 32 "$f" | od -An -t x1 || true; fi
-              cat -n "$f" | sed -n '1,200p' || true
-            done || true
-
-            echo "Searching for 'group:' occurrences (common cause of 'unknown field \"group\"')"
-            grep -n "^\s*group:\s" "$OVERLAY_FILE" || true
-            grep -n "^\s*group:\s" k8s/overlays/preview/patches/* || true
-
-            echo "::error::kustomize build failed for overlay 'preview' - see log and files above for diagnostics"
-            exit 1
-          fi
-
-          echo "Checking YAML syntax by parsing manifests..."
-          python scripts/ci/parse_yaml.py "$TMP_MANIFEST"
-
-          echo "Performing server-side dry-run apply to validate against API server..."
-          if kubectl apply --server-dry-run=server -f "$TMP_MANIFEST"; then
-            echo "Server dry-run OK"
-          else
-            echo "::error::Server dry-run failed - printing manifest and exiting"
-            sed -n '1,200p' "$ERR_FILE" || true
-            cat -n "$OVERLAY_FILE" | sed -n '1,200p' || true
-            cat "$TMP_MANIFEST" | sed -n '1,200p' || true
-            exit 1
-          fi
+        uses: ./.github/actions/validate-kustomize-overlay
 
       - name: Commit and push overlay update
-        env:
-          IMAGE_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Sanity: ensure generated overlay contains a non-empty newTag
-          if grep -q "newTag: \"\"" k8s/overlays/preview/kustomization.yaml; then
-            echo "::error::Generated overlay has empty newTag - aborting commit"
-            echo "--- overlay ---"
-            cat k8s/overlays/preview/kustomization.yaml
-            echo "--- end overlay ---"
-            exit 1
-          fi
-
-          git add k8s/overlays/preview/
-          
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore(preview): update image tags for PR #${PR_NUMBER}
-            
-            Image tag: ${IMAGE_TAG}
-            Commit: ${{ github.event.pull_request.head.sha }}
-            
-            [skip ci]"
-            
-            git push origin ${{ github.event.pull_request.head.ref }}
-          fi
+        uses: ./.github/actions/commit-overlay-changes
+        with:
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+          pr-branch: ${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}
 
   # ---------------------------------------------------------------------------
   # Verify Deployment
@@ -487,179 +250,43 @@ jobs:
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Wait for Argo CD to sync
-        env:
-          NAMESPACE: preview-pr-${{ github.event.pull_request.number }}
-          EXPECTED_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
-        run: |
-          echo "Waiting for Argo CD to sync preview environment..."
-          echo "Expected image tag: ${EXPECTED_TAG}"
-          echo "Namespace: ${NAMESPACE}"
-          
-          # Wait up to 3 minutes for Argo CD to create/update the namespace
-          for i in {1..36}; do
-            if kubectl get namespace ${NAMESPACE} 2>/dev/null; then
-              echo "✅ Namespace ${NAMESPACE} exists"
-              break
-            fi
-            echo "  Attempt $i/36 - Namespace not found, waiting 5s..."
-            sleep 5
-          done
-          
-          if ! kubectl get namespace ${NAMESPACE} 2>/dev/null; then
-            echo "::error::Namespace ${NAMESPACE} was not created by Argo CD after 3 minutes"
-
-            # Try to gather Argo CD Application status for diagnostics
-            APP_NAME="preview-pr-${{ github.event.pull_request.number }}"
-            echo "Attempting to fetch Argo CD Application status for ${APP_NAME} (namespace: argocd)"
-            echo "--- Argo CD Application (yaml) ---"
-            kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o yaml || echo "No Argo CD application named ${APP_NAME} found in namespace 'argocd'"
-            echo "--- Argo CD application events / status (describe) ---"
-            kubectl describe application ${APP_NAME} -n argocd || true
-
-            echo "--- Argo CD applications matching preview-pr-${{ github.event.pull_request.number }} (all namespaces) ---"
-            kubectl get applications.argoproj.io --all-namespaces | grep "preview-pr-${{ github.event.pull_request.number }}" || true
-
-            exit 1
-          fi
+        uses: ./.github/actions/wait-for-argocd-sync
+        with:
+          namespace: preview-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          timeout-seconds: '180'
 
       - name: Verify API deployment image
-        env:
-          NAMESPACE: preview-pr-${{ github.event.pull_request.number }}
-          EXPECTED_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
-          REGISTRY: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-        run: |
-          echo "Waiting for API deployment to be ready..."
-          
-          # Wait up to 5 minutes for the deployment to exist and be ready
-          for i in {1..60}; do
-            if kubectl get deployment api -n ${NAMESPACE} 2>/dev/null; then
-              echo "✅ API deployment exists"
-              
-              # Get the current image
-              CURRENT_IMAGE=$(kubectl get deployment api -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[0].image}')
-              echo "Current image: ${CURRENT_IMAGE}"
-              echo "Expected: ${REGISTRY}/yt-summarizer-api:${EXPECTED_TAG}"
-              
-              # Check if it matches expected tag
-              if [[ "${CURRENT_IMAGE}" == "${REGISTRY}/yt-summarizer-api:${EXPECTED_TAG}" ]]; then
-                echo "✅ API deployment is using the correct image tag"
-                
-                # Wait for deployment to be ready
-                if kubectl rollout status deployment/api -n ${NAMESPACE} --timeout=120s; then
-                  echo "✅ API deployment is ready"
-                  exit 0
-                fi
-              else
-                echo "⚠️ Image tag mismatch - Argo CD may still be syncing"
-              fi
-            fi
-            
-            echo "  Attempt $i/60 - Waiting for deployment, 5s..."
-            sleep 5
-          done
-          
-          echo "::error::API deployment did not reach ready state with correct image after 5 minutes"
-          kubectl get deployment api -n ${NAMESPACE} -o yaml || true
-          exit 1
-
+        uses: ./.github/actions/verify-deployment-image
+        with:
+          namespace: preview-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          deployment-name: api
+          expected-tag: ${{ needs.check-concurrency.outputs.image_tag }}
       - name: Verify workers deployment image
-        env:
-          NAMESPACE: preview-pr-${{ github.event.pull_request.number }}
-          EXPECTED_TAG: ${{ needs.check-concurrency.outputs.image_tag }}
-          REGISTRY: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-        run: |
-          echo "Verifying worker deployments..."
-          
-          for WORKER in transcribe-worker summarize-worker embed-worker relationships-worker; do
-            echo "Checking ${WORKER}..."
-            
-            CURRENT_IMAGE=$(kubectl get deployment ${WORKER} -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[0].image}')
-            echo "  Current image: ${CURRENT_IMAGE}"
-            
-            if [[ "${CURRENT_IMAGE}" == "${REGISTRY}/yt-summarizer-workers:${EXPECTED_TAG}" ]]; then
-              echo "  ✅ ${WORKER} is using the correct image tag"
-            else
-              echo "  ::warning::${WORKER} image mismatch: ${CURRENT_IMAGE}"
-            fi
-          done
+        uses: ./.github/actions/verify-worker-deployments
+        with:
+          namespace: preview-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          expected-tag: ${{ needs.check-concurrency.outputs.image_tag }}
+          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+          fail-on-mismatch: 'false'
+
 
       - name: Run basic API health check
-        env:
-          NAMESPACE: preview-pr-${{ github.event.pull_request.number }}
-          API_URL: ${{ needs.update-overlay.outputs.preview_url }}
-        run: |
-          if [ -n "$API_URL" ]; then
-            echo "Running health check against ${API_URL}/health/live"
-            
-            # Try health check with retries
-            for i in {1..10}; do
-              if curl -sf "${API_URL}/health/live" | grep -q "ok"; then
-                echo "✅ API health check passed"
-                exit 0
-              fi
-              echo "  Attempt $i/10 - API not ready, waiting 10s..."
-              sleep 10
-            done
-            
-            echo "::warning::API health check failed after 10 attempts"
-            echo "This may be a transient issue - check logs in the pod"
-          else
-            echo "::warning::No API URL configured - skipping health check"
-          fi
+        if: needs.update-overlay.outputs.preview_url != ''
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ needs.update-overlay.outputs.preview_url }}/health/live
+          max-attempts: '10'
+          interval-seconds: '10'
+          timeout-seconds: '5'
+          expected-status: '200'
+          service-name: 'Preview API'
 
       - name: Verify API Certificate
-        env:
-          API_HOST: ${{ needs.get-ingress.outputs.preview_host }}
-        run: |
-          if [ -n "$API_HOST" ]; then
-            echo "Verifying certificate for ${API_HOST}"
-            
-            # Use openssl to check certificate chain and validity
-            CERT_OUTPUT=$(echo | openssl s_client -connect ${API_HOST}:443 -servername ${API_HOST} 2>/dev/null | openssl x509 -noout -text)
-            
-            if [ $? -ne 0 ]; then
-              echo "::error::Failed to retrieve certificate from ${API_HOST}"
-              exit 1
-            fi
-            
-            # Check if certificate is not expired
-            if echo "$CERT_OUTPUT" | grep -q "Not Before:" && echo "$CERT_OUTPUT" | grep -q "Not After:"; then
-              echo "✅ Certificate dates found"
-            else
-              echo "::error::Certificate missing validity dates"
-              exit 1
-            fi
-            
-            # Check for Let's Encrypt R3 intermediate (common issue we've seen)
-            if echo "$CERT_OUTPUT" | grep -q "Issuer: C=US, O=Let's Encrypt, CN=R3"; then
-              echo "✅ Let's Encrypt R3 intermediate certificate detected"
-            else
-              echo "::warning::Let's Encrypt R3 intermediate not found in certificate chain"
-              echo "This may indicate an incomplete certificate chain"
-            fi
-            
-            # Check certificate validity period
-            NOT_BEFORE=$(echo "$CERT_OUTPUT" | grep "Not Before:" | sed 's/.*Not Before: //')
-            NOT_AFTER=$(echo "$CERT_OUTPUT" | grep "Not After:" | sed 's/.*Not After: //')
-            
-            echo "Certificate valid from: ${NOT_BEFORE}"
-            echo "Certificate valid until: ${NOT_AFTER}"
-            
-            # Check if certificate is currently valid
-            CURRENT_TIME=$(date +%s)
-            NOT_AFTER_EPOCH=$(date -d "$NOT_AFTER" +%s 2>/dev/null || date -j -f "%b %d %H:%M:%S %Y %Z" "$NOT_AFTER" +%s 2>/dev/null)
-            
-            if [ -n "$NOT_AFTER_EPOCH" ] && [ $CURRENT_TIME -lt $NOT_AFTER_EPOCH ]; then
-              echo "✅ Certificate is not expired"
-            else
-              echo "::error::Certificate appears to be expired or invalid date format"
-              exit 1
-            fi
-            
-            echo "✅ Certificate verification passed"
-          else
-            echo "::warning::No API host configured - skipping certificate verification"
-          fi
+        uses: ./.github/actions/verify-tls-certificate
+        with:
+          host: ${{ needs.get-ingress.outputs.preview_host }}
 
   # ---------------------------------------------------------------------------
   # Deploy Frontend Preview to SWA
@@ -672,19 +299,15 @@ jobs:
       frontend_preview_url: ${{ steps.deploy.outputs.static_web_app_url }}
     steps:
       - name: Verify SWA token is configured
-        env:
-          SWA_TOKEN: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-        run: |
-          if [ -z "$SWA_TOKEN" ]; then
-            echo "::error::SWA_DEPLOYMENT_TOKEN secret is not configured. Please add it to repository secrets."
-            exit 1
-          fi
-          echo "✅ SWA deployment token is configured"
+        uses: ./.github/actions/verify-secret
+        with:
+          secret-name: 'SWA_DEPLOYMENT_TOKEN'
+          secret-value: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
 
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -693,18 +316,11 @@ jobs:
           working-directory: apps/web
 
       - name: Build frontend for preview
-        working-directory: apps/web
-        env:
-          # Set the backend API URL directly (SWA doesn't support Next.js rewrites)
-          NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url }}
-          NEXT_PUBLIC_ENVIRONMENT: preview
-        run: |
-          if [ -z "$NEXT_PUBLIC_API_URL" ]; then
-            echo "::warning::Building frontend without backend API URL"
-          else
-            echo "Building frontend with API URL: $NEXT_PUBLIC_API_URL"
-          fi
-          npm run build
+        uses: ./.github/actions/build-frontend
+        with:
+          api-url: ${{ needs.get-ingress.outputs.preview_url }}
+          environment: 'preview'
+          working-directory: 'apps/web'
 
       - name: Deploy to SWA staging environment
         id: deploy
@@ -716,6 +332,7 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
+
           action: upload
           # For Next.js hybrid, app_location is the Next.js app root
           app_location: apps/web
@@ -738,93 +355,23 @@ jobs:
     needs: [update-overlay, verify-deployment, deploy-frontend-preview]
     steps:
       - name: Post preview URL to PR
-        uses: actions/github-script@v7
+        uses: ./.github/actions/post-preview-comment
         with:
-          script: |
-            const backendUrl = '${{ needs.get-ingress.outputs.preview_url }}';
-            const frontendUrl = '${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}' || 'Deploying...';
-            const imageTag = '${{ needs.update-overlay.outputs.image_tag }}';
-            const sha = '${{ github.event.pull_request.head.sha }}'.substring(0, 7);
-            const prNumber = ${{ github.event.pull_request.number }};
-            
-            // Find and update existing comment or create new one
-            const { data: comments } = await github.rest.issues.listComments({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            });
-            
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
-              comment.body.includes('Preview Environment')
-            );
-            
-            const frontendLink = frontendUrl.startsWith('http') 
-              ? `[${frontendUrl}](${frontendUrl})` 
-              : frontendUrl;
-            
-            const body = `## 🚀 Preview Environment
-
-            | Property | Value |
-            |----------|-------|
-            | **Status** | ✅ Deployed |
-            | **Frontend** | ${frontendLink} |
-            | **Backend API** | [${backendUrl}](${backendUrl}) |
-            | **API Health** | [${backendUrl}/health](${backendUrl}/health) |
-            | **Image Tag** | \`${imageTag}\` |
-            | **Commit** | \`${sha}\` |
-            | **Updated** | ${new Date().toISOString()} |
-
-            > 🔄 This preview will be automatically updated when you push new commits.
-            > 🗑️ Preview will be cleaned up automatically when this PR is closed or merged.
-            
-            ---
-            <details>
-            <summary>🔧 Architecture Details</summary>
-            
-            **Frontend**: Deployed to Azure Static Web Apps staging environment
-            **Backend**: Deployed to AKS via Argo CD ApplicationSet with Pull Request Generator
-            
-            The overlay lives in your PR branch at \`k8s/overlays/preview/\`.
-            
-            Application name: \`preview-pr-${prNumber}\`
-            Namespace: \`preview-pr-${prNumber}\`
-            </details>`;
-            
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                comment_id: botComment.id,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
-            }
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          preview-url: ${{ needs.get-ingress.outputs.preview_url }}
+          image-tag: ${{ needs.update-overlay.outputs.image_tag }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+          frontend-url: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}
 
       - name: Create deployment summary
-        run: |
-          echo "## 🚀 Preview Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **PR** | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Preview URL** | ${{ needs.get-ingress.outputs.preview_url }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Image Tag** | \`${{ needs.update-overlay.outputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Commit** | \`${{ github.event.pull_request.head.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
-          echo "- [Preview Site](${{ needs.get-ingress.outputs.preview_url }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ℹ️ Architecture" >> $GITHUB_STEP_SUMMARY
-          echo "This preview uses Argo CD ApplicationSet with Pull Request Generator." >> $GITHUB_STEP_SUMMARY
-          echo "The overlay at \`k8s/overlays/preview/\` lives in your PR branch." >> $GITHUB_STEP_SUMMARY
-          echo "Argo CD automatically discovers open PRs and creates preview environments." >> $GITHUB_STEP_SUMMARY
+        uses: ./.github/actions/create-preview-summary
+        with:
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          preview-url: ${{ needs.get-ingress.outputs.preview_url }}
+          image-tag: ${{ needs.update-overlay.outputs.image_tag }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+
 
   # ---------------------------------------------------------------------------
   # E2E Tests on Preview Environment
@@ -852,102 +399,51 @@ jobs:
         working-directory: apps/web
         run: npm ci
 
-      - name: Install Playwright browsers
-        working-directory: apps/web
-        run: npx playwright install --with-deps chromium
+      - name: Wait for ArgoCD sync
+        uses: ./.github/actions/wait-for-argocd-sync
+        with:
+          namespace: preview-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          timeout-seconds: '60'
 
-      - name: Wait for preview environment to be ready
-        env:
-          PREVIEW_URL: ${{ needs.get-ingress.outputs.preview_url }}
-          FRONTEND_URL: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}
-        run: |
-          # Determine which URL to use for frontend
-          if [ -n "$FRONTEND_URL" ] && [ "$FRONTEND_URL" != "" ]; then
-            FRONTEND_CHECK_URL="$FRONTEND_URL"
-          else
-            FRONTEND_CHECK_URL="$PREVIEW_URL"
-          fi
-          
-          echo "Waiting for preview environment to be ready..."
-          echo "Frontend URL: $FRONTEND_CHECK_URL"
-          echo "API URL: $PREVIEW_URL"
-          
-          # Wait for Argo CD to sync (allow up to 5 minutes)
-          echo "Waiting 60 seconds for Argo CD to sync..."
-          sleep 60
-          
-          # Wait for API to be ready
-          for i in {1..20}; do
-            if curl -sf "${PREVIEW_URL}/health/live" > /dev/null 2>&1; then
-              echo "✓ API is ready"
-              break
-            fi
-            echo "  Attempt $i/20 - API not ready, waiting 15s..."
-            sleep 15
-          done
+      - name: Wait for API to be ready
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ needs.get-ingress.outputs.preview_url }}/health/live
+          max-attempts: '20'
+          interval-seconds: '15'
+          timeout-seconds: '5'
+          expected-status: '200'
+          service-name: 'Preview API (E2E)'
 
       - name: Run E2E tests
         id: run-tests
-        working-directory: apps/web
+        uses: ./.github/actions/run-playwright-tests
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url || needs.get-ingress.outputs.preview_url }}
           NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url }}
           API_URL: ${{ needs.get-ingress.outputs.preview_url }}
-        run: npx playwright test --reporter=html
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-pr-${{ github.event.pull_request.number }}
+          name: playwright-report-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
           path: apps/web/playwright-report/
           retention-days: 7
 
       - name: Comment E2E results on PR
         if: always()
-        uses: actions/github-script@v7
+        uses: ./.github/actions/post-e2e-results
         with:
-          script: |
-            const status = '${{ steps.run-tests.outcome }}' === 'success' ? '✅ Passed' : '❌ Failed';
-            const emoji = '${{ steps.run-tests.outcome }}' === 'success' ? '✅' : '❌';
-            const reportUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            
-            // Find existing E2E comment to update
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            
-            const e2eComment = comments.find(c => 
-              c.user.type === 'Bot' && 
-              c.body.includes('E2E Test Results')
-            );
-            
-            const body = `## ${emoji} E2E Test Results\n\n` +
-              `| Property | Value |\n` +
-              `|----------|-------|\n` +
-              `| **Status** | ${status} |\n` +
-              `| **Environment** | ${{ needs.get-ingress.outputs.preview_url }} |\n` +
-              `| **Commit** | \`${{ github.event.pull_request.head.sha }}\` |\n\n` +
-              `[📊 View Playwright Report](${reportUrl})`;
-            
-            if (e2eComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: e2eComment.id,
-                body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body
-              });
-            }
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          test-outcome: ${{ steps.run-tests.outcome }}
+          preview-url: ${{ needs.get-ingress.outputs.preview_url }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+          run-id: ${{ github.run_id }}
+          repository: ${{ github.repository }}
 
   # ---------------------------------------------------------------------------
   # Preview Status Check - Required Check for Merge
@@ -963,73 +459,12 @@ jobs:
     if: always()
     steps:
       - name: Check preview pipeline status
-        env:
-          API_URL_CONFIGURED: ${{ needs.get-ingress.outputs.preview_url }}
-        run: |
-          echo "## Preview Pipeline Status" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # If no code changes, mark as success (docs-only PR)
-          if [ "${{ needs.detect-changes.outputs.has_code_changes }}" != "true" ]; then
-            echo "📝 No code changes detected - docs-only PR"
-            echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-            echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Detect Changes | ✅ Docs-only |" >> $GITHUB_STEP_SUMMARY
-            exit 0
-          fi
-          
-          # Determine E2E test status display
-          E2E_RESULT="${{ needs.e2e-tests.result }}"
-          if [ -z "$API_URL_CONFIGURED" ]; then
-            E2E_STATUS="⏭️ Skipped (no API URL)"
-            E2E_REQUIRED=false
-          elif [ "$E2E_RESULT" = "success" ]; then
-            E2E_STATUS="✅ Passed"
-            E2E_REQUIRED=true
-          elif [ "$E2E_RESULT" = "skipped" ]; then
-            E2E_STATUS="⏭️ Skipped"
-            E2E_REQUIRED=false
-          else
-            E2E_STATUS="❌ Failed"
-            E2E_REQUIRED=true
-          fi
-          
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Update Overlay | ${{ needs.update-overlay.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Verify Deployment | ${{ needs.verify-deployment.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Deploy Frontend | ${{ needs.deploy-frontend-preview.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| E2E Tests | ${E2E_STATUS} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Required jobs must succeed only if the PR contains code changes
-          if [ "${{ needs.detect-changes.outputs.has_code_changes }}" = "true" ] && [ "${{ needs.update-overlay.result }}" != "success" ]; then
-            echo "::error::Update overlay failed"
-            exit 1
-          fi
+        uses: ./.github/actions/check-preview-status
+        with:
+          has-code-changes: ${{ needs.detect-changes.outputs.has_code_changes }}
+          update-overlay-result: ${{ needs.update-overlay.result }}
+          verify-deployment-result: ${{ needs.verify-deployment.result }}
+          deploy-frontend-result: ${{ needs.deploy-frontend-preview.result }}
+          e2e-tests-result: ${{ needs.e2e-tests.result }}
+          api-url-configured: ${{ needs.get-ingress.outputs.preview_url }}
 
-          if [ "${{ needs.detect-changes.outputs.has_code_changes }}" = "true" ] && [ "${{ needs.verify-deployment.result }}" != "success" ]; then
-            echo "::error::Deployment verification failed - pods may not be running correct image"
-            exit 1
-          fi
-
-          if [ "${{ needs.detect-changes.outputs.has_code_changes }}" = "true" ] && [ "${{ needs.deploy-frontend-preview.result }}" != "success" ]; then
-            echo "::error::Frontend deployment failed"
-            exit 1
-          fi
-          
-          # E2E tests only required if API URL is configured
-          if [ "$E2E_REQUIRED" = "true" ] && [ "$E2E_RESULT" != "success" ]; then
-            echo "::error::E2E tests failed"
-            exit 1
-          fi
-          
-          if [ -z "$API_URL_CONFIGURED" ]; then
-            echo "⚠️ Preview deployed without backend API" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "To enable full preview functionality:" >> $GITHUB_STEP_SUMMARY
-            echo "1. Set \`PREVIEW_API_URL\` in repository variables" >> $GITHUB_STEP_SUMMARY
-            echo "2. Re-run this workflow" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "✅ Preview pipeline completed successfully!" >> $GITHUB_STEP_SUMMARY

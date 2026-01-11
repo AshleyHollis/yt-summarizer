@@ -1,0 +1,21 @@
+name: 'Verify CI Workflow Passed'
+description: 'Verifies that the CI workflow completed successfully (for workflow_run triggers)'
+inputs:
+  workflow-conclusion:
+    description: 'Conclusion of the workflow run'
+    required: true
+  workflow-name:
+    description: 'Name of the workflow that triggered this run'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Verify workflow passed
+      shell: bash
+      run: |
+        echo "Triggered by workflow_run for workflow: ${{ inputs.workflow-name }}"
+        if [ "${{ inputs.workflow-conclusion }}" != "success" ]; then
+          echo "::error::CI workflow did not pass. Preview deployment blocked."
+          exit 1
+        fi
+        echo "✅ CI workflow passed successfully"

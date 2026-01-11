@@ -1,0 +1,47 @@
+name: Check Preview Concurrency
+description: Check if preview deployment is allowed based on concurrent preview limit
+
+inputs:
+  github-token:
+    description: GitHub token for API access
+    required: true
+  max-previews:
+    description: Maximum number of concurrent previews allowed
+    required: false
+    default: '10'
+  repository:
+    description: GitHub repository (owner/repo)
+    required: true
+  pr-number:
+    description: Pull request number
+    required: true
+
+outputs:
+  can_deploy:
+    description: Whether the preview can be deployed
+    value: ${{ steps.check.outputs.can_deploy }}
+
+runs:
+  using: composite
+  steps:
+    - name: Count active previews
+      id: check
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        # Count open PRs (each gets a preview via ApplicationSet PR Generator)
+        OPEN_PRS=$(gh api repos/${{ inputs.repository }}/pulls --jq 'length')
+        
+        echo "Open PRs: ${OPEN_PRS}"
+        echo "Max previews: ${{ inputs.max-previews }}"
+        
+        # This PR is already counted in open PRs, so we compare with <=
+        if [ "$OPEN_PRS" -le "${{ inputs.max-previews }}" ]; then
+          echo "Preview slot available (${OPEN_PRS}/${{ inputs.max-previews }})"
+          echo "can_deploy=true" >> $GITHUB_OUTPUT
+        else
+          echo "::warning::Preview limit reached (${OPEN_PRS}/${{ inputs.max-previews }})"
+          echo "::warning::This PR will not get a preview environment"
+          echo "can_deploy=false" >> $GITHUB_OUTPUT
+        fi

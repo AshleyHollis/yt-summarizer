@@ -1,0 +1,50 @@
+name: 'Cleanup ACR Images'
+description: 'Deletes preview environment images from Azure Container Registry'
+inputs:
+  acr-name:
+    description: 'Azure Container Registry name'
+    required: true
+  pr-number:
+    description: 'Pull request number'
+    required: true
+  repositories:
+    description: 'Comma-separated list of repositories to clean (e.g., "yt-summarizer-api,yt-summarizer-workers")'
+    required: false
+    default: 'yt-summarizer-api,yt-summarizer-workers'
+runs:
+  using: composite
+  steps:
+    - name: Delete PR images from ACR
+      shell: bash
+      run: |
+        echo "Cleaning up images for PR #${{ inputs.pr-number }}..."
+        
+        IFS=',' read -ra REPOS <<< "${{ inputs.repositories }}"
+        for REPO in "${REPOS[@]}"; do
+          echo "Checking repository: $REPO"
+          
+          # Get tags with pr-N- prefix
+          TAGS=$(az acr repository show-tags \
+            --name ${{ inputs.acr-name }} \
+            --repository "$REPO" \
+            --query "[?starts_with(@, 'pr-${{ inputs.pr-number }}-')]" \
+            --output tsv 2>/dev/null || echo "")
+          
+          if [ -z "$TAGS" ]; then
+            echo "  No images found for PR #${{ inputs.pr-number }} in $REPO"
+            continue
+          fi
+          
+          # Delete each tag
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              echo "  Deleting $REPO:${tag}"
+              az acr repository delete \
+                --name ${{ inputs.acr-name }} \
+                --image "$REPO:${tag}" \
+                --yes
+            fi
+          done <<< "$TAGS"
+        done
+        
+        echo "✅ Image cleanup complete"

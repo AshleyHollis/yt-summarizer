@@ -1,0 +1,19 @@
+name: 'Export Image Tag'
+description: 'Exports an image tag to GITHUB_OUTPUT for cross-job propagation'
+inputs:
+  image-tag:
+    description: 'Image tag to export'
+    required: true
+outputs:
+  image_tag:
+    description: 'Exported image tag'
+    value: ${{ steps.export.outputs.image_tag }}
+runs:
+  using: composite
+  steps:
+    - name: Export image tag
+      id: export
+      shell: bash
+      run: |
+        echo "image_tag=${{ inputs.image-tag }}" >> $GITHUB_OUTPUT
+        echo "Exported image tag: ${{ inputs.image-tag }}"

@@ -1,0 +1,29 @@
+name: Validate Terraform Configuration
+description: Initializes and validates Terraform configuration
+
+inputs:
+  working-directory:
+    description: Directory containing Terraform configuration
+    required: true
+  backend-config:
+    description: Whether to initialize with backend configuration
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Terraform Init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ "${{ inputs.backend-config }}" = "true" ]; then
+          terraform init -input=false
+        else
+          terraform init -backend=false
+        fi
+
+    - name: Terraform Validate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: terraform validate -no-color

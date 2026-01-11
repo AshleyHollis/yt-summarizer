@@ -1,0 +1,45 @@
+name: Wait for CI Workflow
+description: Wait for CI workflow to complete successfully before proceeding with deployment
+
+inputs:
+  github-token:
+    description: GitHub token for API access
+    required: true
+  check-name:
+    description: Name of the CI check to wait for
+    required: false
+    default: 'CI Status'
+  commit-sha:
+    description: Commit SHA to check
+    required: true
+  timeout-seconds:
+    description: Maximum time to wait in seconds
+    required: false
+    default: '900'
+  interval-seconds:
+    description: Interval between checks in seconds
+    required: false
+    default: '30'
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for CI workflow
+      uses: fountainhead/action-wait-for-check@v1.2.0
+      id: wait-for-ci
+      shell: bash
+      with:
+        token: ${{ inputs.github-token }}
+        checkName: ${{ inputs.check-name }}
+        ref: ${{ inputs.commit-sha }}
+        timeoutSeconds: ${{ inputs.timeout-seconds }}
+        intervalSeconds: ${{ inputs.interval-seconds }}
+
+    - name: Verify CI passed
+      shell: bash
+      run: |
+        if [ "${{ steps.wait-for-ci.outputs.conclusion }}" != "success" ]; then
+          echo "::error::CI workflow did not pass. Preview deployment blocked."
+          exit 1
+        fi
+        echo "✅ CI workflow passed successfully"

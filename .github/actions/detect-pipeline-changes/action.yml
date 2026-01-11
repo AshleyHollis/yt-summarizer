@@ -1,0 +1,39 @@
+name: Detect Pipeline Changes
+description: Detects which parts of the codebase have changed to optimize pipeline execution
+
+outputs:
+  changed_areas:
+    description: JSON array of changed areas
+    value: ${{ steps.detect.outputs.changed_areas }}
+  has_code_changes:
+    description: Whether code changes exist
+    value: ${{ steps.detect.outputs.has_code_changes }}
+  stage_test_shared:
+    description: Whether to run shared package tests
+    value: ${{ steps.detect.outputs.stage_test_shared }}
+  stage_test_api:
+    description: Whether to run API tests
+    value: ${{ steps.detect.outputs.stage_test_api }}
+  stage_test_workers:
+    description: Whether to run worker tests
+    value: ${{ steps.detect.outputs.stage_test_workers }}
+  stage_test_frontend:
+    description: Whether to run frontend tests
+    value: ${{ steps.detect.outputs.stage_test_frontend }}
+  stage_build_images:
+    description: Whether to build Docker images
+    value: ${{ steps.detect.outputs.stage_build_images }}
+  stage_validate_terraform:
+    description: Whether to validate Terraform
+    value: ${{ steps.detect.outputs.stage_validate_terraform }}
+  stage_validate_kubernetes:
+    description: Whether to validate Kubernetes manifests
+    value: ${{ steps.detect.outputs.stage_validate_kubernetes }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect changes
+      id: detect
+      shell: pwsh
+      run: .\scripts\ci\detect-changes-v2.ps1 -OutputFormat github-actions

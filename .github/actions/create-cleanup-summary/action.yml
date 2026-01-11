@@ -1,0 +1,28 @@
+name: 'Create Cleanup Summary'
+description: 'Creates a GitHub Actions step summary for preview cleanup'
+inputs:
+  pr-number:
+    description: 'Pull request number'
+    required: true
+  pr-merged:
+    description: 'Whether the PR was merged (true/false)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Create cleanup summary
+      shell: bash
+      run: |
+        echo "## 🗑️ Preview Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **PR** | #${{ inputs.pr-number }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Merged** | ${{ inputs.pr-merged }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ℹ️ Automatic Cleanup" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "With Argo CD ApplicationSet using Pull Request Generator:" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Application deleted automatically when PR closes" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Namespace pruned automatically" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ No overlay files to delete (they lived in PR branch)" >> $GITHUB_STEP_SUMMARY
