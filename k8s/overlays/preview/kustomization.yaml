@@ -2,6 +2,7 @@
 # PR: #4
 # Image Tag: pr-4-afb9a26
 # Updated: 2026-01-11T06:15:11Z
+# Test change to trigger pipeline redeploy on K8s changes
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
