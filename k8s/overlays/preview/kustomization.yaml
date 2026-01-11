@@ -1,8 +1,8 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #4
-# Image Tag: pr-4-2ccc0f3
-# Commit: 2ccc0f36773b95e979d91a38a5585fa0f4781243
-# Updated: 2026-01-11T10:07:00Z
+# Image Tag: pr-4-6efe315
+# Commit: 6efe3155492f4dd59087202dc511e05b2bfde2e3
+# Updated: 2026-01-11T10:22:25Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -28,8 +28,8 @@ images:
   - 
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: pr-4-2ccc0f3
+    newTag: pr-4-6efe315
   - 
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: pr-4-2ccc0f3
+    newTag: pr-4-6efe315
