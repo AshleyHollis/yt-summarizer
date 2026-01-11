@@ -54,48 +54,48 @@ This modular approach allows for:
     swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
 ```
 
-### 2. **Scheduled Cleanup of Stale Environments** (Safety Net)
+### 2. **Scheduled Cleanup Detection** (Reporting Only)
 
 **Workflow:** [`.github/workflows/swa-cleanup-scheduled.yml`](.github/workflows/swa-cleanup-scheduled.yml)
 
 **Trigger:** 
 - Daily at 2 AM UTC (cron schedule)
-- Manual dispatch with dry-run option
+- Manual dispatch available
 
 **How it works:**
 - Queries GitHub API for all open PRs
 - Finds recently closed PRs (last 100)
-- Identifies environments from PRs closed >1 hour ago
-- Uses `cleanup-stale-swa-environments` composite action to perform cleanup
-- Initiates deletion for each stale environment
+- Identifies environments from PRs closed >7 days ago
+- **Reports findings** (does not delete)
+- Creates GitHub issue with cleanup instructions
 
 **Benefits:**
-- Catches any environments missed by PR close trigger
-- Provides visibility into environment usage
-- Manual trigger allows on-demand cleanup
-- Dry-run mode for safety
-- Actually deletes stale environments (not just reports)
+- Provides weekly visibility into stale environments
+- Identifies which PRs need to be closed
+- No risk of accidental deletions
+- Manual trigger allows on-demand reports
+
+**⚠️ LIMITATION:** Cannot automatically delete due to Azure SWA API constraints.
 
 **Usage:**
 ```bash
 # Manual trigger from GitHub UI
 # Actions > SWA Cleanup (Scheduled) > Run workflow
-# Toggle "Dry run mode" as needed
+# View report in job output
 ```
 
 **Code:**
 ```yaml
-- name: Find and cleanup stale SWA environments
-  uses: ./.github/actions/cleanup-stale-swa-environments
+- name: Find stale SWA environments
+  uses: ./.github/actions/find-stale-prs
+  id: find-stale
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
-    swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-    dry-run: ${{ github.event.inputs.dry-run || 'false' }}
-    min-age-hours: '1'
+    min-age-hours: '168'  # 7 days
     max-prs-to-check: '100'
 ```
 
-### 3. **Pre-Deployment Cleanup** (Proactive)
+### 3. **Pre-Deployment Check** (Detection Only)
 
 **Workflow:** [`.github/workflows/preview.yml`](.github/workflows/preview.yml)
 
@@ -103,26 +103,28 @@ This modular approach allows for:
 
 **How it works:**
 - Runs before attempting to deploy new environment
-- Uses `cleanup-stale-swa-environments` composite action
-- Actually deletes stale environments from closed PRs
-- Makes room for the new deployment
+- Uses `find-stale-prs` composite action to identify stale environments
+- **Reports** stale environments with clear instructions
+- **Does NOT delete** (Azure SWA API limitations)
 
 **Benefits:**
-- Proactively prevents "maximum environments" errors
-- Ensures deployment succeeds by making room first
-- Uses the same composite action as scheduled cleanup (DRY principle)
-- Automatic, no manual intervention needed
+- Early warning before deployment fails
+- Provides actionable guidance for manual cleanup
+- Shows which PRs need to be closed
+
+**Limitations:**
+- ⚠️ Cannot automatically delete SWA environments
+- Azure SWA environments can only be deleted via:
+  1. PR close event (triggers Azure SWA deploy action with `action: close`)
+  2. Manual deletion in Azure Portal
 
 **Code:**
 ```yaml
-- name: Find and cleanup stale SWA environments
-  uses: ./.github/actions/cleanup-stale-swa-environments
+- name: Check for stale SWA environments
+  uses: ./.github/actions/find-stale-prs
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
-    swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-    dry-run: 'false'
     min-age-hours: '1'
-    max-prs-to-check: '50'
 ```
 
 ## Implementation Details
@@ -221,23 +223,28 @@ az staticwebapp environment list \
 
 ### Deployment Still Fails with "Maximum Environments" Error
 
-**Possible causes:**
-1. Cleanup workflow didn't run (check workflow runs)
-2. Cleanup failed silently (check job logs)
-3. Stale environments from before cleanup was implemented
-
-**Resolution:**
+**Immediate fix:**
 ```bash
-# 1. Check current environment count
-az staticwebapp environment list \
-  --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd
+# Option 1: Close stale PRs (triggers automatic cleanup)
+gh pr close <PR_NUMBER>
 
-# 2. Run scheduled cleanup manually (dry-run first)
-# GitHub Actions > SWA Cleanup (Scheduled) > Run workflow
-
-# 3. If still at limit, manually delete oldest environments via Azure Portal
+# Option 2: Manual deletion via Azure Portal
+# 1. Navigate to: portal.azure.com
+# 2. Find your Static Web App resource
+# 3. Go to: Environments
+# 4. Delete environments for closed PRs
 ```
+
+**Why can't we auto-delete?**
+- Azure SWA environments are tied to PR context
+- The `Azure/static-web-apps-deploy` action with `action: close` only works when run in PR context
+- We cannot call this action for other PRs from a different workflow context
+- The SWA management API requires complex authentication that the deployment token doesn't support
+
+**Long-term solution:**
+- Keep PRs closed promptly after merging
+- Use the scheduled cleanup report to identify stale environments
+- Manually clean up orphaned environments monthly
 
 ### Cleanup Workflow Fails
 

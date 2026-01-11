@@ -1,8 +1,13 @@
 # =============================================================================
-# Scheduled SWA Environment Cleanup
+# Scheduled SWA Environment Detection
 # =============================================================================
-# Runs daily to clean up stale Azure Static Web Apps staging environments
+# Runs daily to detect stale Azure Static Web Apps staging environments
 # for PRs that have been closed/merged
+#
+# NOTE: Cannot automatically delete environments due to Azure SWA API limitations.
+# Environments can only be deleted via:
+# 1. PR close event (triggers preview-cleanup.yml)
+# 2. Manual deletion in Azure Portal
 
 name: SWA Cleanup (Scheduled)
 
@@ -11,12 +16,6 @@ on:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
   workflow_dispatch:
-    inputs:
-      dry-run:
-        description: 'Dry run mode (no actual deletion)'
-        required: false
-        type: boolean
-        default: true
 
 permissions:
   id-token: write
@@ -24,18 +23,49 @@ permissions:
   pull-requests: read
 
 jobs:
-  cleanup-stale-environments:
-    name: Cleanup Stale SWA Environments
+  detect-stale-environments:
+    name: Detect Stale SWA Environments
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Find and cleanup stale SWA environments
-        uses: ./.github/actions/cleanup-stale-swa-environments
+      - name: Find stale PRs
+        id: find-stale
+        uses: ./.github/actions/find-stale-prs
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          dry-run: ${{ github.event.inputs.dry-run || 'false' }}
-          min-age-hours: '1'
+          min-age-hours: '168'  # 7 days
           max-prs-to-check: '100'
+      
+      - name: Report stale environments
+        if: steps.find-stale.outputs.stale-count != '0'
+        run: |
+          echo "🔍 Stale SWA Environment Report"
+          echo "================================"
+          echo ""
+          echo "📊 Found ${{ steps.find-stale.outputs.stale-count }} stale environment(s)"
+          echo ""
+          echo "📋 Stale PRs:"
+          echo "${{ steps.find-stale.outputs.stale-prs }}"
+          echo ""
+          echo "💡 Cleanup Instructions:"
+          echo "1. Close stale PRs (triggers automatic cleanup):"
+          echo "   gh pr close <PR_NUMBER>"
+          echo ""
+          echo "2. Or manually delete in Azure Portal:"
+          echo "   - Navigate to portal.azure.com"
+          echo "   - Find Static Web App resource"
+          echo "   - Go to: Environments"
+          echo "   - Delete environments for closed PRs"
+          echo ""
+          echo "⚠️  Why can't we auto-delete?"
+          echo "   Azure SWA environments can only be deleted via:"
+          echo "   - PR close event (GitHub context required)"
+          echo "   - Azure Portal (manual)"
+      
+      - name: No stale environments found
+        if: steps.find-stale.outputs.stale-count == '0'
+        run: |
+          echo "✅ No stale SWA environments found"
+          echo "All environments are associated with active PRs"

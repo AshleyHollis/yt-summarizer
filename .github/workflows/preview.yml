@@ -361,14 +361,48 @@ jobs:
           environment: 'preview'
           working-directory: 'apps/web'
 
-      - name: Find and cleanup stale SWA environments
-        uses: ./.github/actions/cleanup-stale-swa-environments
+      - name: Check for stale SWA environments
+        id: check-stale
+        continue-on-error: true
+        uses: ./.github/actions/find-stale-prs
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          dry-run: 'false'
           min-age-hours: '1'
           max-prs-to-check: '50'
+
+      - name: Report stale environments (manual cleanup needed)
+        if: steps.check-stale.outputs.stale-count != '0'
+        run: |
+          echo "⚠️  Found ${{ steps.check-stale.outputs.stale-count }} stale SWA environment(s)"
+          echo "💡 Stale PRs: ${{ steps.check-stale.outputs.stale-prs }}"
+          echo ""
+          echo "To free up SWA environment slots, please:"
+          echo "1. Close the stale PRs listed above (this triggers automatic cleanup), OR"
+          echo "2. Manually delete environments in Azure Portal:"
+          echo "   - Go to your Static Web App resource"
+          echo "   - Navigate to 'Environments'"
+          echo "   - Delete environments for the PRs listed above"
+          echo ""
+          
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ⚠️ Stale SWA Environments Detected
+          
+          **Found:** ${{ steps.check-stale.outputs.stale-count }} stale environment(s)  
+          **PR Numbers:** ${{ steps.check-stale.outputs.stale-prs }}
+          
+          ### Action Required
+          
+          If deployment fails due to environment limit, clean up using one of these methods:
+          
+          1. **Close the stale PRs** (triggers automatic cleanup)
+          2. **Manual cleanup in Azure Portal:**
+             - Go to your Static Web App resource
+             - Navigate to **Environments**
+             - Delete environments for PRs: ${{ steps.check-stale.outputs.stale-prs }}
+          
+          > Note: SWA environments can only be deleted via PR close events or manual deletion in Azure Portal.
+          > Pre-deployment cleanup is not possible due to Azure SWA API limitations.
+          EOF
 
       - name: Deploy to SWA staging environment
         id: deploy

@@ -205,6 +205,54 @@ All three cleanup scenarios now use the same core logic:
 - ✅ **Clear Naming** - Action names describe exactly what they do
 - ✅ **Focused Inputs/Outputs** - Each action has minimal, clear interface
 
+## Critical Limitation Discovered
+
+### ⚠️ Azure SWA Environments Cannot Be Deleted Programmatically
+
+After implementation and testing, we discovered a fundamental limitation:
+
+**Problem:** The `cleanup-stale-swa-environments` action was reporting success ("Cleanup dispatched", "Cleanup initiated") but **zero environments were actually deleted in Azure**.
+
+**Root Cause:**
+1. The action was sending `repository_dispatch` events
+2. No workflow was listening for these events
+3. Even if they were, the Azure SWA API has critical context requirements
+
+**Azure SWA Environment Deletion Requirements:**
+- Can ONLY be deleted via:
+  1. `Azure/static-web-apps-deploy` action with `action: close` **in PR context**
+  2. Manual deletion in Azure Portal
+  3. Azure SWA management API (requires different authentication than deployment token)
+
+- Cannot be deleted:
+  - From arbitrary workflow contexts
+  - Using the deployment token outside PR events
+  - By dispatching events to other workflows
+
+**Impact on Architecture:**
+- ✅ **PR close cleanup works** - Runs in PR context, uses Azure action correctly
+- ❌ **Pre-deployment cleanup fails** - Cannot delete from this context
+- ❌ **Scheduled cleanup fails** - Cannot delete from cron context
+- ✅ **Detection still works** - `find-stale-prs` correctly identifies stale environments
+
+**Revised Strategy:**
+```yaml
+# WORKS: PR close triggers cleanup
+on:
+  pull_request:
+    types: [closed]
+
+# DETECTION ONLY: Pre-deployment check
+- uses: ./.github/actions/find-stale-prs
+- run: echo "⚠️ Found stale environments - manual cleanup needed"
+
+# DETECTION ONLY: Scheduled reporting
+- uses: ./.github/actions/find-stale-prs
+- run: echo "📊 Weekly stale environment report"
+```
+
+**See:** `SWA-CLEANUP-REALITY-CHECK.md` for full technical explanation.
+
 ## Migration Path
 
 ### Old Approach (Inline Scripts)
@@ -229,25 +277,37 @@ All three cleanup scenarios now use the same core logic:
 
 - ✅ Updated `docs/swa-environment-cleanup.md` to explain SOLID architecture
 - ✅ Added examples of each composite action
-- ✅ Clarified that pre-deployment now DELETES (not just reports)
+- ⚠️ Clarified that **pre-deployment cannot delete** (Azure API limitation)
 - ✅ Explained the modular action structure
+- ✅ Created `SWA-CLEANUP-REALITY-CHECK.md` explaining what actually works
+- ✅ Deprecated `cleanup-stale-swa-environments` action with clear warnings
 
 ## Benefits Summary
 
-1. **Reliability** - Pre-deployment cleanup prevents "maximum environments" errors
+1. **Partial Success** - PR close cleanup works reliably
 2. **Maintainability** - Update logic in one place, affects all workflows
 3. **Testability** - Test individual actions without full workflow runs
 4. **Clarity** - Each action has a clear, single purpose
-5. **Reusability** - Actions can be used in new workflows easily
-6. **Consistency** - Same logic applied across all cleanup scenarios
+5. **Reusability** - Detection action can be used in new workflows easily
+6. **Transparency** - No false positives, clear about what works and what doesn't
+
+## Lessons Learned
+
+1. **External APIs have context dependencies** - Azure SWA requires PR context for deletions
+2. **Verify actual API calls succeed** - Don't trust "event dispatched" messages
+3. **Detection is valuable even when automation isn't possible** - Knowing the problem exists helps
+4. **False positive reporting is dangerous** - Creates false sense of security
+5. **SOLID principles still apply** - Modular design made it easy to pivot strategy
 
 ## Next Steps
 
-1. Test the new composite actions with a test PR
-2. Monitor the pre-deployment cleanup in action
-3. Verify stale environments are actually being deleted
-4. Consider adding unit tests for the bash scripts within actions
-5. Add metrics/logging to track cleanup effectiveness
+1. ✅ ~~Test the new composite actions with a test PR~~
+2. ✅ ~~Monitor the pre-deployment cleanup in action~~
+3. ❌ ~~Verify stale environments are actually being deleted~~ **NOT POSSIBLE**
+4. ✅ Added deprecation warnings to non-working action
+5. ✅ Documented limitations and workarounds
+6. 📝 Commit changes with clear explanation
+7. 📝 Update team on manual cleanup process
 
 ## Related Commits
 
