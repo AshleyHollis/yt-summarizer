@@ -1,0 +1,67 @@
+# Scan Python Code Quality
+# Runs comprehensive Python code quality checks
+# Uses: ruff (linting), mypy (type checking), bandit (security)
+
+name: 'Scan Python Code Quality'
+description: 'Run comprehensive Python code quality and security scans'
+
+inputs:
+  service-path:
+    description: 'Path to the service directory (e.g., services/api)'
+    required: true
+  check-types:
+    description: 'Run mypy type checking'
+    required: false
+    default: 'false'
+  check-security:
+    description: 'Run bandit security scanning'
+    required: false
+    default: 'true'
+  ruff-config:
+    description: 'Path to ruff configuration file'
+    required: false
+    default: 'services/ruff.toml'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install code quality tools
+      shell: bash
+      run: |
+        pip install bandit[toml] mypy
+
+    - name: Run Bandit security scan
+      if: inputs.check-security == 'true'
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      run: |
+        echo "🔒 Running Bandit security scan..."
+        bandit -r src/ -f json -o bandit-report.json || true
+        bandit -r src/ || {
+          echo "⚠️  Security issues detected - review bandit-report.json"
+          exit 1
+        }
+
+    - name: Run mypy type checking
+      if: inputs.check-types == 'true'
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      continue-on-error: true
+      run: |
+        echo "🔍 Running mypy type checking..."
+        mypy src/ --ignore-missing-imports || {
+          echo "⚠️  Type checking issues detected"
+          exit 1
+        }
+
+    - name: Verify ruff passes
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      run: |
+        echo "✨ Verifying ruff linting..."
+        ruff check src/ --config=${{ inputs.ruff-config }}
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "✅ Code quality scan complete"

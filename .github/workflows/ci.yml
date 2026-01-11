@@ -170,13 +170,21 @@ jobs:
           service-package: services/api
           install-pytest-xdist: 'true'
 
-      - name: Validate critical dependencies are installed
-        run: |
-          python .github/scripts/validate-python-deps.py \
-            services/api/src/api \
-            services/api/pyproject.toml \
-            --critical-only
-        shell: bash
+      - name: Validate Python dependencies
+        uses: ./.github/actions/validate-python-dependencies
+        with:
+          service-path: services/api
+          check-missing: 'true'
+          check-unused: 'false'
+          check-security: 'true'
+          fail-on-warnings: 'false'
+
+      - name: Scan Python code quality
+        uses: ./.github/actions/scan-python-quality
+        with:
+          service-path: services/api
+          check-security: 'true'
+          check-types: 'false'
 
       - name: Record tests start
         id: start
@@ -218,6 +226,20 @@ jobs:
           service-package: services/workers
           install-pytest-xdist: 'true'
 
+      - name: Validate Python dependencies
+        uses: ./.github/actions/validate-python-dependencies
+        with:
+          service-path: services/workers
+          check-missing: 'true'
+          check-unused: 'false'
+          check-security: 'true'
+
+      - name: Scan Python code quality
+        uses: ./.github/actions/scan-python-quality
+        with:
+          service-path: services/workers
+          check-security: 'true'
+
       - name: Record tests start
         id: start
         uses: ./.github/actions/record-test-duration
@@ -256,6 +278,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           working-directory: apps/web
+
+      - name: Scan JavaScript dependencies
+        uses: ./.github/actions/scan-javascript-dependencies
+        with:
+          working-directory: apps/web
+          check-missing-deps: 'true'
+          check-security: 'true'
+          audit-level: 'high'
 
       - name: Run Vitest
         uses: ./.github/actions/run-frontend-tests

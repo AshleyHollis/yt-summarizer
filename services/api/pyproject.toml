@@ -72,3 +72,17 @@ markers = [
 # By default, run all tests except live E2E tests (which require infrastructure)
 addopts = "-m 'not live'"
 
+[tool.deptry]
+# Dependency checker configuration - catches missing/unused dependencies
+# See: https://deptry.com/
+extend_exclude = ["tests", "test_.*"]
+
+[tool.deptry.per_rule_ignores]
+# DEP002: Missing dependencies in pyproject.toml
+# These are handled by mapping import names to package names
+DEP002 = ["azure", "opentelemetry"]  # Multi-package namespaces
+
+[tool.bandit]
+# Security scanner configuration
+exclude_dirs = ["tests", "test_.*", ".venv", "venv"]
+skips = ["B101"]  # Skip assert_used (used in tests)
