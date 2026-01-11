@@ -10,7 +10,7 @@
 # - summarize-worker: 256Mi mem, 200m CPU
 # - embed-worker: 256Mi mem, 200m CPU
 # - relationships-worker: 256Mi mem, 200m CPU
-# Total: 1280Mi mem (~2.0Gi with headroom), 1000m CPU (~1.5 with headroom)
+# Total: 1280Mi mem (~2.5Gi allows rolling updates), 1000m CPU (~1.5 with headroom)
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -20,9 +20,9 @@ spec:
     # CPU limits (5 pods x 200m = 1000m, plus headroom)
     requests.cpu: "750m"
     limits.cpu: "1500m"
-    # Memory limits (5 pods x 256Mi = 1280Mi, plus headroom)
-    requests.memory: "750Mi"
-    limits.memory: "2048Mi"
+    # Memory limits (5 pods x 256Mi = 1280Mi, increased to 2.5Gi to allow rolling updates)
+    requests.memory: "1Gi"
+    limits.memory: "2560Mi"
     # Pod count limit
     pods: "10"
     # Prevent excessive services
