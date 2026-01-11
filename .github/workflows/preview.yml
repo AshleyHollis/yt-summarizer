@@ -401,6 +401,7 @@ jobs:
           preview-host: ${{ needs.get-ingress.outputs.preview_host }}
           tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
 
       - name: Validate generated overlay (kustomize + dry-run)
         uses: ./.github/actions/kustomize-validate

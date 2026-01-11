@@ -20,6 +20,9 @@ inputs:
   preview-url:
     description: Full preview URL
     required: true
+  commit-sha:
+    description: Current commit SHA to ensure overlay always changes
+    required: true
 
 outputs:
   preview_url:
@@ -66,7 +69,8 @@ runs:
           --image-tag "${{ inputs.image-tag }}" \
           --acr-server "${{ inputs.acr-server }}" \
           --preview-host "${{ inputs.preview-host }}" \
-          --tls-secret "${{ inputs.tls-secret }}"
+          --tls-secret "${{ inputs.tls-secret }}" \
+          --commit-sha "${{ inputs.commit-sha }}"
         
         echo "✅ Updated preview overlay at ${OVERLAY_FILE}"
         

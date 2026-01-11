@@ -28,6 +28,7 @@ def main():
     parser.add_argument('--acr-server', required=True, help='ACR server')
     parser.add_argument('--preview-host', required=False, help='Preview host (replaces __PREVIEW_HOST__ in patches)')
     parser.add_argument('--tls-secret', required=False, help='TLS secret name (replaces __TLS_SECRET__ in patches)')
+    parser.add_argument('--commit-sha', required=False, help='Commit SHA for uniqueness')
 
     args = parser.parse_args()
 
@@ -45,6 +46,7 @@ def main():
         'Preview overlay - updated by GitHub Actions',
         f'PR: #{args.pr_number}',
         f'Image Tag: {args.image_tag}',
+        f'Commit: {args.commit_sha or "unknown"}',
         f'Updated: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}'
     ]
 
