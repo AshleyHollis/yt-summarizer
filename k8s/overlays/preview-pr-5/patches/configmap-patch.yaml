@@ -1,0 +1,13 @@
+# =============================================================================
+# Preview ConfigMap Patch
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yt-summarizer-config
+  namespace: yt-summarizer
+data:
+  # Use 'staging' since app only allows development/staging/production
+  ENVIRONMENT: "staging"
+  LOG_LEVEL: "DEBUG"
+  CORS_ORIGINS: "https://red-grass-06d413100-4.eastasia.6.azurestaticapps.net"
