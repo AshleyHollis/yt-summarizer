@@ -269,7 +269,7 @@ jobs:
     name: Check Preview Limit
     runs-on: ubuntu-latest
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.detect-changes.outputs.needs_deployment == 'true'
-    needs: [wait-for-ci, get-existing-image-tag, build-images-manual, detect-changes]
+    needs: [detect-changes]
     outputs:
       can_deploy: ${{ steps.validate-tag.outputs.can_deploy }}
       image_tag: ${{ steps.export-image.outputs.image_tag }}
@@ -284,18 +284,58 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           max-previews: ${{ env.MAX_PREVIEWS }}
 
+      - name: Get image tag from CI
+        if: needs.detect-changes.outputs.needs_image_build == 'true'
+        id: get-ci-tag
+        uses: ./.github/actions/export-image-tag
+        with:
+          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+
+      - name: Get existing image tag
+        if: needs.detect-changes.outputs.needs_image_build == 'false'
+        id: get-existing-tag
+        uses: ./.github/actions/export-image-tag
+        with:
+          image-tag: ${{ needs.get-existing-image-tag.outputs.image_tag }}
+
+      - name: Get manual build image tag
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.force_deploy == 'true'
+        id: get-manual-tag
+        uses: ./.github/actions/export-image-tag
+        with:
+          image-tag: ${{ needs.build-images-manual.outputs.image_tag }}
+
+      - name: Determine final image tag
+        id: determine-tag
+        run: |
+          if [ "${{ needs.detect-changes.outputs.needs_image_build }}" = "true" ]; then
+            IMAGE_TAG="${{ steps.get-ci-tag.outputs.image_tag }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+            IMAGE_TAG="${{ steps.get-manual-tag.outputs.image_tag }}"
+          else
+            IMAGE_TAG="${{ steps.get-existing-tag.outputs.image_tag }}"
+          fi
+          
+          if [ -z "$IMAGE_TAG" ]; then
+            echo "::error::No image tag available for deployment"
+            exit 1
+          fi
+          
+          echo "Final image tag: $IMAGE_TAG"
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
       - name: Validate image tag is available
         id: validate-tag
         uses: ./.github/actions/validate-image-tag-availability
         with:
-          image_tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.get-existing-image-tag.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}
+          image_tag: ${{ steps.determine-tag.outputs.image_tag }}
           concurrency_check_result: ${{ steps.check.outputs.can_deploy }}
 
       - name: Export computed image tag
         id: export-image
         uses: ./.github/actions/export-image-tag
         with:
-          image-tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.get-existing-image-tag.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}
+          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
 
 
       - name: Post queue status
