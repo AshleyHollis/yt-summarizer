@@ -34,7 +34,7 @@ env:
   # pull_request events (github.event.pull_request.number) or workflow_run events
   # (github.event.workflow_run.pull_requests[0].number). Used throughout workflow
   # to avoid repeating this complex expression 15+ times.
-  PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+  # PR metadata is emitted by the detect-changes job to avoid top-level context evaluation warnings
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
   MAX_PREVIEWS: 3
@@ -55,9 +55,20 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     outputs:
       has_code_changes: ${{ steps.check.outputs.has_code_changes }}
+      pr_number: ${{ steps.pr-meta.outputs.pr_number }}
+      pr_head_ref: ${{ steps.pr-meta.outputs.pr_head_ref }}
+      pr_head_sha: ${{ steps.pr-meta.outputs.pr_head_sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Emit PR metadata
+        id: pr-meta
+        shell: bash
+        run: |
+          echo "pr_number=${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}" >> $GITHUB_OUTPUT
+          echo "pr_head_ref=${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}" >> $GITHUB_OUTPUT
+          echo "pr_head_sha=${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}" >> $GITHUB_OUTPUT
 
       - name: Check if commit has code changes
         id: check
@@ -65,7 +76,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          pr-number: ${{ env.PR_NUMBER }}
+          pr-number: ${{ steps.pr-meta.outputs.pr_number }}
 
 
   # ---------------------------------------------------------------------------
@@ -86,7 +97,7 @@ jobs:
     needs: detect-changes
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.detect-changes.outputs.has_code_changes == 'true'
     outputs:
-      image_tag: ${{ steps.image-tag.outputs.image_tag }}
+      image_tag: ${{ steps.wait.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -109,17 +120,10 @@ jobs:
         uses: ./.github/actions/wait-for-ci
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          commit-sha: ${{ github.event.pull_request.head.sha }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           timeout-seconds: '1800'  # 30 minutes timeout
 
-      - name: Determine image tag from CI
-        # Generate image tag: Creates unique image tag using PR number for preview isolation.
-        # Uses env.PR_NUMBER variable to avoid repeating complex expression.
-        id: image-tag
-        uses: ./.github/actions/generate-image-tag
-        with:
-          commit-sha: ${{ github.event.pull_request.head.sha }}
-          pr-number: ${{ env.PR_NUMBER }}
+      # Image tag is provided by CI via artifact and validated by `validate-image-tag`. No local generation here.
 
   # ---------------------------------------------------------------------------
   # Check Active Preview Count (prevents resource exhaustion from too many previews)
@@ -128,7 +132,7 @@ jobs:
     name: Check Preview Limit
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
-    needs: wait-for-ci
+    needs: [wait-for-ci, detect-changes]
     outputs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
       image_tag: ${{ steps.export-image.outputs.image_tag }}
@@ -143,7 +147,7 @@ jobs:
           github-token: ${{ github.token }}
           max-previews: ${{ env.MAX_PREVIEWS }}
           repository: ${{ github.repository }}
-          pr-number: ${{ env.PR_NUMBER }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
 
       - name: Export computed image tag
         id: export-image
@@ -171,7 +175,7 @@ jobs:
     name: Get Ingress Info
     runs-on: ubuntu-latest
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.check-concurrency.outputs.can_deploy == 'true'
-    needs: check-concurrency
+    needs: [check-concurrency, detect-changes]
     outputs:
       ingress_ip: ${{ steps.get-ip.outputs.ingress-ip }}
       preview_url: ${{ steps.compute.outputs.preview-url }}
@@ -195,7 +199,7 @@ jobs:
         id: compute
         uses: ./.github/actions/compute-preview-urls
         with:
-          pr-number: ${{ env.PR_NUMBER }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           ingress-ip: ${{ steps.get-ip.outputs.ingress-ip }}
 
   # ---------------------------------------------------------------------------
@@ -205,12 +209,14 @@ jobs:
     name: Update Preview Overlay
     runs-on: ubuntu-latest
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.check-concurrency.outputs.can_deploy == 'true'
-    needs: [check-concurrency, get-ingress]
+    needs: [check-concurrency, get-ingress, detect-changes]
+    outputs:
+      image_tag: ${{ needs.check-concurrency.outputs.image_tag }}
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}
+          ref: ${{ needs.detect-changes.outputs.pr_head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python with dependencies
@@ -243,11 +249,18 @@ jobs:
           cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
 
+      - name: Validate CI image tag for PR
+        uses: ./.github/actions/validate-image-tag
+        with:
+          ci-image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
+
       - name: Update preview overlay with image tags
         id: overlay
         uses: ./.github/actions/update-preview-overlay
         with:
-          pr-number: ${{ env.PR_NUMBER }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
           acr-server: ${{ env.ACR_LOGIN_SERVER }}
           preview-host: ${{ needs.get-ingress.outputs.preview_host }}
@@ -260,10 +273,10 @@ jobs:
       - name: Commit and push overlay update
         uses: ./.github/actions/commit-overlay-changes
         with:
-          pr-number: ${{ env.PR_NUMBER }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
-          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
-          pr-branch: ${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
+          pr-branch: ${{ needs.detect-changes.outputs.pr_head_ref }}
 
   # ---------------------------------------------------------------------------
   # Verify Deployment
@@ -294,20 +307,20 @@ jobs:
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd-sync
         with:
-          namespace: preview-pr-${{ env.PR_NUMBER }}
-          pr-number: ${{ env.PR_NUMBER }}
+          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           timeout-seconds: '180'
 
       - name: Verify API deployment image
         uses: ./.github/actions/verify-deployment-image
         with:
-          namespace: preview-pr-${{ env.PR_NUMBER }}
+          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           deployment-name: api
           expected-tag: ${{ needs.check-concurrency.outputs.image_tag }}
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-worker-deployments
         with:
-          namespace: preview-pr-${{ env.PR_NUMBER }}
+          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           expected-tag: ${{ needs.check-concurrency.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
@@ -337,14 +350,14 @@ jobs:
     name: Deploy Frontend Preview
     runs-on: ubuntu-latest
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.check-concurrency.outputs.can_deploy == 'true'
-    needs: get-ingress
+    needs: [get-ingress, detect-changes]
     outputs:
       frontend_preview_url: ${{ steps.deploy.outputs.static_web_app_url }}
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}
+          ref: ${{ needs.detect-changes.outputs.pr_head_ref }}
 
       - name: Verify SWA token is configured
         uses: ./.github/actions/verify-secret
@@ -396,25 +409,25 @@ jobs:
     name: Post Preview Comment
     runs-on: ubuntu-latest
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.check-concurrency.outputs.can_deploy == 'true'
-    needs: [update-overlay, verify-deployment, deploy-frontend-preview]
+    needs: [update-overlay, verify-deployment, deploy-frontend-preview, detect-changes]
     steps:
       - name: Post preview URL to PR
         uses: ./.github/actions/post-preview-comment
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ env.PR_NUMBER }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
-          image-tag: ${{ needs.update-overlay.outputs.image_tag }}
-          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+          image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
           frontend-url: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}
 
       - name: Create deployment summary
         uses: ./.github/actions/create-preview-summary
         with:
-          pr-number: ${{ env.PR_NUMBER }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
-          image-tag: ${{ needs.update-overlay.outputs.image_tag }}
-          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+          image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
 
 
   # ---------------------------------------------------------------------------
@@ -423,7 +436,7 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [update-overlay, verify-deployment, deploy-frontend-preview, post-preview-comment]
+    needs: [update-overlay, verify-deployment, deploy-frontend-preview, post-preview-comment, detect-changes]
     # Skip E2E tests if no API URL is configured or not a PR/workflow_dispatch event
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.check-concurrency.outputs.can_deploy == 'true' && needs.get-ingress.outputs.preview_url != ''
     outputs:
@@ -446,8 +459,8 @@ jobs:
       - name: Wait for ArgoCD sync
         uses: ./.github/actions/wait-for-argocd-sync
         with:
-          namespace: preview-pr-${{ env.PR_NUMBER }}
-          pr-number: ${{ env.PR_NUMBER }}
+          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           timeout-seconds: '60'
 
       - name: Wait for API to be ready
@@ -473,7 +486,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-pr-${{ env.PR_NUMBER }}
+          name: playwright-report-pr-${{ needs.detect-changes.outputs.pr_number }}
           path: apps/web/playwright-report/
           retention-days: 7
 
@@ -482,10 +495,10 @@ jobs:
         uses: ./.github/actions/post-e2e-results
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ env.PR_NUMBER }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           test-outcome: ${{ steps.run-tests.outcome }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
-          commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
           run-id: ${{ github.run_id }}
           repository: ${{ github.repository }}
 

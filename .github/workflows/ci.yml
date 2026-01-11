@@ -322,6 +322,30 @@ jobs:
           pr-number: ${{ github.event.pull_request.number }}
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
+      - name: Publish image tag artifact
+        if: steps.tag.outputs.image-tag != ''
+        uses: ./.github/actions/publish-image-tag
+        with:
+          image-tag: ${{ steps.tag.outputs.image-tag }}
+
+      - name: Verify image-tag artifact is available
+        if: steps.tag.outputs.image-tag != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: image-tag
+          path: ./downloaded-artifacts
+
+      - name: Assert downloaded image tag
+        if: steps.tag.outputs.image-tag != ''
+        shell: bash
+        run: |
+          if [ ! -f downloaded-artifacts/image-tag.txt ]; then
+            echo "::error::image-tag.txt not found in artifact"
+            exit 1
+          fi
+          echo "Verified image tag artifact:"
+          cat downloaded-artifacts/image-tag.txt
+
   build-images:
     name: Build Images (parallel)
     runs-on: ubuntu-latest
