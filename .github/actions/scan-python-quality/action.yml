@@ -35,12 +35,37 @@ runs:
       shell: bash
       working-directory: ${{ inputs.service-path }}
       run: |
-        echo "🔒 Running Bandit security scan..."
-        bandit -r src/ -f json -o bandit-report.json || true
-        bandit -r src/ || {
-          echo "⚠️  Security issues detected - review bandit-report.json"
+        echo "════════════════════════════════════════════════════════════════"
+        echo "🔒 Python Security Scan (bandit)"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+        
+        # Auto-detect source directory
+        if [ -d "src" ]; then
+          SCAN_DIR="src"
+        else
+          SCAN_DIR="."
+        fi
+        
+        echo "📁 Scanning directory: $SCAN_DIR"
+        echo ""
+        
+        if bandit -r "$SCAN_DIR" -f screen; then
+          echo ""
+          echo "✅ No security issues detected"
+        else
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo "⚠️  SECURITY ISSUES DETECTED"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📋 Action Required:"
+          echo "   Review the security findings above and address concerns"
+          echo "   Common issues: hardcoded secrets, SQL injection, weak crypto"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
           exit 1
-        }
+        fi
 
     - name: Run mypy type checking
       if: inputs.check-types == 'true'

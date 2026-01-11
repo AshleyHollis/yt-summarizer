@@ -36,24 +36,57 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        echo "🔍 Scanning for missing JavaScript dependencies..."
-        depcheck --ignores="@types/*,eslint-*,prettier,typescript,vitest,playwright" || {
-          echo "❌ Missing or unused dependencies detected"
-          echo "Review the output above and update package.json"
+        echo "════════════════════════════════════════════════════════════════"
+        echo "🔍 JavaScript Dependency Scan (depcheck)"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+        
+        if depcheck --ignores="@types/*,eslint-*,prettier,typescript,vitest,playwright"; then
+          echo ""
+          echo "✅ No dependency issues detected"
+        else
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo "⚠️  DEPENDENCY ISSUES DETECTED"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📋 Action Required:"
+          echo "   Review missing/unused packages above"
+          echo "   Update package.json accordingly"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
           exit 1
-        }
+        fi
 
     - name: Run npm audit for security vulnerabilities
       if: inputs.check-security == 'true'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        echo "🔒 Scanning for security vulnerabilities..."
-        npm audit --audit-level=${{ inputs.audit-level }} || {
-          echo "⚠️  Security vulnerabilities detected"
-          echo "Run 'npm audit fix' to resolve issues"
+        echo ""
+        echo "════════════════════════════════════════════════════════════════"
+        echo "🔒 Security Vulnerability Scan (npm audit)"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+        
+        if npm audit --audit-level=${{ inputs.audit-level }}; then
+          echo ""
+          echo "✅ No security vulnerabilities detected"
+        else
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo "⚠️  SECURITY VULNERABILITIES FOUND"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📋 Action Required:"
+          echo "   1. Review the vulnerability report above"
+          echo "   2. Run 'npm audit fix' to auto-fix where possible"
+          echo "   3. For breaking changes, use 'npm audit fix --force'"
+          echo "   4. Update package.json for manual updates"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
           exit 1
-        }
+        fi
 
     - name: Verify no missing peer dependencies
       shell: bash
