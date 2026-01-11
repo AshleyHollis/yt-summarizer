@@ -25,13 +25,14 @@ on:
     types: [completed]
 
 concurrency:
-  group: preview-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+  group: preview-${{ env.PR_NUMBER }}
   cancel-in-progress: true
 
 env:
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
   MAX_PREVIEWS: 3
+  PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
 
 permissions:
   id-token: write
@@ -59,7 +60,7 @@ jobs:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           event-name: ${{ github.event_name }}
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
 
 
   # ---------------------------------------------------------------------------
@@ -96,7 +97,7 @@ jobs:
         uses: ./.github/actions/generate-image-tag
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
 
   # ---------------------------------------------------------------------------
   # Check Active Preview Count
@@ -116,7 +117,7 @@ jobs:
           github-token: ${{ github.token }}
           max-previews: ${{ env.MAX_PREVIEWS }}
           repository: ${{ github.repository }}
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
 
       - name: Export computed image tag
         id: export-image
@@ -168,7 +169,7 @@ jobs:
         id: compute
         uses: ./.github/actions/compute-preview-urls
         with:
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
           ingress-ip: ${{ steps.get-ip.outputs.ingress-ip }}
 
   update-overlay:
@@ -220,7 +221,7 @@ jobs:
         id: overlay
         uses: ./.github/actions/update-preview-overlay
         with:
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
           image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
           acr-server: ${{ env.ACR_LOGIN_SERVER }}
           preview-host: ${{ needs.get-ingress.outputs.preview_host }}
@@ -233,7 +234,7 @@ jobs:
       - name: Commit and push overlay update
         uses: ./.github/actions/commit-overlay-changes
         with:
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
           image-tag: ${{ needs.check-concurrency.outputs.image_tag }}
           commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
           pr-branch: ${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}
@@ -263,20 +264,20 @@ jobs:
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd-sync
         with:
-          namespace: preview-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          namespace: preview-pr-${{ env.PR_NUMBER }}
+          pr-number: ${{ env.PR_NUMBER }}
           timeout-seconds: '180'
 
       - name: Verify API deployment image
         uses: ./.github/actions/verify-deployment-image
         with:
-          namespace: preview-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          namespace: preview-pr-${{ env.PR_NUMBER }}
           deployment-name: api
           expected-tag: ${{ needs.check-concurrency.outputs.image_tag }}
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-worker-deployments
         with:
-          namespace: preview-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          namespace: preview-pr-${{ env.PR_NUMBER }}
           expected-tag: ${{ needs.check-concurrency.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
@@ -369,7 +370,7 @@ jobs:
         uses: ./.github/actions/post-preview-comment
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
           image-tag: ${{ needs.update-overlay.outputs.image_tag }}
           commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
@@ -378,7 +379,7 @@ jobs:
       - name: Create deployment summary
         uses: ./.github/actions/create-preview-summary
         with:
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
           image-tag: ${{ needs.update-overlay.outputs.image_tag }}
           commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
@@ -413,8 +414,8 @@ jobs:
       - name: Wait for ArgoCD sync
         uses: ./.github/actions/wait-for-argocd-sync
         with:
-          namespace: preview-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          namespace: preview-pr-${{ env.PR_NUMBER }}
+          pr-number: ${{ env.PR_NUMBER }}
           timeout-seconds: '60'
 
       - name: Wait for API to be ready
@@ -440,7 +441,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          name: playwright-report-pr-${{ env.PR_NUMBER }}
           path: apps/web/playwright-report/
           retention-days: 7
 
@@ -449,7 +450,7 @@ jobs:
         uses: ./.github/actions/post-e2e-results
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          pr-number: ${{ env.PR_NUMBER }}
           test-outcome: ${{ steps.run-tests.outcome }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
           commit-sha: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
