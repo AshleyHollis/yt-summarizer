@@ -81,7 +81,7 @@ jobs:
     name: Wait for CI
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.needs_image_build == 'true'
+    if: needs.detect-changes.outputs.needs_deployment == 'true'
     outputs:
       image_tag: ${{ steps.wait.outputs.image_tag }}
     steps:
@@ -97,54 +97,6 @@ jobs:
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           timeout-seconds: '1800'
 
-  get-existing-image-tag:
-    name: Get Existing Image Tag
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.needs_deployment == 'true' && needs.detect-changes.outputs.needs_image_build == 'false'
-    outputs:
-      image_tag: ${{ steps.get-tag.outputs.image_tag }}
-    steps:
-      - name: Checkout main branch
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          sparse-checkout: |
-            k8s/overlays/prod
-            .github/actions/get-production-image-tag
-
-      - name: Extract current image tag from production overlay
-        id: get-tag
-        uses: ./.github/actions/get-production-image-tag
-
-  compute-image-tag:
-    name: Compute Image Tag
-    runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, get-existing-image-tag]
-    if: |
-      always() &&
-      !cancelled() &&
-      needs.detect-changes.result == 'success' &&
-      needs.detect-changes.outputs.needs_deployment == 'true' &&
-      (
-        needs.wait-for-ci.result == 'success' ||
-        needs.get-existing-image-tag.result == 'success'
-      )
-    outputs:
-      image_tag: ${{ steps.compute.outputs.image_tag }}
-      source: ${{ steps.compute.outputs.source }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Compute final image tag
-        id: compute
-        uses: ./.github/actions/compute-preview-image-tag
-        with:
-          needs-image-build: ${{ needs.detect-changes.outputs.needs_image_build }}
-          ci-image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
-          production-image-tag: ${{ needs.get-existing-image-tag.outputs.image_tag }}
-
   check-concurrency:
     name: Check Preview Limit
     runs-on: ubuntu-latest
@@ -153,8 +105,8 @@ jobs:
       !cancelled() &&
       needs.detect-changes.result == 'success' &&
       needs.detect-changes.outputs.needs_deployment == 'true' &&
-      needs.compute-image-tag.result == 'success'
-    needs: [detect-changes, compute-image-tag]
+      needs.wait-for-ci.result == 'success'
+    needs: [detect-changes, wait-for-ci]
     outputs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
     steps:
@@ -207,9 +159,9 @@ jobs:
     name: Update Preview Overlay
     runs-on: ubuntu-latest
     if: always() && !cancelled() && needs.check-concurrency.result == 'success' && needs.check-concurrency.outputs.can_deploy == 'true' && needs.get-ingress.result == 'success'
-    needs: [check-concurrency, compute-image-tag, get-ingress, detect-changes]
+    needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes]
     outputs:
-      image_tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+      image_tag: ${{ needs.wait-for-ci.outputs.image_tag }}
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -239,7 +191,7 @@ jobs:
       - name: Validate CI image tag for PR
         uses: ./.github/actions/validate-image-tag
         with:
-          ci-image-tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+          ci-image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
 
@@ -248,7 +200,7 @@ jobs:
         uses: ./.github/actions/update-preview-overlay
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           acr-server: ${{ env.ACR_LOGIN_SERVER }}
           preview-host: ${{ needs.get-ingress.outputs.preview_host }}
           tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
@@ -265,7 +217,7 @@ jobs:
         uses: ./.github/actions/commit-overlay-changes
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
           pr-branch: ${{ needs.detect-changes.outputs.pr_head_ref }}
 
@@ -273,7 +225,7 @@ jobs:
     name: Verify Deployment
     runs-on: ubuntu-latest
     if: always() && !cancelled() && needs.check-concurrency.result == 'success' && needs.check-concurrency.outputs.can_deploy == 'true' && needs.update-overlay.result == 'success'
-    needs: [update-overlay, check-concurrency, compute-image-tag, get-ingress, detect-changes]
+    needs: [update-overlay, check-concurrency, wait-for-ci, get-ingress, detect-changes]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -303,14 +255,14 @@ jobs:
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           deployment-name: api
-          expected-tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+          expected-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           image-name: yt-summarizer-api
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-worker-deployments
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          expected-tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+          expected-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
           fail-on-mismatch: 'false'
@@ -412,7 +364,7 @@ jobs:
     name: Post Preview Comment
     runs-on: ubuntu-latest
     if: always() && !cancelled() && needs.check-concurrency.result == 'success' && needs.check-concurrency.outputs.can_deploy == 'true' && needs.verify-deployment.result == 'success' && needs.deploy-frontend-preview.result == 'success'
-    needs: [update-overlay, verify-deployment, deploy-frontend-preview, detect-changes, get-ingress, check-concurrency, compute-image-tag]
+    needs: [update-overlay, verify-deployment, deploy-frontend-preview, detect-changes, get-ingress, check-concurrency, wait-for-ci]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -423,7 +375,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
-          image-tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
           frontend-url: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}
 
@@ -432,7 +384,7 @@ jobs:
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
-          image-tag: ${{ needs.compute-image-tag.outputs.image_tag }}
+          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
 
   e2e-tests:
