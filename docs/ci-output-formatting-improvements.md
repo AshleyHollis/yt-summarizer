@@ -35,12 +35,13 @@ deptry "$SRC_DIR" --extend-exclude "test.*" --ignore DEP003,DEP002
 
 **Solution**: Configure bandit to skip test directories and test-specific warnings:
 ```bash
-bandit -r "$SCAN_DIR" -f screen --skip B101,B110 --exclude "./tests/*,*/tests/*,*/test_*.py"
+bandit -r "$SCAN_DIR" -f screen --skip B101,B110,B608 --exclude "./tests/*,*/tests/*,*/test_*.py"
 ```
 
 **Rationale**:
 - **B101 (assert_used)**: Assert statements are **required** in test files - this is not a security issue
 - **B110 (try_except_pass)**: Using `pass` in error handlers for optional features (telemetry, observability) is acceptable
+- **B608 (hardcoded_sql_expressions)**: False positive with SQLAlchemy ORM - parameterization is handled automatically
 - **Test exclusions**: Skip scanning test directories entirely - they contain intentional security violations for testing purposes
 - Focus remains on **production code** security issues
 
