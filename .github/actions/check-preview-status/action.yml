@@ -1,8 +1,11 @@
 name: 'Check Preview Pipeline Status'
 description: 'Validates preview pipeline results and creates status summary'
 inputs:
-  has-code-changes:
-    description: 'Whether PR has code changes (true/false)'
+  needs-image-build:
+    description: 'Whether PR needs image build (true/false)'
+    required: true
+  needs-deployment:
+    description: 'Whether PR needs deployment (true/false)'
     required: true
   update-overlay-result:
     description: 'Result of update-overlay job'
@@ -31,12 +34,12 @@ runs:
         echo "## Preview Pipeline Status" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        # If no code changes, mark as success (docs-only PR)
-        if [ "${{ inputs.has-code-changes }}" != "true" ]; then
-          echo "📝 No code changes detected - docs-only PR"
+        # If no deployment needed, mark as success (docs-only PR)
+        if [ "${{ inputs.needs-deployment }}" != "true" ]; then
+          echo "📝 No deployment needed - docs-only PR"
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Detect Changes | ✅ Docs-only |" >> $GITHUB_STEP_SUMMARY
+          echo "| Detect Changes | ✅ No deployment needed |" >> $GITHUB_STEP_SUMMARY
           exit 0
         fi
         

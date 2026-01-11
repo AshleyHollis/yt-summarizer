@@ -30,9 +30,12 @@ inputs:
     default: 'false'
 
 outputs:
-  has_code_changes:
-    description: Whether the PR contains code changes
-    value: ${{ steps.detect.outputs.has_code_changes }}
+  needs_image_build:
+    description: Whether the PR contains changes that require building new images
+    value: ${{ steps.detect.outputs.needs_image_build }}
+  needs_deployment:
+    description: Whether the PR contains changes that require deployment
+    value: ${{ steps.detect.outputs.needs_deployment }}
 
 runs:
   using: composite
@@ -107,41 +110,51 @@ runs:
         echo "$FILES"
 
         # Check if any file would trigger image building in CI
-        # CRITICAL FIX: Only return true for changes that actually build images in CI workflow
-        # This prevents preview deployments when no images are available (except for k8s changes which rebuild images)
+        # Check for changes that require image building vs changes that require deployment
         #
-        # CI BUILD TRIGGERS (build-images-meta job):
+        # IMAGE BUILD TRIGGERS (CI actually builds new images):
         # - services/api/** (API service)
-        # - services/workers/** (background workers)
+        # - services/workers/** (background workers) 
         # - services/shared/** (shared libraries)
         # - apps/web/** (frontend application)
         # - **/Dockerfile* (Docker files)
         # - docker-compose*.yml (compose files)
         # - .dockerignore (docker config)
-        # - k8s/** (Kubernetes manifests - rebuilds images for deployment)
         #
-        # ROOT CAUSE: Previously checked for ANY non-docs change, causing preview to run
-        # even when CI skipped image building (e.g., workflow-only changes)
-        HAS_CODE=false
+        # DEPLOYMENT TRIGGERS (changes that affect what gets deployed):
+        # - All image build triggers above
+        # - k8s/** (Kubernetes manifests - change deployment config)
+        #
+        # This allows K8s-only changes to trigger preview deployments using existing images
+        HAS_IMAGE_BUILD=false
+        HAS_DEPLOYMENT=false
         while IFS= read -r file; do
           if [[ -n "$file" ]]; then
             # Skip docs, specs, and markdown files
             if [[ "$file" == docs/* ]] || [[ "$file" == specs/* ]] || [[ "$file" == *.md ]]; then
               echo "  [skip] $file (docs/specs/markdown)"
-            # Check if file is in areas that trigger image building
-            elif [[ "$file" == services/api/** ]] || [[ "$file" == services/workers/** ]] || [[ "$file" == services/shared/** ]] || [[ "$file" == apps/web/** ]] || [[ "$file" == **/Dockerfile* ]] || [[ "$file" == docker-compose*.yml ]] || [[ "$file" == .dockerignore ]] || [[ "$file" == k8s/** ]]; then
+            # Check if file triggers image building
+            elif [[ "$file" == services/api/** ]] || [[ "$file" == services/workers/** ]] || [[ "$file" == services/shared/** ]] || [[ "$file" == apps/web/** ]] || [[ "$file" == **/Dockerfile* ]] || [[ "$file" == docker-compose*.yml ]] || [[ "$file" == .dockerignore ]]; then
               echo "  [BUILD] $file (triggers image build)"
-              HAS_CODE=true
+              HAS_IMAGE_BUILD=true
+              HAS_DEPLOYMENT=true
+            # Check if file triggers deployment (but not image build)
+            elif [[ "$file" == k8s/** ]]; then
+              echo "  [DEPLOY] $file (triggers deployment)"
+              HAS_DEPLOYMENT=true
             else
-              echo "  [skip] $file (does not trigger image build)"
+              echo "  [skip] $file (does not trigger build or deployment)"
             fi
           fi
         done <<< "$FILES"
 
-        echo "has_code_changes=$HAS_CODE" >> $GITHUB_OUTPUT
+        echo "needs_image_build=$HAS_IMAGE_BUILD" >> $GITHUB_OUTPUT
+        echo "needs_deployment=$HAS_DEPLOYMENT" >> $GITHUB_OUTPUT
 
-        if [ "$HAS_CODE" = "true" ]; then
+        if [ "$HAS_IMAGE_BUILD" = "true" ]; then
           echo "✅ Comparison contains changes that trigger image building"
+        elif [ "$HAS_DEPLOYMENT" = "true" ]; then
+          echo "📦 Comparison contains changes that trigger deployment (using existing images)"
         else
-          echo "📝 Comparison contains only documentation changes or changes that don't require image building"
+          echo "📝 Comparison contains only documentation changes"
         fi

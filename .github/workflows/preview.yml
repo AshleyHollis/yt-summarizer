@@ -85,7 +85,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     outputs:
-      has_code_changes: ${{ steps.check.outputs.has_code_changes }}
+      needs_image_build: ${{ steps.check.outputs.needs_image_build }}
+      needs_deployment: ${{ steps.check.outputs.needs_deployment }}
       pr_number: ${{ steps.set-pr.outputs.pr_number }}
       pr_head_ref: ${{ steps.set-pr.outputs.pr_head_ref }}
       pr_head_sha: ${{ steps.set-pr.outputs.pr_head_sha }}
@@ -140,7 +141,7 @@ jobs:
     name: Wait for CI
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.detect-changes.outputs.has_code_changes == 'true'
+    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.detect-changes.outputs.needs_image_build == 'true'
     outputs:
       image_tag: ${{ steps.wait.outputs.image_tag }}
     steps:
@@ -169,6 +170,35 @@ jobs:
           timeout-seconds: '1800'  # 30 minutes timeout
 
       # Image tag is provided by CI via artifact and validated by `validate-image-tag`. No local generation here.
+
+  # ---------------------------------------------------------------------------  
+  # Get Existing Image Tag (for K8s-only changes)
+  # ---------------------------------------------------------------------------
+  get-existing-image-tag:
+    name: Get Existing Image Tag
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.needs_deployment == 'true' && needs.detect-changes.outputs.needs_image_build == 'false'
+    outputs:
+      image_tag: ${{ steps.get-tag.outputs.image_tag }}
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: k8s/overlays/prod
+
+      - name: Extract current image tag from production overlay
+        id: get-tag
+        run: |
+          # Get the current image tag from the production kustomization
+          IMAGE_TAG=$(grep -oP 'newTag: \K.*' k8s/overlays/prod/kustomization.yaml | head -1)
+          if [ -z "$IMAGE_TAG" ]; then
+            echo "::error::Could not find image tag in production overlay"
+            exit 1
+          fi
+          echo "Found existing image tag: $IMAGE_TAG"
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   # ---------------------------------------------------------------------------  
   # Build Images for Manual Triggers (workflow_dispatch)
@@ -227,8 +257,8 @@ jobs:
   check-concurrency:
     name: Check Preview Limit
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
-    needs: [wait-for-ci, build-images-manual, detect-changes]
+    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.detect-changes.outputs.needs_deployment == 'true'
+    needs: [wait-for-ci, get-existing-image-tag, build-images-manual, detect-changes]
     outputs:
       can_deploy: ${{ steps.validate-tag.outputs.can_deploy }}
       image_tag: ${{ steps.export-image.outputs.image_tag }}
@@ -247,14 +277,14 @@ jobs:
         id: validate-tag
         uses: ./.github/actions/validate-image-tag-availability
         with:
-          image_tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}
+          image_tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.get-existing-image-tag.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}
           concurrency_check_result: ${{ steps.check.outputs.can_deploy }}
 
       - name: Export computed image tag
         id: export-image
         uses: ./.github/actions/export-image-tag
         with:
-          image-tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}
+          image-tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.get-existing-image-tag.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}
 
 
       - name: Post queue status
@@ -262,7 +292,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const reason = "${{ needs.wait-for-ci.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}" === "" 
+            const reason = "${{ needs.wait-for-ci.outputs.image_tag || needs.get-existing-image-tag.outputs.image_tag || needs.build-images-manual.outputs.image_tag }}" === "" 
               ? "No image tag available from CI. This may indicate CI did not build images for this PR."
               : `Maximum concurrent previews (${{ env.MAX_PREVIEWS }}) reached. Your preview will deploy when a slot becomes available.\n\nClose another PR or wait for an existing preview to be cleaned up.`;
             
@@ -630,7 +660,8 @@ jobs:
       - name: Check preview pipeline status
         uses: ./.github/actions/check-preview-status
         with:
-          has-code-changes: ${{ needs.detect-changes.outputs.has_code_changes }}
+          needs-image-build: ${{ needs.detect-changes.outputs.needs_image_build }}
+          needs-deployment: ${{ needs.detect-changes.outputs.needs_deployment }}
           update-overlay-result: ${{ needs.update-overlay.result }}
           verify-deployment-result: ${{ needs.verify-deployment.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend-preview.result }}
