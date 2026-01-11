@@ -30,7 +30,21 @@ deptry "$SRC_DIR" --extend-exclude "test.*" --ignore DEP003,DEP002
 - **DEP002**: Dev dependencies (`pytest`, `ruff`), test fixtures, and infrastructure packages are declared in `pyproject.toml` but may not be imported in application code
 - Focus remains on **DEP001** (actual missing dependencies) which catches real import issues
 
-### 3. Unclear Output Format
+### 3. Bandit False Positives in Tests
+**Problem**: Bandit security scanner flags test code patterns as security issues (B101: assert statements, B110: try/except/pass in telemetry).
+
+**Solution**: Configure bandit to skip test directories and test-specific warnings:
+```bash
+bandit -r "$SCAN_DIR" -f screen --skip B101,B110 --exclude "./tests/*,*/tests/*,*/test_*.py"
+```
+
+**Rationale**:
+- **B101 (assert_used)**: Assert statements are **required** in test files - this is not a security issue
+- **B110 (try_except_pass)**: Using `pass` in error handlers for optional features (telemetry, observability) is acceptable
+- **Test exclusions**: Skip scanning test directories entirely - they contain intentional security violations for testing purposes
+- Focus remains on **production code** security issues
+
+### 4. Unclear Output Format
 **Problem**: Scanner outputs were intermingled with GitHub Actions logs, making it hard to identify:
 - Which scanner is running
 - What the results mean
