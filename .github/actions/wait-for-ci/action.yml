@@ -40,34 +40,38 @@ runs:
         end_time=$((start_time + TIMEOUT_SECONDS))
 
         while [ $(date +%s) -lt $end_time ]; do
-          # Get CI workflow runs for this commit
+          # Get CI workflow runs for this commit (remove event filter to catch all triggers)
           response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$COMMIT_SHA&event=push")
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$COMMIT_SHA")
 
-          # Extract the most recent CI workflow run
-          run_id=$(echo "$response" | jq -r '.workflow_runs[0].id // empty')
-          run_status=$(echo "$response" | jq -r '.workflow_runs[0].status // empty')
-          run_conclusion=$(echo "$response" | jq -r '.workflow_runs[0].conclusion // empty')
+          # Debug: Show total workflow runs found
+          total_runs=$(echo "$response" | jq -r '.total_count // 0')
+          echo "   Found $total_runs workflow runs for commit $COMMIT_SHA"
 
-          if [ -z "$run_id" ]; then
+          # Extract CI workflow run (filter by workflow name "CI")
+          ci_run=$(echo "$response" | jq -r '.workflow_runs[] | select(.name == "CI") | .id' | head -1)
+          ci_status=$(echo "$response" | jq -r ".workflow_runs[] | select(.id == \"$ci_run\") | .status")
+          ci_conclusion=$(echo "$response" | jq -r ".workflow_runs[] | select(.id == \"$ci_run\") | .conclusion")
+
+          if [ -z "$ci_run" ]; then
             echo "   No CI workflow run found yet for commit $COMMIT_SHA"
-          elif [ "$run_status" = "completed" ]; then
-            if [ "$run_conclusion" = "success" ]; then
+          elif [ "$ci_status" = "completed" ]; then
+            if [ "$ci_conclusion" = "success" ]; then
               echo "✅ CI workflow completed successfully"
               exit 0
-            elif [ "$run_conclusion" = "failure" ]; then
+            elif [ "$ci_conclusion" = "failure" ]; then
               echo "::error::CI workflow failed. Stopping preview deployment."
               exit 1
-            elif [ "$run_conclusion" = "cancelled" ]; then
+            elif [ "$ci_conclusion" = "cancelled" ]; then
               echo "::error::CI workflow was cancelled. Stopping preview deployment."
               exit 1
             else
-              echo "::error::CI workflow completed with unexpected conclusion: $run_conclusion"
+              echo "::error::CI workflow completed with unexpected conclusion: $ci_conclusion"
               exit 1
             fi
           else
-            echo "   CI workflow status: $run_status (conclusion: $run_conclusion)"
+            echo "   CI workflow status: $ci_status (conclusion: $ci_conclusion)"
           fi
 
           # Wait before next check
