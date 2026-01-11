@@ -414,6 +414,9 @@ jobs:
     if: always() && !cancelled() && needs.check-concurrency.result == 'success' && needs.check-concurrency.outputs.can_deploy == 'true' && needs.verify-deployment.result == 'success' && needs.deploy-frontend-preview.result == 'success'
     needs: [update-overlay, verify-deployment, deploy-frontend-preview, detect-changes, get-ingress, check-concurrency, compute-image-tag]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Post preview URL to PR
         uses: ./.github/actions/post-preview-comment
         with:

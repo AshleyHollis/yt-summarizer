@@ -215,7 +215,7 @@ runs:
                   echo "  ⏳ Orphaned but recent (${age_hours}h) - keeping for now"
                 fi
               else
-                # No metadata at all - but don't delete without age info for safety
+                # No metadata at all - orphaned environment, should be deleted
                 # Try to find any matching PR by environment name
                 name_pr=$(gh pr list --state all --json number,title --jq ".[] | select(.title | contains(\"$env_name\")) | .number" | head -1 || echo "")
                 
@@ -235,7 +235,10 @@ runs:
                     fi
                   fi
                 else
-                  echo "  ⚠️  No metadata and no age info - skipping for safety"
+                  # No PR match and no metadata - delete orphaned environment
+                  echo "  🗑️  No PR/branch metadata found - marking as stale orphaned environment"
+                  is_stale=true
+                  stale_reason="Orphaned environment with no PR/branch metadata"
                 fi
               fi
             fi
