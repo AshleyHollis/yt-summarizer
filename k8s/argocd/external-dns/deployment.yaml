@@ -26,7 +26,6 @@ spec:
           args:
             - --source=gateway-httproute
             - --provider=cloudflare
-            - --cloudflare-proxied=false
             - --domain-filter=apps.ashleyhollis.com
             - --policy=sync
             - --registry=txt
