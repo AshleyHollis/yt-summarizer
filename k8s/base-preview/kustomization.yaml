@@ -13,6 +13,7 @@ resources:
   - api-deployment.yaml
   - api-service.yaml
   - api-ingress.yaml
+  - api-httproute.yaml
   - transcribe-worker-deployment.yaml
   - summarize-worker-deployment.yaml
   - embed-worker-deployment.yaml

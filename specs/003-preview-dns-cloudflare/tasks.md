@@ -84,13 +84,13 @@
 
 ### HTTPRoute Infrastructure for Previews
 
-- [ ] T027 [US1] Create base HTTPRoute template in k8s/base-preview/api-httproute.yaml
-- [ ] T028 [US1] Update base-preview kustomization to include HTTPRoute in k8s/base-preview/kustomization.yaml
-- [ ] T029 [US1] Create HTTPRoute patch template for preview overlay in k8s/overlays/preview/patches/httproute-patch.yaml
+- [X] T027 [US1] Create base HTTPRoute template in k8s/base-preview/api-httproute.yaml
+- [X] T028 [US1] Update base-preview kustomization to include HTTPRoute in k8s/base-preview/kustomization.yaml
+- [X] T029 [US1] Create HTTPRoute patch template for preview overlay in k8s/overlays/preview/patches/httproute-patch.yaml
 
 ### GitHub Actions Updates
 
-- [ ] T030 [US1] Update compute-preview-urls action to use new hostname scheme in .github/actions/compute-preview-urls/action.yml
+- [X] T030 [US1] Update compute-preview-urls action to use new hostname scheme in .github/actions/compute-preview-urls/action.yml
 - [ ] T031 [US1] Create HTTPRoute generation in preview overlay script in scripts/ci/generate_preview_kustomization.py
 - [ ] T032 [P] [US1] Update preview-kustomization-template.yaml to include HTTPRoute patch in scripts/ci/templates/preview-kustomization-template.yaml
 - [ ] T033 [US1] Update update-preview-overlay action to generate HTTPRoute patch in .github/actions/update-preview-overlay/action.yml
