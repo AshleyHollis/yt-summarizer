@@ -9,13 +9,23 @@
 name: Preview
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
-  workflow_dispatch:
+  # IMPORTANT: Only workflow_run trigger, NO pull_request trigger
+  # WHY? To prevent race conditions where preview starts before CI completes
+  # 
+  # LESSON LEARNED: Having both triggers caused preview to run twice:
+  #   1. On pull_request (immediate, before CI finishes)
+  #   2. On workflow_run (after CI completes)
+  # This wasted CI resources and created confusing duplicate runs.
+  #
+  # CORRECT: Wait for CI to complete, then deploy preview
+  # MISTAKE: Don't use branches: [main] - that only triggers for main branch
+  #          PRs run on feature branches, so this prevents preview deploys!
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
 
 concurrency:
-  group: preview-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+  group: preview-${{ env.PR_NUMBER }}
   cancel-in-progress: true
 
 env:
