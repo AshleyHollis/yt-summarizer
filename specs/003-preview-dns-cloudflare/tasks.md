@@ -125,13 +125,15 @@
 
 ### Implementation for User Story 2
 
-- [ ] T042 [US2] Verify preview-cleanup.yml workflow deletes namespace on PR close in .github/workflows/preview-cleanup.yml
-- [ ] T043 [US2] Verify ExternalDNS removes DNS record when HTTPRoute is deleted (automatic via sync policy)
-- [ ] T044 [US2] Test cleanup with real PR - close and verify namespace gone
-- [ ] T045 [US2] Verify DNS record removed from Cloudflare within 10 minutes
-- [ ] T046 [US2] Document cleanup verification steps in docs/runbooks/external-dns-troubleshooting.md
+- [X] T042 [US2] Verify preview-cleanup.yml workflow deletes namespace on PR close (.github/workflows/preview-cleanup.yml uses ArgoCD ApplicationSet)
+- [X] T043 [US2] Verify ExternalDNS removes DNS record when HTTPRoute is deleted (automatic via watch mechanism - verified in runbook)
+- [ ] T044 [US2] **READY FOR TESTING** - Test cleanup with real PR - close and verify namespace gone
+- [ ] T045 [US2] **READY FOR TESTING** - Verify DNS record removed from Cloudflare within 10 minutes
+- [X] T046 [US2] Document cleanup verification steps in docs/runbooks/external-dns-troubleshooting.md
 
 **Checkpoint**: Preview cleanup fully automated with DNS record removal
+
+**STATUS**: Cleanup workflow verified, documentation complete. Testing requires closing a real PR.
 
 ---
 
