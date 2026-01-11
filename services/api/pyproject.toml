@@ -19,6 +19,7 @@ dependencies = [
     "httpx>=0.27.0",
     "yt-dlp>=2024.12.6",
     "agent-framework",
+    "agent-framework-ag-ui",
     # OpenTelemetry for observability (T185)
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
