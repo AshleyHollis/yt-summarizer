@@ -1,0 +1,23 @@
+name: Run ruff checks
+description: Runs ruff linter and formatter checks on Python code
+
+inputs:
+  target-path:
+    description: Path to check with ruff
+    required: false
+    default: 'services/'
+
+runs:
+  using: composite
+  steps:
+    - name: Install ruff
+      shell: bash
+      run: pip install ruff
+
+    - name: Run ruff linter
+      shell: bash
+      run: ruff check ${{ inputs.target-path }}
+
+    - name: Run ruff formatter check
+      shell: bash
+      run: ruff format --check ${{ inputs.target-path }}

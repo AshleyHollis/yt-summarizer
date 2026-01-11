@@ -6,6 +6,7 @@ export type { ProseVariant } from './MarkdownRenderer';
 export { CollapsibleContent } from './CollapsibleContent';
 export { DescriptionRenderer } from './DescriptionRenderer';
 export { WarmingUpIndicator } from './WarmingUpIndicator';
+export { CopilotErrorBoundary } from './CopilotErrorBoundary';
 export {
   Skeleton,
   VideoCardSkeleton,

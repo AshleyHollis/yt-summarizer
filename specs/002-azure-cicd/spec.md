@@ -41,6 +41,23 @@ As a developer, I want a live preview environment deployed for each pull request
 
 ---
 
+#### Preview Hostnames & TLS (Free solution)
+
+To ensure each preview is addressable and serves TLS (HTTPS) for the frontend and API without requiring a paid DNS provider, we will use a free wildcard IP-to-hostname resolver (e.g., `nip.io` or `sslip.io`) combined with `cert-manager` and Let's Encrypt.
+
+- Implementation:
+  - Generate a preview-specific host that encodes the preview ingress IP, e.g. `api.preview-pr-<num>.<ingress-ip-with-dashes>.nip.io` which resolves to the cluster LB IP automatically.
+  - Install `cert-manager` and create a staging `ClusterIssuer` (Let's Encrypt staging) for non-production testing, and a production `ClusterIssuer` for issuance after validation.
+  - Annotate preview `Ingress` to request a certificate (HTTP-01 solver) and add a TLS block referencing the secret created by cert-manager.
+  - Update the preview workflow to inject the HTTPS backend URL (e.g., `REAL_BACKEND_URL=https://api.preview-pr-<num>.<ip>.nip.io/api`) into the frontend build.
+
+- Acceptance Criteria:
+  - Preview Ingress accepts the preview host + TLS and cert-manager successfully provisions a certificate (staging first).
+  - `https://api.preview-pr-<num>.<ip>.nip.io/debug` returns `database_initialized: true` and the frontend stops showing the "warming up" state.
+  - The solution uses only free services (nip.io + Let's Encrypt).  
+
+---
+
 ### User Story 3 - Automatic Production Deployment on Merge (Priority: P1)
 
 As a team lead, I want the application to automatically deploy to production when a PR is merged to main, so that validated changes reach users quickly without manual intervention.

@@ -1,0 +1,10 @@
+# =============================================================================
+# Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: yt-summarizer
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/part-of: yt-summarizer

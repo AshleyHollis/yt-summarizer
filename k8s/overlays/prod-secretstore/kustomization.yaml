@@ -1,0 +1,12 @@
+# =============================================================================
+# Production SecretStore Overlay
+# =============================================================================
+# Patches the base secretstore with production Workload Identity configuration
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: yt-summarizer
+
+resources:
+  - secretstore.yaml
+  - serviceaccount.yaml

@@ -1,0 +1,91 @@
+# Reusable health check action
+# Polls an endpoint until it returns healthy or times out
+
+name: 'Health Check'
+description: 'Wait for service to become healthy'
+
+inputs:
+  url:
+    description: 'Health check URL (e.g., https://api.example.com/health/live)'
+    required: true
+  max-attempts:
+    description: 'Maximum number of attempts'
+    required: false
+    default: '30'
+  interval-seconds:
+    description: 'Seconds between attempts'
+    required: false
+    default: '10'
+  timeout-seconds:
+    description: 'Timeout for each request in seconds'
+    required: false
+    default: '5'
+  expected-status:
+    description: 'Expected HTTP status code'
+    required: false
+    default: '200'
+  service-name:
+    description: 'Service name for logging'
+    required: false
+    default: 'Service'
+
+outputs:
+  healthy:
+    description: 'Whether the service became healthy'
+    value: ${{ steps.check.outputs.healthy }}
+  attempts:
+    description: 'Number of attempts made'
+    value: ${{ steps.check.outputs.attempts }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Wait for service health
+      id: check
+      shell: bash
+      run: |
+        URL="${{ inputs.url }}"
+        MAX_ATTEMPTS="${{ inputs.max-attempts }}"
+        INTERVAL="${{ inputs.interval-seconds }}"
+        TIMEOUT="${{ inputs.timeout-seconds }}"
+        EXPECTED_STATUS="${{ inputs.expected-status }}"
+        SERVICE_NAME="${{ inputs.service-name }}"
+        
+        echo "Waiting for $SERVICE_NAME to become healthy..."
+        echo "URL: $URL"
+        echo "Max attempts: $MAX_ATTEMPTS (interval: ${INTERVAL}s)"
+        
+        ATTEMPT=1
+        HEALTHY=false
+        
+        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+          
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time $TIMEOUT \
+            --connect-timeout $TIMEOUT \
+            "$URL" 2>/dev/null || echo "000")
+          
+          if [ "$HTTP_STATUS" = "$EXPECTED_STATUS" ]; then
+            echo "✅ $SERVICE_NAME is healthy (HTTP $HTTP_STATUS)"
+            HEALTHY=true
+            break
+          else
+            echo "  Status: $HTTP_STATUS (expected: $EXPECTED_STATUS)"
+            
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              echo "  Waiting ${INTERVAL}s before next attempt..."
+              sleep $INTERVAL
+            fi
+          fi
+          
+          ATTEMPT=$((ATTEMPT + 1))
+        done
+        
+        if [ "$HEALTHY" = "false" ]; then
+          echo "::error::$SERVICE_NAME did not become healthy after $MAX_ATTEMPTS attempts"
+          exit 1
+        fi
+        
+        echo "healthy=true" >> $GITHUB_OUTPUT
+        echo "attempts=$ATTEMPT" >> $GITHUB_OUTPUT

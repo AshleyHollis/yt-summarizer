@@ -1,0 +1,54 @@
+name: Wait for Argo CD Sync
+description: Wait for Argo CD to sync and create the preview namespace
+
+inputs:
+  namespace:
+    description: Kubernetes namespace to wait for
+    required: true
+  pr-number:
+    description: Pull request number (for diagnostics)
+    required: true
+  timeout-seconds:
+    description: Maximum time to wait in seconds
+    required: false
+    default: '180'
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for namespace creation
+      shell: bash
+      run: |
+        NAMESPACE="${{ inputs.namespace }}"
+        TIMEOUT=${{ inputs.timeout-seconds }}
+        INTERVAL=5
+        MAX_ATTEMPTS=$((TIMEOUT / INTERVAL))
+        
+        echo "Waiting for Argo CD to sync preview environment..."
+        echo "Namespace: ${NAMESPACE}"
+        echo "Timeout: ${TIMEOUT}s (${MAX_ATTEMPTS} attempts)"
+        
+        # Wait for Argo CD to create/update the namespace
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+          if kubectl get namespace ${NAMESPACE} 2>/dev/null; then
+            echo "✅ Namespace ${NAMESPACE} exists"
+            exit 0
+          fi
+          echo "  Attempt $i/${MAX_ATTEMPTS} - Namespace not found, waiting ${INTERVAL}s..."
+          sleep $INTERVAL
+        done
+        
+        # Namespace not created - gather diagnostics
+        echo "::error::Namespace ${NAMESPACE} was not created by Argo CD after ${TIMEOUT}s"
+
+        APP_NAME="preview-pr-${{ inputs.pr-number }}"
+        echo "Attempting to fetch Argo CD Application status for ${APP_NAME}"
+        echo "--- Argo CD Application (yaml) ---"
+        kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o yaml || echo "No application named ${APP_NAME} found"
+        echo "--- Argo CD application events / status (describe) ---"
+        kubectl describe application ${APP_NAME} -n argocd || true
+
+        echo "--- All preview applications ---"
+        kubectl get applications.argoproj.io --all-namespaces | grep "preview-pr-" || true
+
+        exit 1

@@ -5,7 +5,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: api
+
 spec:
   template:
     spec:
@@ -13,16 +15,18 @@ spec:
         - name: api
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 200m
+              cpu: 150m
               memory: 256Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: transcribe-worker
+
 spec:
   template:
     spec:
@@ -30,16 +34,18 @@ spec:
         - name: worker
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 200m
+              cpu: 150m
               memory: 256Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: summarize-worker
+
 spec:
   template:
     spec:
@@ -47,16 +53,18 @@ spec:
         - name: worker
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 200m
+              cpu: 150m
               memory: 256Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: embed-worker
+
 spec:
   template:
     spec:
@@ -64,16 +72,18 @@ spec:
         - name: worker
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 200m
+              cpu: 150m
               memory: 256Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: yt-summarizer
   name: relationships-worker
+
 spec:
   template:
     spec:
@@ -81,8 +91,8 @@ spec:
         - name: worker
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 200m
+              cpu: 150m
               memory: 256Mi

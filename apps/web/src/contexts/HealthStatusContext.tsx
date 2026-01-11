@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, ReactElement } from 'react';
 import { useHealthCheck, UseHealthCheckResult } from '@/hooks/useHealthCheck';
 
 // Context type is the same as the hook result
@@ -26,7 +26,7 @@ export interface HealthStatusProviderProps {
 export function HealthStatusProvider({ 
   children,
   pollInterval = 5000,
-}: HealthStatusProviderProps): JSX.Element {
+}: HealthStatusProviderProps): ReactElement {
   const healthState = useHealthCheck({
     pollInterval,
     continuous: false, // Only poll when degraded

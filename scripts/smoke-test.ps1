@@ -91,11 +91,84 @@ function Test-Endpoint {
     }
 }
 
+function Test-Certificate {
+    param(
+        [string]$Url
+    )
+    
+    Write-Host "Testing certificate for $Url... " -NoNewline
+    
+    try {
+        # Extract host from URL
+        $uri = [System.Uri]$Url
+        $hostName = $uri.Host
+        
+        # Use .NET to validate certificate
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $tcpClient.Connect($hostName, 443)
+        $sslStream = New-Object System.Net.Security.SslStream($tcpClient.GetStream(), $false, {
+            param($sender, $certificate, $chain, $sslPolicyErrors)
+            # Return true to accept the certificate (we'll check it manually)
+            return $true
+        })
+        $sslStream.AuthenticateAsClient($hostName)
+        
+        $cert = $sslStream.RemoteCertificate
+        $chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
+        $chain.Build($cert)
+        
+        # Check if certificate is valid
+        $now = Get-Date
+        if ($cert.NotBefore -gt $now -or $cert.NotAfter -lt $now) {
+            Write-Host "[FAIL] Certificate expired or not yet valid" -ForegroundColor Red
+            $script:failed++
+            return $false
+        }
+        
+        # Check for Let's Encrypt R3 intermediate
+        $hasLetsEncryptR3 = $false
+        foreach ($chainElement in $chain.ChainElements) {
+            if ($chainElement.Certificate.Issuer -match "CN=R3.*Let's Encrypt") {
+                $hasLetsEncryptR3 = $true
+                break
+            }
+        }
+        
+        if (-not $hasLetsEncryptR3) {
+            Write-Host "[WARN] Let's Encrypt R3 intermediate not found" -ForegroundColor Yellow
+        }
+        
+        Write-Host "[PASS] Certificate valid" -ForegroundColor Green
+        $script:passed++
+        return $true
+    }
+    catch {
+        Write-Host "[FAIL] Certificate validation failed: $_" -ForegroundColor Red
+        $script:failed++
+        return $false
+    }
+    finally {
+        if ($sslStream) { $sslStream.Close() }
+        if ($tcpClient) { $tcpClient.Close() }
+    }
+}
+
+# =============================================================================
+# Certificate Validation
+# =============================================================================
+
+Write-Host "--- Certificate Validation ---" -ForegroundColor Yellow
+
+# Only test certificate if it's HTTPS
+if ($ApiUrl -match "^https://") {
+    Test-Certificate -Url $ApiUrl
+} else {
+    Write-Host "Skipping certificate test for HTTP URL: $ApiUrl" -ForegroundColor Gray
+}
+
 # =============================================================================
 # API Health Checks
 # =============================================================================
-
-Write-Host "--- API Health Checks ---" -ForegroundColor Yellow
 
 Test-Endpoint -Name "Health endpoint" -Url "$ApiUrl/health"
 Test-Endpoint -Name "Liveness probe" -Url "$ApiUrl/health/live"

@@ -7,13 +7,16 @@
 
 This plan implements CI/CD pipelines for the YT Summarizer application with the following flow:
 
-1. **CI on Pull Request**: Run unit tests (shared, workers, API, frontend), linting, and validation on every PR
-2. **PR Preview Environments**: Deploy ephemeral preview environments to AKS for each PR after CI passes; E2E tests run against preview URL
-3. **Automatic Production Deployment**: On merge to `main`, update production Kustomize overlay with validated image digests; Argo CD syncs automatically
+1. **CI on Pull Request**: Run unit tests (shared, workers, API, frontend), linting, **build frontend** (catches TypeScript errors), and validation on every PR
+2. **PR Preview Environments**: Deploy ephemeral preview environments (backend to AKS via Argo CD Pull Request Generator, frontend to SWA staging) for each PR after CI passes
+3. **Automatic Production Deployment**: On merge to `main`, **wait for CI to pass** (`workflow_run` trigger), then update production
 
-**Key Design Decisions**:
+**Key Design Decisions** (Updated 2026-01-09):
 - **No permanent staging environment** — PR previews are the primary validation surface
-- **GitOps**: Argo CD watches `k8s/overlays/prod/` for production; ApplicationSet generates preview apps from `k8s/overlays/previews/pr-*/`
+- **GitOps with Pull Request Generator**: Argo CD polls GitHub API to discover open PRs; preview overlays live in PR branches (not main)
+- **CI gating for production**: `deploy-prod.yml` triggered by `workflow_run` event after CI completes successfully
+- **Frontend build verification**: CI runs `npm run build` to catch TypeScript errors before merge
+- **Frontend previews**: Azure Static Web Apps staging environments for PR preview
 - **Single-node AKS**: Cost-optimized (~$30/month) with resource quotas protecting production
 - **Immutable artifacts**: Same Docker image digests validated in preview are promoted to production (no rebuild)
 
@@ -77,15 +80,15 @@ specs/002-azure-cicd/
 └── tasks.md             # Phase 2 output (NEEDS REGENERATION)
 ```
 
-### Repository Structure (Target State)
+### Repository Structure (Current State - Updated 2026-01-09)
 
 ```text
 .github/
 └── workflows/
-    ├── ci.yml               # PR: Run unit tests, linting, validation (no E2E)
-    ├── preview.yml          # PR: Build images, deploy preview, E2E tests against preview URL
-    ├── deploy-prod.yml      # Push to main: Pin prod overlay to merged image digests
-    └── preview-cleanup.yml  # PR closed: Delete preview overlay (triggers Argo prune)
+    ├── ci.yml               # PR: Run unit tests, linting, validation, build frontend
+    ├── preview.yml          # PR: Build images, deploy preview (backend + frontend)
+    ├── deploy-prod.yml      # workflow_run: Triggered after CI passes on main
+    └── infra.yml            # Terraform plan/apply for infrastructure changes
 
 k8s/
 ├── base/                    # Shared manifests (unchanged)
@@ -105,14 +108,13 @@ k8s/
 │   ├── prod/                # Production overlay (pinned digests)
 │   │   ├── kustomization.yaml
 │   │   └── patches/
-│   └── previews/            # Generated per PR (ephemeral)
-│       └── pr-<number>/     # Created by preview.yml, deleted by preview-cleanup.yml
-│           ├── kustomization.yaml
-│           ├── namespace.yaml
-│           └── patches/
+│   └── preview/             # Template for PR branches (NOT in main)
+│       ├── kustomization.yaml
+│       ├── namespace.yaml   # Uses preview-pr-{{number}} namespace
+│       └── patches/
 └── argocd/
     ├── prod-app.yaml        # Production Argo Application (persistent)
-    ├── preview-appset.yaml  # ApplicationSet for preview discovery
+    ├── preview-appset.yaml  # ApplicationSet with Pull Request Generator
     └── repo-secret.yaml     # Git credentials (sealed)
 
 infra/
@@ -137,10 +139,11 @@ scripts/
 └── bootstrap-argocd.ps1       # One-time Argo CD installation
 ```
 
-**Structure Decision**: 
-- Replaced `staging/` and `production/` overlays with `prod/` and `previews/pr-*/`
-- Terraform collapsed to single `prod/` environment (previews reuse same infra, different namespaces)
-- Argo CD ApplicationSet discovers preview overlays dynamically
+**Structure Notes**: 
+- **No `k8s/overlays/previews/pr-*/` directories** - Pull Request Generator doesn't need them
+- **`k8s/overlays/preview/`** exists as a template in PR branches, not in main
+- **No `preview-cleanup.yml`** - Pull Request Generator handles cleanup automatically
+- **`deploy-prod.yml`** uses `workflow_run` trigger to wait for CI to pass
 
 ## Terraform Scope (Azure Infrastructure Only)
 
@@ -195,34 +198,45 @@ spec:
       - CreateNamespace=true
 ```
 
-### Preview ApplicationSet
+### Preview ApplicationSet (Pull Request Generator)
+
+> **Architecture Update (2026-01-09)**: Using Pull Request Generator instead of Git Directory Generator.
+> The ApplicationSet automatically discovers open PRs via GitHub API rather than watching for overlay directories.
 
 ```yaml
 # k8s/argocd/preview-appset.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: yt-summarizer-previews
+  name: yt-summarizer-preview
   namespace: argocd
 spec:
   generators:
-    - git:
-        repoURL: https://github.com/AshleyHollis/yt-summarizer
-        revision: main
-        directories:
-          - path: k8s/overlays/previews/pr-*
+    - pullRequest:
+        github:
+          owner: AshleyHollis
+          repo: yt-summarizer
+          tokenRef:
+            secretName: github-token
+            key: token
+          labels:
+            - preview  # Only generate apps for PRs with this label
+        requeueAfterSeconds: 60
   template:
     metadata:
-      name: 'preview-{{path.basename}}'
+      name: 'yt-summarizer-pr-{{number}}'
+      labels:
+        app.kubernetes.io/component: preview
+        preview/pr-number: '{{number}}'
     spec:
       project: default
       source:
         repoURL: https://github.com/AshleyHollis/yt-summarizer
-        targetRevision: main
-        path: '{{path}}'
+        targetRevision: '{{head_sha}}'  # Points to PR branch commit
+        path: k8s/overlays/preview      # Lives in PR branch (NOT main)
       destination:
         server: https://kubernetes.default.svc
-        namespace: 'preview-{{path.basename}}'
+        namespace: preview-pr-{{number}}
       syncPolicy:
         automated:
           prune: true
@@ -231,10 +245,18 @@ spec:
           - CreateNamespace=true
 ```
 
+**Key Differences from Git Directory Generator**:
+- No `k8s/overlays/previews/pr-*/` directories in main branch
+- Preview overlay lives in PR branch at `k8s/overlays/preview/`
+- Argo CD discovers open PRs via GitHub API (polls every 60 seconds)
+- Cleanup is automatic: when PR closes, ApplicationSet deletes the Application
+- No `preview-cleanup.yml` workflow needed!
+
 ### Preview URL Exposure
 
 - **Ingress approach**: Each preview namespace gets an Ingress with subdomain routing
 - **Pattern**: `pr-<number>.preview.ytsummarizer.dev` (or path-based: `preview.ytsummarizer.dev/pr-<number>/`)
+- **TLS & free hostname (preview)**: For PR previews we will use a free IP-to-hostname resolver (e.g., `nip.io` or `sslip.io`) and `cert-manager` with Let's Encrypt to provide HTTPS for preview hosts without a paid DNS provider. This encodes the LB IP into the hostname (e.g., `api.preview-pr-<num>.<ingress-ip-dashed>.nip.io`) and allows cert-manager to provision TLS via HTTP-01.
 - **Status posting**: `preview.yml` posts a PR comment with:
   - Deploy status (deploying/ready/failed)
   - Preview URL

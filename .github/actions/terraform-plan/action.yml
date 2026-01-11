@@ -1,0 +1,38 @@
+name: 'Terraform Plan'
+description: 'Runs terraform plan and captures output for PR comments'
+inputs:
+  working-directory:
+    description: 'Working directory for terraform commands'
+    required: true
+  subscription-id:
+    description: 'Azure subscription ID'
+    required: true
+  sql-admin-password:
+    description: 'SQL admin password'
+    required: true
+outputs:
+  plan_output:
+    description: 'Terraform plan output'
+    value: ${{ steps.plan.outputs.plan_output }}
+  outcome:
+    description: 'Plan outcome (success/failure)'
+    value: ${{ steps.plan.outcome }}
+runs:
+  using: composite
+  steps:
+    - name: Run terraform plan
+      id: plan
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -o pipefail
+        terraform plan -no-color -input=false -out=tfplan \
+          -var="subscription_id=${{ inputs.subscription-id }}" \
+          -var="sql_admin_password=${{ inputs.sql-admin-password }}" \
+          2>&1 | tee plan_output.txt
+        PLAN_EXIT_CODE=$?
+        echo "plan_output<<EOF" >> "$GITHUB_OUTPUT"
+        cat plan_output.txt >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+        exit $PLAN_EXIT_CODE
+      continue-on-error: true

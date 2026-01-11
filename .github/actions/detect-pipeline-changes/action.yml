@@ -1,0 +1,39 @@
+# =============================================================================
+# Detect Pipeline Changes - Smart Change Detection
+# =============================================================================
+# DESIGN DECISION: Dumb detection, smart consumption
+# 
+# This action outputs RAW change data, not execution decisions:
+#   - changed_areas: space-separated list of changed paths
+#   - has_code_changes: boolean flag (excludes docs)
+#
+# Jobs use contains() to check if their area changed:
+#   if: contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
+#
+# WHY THIS APPROACH?
+# ✅ Maintainable: Add new jobs without touching this action
+# ✅ Flexible: Jobs can combine multiple area checks with OR/AND
+# ✅ Transparent: Each job's condition is self-documenting
+# ✅ Testable: Easy to verify job conditions in workflows
+#
+# ❌ AVOID: Adding stage_test_* or stage_build_* outputs here
+#    That couples detection logic to pipeline structure (brittle!)
+# =============================================================================
+name: Detect Pipeline Changes
+description: Detects which parts of the codebase have changed to optimize pipeline execution
+
+outputs:
+  changed_areas:
+    description: Space-separated list of changed areas (e.g., "apps/web services/api k8s")
+    value: ${{ steps.detect.outputs.changed_areas }}
+  has_code_changes:
+    description: Whether code changes exist (excludes docs-only changes)
+    value: ${{ steps.detect.outputs.has_code_changes }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect changes
+      id: detect
+      shell: pwsh
+      run: .\scripts\ci\detect-changes.ps1 -OutputFormat github-actions

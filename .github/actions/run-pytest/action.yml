@@ -1,0 +1,28 @@
+name: Run pytest
+description: Executes pytest with standardized configuration
+
+inputs:
+  working-directory:
+    description: Directory containing tests to run
+    required: true
+  pytest-args:
+    description: Additional pytest arguments
+    required: false
+    default: '-v --tb=short'
+  parallel:
+    description: Run tests in parallel with pytest-xdist
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Run pytest
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ "${{ inputs.parallel }}" = "true" ]; then
+          python -m pytest -n auto tests/ ${{ inputs.pytest-args }}
+        else
+          python -m pytest tests/ ${{ inputs.pytest-args }}
+        fi

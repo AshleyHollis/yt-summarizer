@@ -1,0 +1,46 @@
+name: 'Validate Kubernetes YAML'
+description: 'Validates YAML syntax for all Kubernetes manifest files'
+
+inputs:
+  directory:
+    description: 'Directory containing Kubernetes manifests'
+    required: false
+    default: 'k8s'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate YAML syntax
+      shell: bash
+      working-directory: ${{ inputs.directory != '.' && inputs.directory || github.workspace }}
+      run: |
+        python3 << 'EOF'
+        import yaml
+        import os
+        import sys
+        
+        exit_code = 0
+        search_dir = "${{ inputs.directory }}" if "${{ inputs.directory }}" != "." else "."
+        
+        for root, dirs, files in os.walk(search_dir):
+            for file in files:
+                if file.endswith(('.yaml', '.yml')):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            list(yaml.safe_load_all(f))
+                        print(f'✅ Valid: {filepath}')
+                    except yaml.YAMLError as e:
+                        print(f'❌ YAML error in {filepath}: {e}')
+                        exit_code = 1
+                    except Exception as e:
+                        print(f'❌ Error in {filepath}: {e}')
+                        exit_code = 1
+        
+        if exit_code == 0:
+            print('✅ All YAML files have valid syntax')
+        else:
+            print('::error::YAML syntax validation failed')
+        
+        sys.exit(exit_code)
+        EOF

@@ -1,0 +1,69 @@
+name: Validate Resource Quota
+description: Validates that Kubernetes manifest resources are within quota limits
+
+inputs:
+  manifest-file:
+    description: Path to the Kubernetes manifest file to validate
+    required: true
+  max-cpu:
+    description: Maximum CPU requests in millicores (e.g., 1500 for 1.5 CPU)
+    required: false
+    default: ''
+  max-memory:
+    description: Maximum memory requests in Mi (e.g., 2048 for 2Gi)
+    required: false
+    default: ''
+  resource-name:
+    description: Name of the resource for error messages
+    required: false
+    default: 'resource'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate resource quota
+      shell: bash
+      run: |
+        MANIFEST="${{ inputs.manifest-file }}"
+        RESOURCE_NAME="${{ inputs.resource-name }}"
+        
+        if [ ! -f "$MANIFEST" ]; then
+          echo "::error::Manifest file not found: $MANIFEST"
+          exit 1
+        fi
+        
+        echo "Validating resource quotas for ${RESOURCE_NAME}..."
+        
+        # Validate CPU if specified
+        if [ -n "${{ inputs.max-cpu }}" ]; then
+          if [ -f scripts/ci/validate_kustomize.py ]; then
+            if ! python scripts/ci/validate_kustomize.py --file "$MANIFEST" --max-cpu ${{ inputs.max-cpu }} --name "${RESOURCE_NAME}"; then
+              echo "::error::${RESOURCE_NAME} CPU requests exceed quota (${{ inputs.max-cpu }}m)"
+              echo "--- Manifest preview (first 200 lines) ---"
+              head -n 200 "$MANIFEST" || true
+              exit 1
+            fi
+            echo "✅ CPU quota validation passed (max: ${{ inputs.max-cpu }}m)"
+          else
+            echo "⚠️ Skipping CPU validation (validate_kustomize.py not found)"
+          fi
+        fi
+        
+        # Validate memory if specified
+        if [ -n "${{ inputs.max-memory }}" ]; then
+          if [ -f scripts/ci/validate_kustomize.py ]; then
+            if ! python scripts/ci/validate_kustomize.py --file "$MANIFEST" --max-memory ${{ inputs.max-memory }} --name "${RESOURCE_NAME}"; then
+              echo "::error::${RESOURCE_NAME} memory requests exceed quota (${{ inputs.max-memory }}Mi)"
+              echo "--- Manifest preview (first 200 lines) ---"
+              head -n 200 "$MANIFEST" || true
+              exit 1
+            fi
+            echo "✅ Memory quota validation passed (max: ${{ inputs.max-memory }}Mi)"
+          else
+            echo "⚠️ Skipping memory validation (validate_kustomize.py not found)"
+          fi
+        fi
+        
+        if [ -z "${{ inputs.max-cpu }}" ] && [ -z "${{ inputs.max-memory }}" ]; then
+          echo "⚠️ No quota limits specified - skipping validation"
+        fi

@@ -9,22 +9,24 @@ import { test, expect } from '@playwright/test';
  * 3. Form validation works
  * 4. Video submission flow works (requires backend)
  *
+ * Tests tagged with @smoke are run after production deployments.
+ *
  * Prerequisites:
  * - For tests that need the backend, run Aspire first:
  *   cd services/aspire/AppHost && dotnet run
  * - Then run tests with: USE_EXTERNAL_SERVER=true npm run test:e2e
  */
 
-test.describe('Core User Flows', () => {
+test.describe('Core User Flows @smoke', () => {
   test.describe('Navigation', () => {
-    test('home page redirects to add page', async ({ page }) => {
+    test('home page redirects to add page @smoke', async ({ page }) => {
       await page.goto('/');
       
       // Should redirect to /add
       await expect(page).toHaveURL('/add');
     });
 
-    test('add page has correct title', async ({ page }) => {
+    test('add page has correct title @smoke', async ({ page }) => {
       await page.goto('/add');
       
       // Check page title
@@ -37,7 +39,7 @@ test.describe('Core User Flows', () => {
       await page.goto('/add');
     });
 
-    test('renders header with app name', async ({ page }) => {
+    test('renders header with app name @smoke', async ({ page }) => {
       // Check header/navigation exists
       const nav = page.locator('nav');
       await expect(nav).toBeVisible();

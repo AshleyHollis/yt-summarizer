@@ -1,0 +1,36 @@
+name: 'Create Preview Deployment Summary'
+description: 'Creates a GitHub Actions step summary for preview deployments'
+inputs:
+  pr-number:
+    description: 'Pull request number'
+    required: true
+  preview-url:
+    description: 'Preview environment URL'
+    required: true
+  image-tag:
+    description: 'Docker image tag deployed'
+    required: true
+  commit-sha:
+    description: 'Git commit SHA'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Create deployment summary
+      shell: bash
+      run: |
+        echo "## 🚀 Preview Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **PR** | #${{ inputs.pr-number }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Preview URL** | ${{ inputs.preview-url }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Image Tag** | \`${{ inputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Commit** | \`${{ inputs.commit-sha }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [Preview Site](${{ inputs.preview-url }})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ℹ️ Architecture" >> $GITHUB_STEP_SUMMARY
+        echo "- **Backend**: Deployed to AKS preview namespace" >> $GITHUB_STEP_SUMMARY
+        echo "- **Frontend**: Deployed to Azure Static Web Apps staging slot" >> $GITHUB_STEP_SUMMARY

@@ -3,11 +3,11 @@
 import { CopilotKit } from "@copilotkit/react-core";
 import "@copilotkit/react-ui/styles.css";
 import { ThemeProvider } from "next-themes";
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ToolResultProvider } from "@/contexts/ToolResultContext";
 import { HealthStatusProvider, useHealthStatus } from "@/contexts/HealthStatusContext";
-import { WarmingUpIndicator } from "@/components/common";
+import { WarmingUpIndicator, CopilotErrorBoundary } from "@/components/common";
 
 // Types for scope management
 export interface DateRange {
@@ -258,10 +258,39 @@ interface ProvidersProps {
  * @see threadPersistence.ts - API layer and message transformation
  */
 export function Providers({ children }: ProvidersProps) {
+  // Wrap in Suspense because ProvidersInner uses useSearchParams
+  // This is required for static generation (e.g., 404 page)
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <HealthStatusProvider pollInterval={5000}>
+        <HealthStatusBanner />
+        <Suspense fallback={null}>
+          <ProvidersInner>{children}</ProvidersInner>
+        </Suspense>
+      </HealthStatusProvider>
+    </ThemeProvider>
+  );
+}
+
+/**
+ * Inner providers component that uses useSearchParams.
+ * Must be wrapped in Suspense boundary for static generation.
+ */
+function ProvidersInner({ children }: ProvidersProps) {
   // Self-hosted runtime using Microsoft Agent Framework
   // Configure NEXT_PUBLIC_API_URL to point to your backend
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const runtimeUrl = `${apiUrl}/api/copilotkit`;
+  
+  // Debug logging for production troubleshooting
+  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENVIRONMENT === 'preview') {
+    console.log('[CopilotKit Debug]', {
+      apiUrl,
+      runtimeUrl,
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+      NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
+    });
+  }
   
   // ============================================================================
   // THREAD ID FROM URL - The Single Source of Truth
@@ -286,26 +315,23 @@ export function Providers({ children }: ProvidersProps) {
   // causes the "page refresh" effect. CopilotKit handles threadId changes internally.
   
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <HealthStatusProvider pollInterval={5000}>
-        <HealthStatusBanner />
-        <CopilotKit 
-          runtimeUrl={runtimeUrl} 
-          agent="yt-summarizer" 
-          showDevConsole={false}
-          enableInspector={false}
-          threadId={mounted ? (urlThreadId ?? undefined) : undefined}
-        >
-          <ToolResultProvider>
-            <VideoContextProvider>
-              <ScopeProvider>
-                <AISettingsProvider>{children}</AISettingsProvider>
-              </ScopeProvider>
-            </VideoContextProvider>
-          </ToolResultProvider>
-        </CopilotKit>
-      </HealthStatusProvider>
-    </ThemeProvider>
+    <CopilotErrorBoundary>
+      <CopilotKit 
+        runtimeUrl={runtimeUrl} 
+        agent="yt-summarizer" 
+        showDevConsole={false}
+        enableInspector={false}
+        threadId={mounted ? (urlThreadId ?? undefined) : undefined}
+      >
+        <ToolResultProvider>
+          <VideoContextProvider>
+            <ScopeProvider>
+              <AISettingsProvider>{children}</AISettingsProvider>
+            </ScopeProvider>
+          </VideoContextProvider>
+        </ToolResultProvider>
+      </CopilotKit>
+    </CopilotErrorBoundary>
   );
 }
 

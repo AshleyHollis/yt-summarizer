@@ -1,18 +1,34 @@
 # =============================================================================
 # Preview Ingress Patch
 # =============================================================================
-# Routes traffic via path-based routing (no dynamic subdomain needed)
-# Preview URL: https://preview.yt-summarizer.example.com/api
+# Routes traffic to preview API pods via nip.io wildcard DNS
+# 
+# CRITICAL: TLS/HTTPS REQUIREMENTS
+# ---------------------------------
+# - Frontend served from Azure Static Web Apps over HTTPS
+# - Backend MUST also use HTTPS to avoid mixed content errors
+# - Browsers block HTTP requests from HTTPS pages (mixed content policy)
+# - cert-manager.io/cluster-issuer MUST use "letsencrypt-prod" for trusted certs
+# - NEVER use "letsencrypt-staging" - it creates untrusted certs that browsers reject
+#
+# Access URL: https://api.preview-pr-<num>.<ip-dashed>.nip.io
+# Example: https://api.preview-pr-4-20260110.20-255-113-149.nip.io
+# =============================================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-ingress
+  namespace: yt-summarizer
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # IMPORTANT: ssl-redirect must be "true" for HTTPS (prevents mixed content errors)
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Using letsencrypt-prod with new domain to avoid rate limits
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   rules:
-    - host: preview.yt-summarizer.example.com
+    # Host will be filled in by the preview workflow (e.g. api.preview-pr-<num>.<ip-dashed>.nip.io)
+    # Modified domain to avoid Let's Encrypt rate limits
+    - host: test.example
       http:
         paths:
           - path: /api(/|$)(.*)
@@ -22,3 +38,14 @@ spec:
                 name: api
                 port:
                   number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - test.example
+      secretName: tls-secret

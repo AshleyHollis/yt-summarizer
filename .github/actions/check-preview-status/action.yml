@@ -1,0 +1,97 @@
+name: 'Check Preview Pipeline Status'
+description: 'Validates preview pipeline results and creates status summary'
+inputs:
+  has-code-changes:
+    description: 'Whether PR has code changes (true/false)'
+    required: true
+  update-overlay-result:
+    description: 'Result of update-overlay job'
+    required: true
+  verify-deployment-result:
+    description: 'Result of verify-deployment job'
+    required: true
+  deploy-frontend-result:
+    description: 'Result of deploy-frontend-preview job'
+    required: true
+  e2e-tests-result:
+    description: 'Result of e2e-tests job'
+    required: true
+  api-url-configured:
+    description: 'Whether API URL is configured'
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Check preview pipeline status
+      shell: bash
+      env:
+        API_URL_CONFIGURED: ${{ inputs.api-url-configured }}
+      run: |
+        echo "## Preview Pipeline Status" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # If no code changes, mark as success (docs-only PR)
+        if [ "${{ inputs.has-code-changes }}" != "true" ]; then
+          echo "📝 No code changes detected - docs-only PR"
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Detect Changes | ✅ Docs-only |" >> $GITHUB_STEP_SUMMARY
+          exit 0
+        fi
+        
+        # Determine E2E test status display
+        E2E_RESULT="${{ inputs.e2e-tests-result }}"
+        if [ -z "$API_URL_CONFIGURED" ]; then
+          E2E_STATUS="⏭️ Skipped (no API URL)"
+          E2E_REQUIRED=false
+        elif [ "$E2E_RESULT" = "success" ]; then
+          E2E_STATUS="✅ Passed"
+          E2E_REQUIRED=true
+        elif [ "$E2E_RESULT" = "skipped" ]; then
+          E2E_STATUS="⏭️ Skipped"
+          E2E_REQUIRED=false
+        else
+          E2E_STATUS="❌ Failed"
+          E2E_REQUIRED=true
+        fi
+        
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Update Overlay | ${{ inputs.update-overlay-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Verify Deployment | ${{ inputs.verify-deployment-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Deploy Frontend | ${{ inputs.deploy-frontend-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| E2E Tests | ${E2E_STATUS} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Required jobs must succeed only if the PR contains code changes
+        if [ "${{ inputs.has-code-changes }}" = "true" ] && [ "${{ inputs.update-overlay-result }}" != "success" ]; then
+          echo "::error::Update overlay failed"
+          exit 1
+        fi
+
+        if [ "${{ inputs.has-code-changes }}" = "true" ] && [ "${{ inputs.verify-deployment-result }}" != "success" ]; then
+          echo "::error::Deployment verification failed - pods may not be running correct image"
+          exit 1
+        fi
+
+        if [ "${{ inputs.has-code-changes }}" = "true" ] && [ "${{ inputs.deploy-frontend-result }}" != "success" ]; then
+          echo "::error::Frontend deployment failed"
+          exit 1
+        fi
+        
+        # E2E tests only required if API URL is configured
+        if [ "$E2E_REQUIRED" = "true" ] && [ "$E2E_RESULT" != "success" ]; then
+          echo "::error::E2E tests failed"
+          exit 1
+        fi
+        
+        if [ -z "$API_URL_CONFIGURED" ]; then
+          echo "⚠️ Preview deployed without backend API" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To enable full preview functionality:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Set \`PREVIEW_API_URL\` in repository variables" >> $GITHUB_STEP_SUMMARY
+          echo "2. Re-run this workflow" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "✅ Preview pipeline completed successfully!" >> $GITHUB_STEP_SUMMARY

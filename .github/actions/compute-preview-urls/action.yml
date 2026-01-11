@@ -1,0 +1,78 @@
+name: 'Compute Preview URLs'
+description: 'Computes preview environment URLs and TLS secret names based on PR number and ingress IP'
+
+inputs:
+  pr-number:
+    description: 'Pull request number'
+    required: true
+  ingress-ip:
+    description: 'Ingress controller external IP'
+    required: true
+  use-https:
+    description: 'Use HTTPS for preview URL (required for Static Web Apps)'
+    required: false
+    default: 'true'
+
+outputs:
+  preview-url:
+    description: 'Full preview URL (e.g., https://api.preview-pr-123.1-2-3-4.nip.io)'
+    value: ${{ steps.compute.outputs.preview_url }}
+  preview-host:
+    description: 'Preview hostname (e.g., api.preview-pr-123.1-2-3-4.nip.io)'
+    value: ${{ steps.compute.outputs.preview_host }}
+  tls-secret:
+    description: 'TLS secret name for preview'
+    value: ${{ steps.compute.outputs.tls_secret }}
+  namespace:
+    description: 'Preview namespace'
+    value: ${{ steps.compute.outputs.namespace }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute URLs
+      id: compute
+      shell: bash
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        INGRESS_IP: ${{ inputs.ingress-ip }}
+        USE_HTTPS: ${{ inputs.use-https }}
+      run: |
+        if [ -n "$INGRESS_IP" ] && [ "$INGRESS_IP" != "" ]; then
+          # Convert IP to dashed format for nip.io
+          IP_DASHED=$(echo "$INGRESS_IP" | tr '.' '-')
+          
+          # Compute preview hostname
+          PREVIEW_HOST="api.preview-pr-${PR_NUMBER}.${IP_DASHED}.nip.io"
+          
+          # Compute preview URL (HTTPS required for Static Web Apps to avoid mixed content)
+          if [ "$USE_HTTPS" = "true" ]; then
+            PREVIEW_URL="https://${PREVIEW_HOST}"
+          else
+            PREVIEW_URL="http://${PREVIEW_HOST}"
+          fi
+          
+          # TLS secret name
+          TLS_SECRET="preview-pr-${PR_NUMBER}-tls"
+          
+          # Namespace
+          NAMESPACE="preview-pr-${PR_NUMBER}"
+          
+          echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
+          echo "preview_host=${PREVIEW_HOST}" >> $GITHUB_OUTPUT
+          echo "tls_secret=${TLS_SECRET}" >> $GITHUB_OUTPUT
+          echo "namespace=${NAMESPACE}" >> $GITHUB_OUTPUT
+          
+          echo "✅ Preview URLs computed:"
+          echo "   URL: ${PREVIEW_URL}"
+          echo "   Host: ${PREVIEW_HOST}"
+          echo "   TLS Secret: ${TLS_SECRET}"
+          echo "   Namespace: ${NAMESPACE}"
+        else
+          echo "::error::Ingress IP is empty - cannot compute preview URLs"
+          echo "preview_url=" >> $GITHUB_OUTPUT
+          echo "preview_host=" >> $GITHUB_OUTPUT
+          echo "tls_secret=" >> $GITHUB_OUTPUT
+          echo "namespace=" >> $GITHUB_OUTPUT
+          exit 1
+        fi

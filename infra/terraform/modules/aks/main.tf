@@ -46,7 +46,7 @@ variable "kubernetes_version" {
 variable "node_pool_name" {
   description = "Name of the default node pool"
   type        = string
-  default     = "default"
+  default     = "system2"
 }
 
 variable "node_count" {
@@ -58,13 +58,19 @@ variable "node_count" {
 variable "node_vm_size" {
   description = "VM size for nodes"
   type        = string
-  default     = "Standard_B2s"
+  default     = "Standard_B4als_v2"  # 4 vCPUs, 8GB RAM, ~$97/month
 }
 
 variable "os_disk_size_gb" {
   description = "OS disk size in GB"
   type        = number
   default     = 30
+}
+
+variable "max_pods" {
+  description = "Maximum number of pods per node"
+  type        = number
+  default     = 100
 }
 
 variable "acr_id" {
@@ -77,6 +83,12 @@ variable "attach_acr" {
   description = "Whether to attach ACR to the cluster"
   type        = bool
   default     = false
+}
+
+variable "enable_workload_identity" {
+  description = "Enable Workload Identity for pod-managed Azure access"
+  type        = bool
+  default     = true
 }
 
 variable "tags" {
@@ -96,12 +108,17 @@ resource "azurerm_kubernetes_cluster" "aks" {
   dns_prefix          = var.dns_prefix
   kubernetes_version  = var.kubernetes_version
 
+  # Enable OIDC issuer for Workload Identity
+  oidc_issuer_enabled       = var.enable_workload_identity
+  workload_identity_enabled = var.enable_workload_identity
+
   # Single-node pool for cost optimization
   default_node_pool {
     name                 = var.node_pool_name
     node_count           = var.node_count
     vm_size              = var.node_vm_size
     os_disk_size_gb      = var.os_disk_size_gb
+    max_pods             = var.max_pods
     auto_scaling_enabled = false  # Renamed from enable_auto_scaling in azurerm 4.x
   }
 
@@ -184,4 +201,9 @@ output "kubelet_identity_object_id" {
 output "identity_principal_id" {
   description = "Principal ID of the cluster managed identity"
   value       = azurerm_kubernetes_cluster.aks.identity[0].principal_id
+}
+
+output "oidc_issuer_url" {
+  description = "OIDC issuer URL for Workload Identity federation"
+  value       = azurerm_kubernetes_cluster.aks.oidc_issuer_url
 }

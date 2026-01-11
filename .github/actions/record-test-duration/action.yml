@@ -1,0 +1,40 @@
+name: Record Test Duration
+description: Records test execution start and finish times for reporting
+
+inputs:
+  start-time:
+    description: Test start time (epoch seconds). If not provided, records current time as start.
+    required: false
+    default: ''
+  test-name:
+    description: Name of the test suite for logging
+    required: false
+    default: 'Tests'
+
+outputs:
+  started_at:
+    description: Test start time (epoch seconds)
+    value: ${{ steps.record.outputs.started_at }}
+  test_duration:
+    description: Test duration in seconds (only available after finish)
+    value: ${{ steps.record.outputs.test_duration }}
+
+runs:
+  using: composite
+  steps:
+    - name: Record test timing
+      id: record
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.start-time }}" ]; then
+          # Record start time
+          echo "started_at=$(date +%s)" >> $GITHUB_OUTPUT
+          echo "📊 Starting ${{ inputs.test-name }}..."
+        else
+          # Record finish time and calculate duration
+          END=$(date +%s)
+          START=${{ inputs.start-time }}
+          DURATION=$((END - START))
+          echo "test_duration=${DURATION}" >> $GITHUB_OUTPUT
+          echo "✅ ${{ inputs.test-name }} completed in ${DURATION}s"
+        fi

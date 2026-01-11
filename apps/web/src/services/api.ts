@@ -4,12 +4,22 @@
 
 import { generateCorrelationId } from './correlation';
 
-// API base URL - use relative path for client-side requests (handled by Next.js rewrites)
-// Only use absolute URL on server-side or when explicitly set
+// API base URL
+// For SWA deployments, NEXT_PUBLIC_API_URL should be the full backend URL
+// For development, it defaults to localhost or can be left empty for rewrites
 const API_BASE_URL =
   typeof window === 'undefined'
-    ? process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:8000'
-    : ''; // Client-side: use relative URLs for Next.js rewrite proxy
+    ? process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    : process.env.NEXT_PUBLIC_API_URL || '';
+
+// Debug logging for production troubleshooting
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENVIRONMENT === 'preview') {
+  console.log('[API Client Debug]', {
+    API_BASE_URL,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
+  });
+}
 
 // Correlation ID header name
 const CORRELATION_ID_HEADER = 'X-Correlation-ID';
@@ -208,7 +218,22 @@ async function request<T>(
   
   // If we never got a response, throw the last network error
   if (!response) {
-    throw lastError || new Error('Failed to connect to API');
+    const error = lastError || new Error('Failed to connect to API');
+    
+    // Check for certificate-related errors
+    if (error.message.includes('certificate') || 
+        error.message.includes('SSL') || 
+        error.message.includes('ERR_CERT') ||
+        error.message.includes('SEC_ERROR')) {
+      throw new ApiClientError(
+        'Backend certificate is invalid or untrusted. This may be a temporary deployment issue. Please try again later or contact support if the problem persists.',
+        0,
+        generateCorrelationId(),
+        undefined
+      );
+    }
+    
+    throw error;
   }
 
   // Get correlation ID from response
