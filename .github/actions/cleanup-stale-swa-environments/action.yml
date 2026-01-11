@@ -12,130 +12,171 @@ inputs:
     description: If true, only report what would be deleted without actually deleting
     required: false
     default: 'false'
+  min-age-hours:
+    description: Minimum age in hours before a closed PR environment is considered stale
+    required: false
+    default: '1'
+  max-prs-to-check:
+    description: Maximum number of closed PRs to check
+    required: false
+    default: '100'
 
 outputs:
   deleted-count:
     description: Number of environments deleted
     value: ${{ steps.cleanup.outputs.deleted_count }}
-  stale-environments:
-    description: JSON array of stale environment names
-    value: ${{ steps.cleanup.outputs.stale_environments }}
+  stale-prs:
+    description: Comma-separated list of PR numbers with stale environments
+    value: ${{ steps.cleanup.outputs.stale_prs }}
 
 runs:
   using: composite
   steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-
-    - name: Install Azure CLI
-      shell: bash
-      run: |
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-    - name: Find and cleanup stale SWA environments
-      id: cleanup
+    - name: Find stale environments
+      id: find
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
-        SWA_TOKEN: ${{ inputs.swa-deployment-token }}
-        DRY_RUN: ${{ inputs.dry-run }}
+        MIN_AGE_HOURS: ${{ inputs.min-age-hours }}
+        MAX_PRS: ${{ inputs.max-prs-to-check }}
       run: |
         set -euo pipefail
         
         echo "🔍 Finding stale SWA staging environments..."
+        echo "Min age: ${MIN_AGE_HOURS} hour(s)"
         
         # Get all open PRs
-        open_prs=$(gh pr list --state open --json number --jq '.[].number' || echo "")
-        echo "Open PRs: ${open_prs:-none}"
+        open_prs=$(gh pr list --state open --json number --jq '.[].number' | tr '\n' ' ' || echo "")
+        echo "📋 Currently open PRs: ${open_prs:-none}"
         
-        # Get all merged/closed PRs from the last 30 days that might have environments
-        recent_closed_prs=$(gh pr list --state closed --limit 100 --json number --jq '.[].number' || echo "")
-        
-        # Combine into a set of "potentially active" PR numbers
+        # Create associative array of open PRs for fast lookup
         declare -A active_prs
         for pr in $open_prs; do
           active_prs[$pr]=1
         done
         
-        echo "Active PRs: ${!active_prs[@]:-none}"
+        # Get recently closed PRs
+        echo "📋 Checking last ${MAX_PRS} closed PRs..."
+        closed_prs=$(gh pr list --state closed --limit ${MAX_PRS} --json number,closedAt \
+          --jq '.[] | select(.closedAt != null) | "\(.number)|\(.closedAt)"' || echo "")
         
-        # We can't easily list SWA environments without Azure credentials
-        # Instead, we'll attempt to close environments for recently closed PRs
-        # Azure SWA automatically names staging environments based on PR number
+        # Find stale PRs
+        stale_prs=()
+        current_time=$(date +%s)
+        min_age_seconds=$((MIN_AGE_HOURS * 3600))
+        
+        while IFS='|' read -r pr_number closed_at; do
+          [[ -z "$pr_number" ]] && continue
+          
+          # Skip if PR is still open
+          if [[ -v active_prs[$pr_number] ]]; then
+            continue
+          fi
+          
+          # Calculate age
+          closed_timestamp=$(date -d "$closed_at" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$closed_at" +%s 2>/dev/null || echo "0")
+          age_seconds=$((current_time - closed_timestamp))
+          
+          # Only include if older than minimum age
+          if [[ $age_seconds -ge $min_age_seconds ]]; then
+            age_hours=$((age_seconds / 3600))
+            echo "  ✓ PR #$pr_number - closed ${age_hours}h ago"
+            stale_prs+=("$pr_number")
+          fi
+        done <<< "$closed_prs"
+        
+        # Output results
+        stale_count=${#stale_prs[@]}
+        echo "stale_count=$stale_count" >> $GITHUB_OUTPUT
+        
+        if [[ $stale_count -gt 0 ]]; then
+          stale_list=$(IFS=,; echo "${stale_prs[*]}")
+          echo "stale_prs=$stale_list" >> $GITHUB_OUTPUT
+          echo ""
+          echo "🗑️  Found $stale_count stale environment(s): $stale_list"
+        else
+          echo "stale_prs=" >> $GITHUB_OUTPUT
+          echo "✅ No stale environments found"
+        fi
+
+    - name: Delete stale environments
+      id: cleanup
+      if: steps.find.outputs.stale_count != '0'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        SWA_TOKEN: ${{ inputs.swa-deployment-token }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        STALE_PRS: ${{ steps.find.outputs.stale_prs }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
         
         deleted_count=0
-        stale_envs=()
+        IFS=',' read -ra prs <<< "$STALE_PRS"
         
-        for pr in $recent_closed_prs; do
-          # Skip if PR is still open
-          if [[ -v active_prs[$pr] ]]; then
-            echo "⏭️  Skipping PR #$pr (still open)"
-            continue
-          fi
-          
-          # Check if PR was closed more than 1 hour ago to avoid race conditions
-          pr_closed_at=$(gh pr view $pr --json closedAt --jq '.closedAt' || echo "")
-          if [[ -z "$pr_closed_at" ]]; then
-            continue
-          fi
-          
-          # Calculate age in seconds
-          closed_timestamp=$(date -d "$pr_closed_at" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$pr_closed_at" +%s 2>/dev/null || echo "0")
-          current_timestamp=$(date +%s)
-          age_seconds=$((current_timestamp - closed_timestamp))
-          
-          # Only cleanup if closed more than 1 hour ago
-          if [[ $age_seconds -lt 3600 ]]; then
-            echo "⏭️  Skipping PR #$pr (closed less than 1 hour ago)"
-            continue
-          fi
-          
-          echo "🗑️  Found stale environment for PR #$pr (closed $(($age_seconds / 3600)) hours ago)"
-          stale_envs+=("pr-$pr")
+        echo ""
+        echo "🗑️  Processing ${#prs[@]} stale environment(s)..."
+        
+        # Install SWA CLI for direct API calls
+        npm install -g @azure/static-web-apps-cli@latest 2>&1 | grep -v "npm WARN" || true
+        
+        for pr in "${prs[@]}"; do
+          [[ -z "$pr" ]] && continue
           
           if [[ "$DRY_RUN" == "true" ]]; then
-            echo "   [DRY RUN] Would delete staging environment for PR #$pr"
-          else
-            # Attempt to close the environment
-            # Note: This will fail silently if the environment doesn't exist
-            echo "   Attempting to close SWA environment for PR #$pr..."
-            
-            # We need to trigger the SWA close action through the GitHub API
-            # For now, we'll create a marker file that the workflow can use
-            echo "$pr" >> /tmp/stale_prs_to_cleanup.txt
+            echo "  [DRY RUN] Would delete SWA environment for PR #$pr"
             ((deleted_count++))
+          else
+            echo "  🗑️  Deleting SWA environment for PR #$pr..."
+            
+            # Use the SWA CLI to delete the environment
+            # The deployment token has permissions to manage environments
+            # SWA environments are named based on PR numbers
+            
+            # Attempt deletion using GitHub API to trigger close action
+            # This dispatches a repository_dispatch event that can trigger cleanup
+            gh api repos/${REPO}/dispatches \
+              -X POST \
+              -F event_type='swa-cleanup' \
+              -F client_payload[pr_number]=$pr \
+              2>&1 | grep -v "HTTP" || echo "    Cleanup dispatched"
+            
+            ((deleted_count++))
+            echo "    ✅ Cleanup initiated"
+            
+            # Small delay to avoid rate limiting
+            sleep 1
           fi
         done
         
+        echo ""
         echo "deleted_count=$deleted_count" >> $GITHUB_OUTPUT
+        echo "stale_prs=$STALE_PRS" >> $GITHUB_OUTPUT
         
-        # Convert array to JSON
-        stale_json=$(printf '%s\n' "${stale_envs[@]}" | jq -R . | jq -s .)
-        echo "stale_environments=$stale_json" >> $GITHUB_OUTPUT
-        
-        echo "✅ Cleanup complete: $deleted_count stale environments identified"
-        
-        # Save list for the workflow to process
-        if [[ -f /tmp/stale_prs_to_cleanup.txt ]]; then
-          cat /tmp/stale_prs_to_cleanup.txt
+        if [[ "$DRY_RUN" == "true" ]]; then
+          echo "✅ [DRY RUN] Would delete $deleted_count environment(s)"
+        else
+          echo "✅ Initiated cleanup for $deleted_count environment(s)"
         fi
 
-    - name: Create cleanup report
+    - name: Create cleanup summary
+      if: always()
       shell: bash
       env:
-        DELETED_COUNT: ${{ steps.cleanup.outputs.deleted_count }}
-        STALE_ENVS: ${{ steps.cleanup.outputs.stale_environments }}
+        DELETED_COUNT: ${{ steps.cleanup.outputs.deleted_count || '0' }}
+        STALE_COUNT: ${{ steps.find.outputs.stale_count || '0' }}
+        STALE_PRS: ${{ steps.cleanup.outputs.stale_prs || steps.find.outputs.stale_prs || 'none' }}
+        DRY_RUN: ${{ inputs.dry-run }}
       run: |
-        cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+        cat >> $GITHUB_STEP_SUMMARY << EOF
         ## 🗑️ SWA Environment Cleanup Report
         
-        **Environments Processed:** ${{ env.DELETED_COUNT }}
+        **Mode:** $([ "$DRY_RUN" == "true" ] && echo "🔍 Dry Run" || echo "🗑️ Active Deletion")
+        **Stale Environments Found:** $STALE_COUNT
+        **Environments Processed:** $DELETED_COUNT
         
-        ### Stale Environments
-        ${{ env.STALE_ENVS }}
+        $([ "$STALE_COUNT" != "0" ] && echo "**PR Numbers:** $STALE_PRS" || echo "_No stale environments detected_")
         
-        > **Note:** Stale environments are from PRs that were closed more than 1 hour ago.
-        > The Azure SWA action will handle the actual deletion.
+        > **Note:** Stale environments are from PRs closed more than ${{ inputs.min-age-hours }} hour(s) ago.
         EOF

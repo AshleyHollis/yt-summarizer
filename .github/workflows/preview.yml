@@ -361,55 +361,14 @@ jobs:
           environment: 'preview'
           working-directory: 'apps/web'
 
-      - name: Pre-deployment cleanup check
-        id: cleanup-check
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "🔍 Checking for stale SWA environments to cleanup before deployment..."
-          
-          # Get all open PRs
-          open_prs=$(gh pr list --state open --json number --jq '.[].number' | tr '\n' ' ' || echo "")
-          echo "Currently open PRs: ${open_prs:-none}"
-          
-          # Get recently closed PRs (last 7 days)
-          closed_prs=$(gh pr list --state closed --limit 50 --json number,closedAt \
-            --jq '.[] | select(.closedAt != null) | "\(.number)|\(.closedAt)"' || echo "")
-          
-          # Create set of open PRs
-          declare -A active_prs
-          for pr in $open_prs; do
-            active_prs[$pr]=1
-          done
-          
-          # Find stale PRs
-          stale_count=0
-          current_time=$(date +%s)
-          
-          while IFS='|' read -r pr_number closed_at; do
-            [[ -z "$pr_number" ]] && continue
-            [[ -v active_prs[$pr_number] ]] && continue
-            
-            # Calculate age
-            closed_timestamp=$(date -d "$closed_at" +%s 2>/dev/null || echo "0")
-            age_hours=$(( (current_time - closed_timestamp) / 3600 ))
-            
-            # Count stale environments (closed > 1 hour ago)
-            if [[ $age_hours -gt 1 ]]; then
-              echo "Found stale environment: PR #$pr_number (closed $age_hours hours ago)"
-              ((stale_count++))
-            fi
-          done <<< "$closed_prs"
-          
-          echo "stale_count=$stale_count" >> $GITHUB_OUTPUT
-          
-          if [[ $stale_count -gt 0 ]]; then
-            echo "⚠️  Found $stale_count potentially stale SWA environments"
-            echo "💡 If deployment fails due to environment limit, these should be cleaned up"
-          else
-            echo "✅ No stale environments detected"
-          fi
+      - name: Find and cleanup stale SWA environments
+        uses: ./.github/actions/cleanup-stale-swa-environments
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          dry-run: 'false'
+          min-age-hours: '1'
+          max-prs-to-check: '50'
 
       - name: Deploy to SWA staging environment
         id: deploy

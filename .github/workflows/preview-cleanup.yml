@@ -26,13 +26,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Cleanup SWA staging environment
+      - name: Close SWA staging environment
         id: swa-cleanup
-        uses: Azure/static-web-apps-deploy@v1
-        continue-on-error: true
+        uses: ./.github/actions/close-swa-environment
         with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          action: close
+          pr-number: ${{ github.event.pull_request.number }}
+          swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
 
       - name: Report SWA cleanup status
         if: always()

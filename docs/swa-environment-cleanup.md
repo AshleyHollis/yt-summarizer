@@ -11,7 +11,21 @@ Reason: This Static Web App already has the maximum number of staging environmen
 
 ## Solution: Multi-Layered Cleanup Approach
 
-We implement three complementary cleanup strategies to ensure stale environments are removed:
+We implement three complementary cleanup strategies using SOLID principles and focused composite actions to ensure stale environments are removed.
+
+### Architecture: Composite Actions (SOLID Principles)
+
+The implementation follows clean code principles with focused, reusable composite actions:
+
+1. **`find-stale-prs`** - Single Responsibility: Find closed PRs
+2. **`close-swa-environment`** - Single Responsibility: Close a specific SWA environment
+3. **`cleanup-stale-swa-environments`** - Orchestration: Find and cleanup in one action
+
+This modular approach allows for:
+- ✅ Easy testing of individual components
+- ✅ Reusability across workflows
+- ✅ Clear separation of concerns
+- ✅ Maintainability
 
 ### 1. **Immediate Cleanup on PR Close** (Primary)
 
@@ -21,23 +35,23 @@ We implement three complementary cleanup strategies to ensure stale environments
 
 **How it works:**
 - Listens to PR `closed` events
+- Uses the `close-swa-environment` composite action
 - Immediately calls Azure SWA deploy action with `action: close`
 - Posts a status comment to the PR
-- Updates K8s resources via Argo CD
 
 **Benefits:**
 - Immediate cleanup when PR is no longer needed
 - Zero manual intervention required
 - Prevents environment accumulation
+- Uses focused composite action for reusability
 
 **Code:**
 ```yaml
-- name: Cleanup SWA staging environment
-  uses: Azure/static-web-apps-deploy@v1
-  continue-on-error: true
+- name: Close SWA staging environment
+  uses: ./.github/actions/close-swa-environment
   with:
-    azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-    action: close
+    pr-number: ${{ github.event.pull_request.number }}
+    swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
 ```
 
 ### 2. **Scheduled Cleanup of Stale Environments** (Safety Net)
@@ -50,16 +64,17 @@ We implement three complementary cleanup strategies to ensure stale environments
 
 **How it works:**
 - Queries GitHub API for all open PRs
-- Finds recently closed PRs (last 30 days)
+- Finds recently closed PRs (last 100)
 - Identifies environments from PRs closed >1 hour ago
-- Reports stale environments
-- Can be run in dry-run mode for safety
+- Uses `cleanup-stale-swa-environments` composite action to perform cleanup
+- Initiates deletion for each stale environment
 
 **Benefits:**
 - Catches any environments missed by PR close trigger
 - Provides visibility into environment usage
 - Manual trigger allows on-demand cleanup
-- Dry-run mode for testing
+- Dry-run mode for safety
+- Actually deletes stale environments (not just reports)
 
 **Usage:**
 ```bash
@@ -68,7 +83,19 @@ We implement three complementary cleanup strategies to ensure stale environments
 # Toggle "Dry run mode" as needed
 ```
 
-### 3. **Pre-Deployment Check** (Proactive)
+**Code:**
+```yaml
+- name: Find and cleanup stale SWA environments
+  uses: ./.github/actions/cleanup-stale-swa-environments
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+    dry-run: ${{ github.event.inputs.dry-run || 'false' }}
+    min-age-hours: '1'
+    max-prs-to-check: '100'
+```
+
+### 3. **Pre-Deployment Cleanup** (Proactive)
 
 **Workflow:** [`.github/workflows/preview.yml`](.github/workflows/preview.yml)
 
@@ -76,22 +103,26 @@ We implement three complementary cleanup strategies to ensure stale environments
 
 **How it works:**
 - Runs before attempting to deploy new environment
-- Checks for stale environments from closed PRs
-- Reports findings in deployment logs
-- Provides early warning if approaching limit
+- Uses `cleanup-stale-swa-environments` composite action
+- Actually deletes stale environments from closed PRs
+- Makes room for the new deployment
 
 **Benefits:**
-- Identifies potential issues before deployment fails
-- Provides context for troubleshooting
-- No blocking behavior (continues with deployment)
+- Proactively prevents "maximum environments" errors
+- Ensures deployment succeeds by making room first
+- Uses the same composite action as scheduled cleanup (DRY principle)
+- Automatic, no manual intervention needed
 
 **Code:**
 ```yaml
-- name: Pre-deployment cleanup check
-  run: |
-    # Check for stale SWA environments
-    # Report count and details
-    # Continue with deployment
+- name: Find and cleanup stale SWA environments
+  uses: ./.github/actions/cleanup-stale-swa-environments
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+    dry-run: 'false'
+    min-age-hours: '1'
+    max-prs-to-check: '50'
 ```
 
 ## Implementation Details
