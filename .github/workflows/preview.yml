@@ -90,9 +90,8 @@ jobs:
         id: check
         uses: ./.github/actions/detect-pr-code-changes
         with:
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          pr-number: ${{ steps.pr-meta.outputs.pr_number }}
+          base-sha: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.event.pull_request.base.ref) || 'origin/main' }}
+          head-sha: ${{ steps.pr-meta.outputs.pr_head_sha }}
 
 
   # ---------------------------------------------------------------------------

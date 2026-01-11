@@ -1,22 +1,22 @@
 name: Detect PR Code Changes
 description: |
   Detects if a PR contains changes that would trigger image building in CI.
+  Uses git diff to reliably get ALL changed files between base and head commits.
   Only returns true for changes in: services/api, services/workers, services/shared, apps/web, docker files.
   This ensures preview deployments only run when images are actually available.
 
-  ROOT CAUSE FIX: Previously returned true for ANY non-docs change, causing preview to run
-  even when CI didn't build images (e.g., workflow changes). Now aligned with CI build triggers.
+  BETTER APPROACH: Uses git diff instead of GitHub API for reliability.
+  No longer limited by API pagination or commit history issues.
 
 inputs:
-  github-token:
-    description: GitHub token for API access
-    required: true
-  repository:
-    description: GitHub repository (owner/repo)
-    required: true
-  pr-number:
-    description: Pull request number
-    required: true
+  base-sha:
+    description: Base commit SHA to compare against (defaults to origin/main)
+    required: false
+    default: 'origin/main'
+  head-sha:
+    description: Head commit SHA to compare (defaults to HEAD)
+    required: false
+    default: 'HEAD'
   force-preview-labels:
     description: Comma-separated list of labels that force preview deployment
     required: false
@@ -33,47 +33,25 @@ runs:
     - name: Detect code changes
       id: detect
       shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.github-token }}
       run: |
-        PR_NUMBER="${{ inputs.pr-number }}"
+        # Fetch all changed files using git diff (more reliable than GitHub API)
+        # This ensures we get ALL files changed in the PR, not just recent commits
+        BASE_SHA="${{ inputs.base-sha }}"
+        HEAD_SHA="${{ inputs.head-sha }}"
         
-        echo "Checking PR: ${PR_NUMBER}"
-
-        # Validate PR number
-        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
-          echo "No PR number provided (got: ${PR_NUMBER}) - assuming no code changes"
+        echo "Comparing: $BASE_SHA...$HEAD_SHA"
+        
+        # Get all changed files using git diff
+        FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
+        
+        if [ -z "$FILES" ]; then
+          echo "⚠️ Could not fetch changed files using git diff - assuming no code changes"
           echo "has_code_changes=false" >> $GITHUB_OUTPUT
           exit 0
         fi
 
-        # Fetch all changed files in the PR
-        FILES=$(gh api repos/${{ inputs.repository }}/pulls/${PR_NUMBER}/files --jq '.[] .filename' 2>/dev/null || echo "")
-        
-        if [ -z "$FILES" ]; then
-          echo "⚠️ Could not fetch PR files - assuming code changes for safety"
-          echo "has_code_changes=true" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
-        echo "Files changed in this PR:"
+        echo "Files changed in this comparison:"
         echo "$FILES"
-
-        # Check for force-preview labels
-        HAS_CODE=false
-        LABELS=$(gh api repos/${{ inputs.repository }}/issues/${PR_NUMBER} --jq '.labels[].name' 2>/dev/null || echo "")
-        
-        IFS=',' read -ra FORCE_LABELS <<< "${{ inputs.force-preview-labels }}"
-        for lbl in $LABELS; do
-          for force_label in "${FORCE_LABELS[@]}"; do
-            force_label=$(echo "$force_label" | xargs)  # Trim whitespace
-            if [[ "$lbl" == "$force_label" ]]; then
-              echo "🔔 Force preview label detected: $lbl"
-              HAS_CODE=true
-              break 2
-            fi
-          done
-        done
 
         # Check if any file would trigger image building in CI
         # CRITICAL FIX: Only return true for changes that actually build images in CI workflow
@@ -90,6 +68,7 @@ runs:
         #
         # ROOT CAUSE: Previously checked for ANY non-docs change, causing preview to run
         # even when CI skipped image building (e.g., workflow-only changes)
+        HAS_CODE=false
         while IFS= read -r file; do
           if [[ -n "$file" ]]; then
             # Skip docs, specs, and markdown files
@@ -108,7 +87,7 @@ runs:
         echo "has_code_changes=$HAS_CODE" >> $GITHUB_OUTPUT
 
         if [ "$HAS_CODE" = "true" ]; then
-          echo "✅ PR contains changes that trigger image building or force-preview label"
+          echo "✅ Comparison contains changes that trigger image building"
         else
-          echo "📝 PR contains only documentation changes or changes that don't require image building"
+          echo "📝 Comparison contains only documentation changes or changes that don't require image building"
         fi
