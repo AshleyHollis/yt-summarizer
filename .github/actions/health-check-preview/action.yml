@@ -171,25 +171,7 @@ runs:
           echo "::error::Service has no endpoints - pods may not be ready"
         fi
 
-    - name: Diagnose external connectivity
-      shell: bash
-      run: |
-        EXTERNAL_URL="${{ inputs.external-url }}"
-        
-        echo "🔍 Diagnosing external connectivity..."
-        echo "URL: ${EXTERNAL_URL}/health/live"
-        
-        # Test with verbose output and capture SSL info
-        echo "--- Detailed Connection Test ---"
-        curl -v --max-time 10 "${EXTERNAL_URL}/health/live" 2>&1 | grep -E "SSL|TLS|certificate|HTTP|Connected|Trying" || true
-        
-        # Test with insecure to see if it's just a cert issue
-        echo ""
-        echo "--- Testing with SSL verification bypass ---"
-        INSECURE_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" || echo "000")
-        echo "HTTP Status (with -k): ${INSECURE_CODE}"
-        
-        if [ "$INSECURE_CODE" = "200" ]; then
+    - name: Check external ingress health
       id: external-check
       shell: bash
       run: |
@@ -201,34 +183,38 @@ runs:
         echo "🌐 Checking API health via external ingress..."
         echo "URL: ${EXTERNAL_URL}/health/live"
         
-        # Check certificate status first
+        # Check certificate status first - FAIL FAST if not ready
         WILDCARD_CERT="yt-summarizer-wildcard"
         CERT_NAMESPACE="gateway-system"
         CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
         
-        # DNS propagation can take a few minutes - always give it some time
+        # If certificate is NOT ready, fail immediately without doing external checks
+        if [ "$CERT_READY" != "True" ]; then
+          echo "::error::Gateway API wildcard TLS certificate is NOT ready"
+          echo "::error::Certificate: ${WILDCARD_CERT} (namespace: ${CERT_NAMESPACE})"
+          echo "::error::Status: ${CERT_READY}"
+          echo "::error::Message: ${CERT_MESSAGE}"
+          
+          # Provide specific guidance based on cert status
+          if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
+            echo "::error::Let's Encrypt rate limit detected!"
+            echo "::notice::Rate limit: 5 certificates per exact domain set per 168 hours"
+            echo "::notice::Wait for rate limit to expire or use staging certificates for testing"
+          fi
+          
+          echo "::notice::External access requires a valid TLS certificate"
+          echo "::notice::Fix the certificate issue before the preview environment will be accessible"
+          echo "healthy=false-cert-not-ready" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+        echo "✅ TLS certificate is ready - proceeding with external health checks"
+        
+        # DNS propagation can take a few minutes - give it some time
         echo "::notice::Waiting 30 seconds for DNS propagation..."
         sleep 30
         
-        # IMPORTANT: Only skip external check if cert is rate-limited AND not ready
-        # If cert is ready, we MUST perform external health check and fail on errors
-        if [ "$CERT_READY" != "True" ]; then
-          echo "::warning::Gateway API wildcard TLS certificate is not ready - external health check will likely fail"
-          
-          # Check if it's rate limited
-          if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
-            echo "::warning::Certificate provisioning failed due to Let's Encrypt rate limiting"
-            echo "::notice::The preview environment is fully functional on internal cluster network"
-            echo "::notice::External HTTPS access is temporarily unavailable"
-            echo "::notice::Skipping external health check - internal checks passed"
-            echo "healthy=skipped-rate-limited" >> $GITHUB_OUTPUT
-          # Check if it's rate limited
-          if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
-            echo "::warning::Certificate provisioning failed due to Let's Encrypt rate limiting"
-            echo "::notice::The preview environment is fully functional on internal cluster network"
-            echo "::notice::External HTTPS access is temporarily unavailable"
-            echo "::notice::Skipping external health check - internal checks passed"
         EXTERNAL_HEALTHY=false
         for i in $(seq 1 $MAX_ATTEMPTS); do
           echo "Attempt $i/$MAX_ATTEMPTS (external)..."
@@ -255,7 +241,7 @@ runs:
           exit 0
         fi
         
-        # External check failed - perform diagnostics
+        # External check failed - perform diagnostics and fail
         echo ""
         echo "::error::External API health check failed after $MAX_ATTEMPTS attempts"
         
@@ -279,10 +265,6 @@ runs:
         echo "::notice::- Service/pod not ready or unhealthy"
         echo "::notice::- Backend service port mismatch"
         
-        # ALWAYS fail if external check fails (no exceptions for rate limiting here)
+        # ALWAYS fail if external check fails
         echo "healthy=false" >> $GITHUB_OUTPUT
-        echo "::notice::- DNS propagation delay for Cloudflare (usually resolves in 1-2 minutes)"
-        echo "::notice::- Gateway API HTTPRoute not configured correctly"
-        echo "::notice::- Gateway not routing traffic"
-        echo "::notice::- Service/pod readiness issues"
         exit 1
