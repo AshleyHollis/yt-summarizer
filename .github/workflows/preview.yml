@@ -66,8 +66,8 @@ env:
   # (github.event.workflow_run.pull_requests[0].number). Used throughout workflow
   # to avoid repeating this complex expression 15+ times.
   # PR metadata is emitted by the detect-changes job to avoid top-level context evaluation warnings
-  ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
-  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+  ACR_NAME: acrytsummprd
+  ACR_LOGIN_SERVER: acrytsummprd.azurecr.io
   MAX_PREVIEWS: 3
 
 permissions:
