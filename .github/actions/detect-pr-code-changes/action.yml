@@ -99,18 +99,25 @@ runs:
         
         # Get all changed files using git diff
         # Try multiple approaches since shallow clones may not have full history
+        echo "🔍 Attempting to detect changed files..."
+        echo "   BASE_SHA: $BASE_SHA"
+        echo "   HEAD_SHA: $HEAD_SHA"
+        
         FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
+        echo "   git diff result: $(echo "$FILES" | wc -l) files found"
         
         # If git diff failed, try comparing with HEAD
         if [ -z "$FILES" ]; then
-          echo "git diff failed, trying alternative approach..."
+          echo "   git diff failed, trying git diff with HEAD..."
           FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || echo "")
+          echo "   git diff HEAD result: $(echo "$FILES" | wc -l) files found"
         fi
         
         # If still empty, try git show for the commit
         if [ -z "$FILES" ]; then
-          echo "git diff still failed, trying git show..."
+          echo "   git diff still failed, trying git show..."
           FILES=$(git show --name-only --pretty=format: "$HEAD_SHA" 2>/dev/null || echo "")
+          echo "   git show result: $(echo "$FILES" | wc -l) files found"
         fi
         
         if [ -z "$FILES" ]; then
@@ -142,33 +149,29 @@ runs:
         # This allows K8s-only changes to trigger preview deployments using existing images
         HAS_IMAGE_BUILD=false
         HAS_DEPLOYMENT=false
+        echo "🔍 Analyzing files for build/deployment triggers..."
         while IFS= read -r file; do
           if [[ -n "$file" ]]; then
+            echo "  📄 Processing: $file"
             # Skip docs, specs, and markdown files
             if [[ "$file" == docs/* ]] || [[ "$file" == specs/* ]] || [[ "$file" == *.md ]]; then
-              echo "  [skip] $file (docs/specs/markdown)"
+              echo "     [skip] docs/specs/markdown"
             # Check if file triggers image building
             elif [[ "$file" == services/api/** ]] || [[ "$file" == services/workers/** ]] || [[ "$file" == services/shared/** ]] || [[ "$file" == apps/web/** ]] || [[ "$file" == **/Dockerfile* ]] || [[ "$file" == docker-compose*.yml ]] || [[ "$file" == .dockerignore ]]; then
-              echo "  [BUILD] $file (triggers image build)"
+              echo "     [BUILD] triggers image build"
               HAS_IMAGE_BUILD=true
               HAS_DEPLOYMENT=true
             # Check if file triggers deployment (but not image build)
             elif [[ "$file" == k8s/** ]]; then
-              echo "  [DEPLOY] $file (triggers deployment)"
+              echo "     [DEPLOY] triggers deployment (K8s config)"
               HAS_DEPLOYMENT=true
             else
-              echo "  [skip] $file (does not trigger build or deployment)"
+              echo "     [skip] does not trigger build or deployment"
             fi
           fi
         done <<< "$FILES"
 
-        echo "needs_image_build=$HAS_IMAGE_BUILD" >> $GITHUB_OUTPUT
-        echo "needs_deployment=$HAS_DEPLOYMENT" >> $GITHUB_OUTPUT
-
-        if [ "$HAS_IMAGE_BUILD" = "true" ]; then
-          echo "✅ Comparison contains changes that trigger image building"
-        elif [ "$HAS_DEPLOYMENT" = "true" ]; then
-          echo "📦 Comparison contains changes that trigger deployment (using existing images)"
-        else
-          echo "📝 Comparison contains only documentation changes"
-        fi
+        echo "📊 Analysis Results:"
+        echo "   needs_image_build=$HAS_IMAGE_BUILD"
+        echo "   needs_deployment=$HAS_DEPLOYMENT"
+        
