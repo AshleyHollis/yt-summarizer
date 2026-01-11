@@ -186,9 +186,6 @@ jobs:
           - service: workers
             dockerfile: services/workers/Dockerfile
             image: yt-summarizer-workers
-          - service: shared
-            dockerfile: services/shared/Dockerfile
-            image: yt-summarizer-shared
     outputs:
       image_tag: ${{ steps.tag.outputs.image-tag }}
     steps:
@@ -203,15 +200,21 @@ jobs:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
 
+      - name: Login to Azure Container Registry
+        if: matrix.service == 'api'
+        uses: ./.github/actions/azure-acr-login
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
+
       - name: Build and push ${{ matrix.service }} image
         uses: ./.github/actions/build-images
         with:
           service: ${{ matrix.service }}
           image-tag: ${{ steps.tag.outputs.image-tag }}
           push: true
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Publish image tag artifact
         if: matrix.service == 'api'
