@@ -171,14 +171,14 @@ runs:
               fi
             fi
           else
-            # No PR number detected - check if it's a branch environment
+            # No PR number detected - check if it's a branch environment or orphaned
             if [[ -n "$source_branch" && "$source_branch" != "null" ]]; then
               echo "  🔍 Branch environment: $source_branch"
               # Check if branch still exists
               branch_exists=$(gh api repos/{owner}/{repo}/branches 2>/dev/null | jq -r --arg branch "$source_branch" '.[] | select(.name == $branch) | .name' || echo "")
               
               if [[ -z "$branch_exists" ]]; then
-                # Check environment age for branch environments
+                # Branch doesn't exist - check environment age
                 if [[ -n "$created_time" && "$created_time" != "null" ]]; then
                   created_timestamp=$(date -d "$created_time" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$created_time" +%s 2>/dev/null || echo "0")
                   age_seconds=$((current_time - created_timestamp))
@@ -187,13 +187,57 @@ runs:
                   if [[ $age_seconds -ge $min_age_seconds ]]; then
                     is_stale=true
                     stale_reason="Branch '$source_branch' doesn't exist, environment ${age_hours}h old"
+                  else
+                    echo "  ⏳ Branch '$source_branch' doesn't exist but environment too recent (${age_hours}h) - keeping for now"
                   fi
+                else
+                  # No creation time but branch doesn't exist - assume stale if old enough
+                  is_stale=true
+                  stale_reason="Branch '$source_branch' doesn't exist"
                 fi
               else
                 echo "  ✅ Branch '$source_branch' exists - keeping environment"
               fi
             else
-              echo "  ⚠️  Unable to determine environment type - skipping for safety"
+              # No PR number AND no branch info - orphaned environment
+              echo "  ⚠️  Orphaned environment (no PR/branch metadata)"
+              
+              # Check age if available
+              if [[ -n "$created_time" && "$created_time" != "null" ]]; then
+                created_timestamp=$(date -d "$created_time" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$created_time" +%s 2>/dev/null || echo "0")
+                age_seconds=$((current_time - created_timestamp))
+                age_hours=$((age_seconds / 3600))
+                
+                if [[ $age_seconds -ge $min_age_seconds ]]; then
+                  is_stale=true
+                  stale_reason="Orphaned environment, ${age_hours}h old (threshold: ${MIN_AGE_HOURS}h)"
+                else
+                  echo "  ⏳ Orphaned but recent (${age_hours}h) - keeping for now"
+                fi
+              else
+                # No metadata at all - but don't delete without age info for safety
+                # Try to find any matching PR by environment name
+                name_pr=$(gh pr list --state all --json number,title --jq --arg name "$env_name" '.[] | select(.title | contains($name)) | .number' | head -1 || echo "")
+                
+                if [[ -n "$name_pr" ]]; then
+                  echo "  🔍 Found potential PR by name search: #$name_pr"
+                  pr_number="$name_pr"
+                  # Check PR status
+                  pr_closed_at=$(gh pr view "$pr_number" --json closedAt --jq '.closedAt // empty' 2>/dev/null || echo "")
+                  if [[ -n "$pr_closed_at" ]]; then
+                    closed_timestamp=$(date -d "$pr_closed_at" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$pr_closed_at" +%s 2>/dev/null || echo "0")
+                    age_seconds=$((current_time - closed_timestamp))
+                    age_hours=$((age_seconds / 3600))
+                    
+                    if [[ $age_seconds -ge $min_age_seconds ]]; then
+                      is_stale=true
+                      stale_reason="Orphaned environment linked to closed PR #$pr_number (${age_hours}h ago)"
+                    fi
+                  fi
+                else
+                  echo "  ⚠️  No metadata and no age info - skipping for safety"
+                fi
+              fi
             fi
           fi
           
@@ -208,18 +252,22 @@ runs:
             else
               echo "  🗑️  Deleting environment: $env_name..."
               
-              if az staticwebapp environment delete \
+              # Delete and capture result (don't pipe through grep as it affects exit code)
+              delete_output=$(az staticwebapp environment delete \
                 -n "$SWA_NAME" \
                 -g "$RESOURCE_GROUP" \
                 --environment-name "$env_name" \
                 --yes \
-                2>&1 | grep -v "WARNING"; then
-                
+                2>&1)
+              delete_exit_code=$?
+              
+              if [[ $delete_exit_code -eq 0 ]]; then
                 echo "    ✅ Successfully deleted environment: $env_name"
                 deleted_count=$((deleted_count + 1))
                 [[ -n "$pr_number" ]] && deleted_prs+=("$pr_number")
               else
                 echo "    ❌ Failed to delete environment: $env_name"
+                echo "    Error: $delete_output"
               fi
             fi
           fi
