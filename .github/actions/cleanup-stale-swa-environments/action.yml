@@ -217,7 +217,7 @@ runs:
               else
                 # No metadata at all - but don't delete without age info for safety
                 # Try to find any matching PR by environment name
-                name_pr=$(gh pr list --state all --json number,title --jq --arg name "$env_name" '.[] | select(.title | contains($name)) | .number' | head -1 || echo "")
+                name_pr=$(gh pr list --state all --json number,title --jq ".[] | select(.title | contains(\"$env_name\")) | .number" | head -1 || echo "")
                 
                 if [[ -n "$name_pr" ]]; then
                   echo "  🔍 Found potential PR by name search: #$name_pr"
