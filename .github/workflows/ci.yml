@@ -380,6 +380,9 @@ jobs:
           service: ${{ matrix.service }}
           image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
           push: true
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
 
   # Build Docker Images (Validation Only - No Push)
