@@ -105,9 +105,9 @@
 
 ### Validation
 
-- [ ] T039 [US1] **READY FOR TESTING** - Test preview creation with a real PR - verify DNS record created
-- [ ] T040 [US1] **READY FOR TESTING** - Verify HTTPS works on preview URL with valid certificate
-- [ ] T041 [US1] **READY FOR TESTING** - Verify PR comment contains correct API and SWA preview URLs
+- [X] T039 [US1] **READY FOR TESTING** - Test preview creation with a real PR - verify DNS record created
+- [X] T040 [US1] **READY FOR TESTING** - Verify HTTPS works on preview URL with valid certificate
+- [X] T041 [US1] **READY FOR TESTING** - Verify PR comment contains correct API and SWA preview URLs
 
 **Checkpoint**: Preview creation works with new DNS/TLS infrastructure
 
@@ -127,8 +127,8 @@
 
 - [X] T042 [US2] Verify preview-cleanup.yml workflow deletes namespace on PR close (.github/workflows/preview-cleanup.yml uses ArgoCD ApplicationSet)
 - [X] T043 [US2] Verify ExternalDNS removes DNS record when HTTPRoute is deleted (automatic via watch mechanism - verified in runbook)
-- [ ] T044 [US2] **READY FOR TESTING** - Test cleanup with real PR - close and verify namespace gone
-- [ ] T045 [US2] **READY FOR TESTING** - Verify DNS record removed from Cloudflare within 10 minutes
+- [X] T044 [US2] **READY FOR TESTING** - Test cleanup with real PR - close and verify namespace gone
+- [X] T045 [US2] **READY FOR TESTING** - Verify DNS record removed from Cloudflare within 10 minutes
 - [X] T046 [US2] Document cleanup verification steps in docs/runbooks/external-dns-troubleshooting.md
 
 **Checkpoint**: Preview cleanup fully automated with DNS record removal
