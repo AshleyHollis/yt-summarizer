@@ -373,7 +373,7 @@ jobs:
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
 
       - name: Validate generated overlay (kustomize + dry-run)
-        uses: ./.github/actions/validate-kustomize-overlay
+        uses: ./.github/actions/kustomize-validate
 
       - name: Commit and push overlay update
         uses: ./.github/actions/commit-overlay-changes
