@@ -216,10 +216,10 @@ runs:
         if [ "$CERT_READY" != "True" ]; then
           echo "::warning::TLS certificate is not ready - external health check will likely fail"
           
-          # Check if it's the nip.io global rate limit
-          if echo "$CERT_MESSAGE" | grep -qi "too many certificates.*nip.io"; then
-            echo "::warning::nip.io has hit its global rate limit (25,000 certs per 168 hours)"
-            echo "::notice::This is a shared rate limit across all nip.io users globally"
+          # Check if it's the DNS provider global rate limit
+          if echo "$CERT_MESSAGE" | grep -qi "too many certificates.*sslip.io\|too many certificates.*nip.io"; then
+            echo "::warning::DNS provider has hit its global rate limit (25,000 certs per 168 hours)"
+            echo "::notice::This is a shared rate limit across all users of the DNS provider globally"
             echo "::notice::The preview environment is fully functional on internal cluster network"
             echo "::notice::External HTTPS access is temporarily unavailable due to DNS provider limitations"
             echo "::notice::Skipping external health check - internal checks passed"
@@ -258,9 +258,9 @@ runs:
           # Check cert status again for detailed error
           if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
             echo "::notice::Certificate provisioning failed due to Let's Encrypt rate limiting"
-            if echo "$CERT_MESSAGE" | grep -qi "nip.io"; then
-              echo "::notice::The nip.io DNS provider has exceeded its global rate limit"
-              echo "::notice::Consider using a custom domain or alternative DNS provider"
+            if echo "$CERT_MESSAGE" | grep -qi "sslip.io\|nip.io\|xip.io"; then
+              echo "::notice::The wildcard DNS provider has exceeded its global rate limit"
+              echo "::notice::Consider using a custom domain or switching DNS providers"
             fi
             echo "::notice::Treating as non-critical - deployment is functional on internal network"
             exit 0
@@ -271,7 +271,7 @@ runs:
         
         echo "::error::External API health check failed after $MAX_ATTEMPTS attempts"
         echo "::notice::Possible causes:"
-        echo "::notice::- DNS propagation delay for nip.io (usually resolves in 1-2 minutes)"
+        echo "::notice::- DNS propagation delay for sslip.io (usually resolves in 1-2 minutes)"
         echo "::notice::- TLS certificate provisioning in progress"
         echo "::notice::- Ingress controller configuration issues"
         echo "::notice::- Network policy restrictions"

@@ -44,12 +44,12 @@ runs:
         USE_HTTPS: ${{ inputs.use-https }}
       run: |
         if [ -n "$INGRESS_IP" ] && [ "$INGRESS_IP" != "" ]; then
-          # Convert IP to dashed format for nip.io
-          IP_DASHED=$(echo "$INGRESS_IP" | tr '.' '-')
+          # sslip.io uses dotted IP format (not dashed like nip.io)
+          # Format: {app-name}-api.preview-pr-{number}.{ip-with-dots}.sslip.io
+          # Example: yt-summarizer-api.preview-pr-4.20.255.113.149.sslip.io
           
           # Compute preview hostname with app name to prevent rate limit conflicts across apps
-          # Format: {app-name}-api.preview-pr-{number}.{ip-dashed}.nip.io
-          PREVIEW_HOST="${APP_NAME}-api.preview-pr-${PR_NUMBER}.${IP_DASHED}.nip.io"
+          PREVIEW_HOST="${APP_NAME}-api.preview-pr-${PR_NUMBER}.${INGRESS_IP}.sslip.io"
           
           # Compute preview URL (HTTPS required for Static Web Apps to avoid mixed content)
           if [ "$USE_HTTPS" = "true" ]; then

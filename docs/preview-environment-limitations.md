@@ -1,10 +1,12 @@
 # Preview Environment Limitations
 
-## TLS Certificate Rate Limiting with nip.io
+## TLS Certificate Rate Limiting with Wildcard DNS Services
 
 ### Current Issue
 
-nip.io is a wildcard DNS service that's convenient for development but has Let's Encrypt rate limit constraints:
+Wildcard DNS services (nip.io, sslip.io, xip.io) are convenient for development but have Let's Encrypt rate limit constraints:
+
+**Note**: We've switched from nip.io to sslip.io to avoid the global rate limit.
 
 1. **Global nip.io rate limit**: 25,000 certificates per 168 hours (shared across all users globally)
 2. **Per exact domain set**: 5 certificates per 168 hours per exact domain combination
@@ -35,11 +37,11 @@ The health check has been updated to:
 - Benefits: No shared rate limits, professional URLs
 - Cost: Domain registration (~$12/year)
 
-#### Option 2: Use xip.io or sslip.io
-- Alternative wildcard DNS services
-- Same concept as nip.io but different provider
-- May have different rate limit status
-- Example: `yt-summarizer-api.preview-pr-4.20.255.113.149.sslip.io`
+#### Option 2: Rotate Between DNS Providers
+- Multiple wildcard DNS services available: sslip.io (current), xip.io, nip.io
+- Same concept but different providers with independent rate limits
+- Can switch providers if one hits rate limit
+- Currently using: `yt-summarizer-api.preview-pr-4.20.255.113.149.sslip.io`
 
 #### Option 3: Use Let's Encrypt Staging for Preview
 - Use `letsencrypt-staging` issuer for preview environments
