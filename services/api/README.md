@@ -18,4 +18,4 @@ uvicorn src.api.main:app --reload --port 8000
 pytest
 ```
 
-# Trigger preview deployment again
+# Force preview deployment
