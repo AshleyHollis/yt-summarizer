@@ -178,57 +178,17 @@ jobs:
     needs: detect-changes
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.force_deploy == 'true'
     outputs:
-      image_tag: ${{ steps.tag.outputs.image-tag }}
+      image_tag: ${{ steps.build.outputs.image-tag }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Generate image tag
-        id: tag
-        uses: ./.github/actions/generate-image-tag
+      - name: Build images
+        id: build
+        uses: ./.github/actions/build-images
         with:
-          pr-number: ${{ needs.detect-changes.outputs.pr_number || github.run_number }}
-          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-
-      - name: Login to Azure Container Registry
-        uses: ./.github/actions/azure-acr-login
-        with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          acr-name: ${{ env.ACR_NAME }}
-
-      - name: Build and push API image
-        uses: ./.github/actions/docker-build-push
-        with:
-          dockerfile: services/api/Dockerfile
-          image-name: yt-summarizer-api
-          image-tag: ${{ steps.tag.outputs.image-tag }}
-          registry: ${{ env.ACR_LOGIN_SERVER }}
-          cache-name: api
-
-      - name: Build and push Workers image
-        uses: ./.github/actions/docker-build-push
-        with:
-          dockerfile: services/workers/Dockerfile
-          image-name: yt-summarizer-workers
-          image-tag: ${{ steps.tag.outputs.image-tag }}
-          registry: ${{ env.ACR_LOGIN_SERVER }}
-          cache-name: workers
-
-      - name: Build and push Shared image
-        uses: ./.github/actions/docker-build-push
-        with:
-          dockerfile: services/shared/Dockerfile
-          image-name: yt-summarizer-shared
-          image-tag: ${{ steps.tag.outputs.image-tag }}
-          registry: ${{ env.ACR_LOGIN_SERVER }}
-          cache-name: shared
-
-      - name: Publish image tag artifact
-        uses: ./.github/actions/publish-image-tag
-        with:
-          image-tag: ${{ steps.tag.outputs.image-tag }}
+          generate-tag: true
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
+          services: '["api", "workers", "shared"]'
+          publish-artifact: false
 
   # ---------------------------------------------------------------------------
   # Check Active Preview Count (prevents resource exhaustion from too many previews)

@@ -299,14 +299,14 @@ jobs:
   # - PRs: pr-<number>-<sha>
   # - Main: sha-<sha>
   # ---------------------------------------------------------------------------
-  build-images-meta:
-    name: Prepare Image Tag
+  build-images:
+    name: Build Images
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, lint-frontend]
+    needs: [detect-changes, lint-python, lint-frontend, test-shared, test-api, test-workers, test-frontend]
     # CONDITIONAL IMAGE BUILDING: Only runs when changes require new images
     # vars.ACR_NAME != '': Azure Container Registry must be configured
     # changed_areas contains: Only these areas trigger image builds (MUST match preview workflow logic)
-    # lint results: Ensure code passes basic checks before building images
+    # lint and test results: Ensure code passes basic checks before building images
     if: |
       vars.ACR_NAME != '' &&
       (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
@@ -315,89 +315,25 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
        contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
-    outputs:
-      image_tag: ${{ steps.tag.outputs.image-tag }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Generate image tag
-        id: tag
-        uses: ./.github/actions/generate-image-tag
-        with:
-          pr-number: ${{ github.event.pull_request.number }}
-          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
-
-      - name: Publish image tag artifact
-        if: steps.tag.outputs.image-tag != ''
-        uses: ./.github/actions/publish-image-tag
-        with:
-          image-tag: ${{ steps.tag.outputs.image-tag }}
-
-      - name: Verify image-tag artifact is available
-        if: steps.tag.outputs.image-tag != ''
-        uses: actions/download-artifact@v4
-        with:
-          name: image-tag
-          path: ./downloaded-artifacts
-
-      - name: Assert downloaded image tag
-        if: steps.tag.outputs.image-tag != ''
-        uses: ./.github/actions/assert-image-tag-artifact
-
-  build-images:
-    name: Build Images (parallel)
-    runs-on: ubuntu-latest
-    needs: [detect-changes, build-images-meta, test-shared, test-api, test-workers, test-frontend]
-    if: |
-      vars.ACR_NAME != '' &&
-      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
       (needs.test-shared.result == 'success' || needs.test-shared.result == 'skipped') &&
       (needs.test-api.result == 'success' || needs.test-api.result == 'skipped') &&
       (needs.test-workers.result == 'success' || needs.test-workers.result == 'skipped') &&
       (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped')
-    strategy:
-      matrix:
-        include:
-          - service: api
-            dockerfile: services/api/Dockerfile
-            image: yt-summarizer-api
-          - service: workers
-            dockerfile: services/workers/Dockerfile
-            image: yt-summarizer-workers
-    permissions:
-      id-token: write
-      contents: read
     outputs:
-      build_duration: ${{ steps.build.outputs.build_duration }}
+      image_tag: ${{ steps.build.outputs.image-tag }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Azure ACR Login
-        uses: ./.github/actions/azure-acr-login
-        with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          acr-name: ${{ env.ACR_NAME }}
-
-      - name: Build and push ${{ matrix.service }} image
+      - name: Build images
         id: build
-        uses: ./.github/actions/docker-build-push
+        uses: ./.github/actions/build-images
         with:
-          dockerfile: ${{ matrix.dockerfile }}
-          image-name: ${{ matrix.image }}
-          image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
-          registry: ${{ env.ACR_LOGIN_SERVER }}
-          cache-name: ${{ matrix.service }}
+          generate-tag: true
+          pr-number: ${{ github.event.pull_request.number }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          services: '["api", "workers"]'
+          publish-artifact: true
 
-  # ---------------------------------------------------------------------------
+
   # Build Docker Images (Validation Only - No Push)
   # ---------------------------------------------------------------------------
   # When ACR is not configured, still validate that Docker images build
