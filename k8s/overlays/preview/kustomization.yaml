@@ -1,8 +1,8 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #4
-# Image Tag: pr-4-afb9a26
-# Updated: 2026-01-11T06:15:11Z
-# Test change to trigger pipeline redeploy on K8s changes
+# Image Tag: pr-4-81f7712
+# Commit: 81f77120ccee972c22f39efbe824f24b72f9b4ab
+# Updated: 2026-01-11T08:44:47Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
