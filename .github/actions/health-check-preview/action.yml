@@ -61,11 +61,14 @@ runs:
         
         echo "🌐 Checking API health via external ingress..."
         echo "URL: ${EXTERNAL_URL}/health/live"
+        echo "Note: Using -k (insecure) for preview environments due to Let's Encrypt rate limits"
         
         for i in $(seq 1 $MAX_ATTEMPTS); do
           echo "Attempt $i/$MAX_ATTEMPTS (external)..."
           
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" || echo "000")
+          # Use -k to skip SSL verification for preview environments
+          # This is acceptable since preview environments are temporary and may hit Let's Encrypt rate limits
+          HTTP_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" || echo "000")
           
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ External API health check passed (HTTP $HTTP_CODE)"
