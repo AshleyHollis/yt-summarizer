@@ -68,6 +68,9 @@ jobs:
     # Only run if we want to clean up images (can be disabled to save costs)
     if: false  # Set to true to enable image cleanup
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Azure Login via OIDC
         uses: azure/login@v2
         with:

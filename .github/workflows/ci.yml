@@ -374,6 +374,9 @@ jobs:
       id-token: write
       contents: read
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Login to Azure Container Registry
         uses: ./.github/actions/azure-acr-login
         with:
@@ -417,6 +420,9 @@ jobs:
             dockerfile: services/workers/Dockerfile
             image: yt-summarizer-workers
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Build ${{ matrix.service }} image (no push)
         uses: ./.github/actions/build-images
         with:
