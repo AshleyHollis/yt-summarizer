@@ -69,15 +69,19 @@ runs:
           done
         done
 
-        # Check if any file is NOT docs/specs/markdown
+        # Check if any file would trigger image building in CI
+        # Only these areas cause images to be built: services/api, services/workers, services/shared, apps/web, docker
         while IFS= read -r file; do
           if [[ -n "$file" ]]; then
             # Skip docs, specs, and markdown files
             if [[ "$file" == docs/* ]] || [[ "$file" == specs/* ]] || [[ "$file" == *.md ]]; then
               echo "  [skip] $file (docs/specs/markdown)"
-            else
-              echo "  [CODE] $file"
+            # Check if file is in areas that trigger image building
+            elif [[ "$file" == services/api/** ]] || [[ "$file" == services/workers/** ]] || [[ "$file" == services/shared/** ]] || [[ "$file" == apps/web/** ]] || [[ "$file" == **/Dockerfile* ]] || [[ "$file" == docker-compose*.yml ]] || [[ "$file" == .dockerignore ]]; then
+              echo "  [BUILD] $file (triggers image build)"
               HAS_CODE=true
+            else
+              echo "  [skip] $file (does not trigger image build)"
             fi
           fi
         done <<< "$FILES"
@@ -85,7 +89,7 @@ runs:
         echo "has_code_changes=$HAS_CODE" >> $GITHUB_OUTPUT
 
         if [ "$HAS_CODE" = "true" ]; then
-          echo "✅ PR contains code changes or force-preview label"
+          echo "✅ PR contains changes that trigger image building or force-preview label"
         else
-          echo "📝 PR contains only documentation changes"
+          echo "📝 PR contains only documentation changes or changes that don't require image building"
         fi

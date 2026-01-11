@@ -337,14 +337,7 @@ jobs:
 
       - name: Assert downloaded image tag
         if: steps.tag.outputs.image-tag != ''
-        shell: bash
-        run: |
-          if [ ! -f downloaded-artifacts/image-tag.txt ]; then
-            echo "::error::image-tag.txt not found in artifact"
-            exit 1
-          fi
-          echo "Verified image tag artifact:"
-          cat downloaded-artifacts/image-tag.txt
+        uses: ./.github/actions/assert-image-tag-artifact
 
   build-images:
     name: Build Images (parallel)
