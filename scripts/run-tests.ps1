@@ -37,8 +37,8 @@
 
 param(
     [switch]$SkipE2E,
-    [ValidateSet('all', 'api', 'workers', 'shared', 'web', 'e2e')]
-    [string]$Component = 'all',
+    [ValidateSet('all','detect','api','workers','shared','web','e2e')]
+    [string]$Component = 'detect',
     [switch]$Json
 )
 
@@ -51,6 +51,57 @@ $repoRoot = git rev-parse --show-toplevel 2>$null
 if (-not $repoRoot) {
     $repoRoot = Split-Path -Parent $PSScriptRoot
 }
+
+# Auto-detect changes when Component is 'detect'
+if ($Component -eq 'detect') {
+    try {
+        # Use local git status to include untracked files (staged/unstaged)
+        $statusOutput = & git status --porcelain 2>$null
+        $changedFiles = @()
+        if ($statusOutput -and $statusOutput -ne "") {
+            $lines = if ($statusOutput -is [array]) { $statusOutput } else { $statusOutput -split "`n" }
+            foreach ($line in $lines) {
+                $line = $line.Trim()
+                if ($line -ne "") {
+                    $parts = $line -split '\s+'
+                    $filePath = $parts[-1]
+                    $changedFiles += $filePath
+                }
+            }
+        }
+
+        # Fallback to branch diff if no local changes detected (useful in CI)
+        if ($changedFiles.Count -eq 0) {
+            $diffOutput = & git diff --name-only origin/main...HEAD 2>$null
+            if ($diffOutput -and $diffOutput -ne "") {
+                $changedFiles = $diffOutput -split "`n"
+            }
+        }
+
+        # Determine affected components (ignore docs/specs/markdown/.github and pipeline scripts)
+        $affectedComponents = @()
+        foreach ($file in $changedFiles) {
+            if ($file -and ($file -notmatch '^docs/' -and $file -notmatch '^specs/' -and $file -notmatch '\.md$' -and $file -notmatch '^\.github/' -and $file -notmatch '^scripts/')) {
+                if ($file -match '^services/api/') { if (-not ('api' -in $affectedComponents)) { $affectedComponents += 'api' } }
+                elseif ($file -match '^services/workers/') { if (-not ('workers' -in $affectedComponents)) { $affectedComponents += 'workers' } }
+                elseif ($file -match '^services/shared/') { if (-not ('shared' -in $affectedComponents)) { $affectedComponents += 'shared' } }
+                elseif ($file -match '^apps/web/') { if (-not ('web' -in $affectedComponents)) { $affectedComponents += 'web' } }
+                else { $affectedComponents = @('api','workers','shared','web'); break }
+            }
+        }
+
+        if ($affectedComponents.Count -eq 0) {
+            Write-Host "Only docs/specs/markdown/.github/scripts changes detected - skipping all tests" -ForegroundColor Yellow
+            exit 0
+        } else {
+            $Component = $affectedComponents -join ','
+            Write-Host "Detected changes in: $Component - running selective tests" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "Could not detect changes (git error) - running full tests" -ForegroundColor Yellow
+    }
+}
+
 $failureLogPath = Join-Path $repoRoot "test-gate-failures.log"
 
 # Clear previous failure log
