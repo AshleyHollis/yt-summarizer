@@ -1,0 +1,73 @@
+name: Get PR Metadata
+description: Extracts PR number, head ref, and head SHA from pull_request or workflow_dispatch events
+
+inputs:
+  event-name:
+    description: 'GitHub event name'
+    required: true
+  pr-number-input:
+    description: 'PR number from workflow_dispatch input (optional)'
+    required: false
+    default: ''
+  pr-number-context:
+    description: 'PR number from pull_request context'
+    required: false
+    default: ''
+  pr-head-ref-context:
+    description: 'PR head ref from pull_request context'
+    required: false
+    default: ''
+  pr-head-sha-context:
+    description: 'PR head SHA from pull_request context'
+    required: false
+    default: ''
+  pr-base-sha-context:
+    description: 'PR base SHA from pull_request context'
+    required: false
+    default: ''
+  current-ref:
+    description: 'Current ref name'
+    required: true
+  current-sha:
+    description: 'Current SHA'
+    required: true
+
+outputs:
+  pr_number:
+    description: 'PR number'
+    value: ${{ steps.extract.outputs.pr_number }}
+  pr_head_ref:
+    description: 'PR head ref'
+    value: ${{ steps.extract.outputs.pr_head_ref }}
+  pr_head_sha:
+    description: 'PR head SHA'
+    value: ${{ steps.extract.outputs.pr_head_sha }}
+  base_sha:
+    description: 'Base SHA for comparison'
+    value: ${{ steps.extract.outputs.base_sha }}
+
+runs:
+  using: composite
+  steps:
+    - name: Extract PR metadata
+      id: extract
+      shell: bash
+      run: |
+        EVENT_NAME="${{ inputs.event-name }}"
+        
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          echo "pr_number=${{ inputs.pr-number-context }}" >> $GITHUB_OUTPUT
+          echo "pr_head_ref=${{ inputs.pr-head-ref-context }}" >> $GITHUB_OUTPUT
+          echo "pr_head_sha=${{ inputs.pr-head-sha-context }}" >> $GITHUB_OUTPUT
+          echo "base_sha=${{ inputs.pr-base-sha-context }}" >> $GITHUB_OUTPUT
+        elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          PR_NUM="${{ inputs.pr-number-input }}"
+          if [ -n "$PR_NUM" ]; then
+            echo "pr_number=$PR_NUM" >> $GITHUB_OUTPUT
+          else
+            echo "pr_number=" >> $GITHUB_OUTPUT
+          fi
+          echo "pr_head_ref=${{ inputs.current-ref }}" >> $GITHUB_OUTPUT
+          echo "pr_head_sha=${{ inputs.current-sha }}" >> $GITHUB_OUTPUT
+          echo "base_sha=origin/main" >> $GITHUB_OUTPUT
+        fi

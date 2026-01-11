@@ -1,0 +1,67 @@
+name: Compute Preview Image Tag
+description: |
+  Determines which image tag to use for preview deployment.
+  Logic: If needs_image_build=true, use CI tag; otherwise use existing prod tag.
+
+inputs:
+  needs-image-build:
+    description: 'Whether new images need to be built (from detect-changes)'
+    required: true
+  ci-image-tag:
+    description: 'Image tag from CI workflow (if images were built)'
+    required: false
+    default: ''
+  production-image-tag:
+    description: 'Current production image tag (fallback for K8s-only or forced deploys)'
+    required: false
+    default: ''
+
+outputs:
+  image_tag:
+    description: 'Computed image tag to use for preview deployment'
+    value: ${{ steps.compute.outputs.image_tag }}
+  source:
+    description: 'Source of the image tag (ci or production)'
+    value: ${{ steps.compute.outputs.source }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute final image tag
+      id: compute
+      shell: bash
+      run: |
+        NEEDS_IMAGE_BUILD="${{ inputs.needs-image-build }}"
+        CI_TAG="${{ inputs.ci-image-tag }}"
+        PROD_TAG="${{ inputs.production-image-tag }}"
+        
+        echo "=== Image Tag Computation ==="
+        echo "needs_image_build: $NEEDS_IMAGE_BUILD"
+        echo "CI image_tag: $CI_TAG"
+        echo "Production image_tag: $PROD_TAG"
+        echo ""
+        
+        # Single Responsibility: Compute the correct image tag based on build requirement
+        if [ "$NEEDS_IMAGE_BUILD" = "true" ]; then
+          # New images from CI are required
+          if [ -z "$CI_TAG" ]; then
+            echo "::error::needs_image_build=true but CI did not provide an image tag"
+            echo "This indicates CI did not complete successfully or did not build images."
+            exit 1
+          fi
+          IMAGE_TAG="$CI_TAG"
+          SOURCE="ci"
+          echo "✅ Using NEW image tag from CI: $IMAGE_TAG"
+        else
+          # Use existing production images (K8s-only changes or forced deploy)
+          if [ -z "$PROD_TAG" ]; then
+            echo "::error::needs_image_build=false but could not retrieve production image tag"
+            exit 1
+          fi
+          IMAGE_TAG="$PROD_TAG"
+          SOURCE="production"
+          echo "✅ Using EXISTING production image tag: $IMAGE_TAG"
+        fi
+        
+        echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "source=$SOURCE" >> $GITHUB_OUTPUT
