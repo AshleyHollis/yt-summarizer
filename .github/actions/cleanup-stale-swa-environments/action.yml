@@ -1,38 +1,18 @@
-# =============================================================================
-# ⚠️ DEPRECATED: This action does NOT actually delete SWA environments
-# =============================================================================
-# 
-# PROBLEM: This action was sending repository_dispatch events that nothing
-# listens to, creating false positive "cleanup succeeded" reports while
-# zero environments were actually deleted in Azure.
-#
-# WHY IT DOESN'T WORK:
-# - Azure SWA environments can only be deleted via:
-#   1. Azure/static-web-apps-deploy action with action: close (requires PR context)
-#   2. Manual deletion in Azure Portal
-#   3. Azure SWA management API (requires different auth than deployment token)
-#
-# - We cannot call the deployment action for other PRs from this context
-# - The deployment token does not work with the SWA management API
-# - repository_dispatch events were sent but no workflow listened for them
-#
-# USE INSTEAD:
-# - For detection: ./.github/actions/find-stale-prs
-# - For deletion: Close the PR (triggers preview-cleanup.yml)
-# - For manual cleanup: Azure Portal
-#
-# See: SWA-CLEANUP-REALITY-CHECK.md for full explanation
-# =============================================================================
-
-name: Cleanup Stale SWA Environments (DEPRECATED)
-description: ⚠️ DEPRECATED - Does NOT actually delete environments. Use find-stale-prs instead.
+name: Cleanup Stale SWA Environments
+description: Finds and deletes Azure Static Web Apps staging environments for closed/merged PRs using Azure CLI
 
 inputs:
   github-token:
     description: GitHub token for API access
     required: true
-  swa-deployment-token:
-    description: Azure Static Web Apps deployment token
+  swa-name:
+    description: Azure Static Web App name
+    required: true
+  resource-group:
+    description: Azure resource group name
+    required: true
+  subscription-id:
+    description: Azure subscription ID
     required: true
   dry-run:
     description: If true, only report what would be deleted without actually deleting
@@ -125,73 +105,111 @@ runs:
           echo "✅ No stale environments found"
         fi
 
-    - name: Delete stale environments
+    - name: Delete stale environments using Azure CLI
       id: cleanup
       if: steps.find.outputs.stale_count != '0'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
-        SWA_TOKEN: ${{ inputs.swa-deployment-token }}
+        SWA_NAME: ${{ inputs.swa-name }}
+        RESOURCE_GROUP: ${{ inputs.resource-group }}
+        SUBSCRIPTION_ID: ${{ inputs.subscription-id }}
         DRY_RUN: ${{ inputs.dry-run }}
         STALE_PRS: ${{ steps.find.outputs.stale_prs }}
         REPO: ${{ github.repository }}
       run: |
         set -euo pipefail
         
+        # Set subscription context
+        echo "🔧 Setting Azure subscription context..."
+        az account set --subscription "$SUBSCRIPTION_ID"
+        
+        # List all SWA environments/builds
+        echo "📋 Listing SWA environments for $SWA_NAME..."
+        environments=$(az staticwebapp environment list \
+          -n "$SWA_NAME" \
+          -g "$RESOURCE_GROUP" \
+          -o json 2>/dev/null || echo "[]")
+        
+        if [[ "$environments" == "[]" ]]; then
+          echo "⚠️  No environments found or unable to list environments"
+          echo "deleted_count=0" >> $GITHUB_OUTPUT
+          echo "stale_prs=$STALE_PRS" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
         deleted_count=0
         IFS=',' read -ra prs <<< "$STALE_PRS"
         
         echo ""
-        echo "🗑️  Processing ${#prs[@]} stale environment(s)..."
+        echo "🗑️  Processing ${#prs[@]} stale PR(s)..."
+        echo ""
         
         for pr in "${prs[@]}"; do
           [[ -z "$pr" ]] && continue
           
-          if [[ "$DRY_RUN" == "true" ]]; then
-            echo "  [DRY RUN] Would delete SWA environment for PR #$pr"
-            deleted_count=$((deleted_count + 1))
-          else
-            echo "  🗑️  Attempting to close SWA environment for PR #$pr..."
+          echo "🔍 Looking for environment matching PR #$pr..."
+          
+          # Find environment(s) matching this PR
+          # Match by: pullRequestTitle is set AND (buildId == PR or hostname contains "-PR.")
+          matched_envs=$(echo "$environments" | jq -r --arg pr "$pr" '
+            .[] | 
+            select(
+              (.properties.pullRequestTitle != null and .properties.pullRequestTitle != "") and
+              (
+                (.properties.buildId == $pr) or
+                (.properties.hostname | tostring | contains("-" + $pr + "."))
+              )
+            ) |
+            .name
+          ' 2>/dev/null || echo "")
+          
+          if [[ -z "$matched_envs" ]]; then
+            echo "  ⚠️  No environment found for PR #$pr (may already be deleted)"
+            continue
+          fi
+          
+          # Process each matched environment
+          while IFS= read -r env_name; do
+            [[ -z "$env_name" ]] && continue
             
-            # Create a temporary directory for this PR's closure
-            temp_dir=$(mktemp -d)
-            cd "$temp_dir"
-            
-            # Clone just the specific PR branch
-            if git clone --depth 1 --branch "refs/pull/$pr/head" "https://github.com/${REPO}.git" pr-${pr} 2>/dev/null; then
-              cd pr-${pr}
-              
-              # Check if we can find the SWA config
-              if [[ -f "apps/web/staticwebapp.config.json" ]] || [[ -f "staticwebapp.config.json" ]]; then
-                echo "    Found SWA config, attempting closure..."
-                
-                # We need to use the Azure SWA deployment action's close functionality
-                # But we can't call a GitHub Action from bash
-                # Instead, we'll use the SWA management API directly
-                
-                # For now, mark as "needs manual cleanup" since we can't actually close it
-                echo "    ⚠️  Cannot close SWA environment from this context"
-                echo "    💡 This PR's environment must be closed via PR close event or manual cleanup"
-              fi
-              
-              cd ../..
-              rm -rf "$temp_dir"
-            else
-              echo "    ⚠️  PR branch no longer exists - environment may already be cleaned"
+            # Safety check: never delete "default" (production)
+            if [[ "$env_name" == "default" ]]; then
+              echo "  🛑 SKIPPED: Refusing to delete production environment 'default'"
+              continue
             fi
             
-            # Note: We're not actually incrementing deleted_count because we can't actually delete
-            echo "    ⚠️  Marked for manual cleanup"
-          fi
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "  [DRY RUN] Would delete environment: $env_name (PR #$pr)"
+              deleted_count=$((deleted_count + 1))
+            else
+              echo "  🗑️  Deleting environment: $env_name (PR #$pr)..."
+              
+              if az staticwebapp environment delete \
+                -n "$SWA_NAME" \
+                -g "$RESOURCE_GROUP" \
+                --environment-name "$env_name" \
+                --yes \
+                2>&1 | grep -v "WARNING"; then
+                
+                echo "    ✅ Successfully deleted environment: $env_name"
+                deleted_count=$((deleted_count + 1))
+              else
+                echo "    ❌ Failed to delete environment: $env_name"
+              fi
+            fi
+          done <<< "$matched_envs"
         done
         
         echo ""
         echo "deleted_count=$deleted_count" >> $GITHUB_OUTPUT
         echo "stale_prs=$STALE_PRS" >> $GITHUB_OUTPUT
         
-        echo "⚠️  Pre-deployment cleanup cannot automatically delete SWA environments"
-        echo "💡 Please close the stale PRs or manually delete environments in Azure Portal"
-        echo "   Stale PRs: $STALE_PRS"
+        if [[ "$DRY_RUN" == "true" ]]; then
+          echo "✅ [DRY RUN] Would delete $deleted_count environment(s)"
+        else
+          echo "✅ Deleted $deleted_count environment(s)"
+        fi
 
     - name: Create cleanup summary
       if: always()

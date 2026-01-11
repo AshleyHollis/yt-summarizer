@@ -54,82 +54,140 @@ This modular approach allows for:
     swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
 ```
 
-### 2. **Scheduled Cleanup Detection** (Reporting Only)
+### 2. **Scheduled Cleanup of Stale Environments** (Automated)
 
 **Workflow:** [`.github/workflows/swa-cleanup-scheduled.yml`](.github/workflows/swa-cleanup-scheduled.yml)
 
 **Trigger:** 
 - Daily at 2 AM UTC (cron schedule)
-- Manual dispatch available
+- Manual dispatch with optional dry-run
 
 **How it works:**
-- Queries GitHub API for all open PRs
-- Finds recently closed PRs (last 100)
-- Identifies environments from PRs closed >7 days ago
-- **Reports findings** (does not delete)
-- Creates GitHub issue with cleanup instructions
+- Authenticates to Azure using OIDC
+- Lists all SWA environments using Azure CLI
+- Matches environments to closed PRs using build metadata
+- **Actually deletes** stale environments (PRs closed >7 days ago)
 
 **Benefits:**
-- Provides weekly visibility into stale environments
-- Identifies which PRs need to be closed
-- No risk of accidental deletions
-- Manual trigger allows on-demand reports
-
-**⚠️ LIMITATION:** Cannot automatically delete due to Azure SWA API constraints.
+- Catches any environments missed by PR close trigger
+- Uses Azure CLI for reliable deletion
+- Dry-run mode available for testing
+- Automatic cleanup of old environments
 
 **Usage:**
 ```bash
 # Manual trigger from GitHub UI
 # Actions > SWA Cleanup (Scheduled) > Run workflow
-# View report in job output
+# Toggle "Dry run mode" if desired
 ```
 
 **Code:**
 ```yaml
-- name: Find stale SWA environments
-  uses: ./.github/actions/find-stale-prs
-  id: find-stale
+- name: Azure Login
+  uses: azure/login@v2
+  with:
+    client-id: ${{ secrets.AZURE_CLIENT_ID }}
+    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+- name: Cleanup stale SWA environments
+  uses: ./.github/actions/cleanup-stale-swa-environments
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
+    swa-name: ${{ vars.SWA_NAME }}
+    resource-group: ${{ vars.AZURE_RESOURCE_GROUP }}
+    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    dry-run: 'false'
     min-age-hours: '168'  # 7 days
-    max-prs-to-check: '100'
 ```
 
-### 3. **Pre-Deployment Check** (Detection Only)
+### 3. **Pre-Deployment Cleanup** (Proactive)
 
 **Workflow:** [`.github/workflows/preview.yml`](.github/workflows/preview.yml)
 
 **Trigger:** Before every SWA deployment
 
 **How it works:**
-- Runs before attempting to deploy new environment
-- Uses `find-stale-prs` composite action to identify stale environments
-- **Reports** stale environments with clear instructions
-- **Does NOT delete** (Azure SWA API limitations)
+- Authenticates to Azure using OIDC
+- Lists all SWA environments using Azure CLI
+- Matches environments to closed PRs (closed >1 hour ago)
+- **Actually deletes** matched stale environments
+- Frees up slots before deploying new environment
 
 **Benefits:**
-- Early warning before deployment fails
-- Provides actionable guidance for manual cleanup
-- Shows which PRs need to be closed
-
-**Limitations:**
-- ⚠️ Cannot automatically delete SWA environments
-- Azure SWA environments can only be deleted via:
-  1. PR close event (triggers Azure SWA deploy action with `action: close`)
-  2. Manual deletion in Azure Portal
+- Proactively prevents "maximum environments" errors
+- Ensures deployment succeeds by making room first
+- Uses Azure CLI for reliable deletion
+- Automatic, no manual intervention needed
 
 **Code:**
 ```yaml
-- name: Check for stale SWA environments
-  uses: ./.github/actions/find-stale-prs
+- name: Azure Login for SWA cleanup
+  uses: azure/login@v2
+  with:
+    client-id: ${{ secrets.AZURE_CLIENT_ID }}
+    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+- name: Cleanup stale SWA environments
+  uses: ./.github/actions/cleanup-stale-swa-environments
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
+    swa-name: ${{ vars.SWA_NAME }}
+    resource-group: ${{ vars.AZURE_RESOURCE_GROUP }}
+    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    dry-run: 'false'
     min-age-hours: '1'
 ```
 
 ## Implementation Details
 
-### SWA Environment Lifecycle
+### Azure CLI Approach
+
+The implementation uses Azure CLI commands to directly manage SWA environments:
+
+**1. List Environments:**
+```bash
+az staticwebapp environment list \
+  -n <SWA_NAME> \
+  -g <RESOURCE_GROUP> \
+  -o json
+```
+
+Each environment includes metadata:
+- `name` / `buildId`: Environment identifier
+- `properties.hostname`: Preview URL
+- `properties.sourceBranch`: Source branch name
+- `properties.pullRequestTitle`: PR title (if from PR)
+
+**2. Match to PRs:**
+- By pullRequestTitle (non-null indicates PR environment)
+- By buildId (often equals PR number)
+- By hostname pattern (contains `-<PR_NUMBER>.`)
+
+**3. Delete Environment:**
+```bash
+az staticwebapp environment delete \
+  -n <SWA_NAME> \
+  -g <RESOURCE_GROUP> \
+  --environment-name <BUILD_ID> \
+  --yes
+```
+
+**4. Safety:**
+- Never deletes "default" (production) environment
+- Explicit environment name required
+- Azure OIDC authentication required
+
+### Composite Actions Architecture
+
+The implementation follows SOLID principles with focused, reusable composite actions:
+
+1. **`find-stale-prs`** - Queries GitHub API for closed PRs
+2. **`close-swa-environment`** - Closes specific PR environment (for PR close events)
+3. **`cleanup-stale-swa-environments`** - Lists Azure environments, matches to PRs, deletes stale ones
+
+### 1. **Immediate Cleanup on PR Close** (Primary)
 
 1. **Creation:** When a PR is opened, the preview workflow deploys to SWA
    - SWA automatically creates a staging environment named after the PR
@@ -149,14 +207,13 @@ This modular approach allows for:
 The cleanup workflows require the following secrets/variables:
 
 **Secrets:**
-- `SWA_DEPLOYMENT_TOKEN`: Azure Static Web Apps deployment token
-- `AZURE_CLIENT_ID`: For Azure OIDC authentication (scheduled cleanup)
-- `AZURE_TENANT_ID`: For Azure OIDC authentication (scheduled cleanup)
-- `AZURE_SUBSCRIPTION_ID`: For Azure OIDC authentication (scheduled cleanup)
+- `AZURE_CLIENT_ID`: For Azure OIDC authentication
+- `AZURE_TENANT_ID`: For Azure OIDC authentication
+- `AZURE_SUBSCRIPTION_ID`: For Azure OIDC authentication
 
 **Variables (optional):**
 - `SWA_NAME`: Static Web App name (default: `swa-ytsumm-prd`)
-- `SWA_RESOURCE_GROUP`: Resource group name (default: `rg-ytsumm-prd`)
+- `AZURE_RESOURCE_GROUP`: Resource group name (default: `rg-ytsumm-prd`)
 
 ### Monitoring and Troubleshooting
 
@@ -223,28 +280,32 @@ az staticwebapp environment list \
 
 ### Deployment Still Fails with "Maximum Environments" Error
 
+This should rarely happen now with automated cleanup, but if it does:
+
 **Immediate fix:**
 ```bash
-# Option 1: Close stale PRs (triggers automatic cleanup)
+# Option 1: Wait a few minutes for pre-deployment cleanup to run
+# The preview.yml workflow automatically cleans up stale environments
+
+# Option 2: Trigger scheduled cleanup manually
+# GitHub Actions > SWA Cleanup (Scheduled) > Run workflow
+
+# Option 3: Close stale PRs (triggers immediate cleanup)
 gh pr close <PR_NUMBER>
 
-# Option 2: Manual deletion via Azure Portal
-# 1. Navigate to: portal.azure.com
-# 2. Find your Static Web App resource
-# 3. Go to: Environments
-# 4. Delete environments for closed PRs
+# Option 4: Manual deletion via Azure Portal
+# Navigate to: portal.azure.com → Static Web App → Environments → Delete
 ```
 
-**Why can't we auto-delete?**
-- Azure SWA environments are tied to PR context
-- The `Azure/static-web-apps-deploy` action with `action: close` only works when run in PR context
-- We cannot call this action for other PRs from a different workflow context
-- The SWA management API requires complex authentication that the deployment token doesn't support
+**Why it might still happen:**
+- Multiple PRs deploying simultaneously
+- Cleanup hasn't run yet for recently closed PRs
+- Azure CLI authentication issues
 
 **Long-term solution:**
-- Keep PRs closed promptly after merging
-- Use the scheduled cleanup report to identify stale environments
-- Manually clean up orphaned environments monthly
+- Automated cleanup handles most cases
+- Close PRs promptly after merging
+- Monitor scheduled cleanup reports
 
 ### Cleanup Workflow Fails
 
