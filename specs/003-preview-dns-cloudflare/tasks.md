@@ -51,8 +51,8 @@
 - [X] T019 Create shared Gateway manifest in k8s/argocd/gateway-api/gateway.yaml
 - [X] T019a Configure Gateway to request same LoadBalancer IP as nginx-ingress (add annotation `service.beta.kubernetes.io/azure-load-balancer-ipv4: <IP>` to Gateway service)
 - [X] T020 Update Argo CD infra-apps.yaml to include new components in k8s/argocd/infra-apps.yaml
-- [ ] T021 Apply foundational manifests and verify Gateway has external IP
-- [ ] T022 Verify wildcard certificate is Ready with `kubectl get certificate -n gateway-system`
+- [X] T021 Apply foundational manifests and verify Gateway has external IP (Gateway LoadBalancer IP: 20.187.186.135)
+- [X] T022 Verify wildcard certificate is Ready with `kubectl get certificate -n gateway-system` (READY=True, TLS secret created)
 
 **Checkpoint**: Gateway API, ExternalDNS, and wildcard certificate operational
 
