@@ -1,8 +1,8 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #6
 # Image Tag: latest
-# Commit: 13f750712d720c1f5700bb09c625a3d4d0602c1b
-# Updated: 2026-01-11T15:24:18Z
+# Commit: db1d4051d34802e09271eaa3731dc037d5b56d9b
+# Updated: 2026-01-11T15:29:55Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
