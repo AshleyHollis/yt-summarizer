@@ -105,11 +105,15 @@
 
 ### Validation
 
-- [ ] T039 [US1] Test preview creation with a real PR - verify DNS record created
-- [ ] T040 [US1] Verify HTTPS works on preview URL with valid certificate
-- [ ] T041 [US1] Verify PR comment contains correct API and SWA preview URLs
+- [ ] T039 [US1] **READY FOR TESTING** - Test preview creation with a real PR - verify DNS record created
+- [ ] T040 [US1] **READY FOR TESTING** - Verify HTTPS works on preview URL with valid certificate
+- [ ] T041 [US1] **READY FOR TESTING** - Verify PR comment contains correct API and SWA preview URLs
 
 **Checkpoint**: Preview creation works with new DNS/TLS infrastructure
+
+**STATUS**: All infrastructure code complete. Validation requires:
+1. **PREREQUISITE**: Update Cloudflare DNS `*.yt-summarizer.apps.ashleyhollis.com` → 20.187.186.135
+2. Create test PR to validate preview workflow with new Gateway API infrastructure
 
 ---
 
