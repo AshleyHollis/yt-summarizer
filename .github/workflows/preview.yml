@@ -269,7 +269,11 @@ jobs:
     name: Check Preview Limit
     runs-on: ubuntu-latest
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.detect-changes.outputs.needs_deployment == 'true'
-    needs: [detect-changes]
+    needs: 
+      - detect-changes
+      - wait-for-ci
+      - get-existing-image-tag
+      - build-images-manual
     outputs:
       can_deploy: ${{ steps.validate-tag.outputs.can_deploy }}
       image_tag: ${{ steps.export-image.outputs.image_tag }}
@@ -284,40 +288,31 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           max-previews: ${{ env.MAX_PREVIEWS }}
 
-      - name: Get image tag from CI
-        if: needs.detect-changes.outputs.needs_image_build == 'true'
-        id: get-ci-tag
-        uses: ./.github/actions/export-image-tag
-        with:
-          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
-
-      - name: Get existing image tag
-        if: needs.detect-changes.outputs.needs_image_build == 'false'
-        id: get-existing-tag
-        uses: ./.github/actions/export-image-tag
-        with:
-          image-tag: ${{ needs.get-existing-image-tag.outputs.image_tag }}
-
-      - name: Get manual build image tag
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.force_deploy == 'true'
-        id: get-manual-tag
-        uses: ./.github/actions/export-image-tag
-        with:
-          image-tag: ${{ needs.build-images-manual.outputs.image_tag }}
-
       - name: Determine final image tag
         id: determine-tag
         run: |
-          if [ "${{ needs.detect-changes.outputs.needs_image_build }}" = "true" ]; then
-            IMAGE_TAG="${{ steps.get-ci-tag.outputs.image_tag }}"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
-            IMAGE_TAG="${{ steps.get-manual-tag.outputs.image_tag }}"
-          else
-            IMAGE_TAG="${{ steps.get-existing-tag.outputs.image_tag }}"
+          # Determine image tag based on which jobs actually ran and provided outputs
+          IMAGE_TAG=""
+          
+          # Priority order: CI build > manual build > existing tag
+          if [ -n "${{ needs.wait-for-ci.outputs.image_tag }}" ]; then
+            IMAGE_TAG="${{ needs.wait-for-ci.outputs.image_tag }}"
+            echo "Using image tag from CI: $IMAGE_TAG"
+          elif [ -n "${{ needs.build-images-manual.outputs.image_tag }}" ]; then
+            IMAGE_TAG="${{ needs.build-images-manual.outputs.image_tag }}"
+            echo "Using image tag from manual build: $IMAGE_TAG"
+          elif [ -n "${{ needs.get-existing-image-tag.outputs.image_tag }}" ]; then
+            IMAGE_TAG="${{ needs.get-existing-image-tag.outputs.image_tag }}"
+            echo "Using existing image tag: $IMAGE_TAG"
           fi
           
           if [ -z "$IMAGE_TAG" ]; then
             echo "::error::No image tag available for deployment"
+            echo "Debug info:"
+            echo "  needs_image_build: ${{ needs.detect-changes.outputs.needs_image_build }}"
+            echo "  wait-for-ci image_tag: ${{ needs.wait-for-ci.outputs.image_tag }}"
+            echo "  build-images-manual image_tag: ${{ needs.build-images-manual.outputs.image_tag }}"
+            echo "  get-existing-image-tag image_tag: ${{ needs.get-existing-image-tag.outputs.image_tag }}"
             exit 1
           fi
           
