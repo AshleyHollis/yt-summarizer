@@ -100,5 +100,7 @@ runs:
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
           
           echo "✅ Image exists in ACR"
-          [ -n "$DIGEST" ] && echo "   Digest: ${DIGEST}"
+          if [ -n "$DIGEST" ]; then
+            echo "   Digest: ${DIGEST}"
+          fi
         fi
