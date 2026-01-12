@@ -121,6 +121,9 @@ jobs:
           plan-summary: ${{ steps.plan.outputs.plan_summary }}
           formatted-plan: ${{ steps.plan.outputs.formatted_plan }}
           plan-outcome: ${{ steps.plan.outcome }}
+
+      - name: Plan Status
+        if: steps.plan.outcome == 'failure'
         run: exit 1
 
       - name: Terraform Apply
