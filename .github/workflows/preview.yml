@@ -414,6 +414,15 @@ jobs:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
+      - name: Verify cluster can pull image
+        # Runs after AKS context + ACR login are configured
+        uses: ./.github/actions/validate-acr-image
+        with:
+          registry: ${{ env.ACR_NAME }}
+          repository: yt-summarizer-api
+          tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
+          run-k8s-pull-test: 'true'
+
       - name: Validate CI image tag for PR
         if: needs.detect-changes.outputs.needs_image_build == 'true'
         uses: ./.github/actions/validate-image-tag
