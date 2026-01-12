@@ -3,21 +3,6 @@
 # =============================================================================
 # Uses Pull Request Generator to automatically create preview apps for open PRs
 # Overlay files live in the PR branch itself (k8s/overlays/preview/)
-# No need to push to main - Argo CD reads directly from PR branch
-apiVersion: argoproj.io/v1alpha1
-kind: ApplicationSet
-metadata:
-  name: yt-summarizer-previews
-  namespace: argocd
-  labels:
-    app.kubernetes.io/name: yt-summarizer
-    app.kubernetes.io/component: preview
-    app.kubernetes.io/part-of: yt-summarizer
-# =============================================================================
-# Argo CD ApplicationSet - Preview Environments
-# =============================================================================
-# Uses Pull Request Generator to automatically create preview apps for open PRs
-# Overlay files live in the PR branch itself (k8s/overlays/preview/)
 #
 # AUTHENTICATION OPTIONS:
 #
