@@ -147,6 +147,32 @@ jobs:
           timeout-seconds: '1800'
 
   # ===========================================================================
+  # PHASE 2B: GET PRODUCTION IMAGE TAG FOR K8S-ONLY CHANGES
+  # ===========================================================================
+  # For K8s-only changes (needs_image_build=false), we use the production
+  # image tag to test configuration changes with the current production code.
+  # This is deterministic and matches what will be deployed after merge.
+  # ===========================================================================
+  get-production-tag:
+    name: Get Production Image Tag
+    runs-on: ubuntu-latest
+    needs: [detect-changes, wait-for-ci]
+    if: |
+      needs.detect-changes.outputs.needs_deployment == 'true' &&
+      needs.detect-changes.outputs.needs_image_build == 'false'
+    outputs:
+      image_tag: ${{ steps.prod-tag.outputs.image_tag }}
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Get production image tag from main
+        id: prod-tag
+        uses: ./.github/actions/get-production-image-tag
+
+  # ===========================================================================
   # PHASE 3: CONCURRENCY LIMIT CHECK
   # ===========================================================================
   # ONLY runs when both detect-changes and wait-for-ci succeed
@@ -167,10 +193,12 @@ jobs:
       !cancelled() &&
       needs.detect-changes.result == 'success' &&
       needs.detect-changes.outputs.needs_deployment == 'true' &&
-      needs.wait-for-ci.result == 'success'
-    needs: [detect-changes, wait-for-ci]
+      needs.wait-for-ci.result == 'success' &&
+      (needs.get-production-tag.result == 'success' || needs.get-production-tag.result == 'skipped')
+    needs: [detect-changes, wait-for-ci, get-production-tag]
     outputs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
+      final_image_tag: ${{ needs.wait-for-ci.outputs.image_tag != '' && needs.wait-for-ci.outputs.image_tag || needs.get-production-tag.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -257,7 +285,7 @@ jobs:
     if: always() && !cancelled() && needs.check-concurrency.result == 'success' && needs.check-concurrency.outputs.can_deploy == 'true' && needs.get-ingress.result == 'success'
     needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes]
     outputs:
-      image_tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+      image_tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -285,9 +313,10 @@ jobs:
           cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Validate CI image tag for PR
+        if: needs.detect-changes.outputs.needs_image_build == 'true'
         uses: ./.github/actions/validate-image-tag
         with:
-          ci-image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          ci-image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
 
@@ -296,7 +325,7 @@ jobs:
         uses: ./.github/actions/update-preview-overlay
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           acr-server: ${{ env.ACR_LOGIN_SERVER }}
           preview-host: ${{ needs.get-ingress.outputs.preview_host }}
           tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
@@ -313,7 +342,7 @@ jobs:
         uses: ./.github/actions/commit-overlay-changes
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
           pr-branch: ${{ needs.detect-changes.outputs.pr_head_ref }}
 
@@ -369,14 +398,14 @@ jobs:
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           deployment-name: api
-          expected-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           image-name: yt-summarizer-api
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-worker-deployments
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          expected-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
           fail-on-mismatch: 'false'
