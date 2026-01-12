@@ -496,9 +496,8 @@ class TestBlobPathConsistency:
 
     def test_api_and_worker_transcript_paths_match(self):
         """Test that API and workers use the same transcript path helper."""
-        from shared.blob.client import get_transcript_blob_path as worker_helper
-
         from api.routes.videos import get_transcript_blob_path as api_helper
+        from shared.blob.client import get_transcript_blob_path as worker_helper
 
         test_cases = [
             ("Simple Channel", "dQw4w9WgXcQ"),
@@ -518,9 +517,8 @@ class TestBlobPathConsistency:
 
     def test_api_and_worker_summary_paths_match(self):
         """Test that API and workers use the same summary path helper."""
-        from shared.blob.client import get_summary_blob_path as worker_helper
-
         from api.routes.videos import get_summary_blob_path as api_helper
+        from shared.blob.client import get_summary_blob_path as worker_helper
 
         test_cases = [
             ("Simple Channel", "dQw4w9WgXcQ"),

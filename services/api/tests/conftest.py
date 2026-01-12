@@ -68,10 +68,10 @@ def app(mock_session):
 
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    from shared.db.connection import get_session
 
     from api.middleware import CorrelationIdMiddleware
     from api.routes import batches, channels, copilot, health, jobs, library, threads, videos
+    from shared.db.connection import get_session
 
     @asynccontextmanager
     async def mock_lifespan(app: FastAPI):

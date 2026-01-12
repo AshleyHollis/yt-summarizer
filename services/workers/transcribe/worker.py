@@ -371,9 +371,10 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             Tuple of (transcript_text, timestamped_segments) or (None, None) if unavailable.
         """
         import asyncio
-        import tempfile
-        import os
         import glob
+        import os
+        import tempfile
+
         import yt_dlp
 
         self._log_youtube_request(youtube_video_id, "yt-dlp-download-subtitles")
@@ -455,7 +456,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 sub_file = sub_files[0]
                 sub_ext = os.path.splitext(sub_file)[1].lstrip(".")
 
-                with open(sub_file, "r", encoding="utf-8") as f:
+                with open(sub_file, encoding="utf-8") as f:
                     subtitle_content = f.read()
 
                 # Validate the content before accepting it

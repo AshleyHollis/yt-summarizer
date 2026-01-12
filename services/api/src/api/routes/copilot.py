@@ -278,9 +278,10 @@ async def explain_recommendation(
     """
     # Import models
     try:
-        from shared.db.models import Relationship, Segment, Video
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
+
+        from shared.db.models import Relationship, Segment, Video
     except ImportError:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,

@@ -144,7 +144,6 @@ class TestTranscribeWorkerProcessing:
         progressing through the pipeline with empty content.
         """
         from shared.worker.base_worker import WorkerStatus
-
         from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
@@ -194,7 +193,6 @@ class TestTranscribeWorkerProcessing:
         the worker extracts them successfully.
         """
         from shared.worker.base_worker import WorkerStatus
-
         from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
@@ -308,7 +306,6 @@ class TestSummarizeWorkerProcessing:
     ):
         """Test that summarize worker succeeds when transcript exists."""
         from shared.worker.base_worker import WorkerStatus
-
         from summarize.worker import SummarizeMessage, SummarizeWorker
 
         worker = SummarizeWorker()
@@ -434,9 +431,9 @@ class TestEmbedWorkerProcessing:
     ):
         """Test that embed worker succeeds when content exists."""
         import numpy as np
-        from shared.worker.base_worker import WorkerStatus
 
         from embed.worker import EmbedMessage, EmbedWorker
+        from shared.worker.base_worker import WorkerStatus
 
         worker = EmbedWorker()
 
@@ -613,9 +610,9 @@ class TestRelationshipsWorkerProcessing:
     ):
         """Test that relationships worker succeeds when embeddings exist."""
         import numpy as np
-        from shared.worker.base_worker import WorkerStatus
 
         from relationships.worker import RelationshipsMessage, RelationshipsWorker
+        from shared.worker.base_worker import WorkerStatus
 
         worker = RelationshipsWorker()
 
@@ -662,7 +659,6 @@ class TestWorkerQueueNames:
     def test_transcribe_worker_queue_name(self):
         """Test transcribe worker uses correct queue."""
         from shared.queue.client import TRANSCRIBE_QUEUE
-
         from transcribe.worker import TranscribeWorker
 
         worker = TranscribeWorker()
@@ -671,7 +667,6 @@ class TestWorkerQueueNames:
     def test_summarize_worker_queue_name(self):
         """Test summarize worker uses correct queue."""
         from shared.queue.client import SUMMARIZE_QUEUE
-
         from summarize.worker import SummarizeWorker
 
         worker = SummarizeWorker()
@@ -679,18 +674,16 @@ class TestWorkerQueueNames:
 
     def test_embed_worker_queue_name(self):
         """Test embed worker uses correct queue."""
-        from shared.queue.client import EMBED_QUEUE
-
         from embed.worker import EmbedWorker
+        from shared.queue.client import EMBED_QUEUE
 
         worker = EmbedWorker()
         assert worker.queue_name == EMBED_QUEUE
 
     def test_relationships_worker_queue_name(self):
         """Test relationships worker uses correct queue."""
-        from shared.queue.client import RELATIONSHIPS_QUEUE
-
         from relationships.worker import RelationshipsWorker
+        from shared.queue.client import RELATIONSHIPS_QUEUE
 
         worker = RelationshipsWorker()
         assert worker.queue_name == RELATIONSHIPS_QUEUE

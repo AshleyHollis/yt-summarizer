@@ -207,7 +207,6 @@ class TestWorkerResultOnInvalidContent:
     async def test_job_fails_with_clear_message_when_no_transcript(self):
         """Job should fail with clear message when no valid transcript is available."""
         from shared.worker.base_worker import WorkerStatus
-
         from transcribe.worker import TranscribeMessage, TranscribeWorker
 
         worker = TranscribeWorker()
@@ -260,7 +259,6 @@ class TestRateLimitHandling:
     async def test_rate_limit_error_returns_rate_limited_result(self, worker, message):
         """When RateLimitError is raised, should return rate_limited result for infinite retry."""
         from shared.worker.base_worker import WorkerStatus
-
         from transcribe.worker import RateLimitError
 
         with (
@@ -291,7 +289,6 @@ class TestRateLimitHandling:
     async def test_rate_limit_does_not_increment_retry_count(self, worker, message):
         """Rate limited jobs should not count toward max_retries."""
         from shared.worker.base_worker import WorkerStatus
-
         from transcribe.worker import RateLimitError
 
         with (

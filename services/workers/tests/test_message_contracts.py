@@ -481,15 +481,14 @@ class TestQueueNameConsistency:
 
     def test_all_workers_use_shared_queue_names(self):
         """Test workers use queue names from shared package."""
+        from embed.worker import EmbedWorker
+        from relationships.worker import RelationshipsWorker
         from shared.queue.client import (
             EMBED_QUEUE,
             RELATIONSHIPS_QUEUE,
             SUMMARIZE_QUEUE,
             TRANSCRIBE_QUEUE,
         )
-
-        from embed.worker import EmbedWorker
-        from relationships.worker import RelationshipsWorker
         from summarize.worker import SummarizeWorker
         from transcribe.worker import TranscribeWorker
 

@@ -237,8 +237,9 @@ class TestLiveDatabaseIntegration:
     @pytest.mark.asyncio
     async def test_can_query_videos_table(self):
         """Verify the Videos table exists and is queryable."""
-        from shared.db.connection import get_db
         from sqlalchemy import text
+
+        from shared.db.connection import get_db
 
         db = get_db()
         async with db.session() as session:
