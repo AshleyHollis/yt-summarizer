@@ -27,7 +27,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🚀 Setting up GitHub App for ArgoCD ApplicationSet" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host "  GitHub App Setup for ArgoCD ApplicationSet" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Check prerequisites
@@ -44,18 +47,20 @@ $context = kubectl config current-context 2>$null
 if (!$context) {
     Write-Error "kubectl not configured. Run: az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd"
 }
-Write-Host "✓ kubectl context: $context" -ForegroundColor Green
+Write-Host "  [OK] kubectl context: $context" -ForegroundColor Green
 
 # Verify gh auth
 $authStatus = gh auth status 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Error "gh CLI not authenticated. Run: gh auth login"
 }
-Write-Host "✓ gh CLI authenticated" -ForegroundColor Green
+Write-Host "  [OK] gh CLI authenticated" -ForegroundColor Green
 Write-Host ""
 
 # Step 1: Create GitHub App
-Write-Host "📝 Step 1: Create GitHub App" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host " Step 1: Create GitHub App" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "I'll guide you through creating a GitHub App with the correct permissions." -ForegroundColor White
 Write-Host ""
@@ -67,7 +72,7 @@ $createUrl = "https://github.com/settings/apps/new"
 Start-Process $createUrl
 
 Write-Host ""
-Write-Host "✏️  Fill in the form with these values:" -ForegroundColor Cyan
+Write-Host "Fill in the form with these values:" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  GitHub App name: " -NoNewline -ForegroundColor Gray
 Write-Host "$AppName" -ForegroundColor Green
@@ -90,12 +95,14 @@ Write-Host "Only on this account" -ForegroundColor Green
 Write-Host ""
 Write-Host "Then click 'Create GitHub App'" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "---------------------------------------------------------------------" -ForegroundColor DarkGray
 Read-Host "Press Enter after creating the app"
 
 # Step 1b: Generate private key
 Write-Host ""
-Write-Host "🔑 Step 1b: Generate Private Key" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host " Step 1b: Generate Private Key" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "In the app settings page:" -ForegroundColor White
 Write-Host "  1. Scroll down to 'Private keys' section" -ForegroundColor Gray
@@ -104,12 +111,14 @@ Write-Host "  3. Save the downloaded .pem file" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Also note the App ID (shown at the top of the settings page)" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "---------------------------------------------------------------------" -ForegroundColor DarkGray
 Read-Host "Press Enter after downloading the private key"
 
 # Step 1c: Install app
 Write-Host ""
-Write-Host "📦 Step 1c: Install App on Repository" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host " Step 1c: Install App on Repository" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "In the app settings page:" -ForegroundColor White
 Write-Host "  1. Click 'Install App' in the left sidebar" -ForegroundColor Gray
@@ -124,12 +133,15 @@ Write-Host "  Example: https://github.com/settings/installations/12345678" -Fore
 Write-Host "  Installation ID: " -NoNewline -ForegroundColor DarkGray
 Write-Host "12345678" -ForegroundColor Green
 Write-Host ""
-Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "---------------------------------------------------------------------" -ForegroundColor DarkGray
 Read-Host "Press Enter after installing the app"
 
 # Step 2: Collect information
 Write-Host ""
-Write-Host "📋 Step 2: Collect App Information" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host " Step 2: Collect App Information" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host ""
 
 $appId = Read-Host "Enter the App ID (from app settings page)"
 $installationId = Read-Host "Enter the Installation ID (from installation URL)"
@@ -140,13 +152,17 @@ if (!(Test-Path $privateKeyPath)) {
     Write-Error "Private key file not found: $privateKeyPath"
 }
 
-Write-Host "✓ App ID: $appId" -ForegroundColor Green
-Write-Host "✓ Installation ID: $installationId" -ForegroundColor Green
-Write-Host "✓ Private key: $privateKeyPath" -ForegroundColor Green
+Write-Host ""
+Write-Host "  [OK] App ID: $appId" -ForegroundColor Green
+Write-Host "  [OK] Installation ID: $installationId" -ForegroundColor Green
+Write-Host "  [OK] Private key: $privateKeyPath" -ForegroundColor Green
 
 # Step 3: Create Kubernetes secret
 Write-Host ""
-Write-Host "🔐 Step 3: Create Kubernetes Secret" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host " Step 3: Create Kubernetes Secret" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host ""
 
 # Delete existing secret if present
 kubectl delete secret github-app -n argocd --ignore-not-found=true
@@ -162,11 +178,13 @@ if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to create Kubernetes secret"
 }
 
-Write-Host "✓ Secret created: github-app (namespace: argocd)" -ForegroundColor Green
+Write-Host "  [OK] Secret created: github-app (namespace: argocd)" -ForegroundColor Green
 
 # Step 4: Update ApplicationSet
 Write-Host ""
-Write-Host "📝 Step 4: Update ApplicationSet Configuration" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host " Step 4: Update ApplicationSet Configuration" -ForegroundColor Cyan
+Write-Host "=====================================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "To use the GitHub App, update k8s/argocd/preview-appset.yaml:" -ForegroundColor Yellow
 Write-Host ""
@@ -182,7 +200,9 @@ Write-Host "Then apply the change:" -ForegroundColor Yellow
 Write-Host "  kubectl apply -f k8s/argocd/preview-appset.yaml" -ForegroundColor Gray
 Write-Host ""
 
-Write-Host "✅ Setup Complete!" -ForegroundColor Green
+Write-Host "=====================================================================" -ForegroundColor Green
+Write-Host " Setup Complete!" -ForegroundColor Green
+Write-Host "=====================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Update k8s/argocd/preview-appset.yaml to use appSecretName" -ForegroundColor White
