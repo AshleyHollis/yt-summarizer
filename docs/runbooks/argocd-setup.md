@@ -122,7 +122,31 @@ kubectl create secret generic github-repo \
 kubectl label secret github-repo -n argocd argocd.argoproj.io/secret-type=repository
 ```
 
-### Option 2: GitHub App (OIDC)
+### Option 3: GitHub Personal Access Token (for ApplicationSet PR Generator)
+
+The ApplicationSet PR generator requires a GitHub PAT to query the GitHub API for open pull requests.
+
+```powershell
+# Create a GitHub PAT with 'repo' scope at:
+# https://github.com/settings/tokens/new
+
+# Create the secret in argocd namespace
+kubectl create secret generic github-token \
+  --namespace=argocd \
+  --from-literal=token=<YOUR_GITHUB_PAT>
+
+# Or using gh CLI (if authenticated)
+$token = (gh auth token)
+kubectl create secret generic github-token -n argocd --from-literal=token=$token
+```
+
+**Required Scopes:**
+- `repo` - Full control of private repositories (required to list PRs)
+- Or `public_repo` - Access public repositories (if repository is public)
+
+**Note:** The ApplicationSet uses this token only to query the GitHub API for open PRs. It does NOT use it to clone the repository (repository access is configured separately via SSH/OIDC).
+
+
 
 ```bash
 # Create GitHub App with repository read access
