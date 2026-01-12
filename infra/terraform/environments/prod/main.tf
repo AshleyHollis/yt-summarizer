@@ -20,7 +20,7 @@ locals {
     Environment       = local.environment
     Project           = "yt-summarizer"
     ManagedBy         = "terraform"
-    TestPipelineDate   = "2026-01-13"
+    TestPipelineDate   = "2026-01-13-v2"
   }
 }
 
