@@ -147,30 +147,87 @@ jobs:
           timeout-seconds: '1800'
 
   # ===========================================================================
-  # PHASE 2B: GET PRODUCTION IMAGE TAG FOR K8S-ONLY CHANGES
+  # PHASE 2B: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
   # ===========================================================================
-  # For K8s-only changes (needs_image_build=false), we use the production
-  # image tag to test configuration changes with the current production code.
-  # This is deterministic and matches what will be deployed after merge.
+  # For K8s-only changes (needs_image_build=false), we need a deterministic
+  # image tag. Strategy:
+  #   1. Walk backwards through PR's git history
+  #   2. Find most recent commit that changed code (services/apps/docker)
+  #   3. Use that commit's image tag: pr-<number>-<sha>
+  #   4. If no commits in PR built images, fallback to production tag
+  # 
+  # This ensures K8s changes are tested with the PR's own code, not random
+  # production code. Fully deterministic as it's tied to git history.
   # ===========================================================================
-  get-production-tag:
-    name: Get Production Image Tag
+  find-pr-image-tag:
+    name: Find PR Image Tag
     runs-on: ubuntu-latest
     needs: [detect-changes, wait-for-ci]
     if: |
       needs.detect-changes.outputs.needs_deployment == 'true' &&
       needs.detect-changes.outputs.needs_image_build == 'false'
     outputs:
-      image_tag: ${{ steps.prod-tag.outputs.image_tag }}
+      image_tag: ${{ steps.find-tag.outputs.image_tag }}
     steps:
-      - name: Checkout main branch
+      - name: Checkout PR branch with full history
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.detect-changes.outputs.pr_head_ref }}
+          fetch-depth: 0  # Need full history to walk commits
 
-      - name: Get production image tag from main
-        id: prod-tag
-        uses: ./.github/actions/get-production-image-tag
+      - name: Find most recent image-building commit in PR
+        id: find-tag
+        shell: bash
+        run: |
+          PR_NUMBER="${{ needs.detect-changes.outputs.pr_number }}"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref || 'main' }}"
+          
+          echo "🔍 Searching PR #$PR_NUMBER history for most recent code change..."
+          
+          # Get list of commits in this PR (from base branch to HEAD)
+          git fetch origin "$BASE_BRANCH"
+          COMMITS=$(git rev-list --reverse "origin/$BASE_BRANCH"..HEAD)
+          
+          FOUND_IMAGE_TAG=""
+          FOUND_COMMIT=""
+          
+          # Walk commits from newest to oldest
+          for commit in $(echo "$COMMITS" | tac); do
+            SHORT_SHA=$(git rev-parse --short=7 "$commit")
+            
+            # Check if this commit changed code areas that trigger image builds
+            CHANGED_FILES=$(git diff-tree --no-commit-tree --name-only -r "$commit")
+            
+            if echo "$CHANGED_FILES" | grep -qE '^(services/api|services/workers|services/shared|apps/web|docker)/'; then
+              FOUND_COMMIT="$commit"
+              FOUND_IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
+              echo "✅ Found code change at commit $SHORT_SHA"
+              echo "   Files changed: $(echo "$CHANGED_FILES" | grep -E '^(services/api|services/workers|services/shared|apps/web|docker)/' | head -3 | tr '\n' ' ')"
+              break
+            fi
+          done
+          
+          # If no code changes found in PR, fallback to production tag
+          if [ -z "$FOUND_IMAGE_TAG" ]; then
+            echo "⚠️  No code changes found in PR history"
+            echo "📦 Falling back to production image tag from main branch"
+            
+            git fetch origin main
+            git checkout origin/main -- k8s/overlays/prod/kustomization.yaml
+            
+            PROD_TAG=$(grep -oP 'newTag: \K.*' k8s/overlays/prod/kustomization.yaml | head -1)
+            
+            if [ -z "$PROD_TAG" ]; then
+              echo "::error::Could not find production image tag"
+              exit 1
+            fi
+            
+            echo "✅ Using production tag: $PROD_TAG"
+            FOUND_IMAGE_TAG="$PROD_TAG"
+          fi
+          
+          echo "image_tag=$FOUND_IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "🎯 Final image tag for K8s-only preview: $FOUND_IMAGE_TAG"
 
   # ===========================================================================
   # PHASE 3: CONCURRENCY LIMIT CHECK
@@ -194,11 +251,11 @@ jobs:
       needs.detect-changes.result == 'success' &&
       needs.detect-changes.outputs.needs_deployment == 'true' &&
       needs.wait-for-ci.result == 'success' &&
-      (needs.get-production-tag.result == 'success' || needs.get-production-tag.result == 'skipped')
-    needs: [detect-changes, wait-for-ci, get-production-tag]
+      (needs.find-pr-image-tag.result == 'success' || needs.find-pr-image-tag.result == 'skipped')
+    needs: [detect-changes, wait-for-ci, find-pr-image-tag]
     outputs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
-      final_image_tag: ${{ needs.wait-for-ci.outputs.image_tag != '' && needs.wait-for-ci.outputs.image_tag || needs.get-production-tag.outputs.image_tag }}
+      final_image_tag: ${{ needs.wait-for-ci.outputs.image_tag != '' && needs.wait-for-ci.outputs.image_tag || needs.find-pr-image-tag.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
