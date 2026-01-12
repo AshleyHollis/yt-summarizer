@@ -200,7 +200,7 @@ runs:
           echo "::error::  Recommended fixes:"
           echo "::error::  - Verify AKS managed identity has 'AcrPull' role: az role assignment list --scope /subscriptions/.../acr/..."
           echo "::error::  - Check ACR network rules allow AKS subnet"
-          echo "::error::  - If using admin credentials, verify imagePullSecrets are configured"
+          echo "::error::  - Prefer granting AKS managed identity the 'AcrPull' role; imagePullSecrets are a fallback and should be used only when necessary and managed securely"
         else
           echo "  ✅ VERIFICATION PASSED: Kubernetes can successfully pull this image"
         fi

@@ -349,11 +349,9 @@ EOF
               echo "::error::     az role assignment create --assignee <kubelet-identity> \\"
               echo "::error::       --role AcrPull --scope /subscriptions/.../resourceGroups/.../providers/Microsoft.ContainerRegistry/registries/${REGISTRY}"
               echo "::error:: "
-              echo "::error::  2. Enable ACR admin credentials and add imagePullSecrets:"
-              echo "::error::     - Enable admin on ACR: az acr update -n ${REGISTRY} --admin-enabled true"
-              echo "::error::     - Create K8s secret: kubectl create secret docker-registry acr-pull-secret \\"
-              echo "::error::         --docker-server=${REGISTRY}.azurecr.io --docker-username=... --docker-password=..."
-              echo "::error::     - Add imagePullSecrets to pod specs in manifests"
+              echo "::error::  → Prefer granting AKS kubelet identity the 'AcrPull' role on the ACR (recommended)"
+              echo "::error::     - az role assignment create --assignee <kubelet-identity> --role AcrPull --scope /subscriptions/.../resourceGroups/.../providers/Microsoft.ContainerRegistry/registries/${REGISTRY}"
+              echo "::error::  → As a fallback, imagePullSecrets (docker-registry secrets) can be used, but ensure they are managed and rotated securely if present."}   }]}] }}}
             elif [[ "$ERROR_MSG" == *"not found"* ]] || [[ "$ERROR_MSG" == *"manifest unknown"* ]]; then
               echo "::error::  → Image tag does not exist in ACR (already caught earlier, but double-check)"
             elif [[ "$ERROR_MSG" == *"network"* ]] || [[ "$ERROR_MSG" == *"timeout"* ]]; then
