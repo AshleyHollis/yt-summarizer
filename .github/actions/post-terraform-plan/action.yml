@@ -110,7 +110,7 @@ runs:
                 // Capture the line first
                 if (line.trim()) {
                   currentDetails.push(line);
-                  
+
                   // Track if we've seen the resource block start
                   if (line.match(/^\s*[~+\-]\s*resource\s+"/)) {
                     seenResourceBlock = true;
@@ -356,7 +356,7 @@ runs:
                 // Capture the line first
                 if (line.trim()) {
                   currentDetails.push(line);
-                  
+
                   // Track if we've seen the resource block start
                   if (line.match(/^\s*[~+\-]\s*resource\s+"/)) {
                     seenResourceBlock = true;
