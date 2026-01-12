@@ -99,7 +99,7 @@ describe('buildResourceItem', () => {
     assert.ok(markdown.includes('<code>module.vpc.aws_subnet.private</code>'));
   });
 
-  test('includes hcl code block', () => {
+  test('includes diff code block', () => {
     const resource = {
       address: 'test',
       action: 'create',
@@ -108,7 +108,7 @@ describe('buildResourceItem', () => {
 
     const markdown = buildResourceItem(resource);
 
-    assert.ok(markdown.includes('```hcl'));
+    assert.ok(markdown.includes('```diff'));
     assert.ok(markdown.includes('```'));
   });
 

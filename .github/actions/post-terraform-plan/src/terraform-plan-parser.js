@@ -32,13 +32,14 @@ function formatValue(value, unknown) {
 
 /**
  * Recursively find all changes between before and after states
+ * Format optimized for GitHub diff syntax highlighting (markers at column 0)
  * @param {Object} before - Before state
  * @param {Object} after - After state
  * @param {Object} afterUnknown - Unknown values in after state
- * @param {string} indent - Current indentation
+ * @param {string} prefix - Indentation prefix (spaces only, no markers)
  * @returns {string[]} Array of formatted change lines
  */
-function findChanges(before, after, afterUnknown, indent = '    ') {
+function findChanges(before, after, afterUnknown, prefix = '  ') {
   const lines = [];
   before = before || {};
   after = after || {};
@@ -65,11 +66,11 @@ function findChanges(before, after, afterUnknown, indent = '    ') {
     // Handle nested objects/blocks
     if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
         typeof beforeVal === 'object' && beforeVal !== null && !Array.isArray(beforeVal)) {
-      const nestedLines = findChanges(beforeVal, afterVal, isUnknown || {}, indent + '    ');
+      const nestedLines = findChanges(beforeVal, afterVal, isUnknown || {}, prefix + '    ');
       if (nestedLines.length > 0) {
-        lines.push(`${indent}~ ${key} {`);
+        lines.push(`~ ${prefix}${key} {`);
         nestedLines.forEach(l => lines.push(l));
-        lines.push(`${indent}  }`);
+        lines.push(`  ${prefix}}`);
       }
       continue;
     }
@@ -90,27 +91,27 @@ function findChanges(before, after, afterUnknown, indent = '    ') {
           const unknownItem = Array.isArray(isUnknown) ? isUnknown[i] : isUnknown;
 
           if (bItem && aItem) {
-            const nestedLines = findChanges(bItem, aItem, unknownItem || {}, indent + '    ');
+            const nestedLines = findChanges(bItem, aItem, unknownItem || {}, prefix + '    ');
             if (nestedLines.length > 0) {
-              lines.push(`${indent}~ ${key} {`);
+              lines.push(`~ ${prefix}${key} {`);
               nestedLines.forEach(l => lines.push(l));
-              lines.push(`${indent}  }`);
+              lines.push(`  ${prefix}}`);
             }
           } else if (aItem && !bItem) {
-            lines.push(`${indent}+ ${key} {`);
-            const nestedLines = findChanges({}, aItem, unknownItem || {}, indent + '    ');
+            lines.push(`+ ${prefix}${key} {`);
+            const nestedLines = findChanges({}, aItem, unknownItem || {}, prefix + '    ');
             nestedLines.forEach(l => lines.push(l));
-            lines.push(`${indent}  }`);
+            lines.push(`  ${prefix}}`);
           } else if (bItem && !aItem) {
-            lines.push(`${indent}- ${key} {`);
-            lines.push(`${indent}    # (block removed)`);
-            lines.push(`${indent}  }`);
+            lines.push(`- ${prefix}${key} {`);
+            lines.push(`- ${prefix}    # (block removed)`);
+            lines.push(`  ${prefix}}`);
           }
         }
       } else {
         // Simple array comparison
         if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
-          lines.push(`${indent}~ ${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
+          lines.push(`~ ${prefix}${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
         }
       }
       continue;
@@ -118,13 +119,13 @@ function findChanges(before, after, afterUnknown, indent = '    ') {
 
     // Value added
     if (!beforeExists && afterExists) {
-      lines.push(`${indent}+ ${key} = ${formatValue(afterVal, isUnknown)}`);
+      lines.push(`+ ${prefix}${key} = ${formatValue(afterVal, isUnknown)}`);
       continue;
     }
 
     // Value removed
     if (beforeExists && !afterExists) {
-      lines.push(`${indent}- ${key} = ${formatValue(beforeVal, false)}`);
+      lines.push(`- ${prefix}${key} = ${formatValue(beforeVal, false)}`);
       continue;
     }
 
@@ -132,7 +133,7 @@ function findChanges(before, after, afterUnknown, indent = '    ') {
     if (beforeExists && afterExists) {
       const beforeFormatted = formatValue(beforeVal, false);
       const afterFormatted = formatValue(afterVal, isUnknown);
-      lines.push(`${indent}~ ${key} = ${beforeFormatted} -> ${afterFormatted}`);
+      lines.push(`~ ${prefix}${key} = ${beforeFormatted} -> ${afterFormatted}`);
     }
   }
 
@@ -143,7 +144,7 @@ function findChanges(before, after, afterUnknown, indent = '    ') {
  * Format resource change details
  * @param {Object} change - Resource change object from Terraform plan
  * @param {string} action - Action type (create, update, destroy, replace)
- * @returns {string} Formatted HCL-like output
+ * @returns {string} Formatted diff output with markers at column 0 for syntax highlighting
  */
 function formatResourceChange(change, action) {
   const lines = [];
@@ -151,25 +152,29 @@ function formatResourceChange(change, action) {
   const after = change.change.after || {};
   const afterUnknown = change.change.after_unknown || {};
 
-  const symbol = action === 'create' ? '+' : action === 'update' ? '~' : action === 'replace' ? '-/+' : '-';
+  // Use diff-compatible prefixes at column 0
+  const symbol = action === 'create' ? '+' : action === 'update' ? '~' : action === 'replace' ? '!' : '-';
+
+  // Resource header with marker at column 0 for diff highlighting
   lines.push(`${symbol} resource "${change.type}" "${change.name}" {`);
 
-  if (action === 'create') {
-    const changeLines = findChanges({}, after, afterUnknown, '    ');
-    changeLines.forEach(l => lines.push(l));
-  } else if (action === 'update') {
-    const changeLines = findChanges(before, after, afterUnknown, '    ');
-    changeLines.forEach(l => lines.push(l));
-  } else if (action === 'destroy') {
-    const changeLines = findChanges(before, {}, {}, '    ');
-    changeLines.forEach(l => lines.push(l));
-  } else if (action === 'replace') {
-    lines.push('    # forces replacement');
-    const changeLines = findChanges(before, after, afterUnknown, '    ');
-    changeLines.forEach(l => lines.push(l));
+  if (action === 'replace') {
+    lines.push(`! # forces replacement`);
   }
 
-  lines.push('  }');
+  // Get attribute changes with proper indentation (marker at column 0)
+  let changeLines;
+  if (action === 'create') {
+    changeLines = findChanges({}, after, afterUnknown, '    ');
+  } else if (action === 'update' || action === 'replace') {
+    changeLines = findChanges(before, after, afterUnknown, '    ');
+  } else if (action === 'destroy') {
+    changeLines = findChanges(before, {}, {}, '    ');
+  }
+
+  changeLines.forEach(l => lines.push(l));
+  lines.push(`  }`);
+
   return lines.join('\n');
 }
 

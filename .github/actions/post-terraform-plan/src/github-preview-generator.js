@@ -152,6 +152,41 @@ function generateGitHubPreview(markdown, options = {}) {
       border-radius: 6px;
     }
 
+    /* GitHub diff code block highlighting */
+    .markdown-body pre code .diff-addition,
+    .markdown-body pre code .hljs-addition {
+      background-color: ${darkMode ? 'rgba(46, 160, 67, 0.15)' : 'rgba(46, 160, 67, 0.15)'};
+      display: block;
+    }
+
+    .markdown-body pre code .diff-deletion,
+    .markdown-body pre code .hljs-deletion {
+      background-color: ${darkMode ? 'rgba(248, 81, 73, 0.15)' : 'rgba(248, 81, 73, 0.15)'};
+      display: block;
+    }
+
+    /* Custom diff line highlighting for code blocks */
+    .diff-line-add {
+      background-color: ${darkMode ? 'rgba(46, 160, 67, 0.15)' : 'rgba(46, 160, 67, 0.15)'};
+      display: block;
+      margin: 0 -1em;
+      padding: 0 1em;
+    }
+
+    .diff-line-delete {
+      background-color: ${darkMode ? 'rgba(248, 81, 73, 0.15)' : 'rgba(248, 81, 73, 0.15)'};
+      display: block;
+      margin: 0 -1em;
+      padding: 0 1em;
+    }
+
+    .diff-line-change {
+      background-color: ${darkMode ? 'rgba(210, 153, 34, 0.15)' : 'rgba(210, 153, 34, 0.15)'};
+      display: block;
+      margin: 0 -1em;
+      padding: 0 1em;
+    }
+
     /* Info box for preview mode */
     .preview-info {
       background: ${darkMode ? '#161b22' : '#f6f8fa'};
@@ -231,6 +266,27 @@ function generateGitHubPreview(markdown, options = {}) {
 
     // Render markdown
     document.getElementById('content').innerHTML = marked.parse(markdown);
+
+    // Apply diff highlighting to code blocks
+    document.querySelectorAll('pre code').forEach(block => {
+      const text = block.textContent;
+      // Check if this looks like a diff block
+      if (text.match(/^[+\-~!]/m)) {
+        const lines = block.innerHTML.split('\\n');
+        const highlighted = lines.map(line => {
+          const trimmed = line.trimStart();
+          if (trimmed.startsWith('+') && !trimmed.startsWith('+++')) {
+            return '<span class="diff-line-add">' + line + '</span>';
+          } else if (trimmed.startsWith('-') && !trimmed.startsWith('---')) {
+            return '<span class="diff-line-delete">' + line + '</span>';
+          } else if (trimmed.startsWith('~') || trimmed.startsWith('!')) {
+            return '<span class="diff-line-change">' + line + '</span>';
+          }
+          return line;
+        });
+        block.innerHTML = highlighted.join('\\n');
+      }
+    });
 
     // Handle dark/light mode from URL
     const urlParams = new URLSearchParams(window.location.search);

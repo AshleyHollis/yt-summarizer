@@ -44,18 +44,16 @@ function badge(label, value, color) {
  */
 function buildResourceItem(resource) {
   const style = ACTION_STYLES[resource.action] || ACTION_STYLES.update;
-  const cleanDetails = resource.details
-    .split('\n')
-    .filter(l => l.trim())
-    .map(l => l.replace(/^\s{4}/, ''))
-    .join('\n');
+
+  // Keep original formatting - the parser now generates proper indentation
+  const details = resource.details || '# (no changes detected)';
 
   return `
 <details>
 <summary>${style.emoji} <code>${resource.address}</code></summary>
 
-\`\`\`hcl
-${cleanDetails || '# (no changes detected)'}
+\`\`\`diff
+${details}
 \`\`\`
 
 </details>`;
