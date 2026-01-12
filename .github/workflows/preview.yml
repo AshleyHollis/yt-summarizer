@@ -146,6 +146,23 @@ jobs:
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           timeout-seconds: '1800'
 
+      - name: Azure Login
+        if: steps.wait.outputs.image_tag != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate image exists in ACR
+        if: steps.wait.outputs.image_tag != ''
+        uses: ./.github/actions/validate-acr-image
+        with:
+          registry: ${{ env.ACR_NAME }}
+          repository: yt-summarizer-api
+          tag: ${{ steps.wait.outputs.image_tag }}
+          fail-if-missing: 'true'
+
   # ===========================================================================
   # PHASE 2B: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
   # ===========================================================================
@@ -239,6 +256,21 @@ jobs:
           
           echo "image_tag=$FOUND_IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "🎯 Final image tag for K8s-only preview: $FOUND_IMAGE_TAG"
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate image exists in ACR
+        uses: ./.github/actions/validate-acr-image
+        with:
+          registry: ${{ env.ACR_NAME }}
+          repository: yt-summarizer-api
+          tag: ${{ steps.find-tag.outputs.image_tag }}
+          fail-if-missing: 'true'
 
   # ===========================================================================
   # PHASE 3: CONCURRENCY LIMIT CHECK
