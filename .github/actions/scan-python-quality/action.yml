@@ -59,6 +59,7 @@ runs:
         if bandit -r "$SCAN_DIR" -f screen --skip B101,B110,B310,B311,B608 --exclude "./tests/*,*/tests/*,*/test_*.py"; then
           echo ""
           echo "✅ No security issues detected"
+          exit 0
         else
           echo ""
           echo "════════════════════════════════════════════════════════════════"
@@ -90,7 +91,21 @@ runs:
       working-directory: ${{ inputs.service-path }}
       run: |
         echo "✨ Verifying ruff linting..."
-        ruff check src/ --config=${{ inputs.ruff-config }}
+        # Auto-detect source directory
+        if [ -d "src" ]; then
+          SCAN_DIR="src"
+        else
+          SCAN_DIR="."
+        fi
+        
+        # Build config path relative to workspace root
+        RUFF_CONFIG="../../${{ inputs.ruff-config }}"
+        if [ -f "$RUFF_CONFIG" ]; then
+          ruff check "$SCAN_DIR" --config="$RUFF_CONFIG"
+        else
+          # Fallback to default config if specified config doesn't exist
+          ruff check "$SCAN_DIR"
+        fi
 
     - name: Summary
       shell: bash
