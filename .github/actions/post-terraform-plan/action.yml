@@ -118,66 +118,108 @@ runs:
           }
 
           function getActionBadge(action) {
-            const badges = { create: '`+ create`', update: '`~ update`', replace: '`-/+ replace`', destroy: '`- destroy`' };
-            return badges[action] || '`read`';
+            const badges = {
+              create: '<span style="background:#10b981; color:white; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">+ create</span>',
+              update: '<span style="background:#f59e0b; color:white; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">~ update</span>',
+              replace: '<span style="background:#8b5cf6; color:white; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">-/+ replace</span>',
+              destroy: '<span style="background:#ef4444; color:white; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">- destroy</span>'
+            };
+            return badges[action] || '<span style="background:#6b7280; color:white; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">read</span>';
           }
 
           function buildResourceSection(resource) {
             const icon = getActionIcon(resource.action);
             const badge = getActionBadge(resource.action);
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
-            return `<details>\n<summary>${icon} <code>${resource.address}</code> ${badge}</summary>\n\n\`\`\`hcl\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
+            return `<details>\n<summary>${icon} <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:13px; background:#f6f8fa; padding:2px 6px; border-radius:4px;">${resource.address}</span> ${badge}</summary>\n\n\`\`\`hcl\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
           }
 
           // Build summary badges like Terraform Cloud
           const summaryBadges = [];
-          if (summary.add > 0) summaryBadges.push(`🟢 **${summary.add}** to add`);
-          if (summary.change > 0) summaryBadges.push(`🟡 **${summary.change}** to change`);
-          if (summary.destroy > 0) summaryBadges.push(`🔴 **${summary.destroy}** to destroy`);
+          if (summary.add > 0) summaryBadges.push(
+            `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#d1fae5;color:#065f46;border-radius:6px;font-weight:600;font-size:14px;">` +
+            `<span style="font-size:18px;">⊕</span> <span>${summary.add}</span> <span style="font-weight:400;color:#047857;">to add</span></span>`
+          );
+          if (summary.change > 0) summaryBadges.push(
+            `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#fef3c7;color:#92400e;border-radius:6px;font-weight:600;font-size:14px;">` +
+            `<span style="font-size:18px;">≈</span> <span>${summary.change}</span> <span style="font-weight:400;color:#b45309;">to change</span></span>`
+          );
+          if (summary.destroy > 0) summaryBadges.push(
+            `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#fee2e2;color:#991b1b;border-radius:6px;font-weight:600;font-size:14px;">` +
+            `<span style="font-size:18px;">⊖</span> <span>${summary.destroy}</span> <span style="font-weight:400;color:#dc2626;">to destroy</span></span>`
+          );
 
           const sections = [];
-          sections.push(`## ${statusEmoji} ${statusText}`);
+          sections.push(`<div style="margin-bottom:24px;">`);
+          sections.push(`### ${statusEmoji} ${statusText}`);
+          sections.push(`</div>`);
           sections.push('');
 
-          if (hasChanges) {
-            sections.push(`**Resources:** ${summaryBadges.join(' · ')}`);
-          } else {
-            sections.push('✅ **No changes.** Infrastructure matches configuration.');
-          }
+          // Footer - moved higher for visibility
+          sections.push(`<div style="padding:12px 16px;background:#f8f9fa;border-left:4px solid:#0366d6;border-radius:0 6px 6px 0;margin-bottom:20px;">`);
+          sections.push(`<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-size:13px;color:#586069;line-height:1.6;">`);
+          sections.push(`<div style="display:flex;align-items:center;gap:6px;">🕐 <strong>Last Updated:</strong> <code style="background:#e1e4e8;padding:2px 6px;border-radius:3px;font-size:12px;">${new Date().toISOString()}</code></div>`);
+          sections.push(`<div style="display:flex;align-items:center;gap:6px;">👤 <strong>Triggered by:</strong> <span style="color:#0366d6;font-weight:500;">@${context.actor}</span></div>`);
+          sections.push(`<div style="display:flex;align-items:center;gap:6px;">🔗 <a href="${context.payload.repository.html_url}/actions/runs/${context.runId}" style="color:#0366d6;text-decoration:none;font-weight:500;">View Workflow Run →</a></div>`);
+          sections.push(`</div>`);
+          sections.push(`</div>`);
           sections.push('');
-          sections.push('---');
+
+          // Summary badges section
+          if (hasChanges && summaryBadges.length > 0) {
+            sections.push(`<div style="margin-bottom:20px;">`);
+            sections.push(`#### Resource Changes`);
+            sections.push('');
+            sections.push(`<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">`);
+            sections.push(...summaryBadges);
+            sections.push(`</div>`);
+            sections.push(`</div>`);
+            sections.push('');
+          } else if (!hasChanges) {
+            sections.push(`<div style="padding:16px;background:#dcfce7;border:1px solid #86efac;border-radius:8px;margin-bottom:20px;">`);
+            sections.push(`<div style="display:flex;align-items:center;gap:10px;color:#166534;font-size:15px;font-weight:500;">✅ No Changes</div>`);
+            sections.push(`<div style="margin-top:6px;color:#15803d;font-size:14px;">Infrastructure matches configuration.</div>`);
+            sections.push(`</div>`);
+            sections.push('');
+          }
+
+          sections.push('<hr style="border:none;border-top:1px solid #e1e4e8;margin:24px 0;">');
           sections.push('');
 
           // Group by action type with expandable sections
           if (creates.length > 0) {
-            sections.push(`### ➕ Resources to Create (${creates.length})`);
+            sections.push(`<div style="margin-bottom:24px;">`);
+            sections.push(`### <span style="color:#15803d;">➕</span> Resources to Create <span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;">${creates.length}</span>`);
             sections.push('');
             creates.forEach(r => sections.push(buildResourceSection(r)));
-            sections.push('');
+            sections.push(`</div>`);
           }
           if (replaces.length > 0) {
-            sections.push(`### ♻️ Resources to Replace (${replaces.length})`);
+            sections.push(`<div style="margin-bottom:24px;">`);
+            sections.push(`### <span style="color:#7c3aed;">♻️</span> Resources to Replace <span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;">${replaces.length}</span>`);
             sections.push('');
             replaces.forEach(r => sections.push(buildResourceSection(r)));
-            sections.push('');
+            sections.push(`</div>`);
           }
           if (updates.length > 0) {
-            sections.push(`### 🔄 Resources to Update (${updates.length})`);
+            sections.push(`<div style="margin-bottom:24px;">`);
+            sections.push(`### <span style="color:#b45309;">🔄</span> Resources to Update <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;">${updates.length}</span>`);
             sections.push('');
             updates.forEach(r => sections.push(buildResourceSection(r)));
-            sections.push('');
+            sections.push(`</div>`);
           }
           if (destroys.length > 0) {
-            sections.push(`### 🗑️ Resources to Destroy (${destroys.length})`);
+            sections.push(`<div style="margin-bottom:24px;">`);
+            sections.push(`### <span style="color:#dc2626;">🗑️</span> Resources to Destroy <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;">${destroys.length}</span>`);
             sections.push('');
             destroys.forEach(r => sections.push(buildResourceSection(r)));
-            sections.push('');
+            sections.push(`</div>`);
           }
 
           // Fallback: show raw plan if no resources parsed
           if (resources.length === 0 && hasChanges) {
             sections.push('<details>');
-            sections.push('<summary><b>📋 View Raw Plan Output</b></summary>');
+            sections.push('<summary style="cursor:pointer;padding:12px;background:#f6f8fa;border:1px solid #d1d5da;border-radius:6px;font-size:14px;font-weight:600;color:#24292f;"><b>📋 View Raw Plan Output</b></summary>');
             sections.push('');
             sections.push('```hcl');
             sections.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
@@ -185,9 +227,6 @@ runs:
             sections.push('</details>');
             sections.push('');
           }
-
-          sections.push('---');
-          sections.push(`<sub>📅 ${new Date().toISOString()} · Triggered by @${context.actor} · [View Run](${context.payload.repository.html_url}/actions/runs/${context.runId})</sub>`);
 
           const commentBody = sections.join('\n');
 
@@ -241,32 +280,48 @@ runs:
         FORMATTED_PLAN='${{ inputs.formatted-plan }}'
         PLAN_OUTCOME='${{ inputs.plan-outcome }}'
 
-        echo "## 🏗️ Terraform Plan" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        if [ "$PLAN_OUTCOME" = "success" ]; then
-          echo "✅ **Plan Successful**" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "❌ **Plan Failed**" >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "" >> $GITHUB_STEP_SUMMARY
-
         # Parse summary from JSON (using simple string parsing)
         ADD=$(echo "$PLAN_SUMMARY" | grep -o '"add":[0-9]*' | cut -d':' -f2)
         CHANGE=$(echo "$PLAN_SUMMARY" | grep -o '"change":[0-9]*' | cut -d':' -f2)
         DESTROY=$(echo "$PLAN_SUMMARY" | grep -o '"destroy":[0-9]*' | cut -d':' -f2)
         HAS_CHANGES=$(echo "$PLAN_SUMMARY" | grep -o '"has_changes":[^,}]*' | cut -d':' -f2)
 
-        if [ "$HAS_CHANGES" = "true" ]; then
-          echo "### Resource Changes" >> $GITHUB_STEP_SUMMARY
+        if [ "$PLAN_OUTCOME" = "success" ]; then
+          echo "## ✅ Terraform Plan - Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Action | Count |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| ➕ Add | $ADD |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔄 Change | $CHANGE |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🗑️ Destroy | $DESTROY |" >> $GITHUB_STEP_SUMMARY
+          echo '<div style="padding:12px 16px;background:#dcfce7;border:1px solid #86efac;border-radius:8px;margin-top:12px;">' >> $GITHUB_STEP_SUMMARY
+          echo '<span style="color:#166534;font-size:14px;font-weight:500;">Infrastructure changes validated successfully</span>' >> $GITHUB_STEP_SUMMARY
+          echo '</div>' >> $GITHUB_STEP_SUMMARY
         else
-          echo "No changes detected. Infrastructure matches configuration." >> $GITHUB_STEP_SUMMARY
+          echo "## ❌ Terraform Plan - Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '<div style="padding:12px 16px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;margin-top:12px;">' >> $GITHUB_STEP_SUMMARY
+          echo '<span style="color:#991b1b;font-size:14px;font-weight:500;">Terraform plan encountered errors</span>' >> $GITHUB_STEP_SUMMARY
+          echo '</div>' >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "$HAS_CHANGES" = "true" ]; then
+          echo "### 📊 Resource Changes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;">' >> $GITHUB_STEP_SUMMARY
+
+          if [ "$ADD" -gt 0 ]; then
+            echo '<span style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;background:#d1fae5;color:#065f46;border-radius:6px;font-weight:600;">⊕ <span>'"${ADD}"'</span> <span style="font-weight:400;color:#047857;">to add</span></span>' >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "$CHANGE" -gt 0 ]; then
+            echo '<span style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;background:#fef3c7;color:#92400e;border-radius:6px;font-weight:600;">≈ <span>'"${CHANGE}"'</span> <span style="font-weight:400;color:#b45309;">to change</span></span>' >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "$DESTROY" -gt 0 ]; then
+            echo '<span style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;background:#fee2e2;color:#991b1b;border-radius:6px;font-weight:600;">⊖ <span>'"${DESTROY}"'</span> <span style="font-weight:400;color:#dc2626;">to destroy</span></span>' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo '</div>' >> $GITHUB_STEP_SUMMARY
+        else
+          echo '<div style="padding:16px;background:#dcfce7;border:1px solid #86efac;border-radius:8px;margin-top:12px;margin-bottom:12px;">' >> $GITHUB_STEP_SUMMARY
+          echo '<div style="display:flex;align-items:center;gap:10px;color:#166534;font-size:15px;font-weight:500;">✅ No Changes Detected</div>' >> $GITHUB_STEP_SUMMARY
+          echo '<div style="margin-top:6px;color:#15803d;font-size:14px;">Infrastructure matches configuration. No deployment required.</div>' >> $GITHUB_STEP_SUMMARY
+          echo '</div>' >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
 
