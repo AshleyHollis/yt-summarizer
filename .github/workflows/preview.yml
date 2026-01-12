@@ -146,6 +146,134 @@ jobs:
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           timeout-seconds: '1800'
 
+      - name: Azure Login
+        if: steps.wait.outputs.image_tag != ''
+        uses: azure/login@v2
+        with:
+          auth-type: OIDC
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate image exists in ACR
+        if: steps.wait.outputs.image_tag != ''
+        uses: ./.github/actions/validate-acr-image
+        with:
+          registry: ${{ env.ACR_NAME }}
+          repository: yt-summarizer-api
+          tag: ${{ steps.wait.outputs.image_tag }}
+          fail-if-missing: 'true'
+
+  # ===========================================================================
+  # PHASE 2B: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
+  # ===========================================================================
+  # For K8s-only changes (needs_image_build=false), we need a deterministic
+  # image tag. Strategy:
+  #   1. Walk backwards through PR's git history
+  #   2. Find most recent commit that changed code (services/apps/docker)
+  #   3. Use that commit's image tag: pr-<number>-<sha>
+  #   4. If no commits in PR built images, fallback to production tag (read prod kustomization.yaml)
+  # 
+  # This ensures K8s changes are tested with the PR's own code, not random
+  # production code. Fully deterministic as it's tied to git history.
+  # ===========================================================================
+  get-production-tag:
+    name: Find PR Image Tag
+    runs-on: ubuntu-latest
+    needs: [detect-changes, wait-for-ci]
+    if: |
+      needs.detect-changes.outputs.needs_deployment == 'true' &&
+      needs.detect-changes.outputs.needs_image_build == 'false'
+    outputs:
+      image_tag: ${{ steps.find-tag.outputs.image_tag }}
+    steps:
+      - name: Checkout PR branch with full history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.detect-changes.outputs.pr_head_ref }}
+          fetch-depth: 0  # Need full history to walk commits
+
+      - name: Find most recent image-building commit in PR
+        id: find-tag
+        shell: bash
+        run: |
+          PR_NUMBER="${{ needs.detect-changes.outputs.pr_number }}"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref || 'main' }}"
+          
+          echo "🔍 Searching PR #$PR_NUMBER history for most recent code change..."
+          
+          # Get list of commits in this PR (from base branch to HEAD)
+          git fetch origin "$BASE_BRANCH"
+          COMMITS=$(git rev-list "origin/$BASE_BRANCH"..HEAD)
+          
+          FOUND_IMAGE_TAG=""
+          FOUND_COMMIT=""
+          
+          # Walk commits from newest to oldest
+          for commit in $COMMITS; do
+            SHORT_SHA=$(git rev-parse --short=7 "$commit")
+            
+            # Check if this commit changed code areas that trigger image builds
+            # Skip merge commits by checking parent count
+            PARENT_COUNT=$(git rev-list --parents -n 1 "$commit" | awk '{print NF-1}')
+            
+            if [ "$PARENT_COUNT" -le 1 ]; then
+              # Regular commit, not a merge
+              CHANGED_FILES=$(git diff-tree --no-commit-tree --name-only -r "$commit" 2>/dev/null || true)
+              
+              if echo "$CHANGED_FILES" | grep -qE '^(services/api|services/workers|services/shared|apps/web|docker)/'; then
+                FOUND_COMMIT="$commit"
+                FOUND_IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
+                echo "✅ Found code change at commit $SHORT_SHA"
+                echo "   Files changed: $(echo "$CHANGED_FILES" | grep -E '^(services/api|services/workers|services/shared|apps/web|docker)/' | head -3 | tr '\n' ' ')"
+                break
+              fi
+            fi
+          done
+          
+          # If no code changes found in PR, fallback to production tag
+          if [ -z "$FOUND_IMAGE_TAG" ]; then
+            echo "⚠️  No code changes found in PR history"
+            echo "📦 Falling back to production image tag from main branch"
+            
+            # Read production kustomization.yaml for deterministic SHA-based tag
+            git fetch origin main
+            PROD_TAG=$(git show origin/main:k8s/overlays/prod/kustomization.yaml | grep -oP 'newTag: \K.*' | head -1)
+            
+            if [ -z "$PROD_TAG" ]; then
+              echo "::error::Could not find production image tag in kustomization.yaml"
+              exit 1
+            fi
+            
+            if [ "$PROD_TAG" = "latest" ]; then
+              echo "::error::Production kustomization is using 'latest' tag - not deterministic!"
+              echo "::error::Production deployment must use SHA-based tags (e.g., sha-abc123f)"
+              exit 1
+            fi
+            
+            echo "✅ Using production tag: $PROD_TAG"
+            FOUND_IMAGE_TAG="$PROD_TAG"
+          fi
+          
+          echo "image_tag=$FOUND_IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "🎯 Final image tag for K8s-only preview: $FOUND_IMAGE_TAG"
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          auth-type: OIDC
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate image exists in ACR
+        uses: ./.github/actions/validate-acr-image
+        with:
+          registry: ${{ env.ACR_NAME }}
+          repository: yt-summarizer-api
+          tag: ${{ steps.find-tag.outputs.image_tag }}
+          fail-if-missing: 'true'
+
   # ===========================================================================
   # PHASE 3: CONCURRENCY LIMIT CHECK
   # ===========================================================================
@@ -167,10 +295,12 @@ jobs:
       !cancelled() &&
       needs.detect-changes.result == 'success' &&
       needs.detect-changes.outputs.needs_deployment == 'true' &&
-      needs.wait-for-ci.result == 'success'
-    needs: [detect-changes, wait-for-ci]
+      needs.wait-for-ci.result == 'success' &&
+      (needs.get-production-tag.result == 'success' || needs.get-production-tag.result == 'skipped')
+    needs: [detect-changes, wait-for-ci, get-production-tag]
     outputs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
+      final_image_tag: ${{ needs.wait-for-ci.outputs.image_tag != '' && needs.wait-for-ci.outputs.image_tag || needs.get-production-tag.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -257,7 +387,7 @@ jobs:
     if: always() && !cancelled() && needs.check-concurrency.result == 'success' && needs.check-concurrency.outputs.can_deploy == 'true' && needs.get-ingress.result == 'success'
     needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes]
     outputs:
-      image_tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+      image_tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -284,10 +414,20 @@ jobs:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
+      - name: Verify cluster can pull image
+        # Runs after AKS context + ACR login are configured
+        uses: ./.github/actions/validate-acr-image
+        with:
+          registry: ${{ env.ACR_NAME }}
+          repository: yt-summarizer-api
+          tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
+          run-k8s-pull-test: 'true'
+
       - name: Validate CI image tag for PR
+        if: needs.detect-changes.outputs.needs_image_build == 'true'
         uses: ./.github/actions/validate-image-tag
         with:
-          ci-image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          ci-image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
 
@@ -296,7 +436,7 @@ jobs:
         uses: ./.github/actions/update-preview-overlay
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           acr-server: ${{ env.ACR_LOGIN_SERVER }}
           preview-host: ${{ needs.get-ingress.outputs.preview_host }}
           tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
@@ -313,7 +453,7 @@ jobs:
         uses: ./.github/actions/commit-overlay-changes
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
           pr-branch: ${{ needs.detect-changes.outputs.pr_head_ref }}
 
@@ -347,6 +487,7 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
+          auth-type: OIDC
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -369,14 +510,14 @@ jobs:
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           deployment-name: api
-          expected-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           image-name: yt-summarizer-api
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-worker-deployments
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          expected-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
+          expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
           fail-on-mismatch: 'false'
@@ -447,6 +588,7 @@ jobs:
       - name: Azure Login for SWA cleanup
         uses: azure/login@v2
         with:
+          auth-type: OIDC
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}

@@ -122,29 +122,107 @@ kubectl create secret generic github-repo \
 kubectl label secret github-repo -n argocd argocd.argoproj.io/secret-type=repository
 ```
 
-### Option 3: GitHub Personal Access Token (for ApplicationSet PR Generator)
+### Option 3: GitHub App (Recommended for ApplicationSet PR Generator)
 
-The ApplicationSet PR generator requires a GitHub PAT to query the GitHub API for open pull requests.
+**⚠️ RECOMMENDED**: GitHub Apps provide better security, don't expire, and have higher rate limits than PATs.
+
+#### Create GitHub App
+
+1. **Create the GitHub App**: https://github.com/settings/apps/new
+   - **GitHub App name**: `yt-summarizer-argocd-previews`
+   - **Homepage URL**: `https://argocd.yt-summarizer.com` (your ArgoCD URL)
+   - **Webhook**: Uncheck "Active"
+   - **Repository permissions**:
+     - Pull requests: `Read-only`
+     - Contents: `Read-only` (for reading repository files)
+     - Metadata: `Read-only` (automatically selected)
+   - **Where can this GitHub App be installed?**: `Only on this account`
+
+2. **Install the App**:
+   - After creation, click "Install App"
+   - Select `AshleyHollis/yt-summarizer` repository
+   - Note the **Installation ID** from the URL: `https://github.com/settings/installations/{INSTALLATION_ID}`
+
+3. **Generate Private Key**:
+   - In the app settings, scroll to "Private keys"
+   - Click "Generate a private key"
+   - Download the `.pem` file
+
+4. **Create Kubernetes Secret**:
+   ```powershell
+   # Note your App ID from the app settings page
+   $APP_ID = "123456"  # Replace with your App ID
+   $INSTALLATION_ID = "789012"  # From installation URL
+   
+   # Create secret with private key
+   kubectl create secret generic github-app \
+     --namespace=argocd \
+     --from-literal=appID=$APP_ID \
+     --from-literal=installationID=$INSTALLATION_ID \
+     --from-file=privateKey=path/to/your-app.private-key.pem
+   ```
+
+5. **Update ApplicationSet**:
+   ```yaml
+   # k8s/argocd/preview-appset.yaml
+   generators:
+     - pullRequest:
+         github:
+           owner: AshleyHollis
+           repo: yt-summarizer
+           appSecretName: github-app  # Use GitHub App instead of token
+   ```
+
+**Benefits over PAT:**
+- ✅ Private key doesn't expire
+- ✅ 5000 API requests/hour (vs 60 for PAT)
+- ✅ Scoped to specific repository
+- ✅ Survives team member changes
+- ✅ Better audit logging
+
+### Option 4: External Secrets with GitHub PAT (Auto-Rotation)
+
+If you must use a GitHub PAT, store it in Azure Key Vault for automatic rotation:
 
 ```powershell
-# Create a GitHub PAT with 'repo' scope at:
-# https://github.com/settings/tokens/new
+# 1. Store token in Azure Key Vault
+az keyvault secret set \
+  --vault-name kv-ytsumm-prd \
+  --name github-argocd-token \
+  --value "<YOUR_GITHUB_PAT>"
 
-# Create the secret in argocd namespace
-kubectl create secret generic github-token \
-  --namespace=argocd \
-  --from-literal=token=<YOUR_GITHUB_PAT>
-
-# Or using gh CLI (if authenticated)
-$token = (gh auth token)
-kubectl create secret generic github-token -n argocd --from-literal=token=$token
+# 2. Create ExternalSecret (syncs from Key Vault to k8s secret)
+kubectl apply -f - <<EOF
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: github-token
+  namespace: argocd
+spec:
+  refreshInterval: 1h  # Sync from Key Vault every hour
+  secretStoreRef:
+    name: cluster-secretstore  # Your existing ClusterSecretStore
+    kind: ClusterSecretStore
+  target:
+    name: github-token
+    creationPolicy: Owner
+  data:
+    - secretKey: token
+      remoteRef:
+        key: github-argocd-token
+EOF
 ```
 
-**Required Scopes:**
-- `repo` - Full control of private repositories (required to list PRs)
-- Or `public_repo` - Access public repositories (if repository is public)
+**Token Rotation Process:**
+1. Generate new GitHub PAT
+2. Update Azure Key Vault secret
+3. External Secrets Operator automatically updates k8s secret within 1 hour
+4. ArgoCD picks up new token on next sync
 
-**Note:** The ApplicationSet uses this token only to query the GitHub API for open PRs. It does NOT use it to clone the repository (repository access is configured separately via SSH/OIDC).
+**⚠️ PAT Expiration Reminder:**
+- Set calendar reminder 2 weeks before PAT expires
+- Rotate token by updating Key Vault secret
+- Consider GitHub App instead for zero-maintenance
 
 
 
