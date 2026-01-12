@@ -147,7 +147,34 @@ runs:
                 APP_NAME=$(kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/instance}' 2>/dev/null || echo "Unknown")
                 if [ "$APP_NAME" != "Unknown" ]; then
                   SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+                  SYNCED_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.revision}' 2>/dev/null || echo "")
+                  TARGET_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "")
+                  
                   echo "  Argo CD App: ${APP_NAME}"
+                  echo "  Sync Status: ${SYNC_STATUS}"
+                  echo "  Target Revision: ${TARGET_REV}"
+                  echo "  Synced Revision: ${SYNCED_REV:0:8}..."
+                  
+                  # Critical check: Is Argo CD tracking the right revision?
+                  if [[ "${TARGET_REV}" =~ ^[0-9a-f]{40}$ ]]; then
+                    echo "  ::error::❌ CRITICAL: Application is locked to commit SHA!"
+                    echo "  Argo CD won't detect overlay updates pushed to the PR branch."
+                    echo "  ApplicationSet must use '{{branch}}' not '{{head_sha}}'"
+                    echo "  This is why the image tag hasn't updated."
+                    exit 1
+                  fi
+                  
+                  # Check if Argo CD has even synced yet
+                  if [ "$SYNC_STATUS" != "Synced" ]; then
+                    echo "  ⏳ Waiting for Argo CD to sync overlay changes..."
+                    OPERATION_STATE=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "")
+                    if [ -n "$OPERATION_STATE" ]; then
+                      echo "  Operation State: ${OPERATION_STATE}"
+                    fi
+                  else
+                    echo "  ::warning::Argo CD shows 'Synced' but deployment has wrong image"
+                    echo "  This may indicate the kustomization.yaml wasn't updated correctly"
+                  fi
                   echo "  Sync Status: ${SYNC_STATUS}"
                   
                   # Check if kustomization.yaml has the expected tag

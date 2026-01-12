@@ -39,9 +39,23 @@ runs:
           # Get sync status
           SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
           HEALTH_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+          TARGET_REVISION=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "Unknown")
+          SYNCED_REVISION=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.revision}' 2>/dev/null || echo "Unknown")
           
           echo "  Sync Status: ${SYNC_STATUS}"
           echo "  Health Status: ${HEALTH_STATUS}"
+          echo "  Target Revision: ${TARGET_REVISION}"
+          echo "  Synced Revision: ${SYNCED_REVISION}"
+          
+          # CRITICAL CHECK: Verify Argo CD is tracking branch, not commit SHA
+          if [[ "${TARGET_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::❌ Application is tracking commit SHA instead of branch!"
+            echo "  This means Argo CD won't detect overlay updates pushed to the PR branch."
+            echo "  Expected: branch name (e.g., 'fix/my-feature')"
+            echo "  Actual: commit SHA '${TARGET_REVISION}'"
+            echo "  Fix: Update ApplicationSet to use '{{branch}}' instead of '{{head_sha}}'"
+            exit 1
+          fi
           
           # Show sync errors if any
           SYNC_ERRORS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.conditions[?(@.type=="SyncError")].message}' 2>/dev/null || echo "")
@@ -61,10 +75,15 @@ runs:
         fi
         echo "::endgroup::"
         
-        # Wait for Argo CD to create/update the namespace
+        # Wait for namespace creation AND verify Argo CD syncs to latest commit
         echo ""
+        echo "⏳ Waiting for namespace creation and Argo CD sync..."
+        NAMESPACE_CREATED=false
+        ARGOCD_SYNCED=false
+        
         for i in $(seq 1 $MAX_ATTEMPTS); do
-          if kubectl get namespace ${NAMESPACE} 2>/dev/null; then
+          # Step 1: Check if namespace exists
+          if ! $NAMESPACE_CREATED && kubectl get namespace ${NAMESPACE} 2>/dev/null; then
             echo "✅ Namespace ${NAMESPACE} exists"
             
             # Verify namespace has Argo CD labels
@@ -75,32 +94,65 @@ runs:
               echo "  ::warning::Namespace exists but not labeled as managed by Argo CD"
             fi
             
+            NAMESPACE_CREATED=true
+          fi
+          
+          # Step 2: Once namespace exists, verify Argo CD has synced the latest commit
+          if $NAMESPACE_CREATED && ! $ARGOCD_SYNCED; then
+            CURRENT_SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            CURRENT_SYNCED_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.revision}' 2>/dev/null || echo "")
+            
+            if [ "$CURRENT_SYNC_STATUS" = "Synced" ]; then
+              echo "✅ Argo CD sync complete"
+              echo "  Synced to revision: ${CURRENT_SYNCED_REV:0:8}..."
+              ARGOCD_SYNCED=true
+              exit 0
+            fi
+          fi
+          
+          # Both checks complete
+          if $NAMESPACE_CREATED && $ARGOCD_SYNCED; then
+            echo "✅ Preview environment ready!"
             exit 0
           fi
           
-          # Proactive check: Show why namespace might not be created yet
+          # Proactive check: Show why namespace might not be created yet or why sync is pending
           if [ $((i % 6)) -eq 0 ]; then  # Every 30s (6 * 5s interval)
             echo "::group::🔍 Argo CD Status Update (${i}/${MAX_ATTEMPTS})"
             SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            SYNCED_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.revision}' 2>/dev/null || echo "None")
+            TARGET_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "Unknown")
+            
             echo "  Current Sync Status: ${SYNC_STATUS}"
+            echo "  Target Branch/Revision: ${TARGET_REV}"
+            echo "  Synced to Commit: ${SYNCED_REV:0:8}..."
             
             # Check if application is even running a sync operation
             OPERATION_RUNNING=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
             if [ "$OPERATION_RUNNING" = "Running" ]; then
               echo "  ⏳ Sync operation in progress..."
+            elif [ "$OPERATION_RUNNING" = "Succeeded" ]; then
+              echo "  ✅ Last sync operation succeeded"
             elif [ "$OPERATION_RUNNING" = "None" ] && [ "$SYNC_STATUS" != "Synced" ]; then
               echo "  ::warning::No sync operation running but status is ${SYNC_STATUS}"
-              echo "  This may indicate Argo CD is not auto-syncing - check sync policy"
+              echo "  This may indicate Argo CD hasn't detected changes yet (polling interval: 30s)"
             fi
             echo "::endgroup::"
           fi
           
-          echo "  Attempt $i/${MAX_ATTEMPTS} - Namespace not found, waiting ${INTERVAL}s..."
+          STATUS_MSG="Attempt $i/${MAX_ATTEMPTS}"
+          [ ! $NAMESPACE_CREATED ] && STATUS_MSG="${STATUS_MSG} - Waiting for namespace..."
+          [ $NAMESPACE_CREATED ] && [ ! $ARGOCD_SYNCED ] && STATUS_MSG="${STATUS_MSG} - Waiting for Argo CD sync..."
+          echo "  ${STATUS_MSG}"
           sleep $INTERVAL
         done
         
-        # Namespace not created - COMPREHENSIVE diagnostics
-        echo "::error::Namespace ${NAMESPACE} was not created by Argo CD after ${TIMEOUT}s"
+        # Sync timeout - COMPREHENSIVE diagnostics
+        if $NAMESPACE_CREATED && ! $ARGOCD_SYNCED; then
+          echo "::error::Argo CD did not complete sync after ${TIMEOUT}s (namespace exists but sync incomplete)"
+        else
+          echo "::error::Namespace ${NAMESPACE} was not created by Argo CD after ${TIMEOUT}s"
+        fi
         echo ""
         
         echo "::group::🔴 FAILURE DIAGNOSTICS"
@@ -110,6 +162,15 @@ runs:
         echo ""
         echo "--- Argo CD Application Events ---"
         kubectl describe application ${APP_NAME} -n argocd 2>/dev/null || echo "Cannot describe application"
+        
+        echo ""
+        echo "--- Target Revision Configuration ---"
+        TARGET_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "Unknown")
+        echo "  Target Revision: ${TARGET_REV}"
+        if [[ "${TARGET_REV}" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "  ⚠️ WARNING: Using commit SHA - overlay updates won't be detected!"
+          echo "  ApplicationSet should use '{{branch}}' not '{{head_sha}}'"
+        fi
         
         echo ""
         echo "--- All Preview Applications ---"
