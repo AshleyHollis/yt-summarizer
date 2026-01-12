@@ -16,14 +16,16 @@ runs:
 
     - name: Run ruff linter
       shell: bash
+      working-directory: ${{ inputs.target-path }}
       run: |
-        echo "🔍 Running ruff linter on ${{ inputs.target-path }}..."
+        echo "🔍 Running ruff linter in ${{ inputs.target-path }}..."
         # Ruff auto-discovers configuration from pyproject.toml or ruff.toml
-        # in the target directory or parent directories
-        ruff check ${{ inputs.target-path }}
+        # in the current directory or parent directories
+        ruff check .
 
     - name: Run ruff formatter check
       shell: bash
+      working-directory: ${{ inputs.target-path }}
       run: |
-        echo "✨ Checking ruff formatting on ${{ inputs.target-path }}..."
-        ruff format --check ${{ inputs.target-path }}
+        echo "✨ Checking ruff formatting in ${{ inputs.target-path }}..."
+        ruff format --check .
