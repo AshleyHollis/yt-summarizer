@@ -13,7 +13,8 @@ const {
   calculateSummary,
   groupResourcesByAction,
   formatValue,
-  findChanges
+  findChanges,
+  formatResourceChange
 } = require('../src/terraform-plan-parser');
 
 // Test utilities
@@ -139,6 +140,150 @@ describe('findChanges', () => {
 
     assert.strictEqual(lines.length, 1);
     assert.ok(lines[0].includes('(known after apply)'));
+  });
+
+  test('forces + marker for all lines when forceMarker is +', () => {
+    const before = {};
+    const after = { name: 'test', count: 5, enabled: true };
+    const lines = findChanges(before, after, {}, '', '+');
+
+    assert.strictEqual(lines.length, 3);
+    lines.forEach(line => {
+      assert.ok(line.startsWith('+'), `Line should start with +: ${line}`);
+      assert.ok(!line.includes('->'), `Create should not show before->after: ${line}`);
+    });
+  });
+
+  test('forces - marker for all lines when forceMarker is -', () => {
+    const before = { name: 'test', count: 5 };
+    const after = {};
+    const lines = findChanges(before, after, {}, '', '-');
+
+    assert.strictEqual(lines.length, 2);
+    lines.forEach(line => {
+      assert.ok(line.startsWith('-'), `Line should start with -: ${line}`);
+    });
+  });
+
+  test('handles nested blocks with forced marker', () => {
+    const before = {};
+    const after = { tags: { env: 'prod', team: 'infra' } };
+    const lines = findChanges(before, after, {}, '', '+');
+
+    assert.ok(lines.length >= 1, 'Should have lines for nested block');
+    // All lines should use + marker
+    lines.forEach(line => {
+      if (line.trim() !== '}') {
+        assert.ok(line.startsWith('+') || line.startsWith(' '), `Line should start with + or be closing brace: ${line}`);
+      }
+    });
+  });
+});
+
+describe('formatResourceChange', () => {
+  test('create action uses + for all content lines', () => {
+    const change = {
+      type: 'aws_instance',
+      name: 'web',
+      change: {
+        before: null,
+        after: { ami: 'ami-123', instance_type: 't2.micro' },
+        after_unknown: {}
+      }
+    };
+
+    const result = formatResourceChange(change, 'create');
+    const lines = result.split('\n');
+
+    // First line should be the resource header with +
+    assert.ok(lines[0].startsWith('+'), 'Resource header should start with +');
+
+    // Content lines should all use + (except closing brace)
+    lines.slice(1, -1).forEach(line => {
+      assert.ok(line.startsWith('+'), `Create content line should start with +: ${line}`);
+    });
+  });
+
+  test('destroy action uses - for all content lines', () => {
+    const change = {
+      type: 'aws_instance',
+      name: 'web',
+      change: {
+        before: { ami: 'ami-123', instance_type: 't2.micro' },
+        after: null,
+        after_unknown: {}
+      }
+    };
+
+    const result = formatResourceChange(change, 'destroy');
+    const lines = result.split('\n');
+
+    // First line should be the resource header with -
+    assert.ok(lines[0].startsWith('-'), 'Resource header should start with -');
+
+    // Content lines should all use - (except closing brace)
+    lines.slice(1, -1).forEach(line => {
+      assert.ok(line.startsWith('-'), `Destroy content line should start with -: ${line}`);
+    });
+  });
+
+  test('update action uses ~ for changed values', () => {
+    const change = {
+      type: 'aws_instance',
+      name: 'web',
+      change: {
+        before: { instance_type: 't2.micro' },
+        after: { instance_type: 't2.small' },
+        after_unknown: {}
+      }
+    };
+
+    const result = formatResourceChange(change, 'update');
+    const lines = result.split('\n');
+
+    // Header should use ~
+    assert.ok(lines[0].startsWith('~'), 'Update header should start with ~');
+
+    // Should show before -> after for changed value
+    assert.ok(result.includes('->'), 'Update should show before -> after');
+  });
+
+  test('update action allows + for new values within resource', () => {
+    const change = {
+      type: 'aws_instance',
+      name: 'web',
+      change: {
+        before: { instance_type: 't2.micro' },
+        after: { instance_type: 't2.micro', new_tag: 'added' },
+        after_unknown: {}
+      }
+    };
+
+    const result = formatResourceChange(change, 'update');
+
+    // Should have + for the new value
+    assert.ok(result.includes('+ '), 'Update should use + for new values');
+    assert.ok(result.includes('new_tag'), 'Should include the new attribute');
+  });
+
+  test('replace action uses ! for header', () => {
+    const change = {
+      type: 'aws_instance',
+      name: 'web',
+      change: {
+        before: { ami: 'ami-old' },
+        after: { ami: 'ami-new' },
+        after_unknown: {}
+      }
+    };
+
+    const result = formatResourceChange(change, 'replace');
+    const lines = result.split('\n');
+
+    // Header should use !
+    assert.ok(lines[0].startsWith('!'), 'Replace header should start with !');
+    // Should include forces replacement comment
+    assert.ok(result.includes('# forces replacement'), 'Replace should include replacement comment');
   });
 });
 
