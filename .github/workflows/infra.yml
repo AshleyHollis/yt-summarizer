@@ -119,36 +119,82 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         env:
-          PLAN_OUTPUT: ${{ steps.plan.outputs.plan_output }}
+          PLAN_SUMMARY: ${{ steps.plan.outputs.plan_summary }}
+          FORMATTED_PLAN: ${{ steps.plan.outputs.formatted_plan }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
         with:
           script: |
-            const planOutput = process.env.PLAN_OUTPUT || 'No plan output available';
-            const truncatedPlan = planOutput.length > 60000 
-              ? planOutput.substring(0, 60000) + '\n\n... (truncated)'
-              : planOutput;
+            const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
+            const formattedPlan = process.env.FORMATTED_PLAN || 'No plan output available';
+            const planOutcome = process.env.PLAN_OUTCOME;
             
-            const body = `### 🏗️ Terraform Plan - Production
+            // Determine status emoji and color
+            const statusEmoji = planOutcome === 'success' ? '✅' : '❌';
+            const hasChanges = summary.has_changes;
             
-            #### Initialization: \`${{ steps.init.outcome }}\`
-            #### Validation: \`${{ steps.validate.outcome }}\`
-            #### Plan: \`${{ steps.plan.outcome }}\`
+            // Build summary section like Terraform Cloud
+            let changesSummary = '';
+            if (!hasChanges) {
+              changesSummary = '**No changes.** Infrastructure matches the configuration.';
+            } else {
+              const parts = [];
+              if (summary.add > 0) parts.push(`**${summary.add}** to add`);
+              if (summary.change > 0) parts.push(`**${summary.change}** to change`);
+              if (summary.destroy > 0) parts.push(`**${summary.destroy}** to destroy`);
+              changesSummary = parts.join(', ');
+            }
             
-            <details><summary>Show Plan Output</summary>
+            // Truncate plan if too long
+            const maxLength = 60000;
+            const truncatedPlan = formattedPlan.length > maxLength 
+              ? formattedPlan.substring(0, maxLength) + '\n\n... (output truncated)'
+              : formattedPlan;
             
-            \`\`\`hcl
-            ${truncatedPlan}
-            \`\`\`
+            const body = `## Terraform Plan ${statusEmoji}
+
+### 📊 Plan Summary
+${changesSummary}
+
+<details>
+<summary><strong>📋 View Full Plan</strong></summary>
+
+#### Plan Output
+\`\`\`terraform
+${truncatedPlan}
+\`\`\`
+
+</details>
+
+---
+<sub>Pushed by: @${{ github.actor }} • Plan: \`${planOutcome}\` • [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})</sub>`;
             
-            </details>
-            
-            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-            
-            github.rest.issues.createComment({
+            // Find and update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: body
             });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Terraform Plan')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
 
       - name: Plan Status
         if: steps.plan.outcome == 'failure'

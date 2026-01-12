@@ -12,8 +12,14 @@ inputs:
     required: true
 outputs:
   plan_output:
-    description: 'Terraform plan output'
+    description: 'Raw terraform plan output'
     value: ${{ steps.plan.outputs.plan_output }}
+  formatted_plan:
+    description: 'Formatted plan for PR comments'
+    value: ${{ steps.format.outputs.formatted_plan }}
+  plan_summary:
+    description: 'JSON summary of plan changes'
+    value: ${{ steps.format.outputs.plan_summary }}
   outcome:
     description: 'Plan outcome (success/failure)'
     value: ${{ steps.plan.outcome }}
@@ -36,3 +42,45 @@ runs:
         echo "EOF" >> "$GITHUB_OUTPUT"
         exit $PLAN_EXIT_CODE
       continue-on-error: true
+
+    - name: Format plan output
+      id: format
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Parse plan summary
+        ADD=$(grep -oP 'Plan: \K\d+(?= to add)' plan_output.txt || echo "0")
+        CHANGE=$(grep -oP '\d+(?= to change)' plan_output.txt || echo "0")
+        DESTROY=$(grep -oP '\d+(?= to destroy)' plan_output.txt || echo "0")
+        
+        # Create JSON summary
+        SUMMARY=$(cat <<EOF
+        {
+          "add": $ADD,
+          "change": $CHANGE,
+          "destroy": $DESTROY,
+          "has_changes": $([ $ADD -gt 0 ] || [ $CHANGE -gt 0 ] || [ $DESTROY -gt 0 ] && echo "true" || echo "false")
+        }
+        EOF
+        )
+        
+        echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
+        echo "$SUMMARY" >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+        
+        # Extract resource changes (lines with +, ~, -, or #)
+        FORMATTED=""
+        while IFS= read -r line; do
+          if [[ "$line" =~ ^[[:space:]]*(#|\+|~|-|<-)[[:space:]] ]]; then
+            FORMATTED+="$line"$'\n'
+          fi
+        done < plan_output.txt
+        
+        # If no formatted content, use full output
+        if [ -z "$FORMATTED" ]; then
+          FORMATTED=$(cat plan_output.txt)
+        fi
+        
+        echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
+        echo "$FORMATTED" >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
