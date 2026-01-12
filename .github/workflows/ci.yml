@@ -115,10 +115,97 @@ jobs:
         run: npm run lint
 
   # ===========================================================================
-  # PHASE 3: TESTING
+  # PHASE 3: SECURITY SCANNING
+  # ===========================================================================
+  # Runs after linting passes, before tests
+  # Provides security feedback early in pipeline
+  # Scans: bandit (code security), pip-audit (dependency vulnerabilities), deptry (dependency consistency)
+  # ===========================================================================
+  scan-python-security:
+    name: Scan Python Security
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-python]
+    if: |
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          service-package: services/api
+
+      - name: Scan API security
+        if: contains(needs.detect-changes.outputs.changed_areas, 'services/api')
+        uses: ./.github/actions/scan-python-security
+        with:
+          service-path: services/api
+          check-security: 'true'
+          check-types: 'false'
+
+      - name: Scan Workers security
+        if: contains(needs.detect-changes.outputs.changed_areas, 'services/workers')
+        uses: ./.github/actions/scan-python-security
+        with:
+          service-path: services/workers
+          check-security: 'true'
+          check-types: 'false'
+
+      - name: Validate API dependencies
+        if: contains(needs.detect-changes.outputs.changed_areas, 'services/api')
+        uses: ./.github/actions/validate-python-dependencies
+        with:
+          service-path: services/api
+          check-missing: 'true'
+          check-unused: 'false'
+          check-security: 'true'
+          fail-on-warnings: 'false'
+
+      - name: Validate Workers dependencies
+        if: contains(needs.detect-changes.outputs.changed_areas, 'services/workers')
+        uses: ./.github/actions/validate-python-dependencies
+        with:
+          service-path: services/workers
+          check-missing: 'true'
+          check-unused: 'false'
+          check-security: 'true'
+          fail-on-warnings: 'false'
+
+  scan-javascript-security:
+    name: Scan JavaScript Security
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-frontend]
+    if: |
+      contains(needs.detect-changes.outputs.changed_areas, 'apps/web') &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          working-directory: apps/web
+
+      - name: Scan JavaScript dependencies
+        uses: ./.github/actions/scan-javascript-dependencies
+        with:
+          working-directory: apps/web
+          check-missing-deps: 'true'
+          check-security: 'true'
+          audit-level: 'high'
+
+  # ===========================================================================
+  # PHASE 4: TESTING
   # ===========================================================================
   # Runs only when relevant code changes
-  # Dependencies: lint must pass (fail-fast)
+  # Dependencies: lint AND security must pass (fail-fast)
   # 
   # Test Execution Rules:
   # - test-shared: runs if services/shared changed
@@ -131,10 +218,11 @@ jobs:
   test-shared:
     name: Test Shared Package
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python]
+    needs: [detect-changes, lint-python, scan-python-security]
     if: |
       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -153,10 +241,11 @@ jobs:
   test-api:
     name: Test API
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python]
+    needs: [detect-changes, lint-python, scan-python-security]
     if: |
       (contains(needs.detect-changes.outputs.changed_areas, 'services/api') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     outputs:
       test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
@@ -169,22 +258,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           service-package: services/api
           install-pytest-xdist: 'true'
-
-      - name: Validate Python dependencies
-        uses: ./.github/actions/validate-python-dependencies
-        with:
-          service-path: services/api
-          check-missing: 'true'
-          check-unused: 'false'
-          check-security: 'true'
-          fail-on-warnings: 'false'
-
-      - name: Scan Python code quality
-        uses: ./.github/actions/scan-python-quality
-        with:
-          service-path: services/api
-          check-security: 'true'
-          check-types: 'false'
 
       - name: Record tests start
         id: start
@@ -209,10 +282,11 @@ jobs:
   test-workers:
     name: Test Workers
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python]
+    needs: [detect-changes, lint-python, scan-python-security]
     if: |
       (contains(needs.detect-changes.outputs.changed_areas, 'services/workers') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     outputs:
       test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
@@ -225,20 +299,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           service-package: services/workers
           install-pytest-xdist: 'true'
-
-      - name: Validate Python dependencies
-        uses: ./.github/actions/validate-python-dependencies
-        with:
-          service-path: services/workers
-          check-missing: 'true'
-          check-unused: 'false'
-          check-security: 'true'
-
-      - name: Scan Python code quality
-        uses: ./.github/actions/scan-python-quality
-        with:
-          service-path: services/workers
-          check-security: 'true'
 
       - name: Record tests start
         id: start
@@ -259,16 +319,14 @@ jobs:
           start-time: ${{ steps.start.outputs.started_at }}
           test-name: Workers Tests
 
-  # ===========================================================================
-  # PHASE 3B: FRONTEND TESTING
-  # ===========================================================================
   test-frontend:
     name: Test Frontend
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-frontend]
+    needs: [detect-changes, lint-frontend, scan-javascript-security]
     if: |
       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
+      (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -279,19 +337,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           working-directory: apps/web
 
-      - name: Scan JavaScript dependencies
-        uses: ./.github/actions/scan-javascript-dependencies
-        with:
-          working-directory: apps/web
-          check-missing-deps: 'true'
-          check-security: 'true'
-          audit-level: 'high'
-
       - name: Run Vitest
         uses: ./.github/actions/run-frontend-tests
 
   # ===========================================================================
-  # PHASE 4: KUBERNETES VALIDATION
+  # PHASE 5: KUBERNETES VALIDATION
   # ===========================================================================
   # Runs only when k8s/ directory changes
   # Validates:
@@ -353,7 +403,7 @@ jobs:
 
 
   # ===========================================================================
-  # PHASE 5: IMAGE BUILDING (Conditional)
+  # PHASE 6: IMAGE BUILDING (Conditional)
   # ===========================================================================
   # WHEN: Only when code requiring images changes (services/, apps/web, docker/)
   # WHY: Avoid rebuilding images for k8s manifest or docs changes
@@ -363,14 +413,14 @@ jobs:
   # 2. build-images: Build and push images with that tag
   #
   # CRITICAL always() PATTERN:
-  # - build-images-meta uses always() to run when lint/test jobs skip
+  # - build-images-meta uses always() to run when lint/security/test jobs skip
   # - build-images MUST also use always() + check meta result == 'success'
   # - Without this, build-images skips even when meta succeeds
   # 
   # FLOW 1 (ACR configured):
-  #   Tests pass → build-images-meta generates tag → build-images builds + pushes
+  #   Lint → Security → Tests pass → build-images-meta generates tag → build-images builds + pushes
   # FLOW 2 (No ACR):
-  #   Tests pass → build-images-validate builds without pushing (validation only)
+  #   Lint → Security → Tests pass → build-images-validate builds without pushing (validation only)
   # 
   # Image Tags:
   # - PRs: pr-<number>-<sha> (e.g., pr-42-abc123f)
@@ -379,11 +429,11 @@ jobs:
   build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, lint-frontend, test-shared, test-api, test-workers, test-frontend]
+    needs: [detect-changes, lint-python, lint-frontend, scan-python-security, scan-javascript-security, test-shared, test-api, test-workers, test-frontend]
     # CONDITIONAL IMAGE BUILDING: Only runs when changes require new images
     # vars.ACR_NAME != '': Azure Container Registry must be configured
     # changed_areas contains: Only these areas trigger image builds (MUST match preview workflow logic)
-    # lint and test results: Ensure code passes basic checks before building images
+    # lint, security, and test results: Ensure code passes all checks before building images
     # always(): Run even if some dependencies were skipped, then check their results
     if: |
       always() &&
@@ -395,6 +445,8 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped') &&
+      (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped') &&
       (needs.test-shared.result == 'success' || needs.test-shared.result == 'skipped') &&
       (needs.test-api.result == 'success' || needs.test-api.result == 'skipped') &&
       (needs.test-workers.result == 'success' || needs.test-workers.result == 'skipped') &&

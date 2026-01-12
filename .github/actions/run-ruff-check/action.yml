@@ -6,6 +6,10 @@ inputs:
     description: Path to check with ruff
     required: false
     default: 'services/'
+  config-path:
+    description: Path to ruff configuration file
+    required: false
+    default: 'services/ruff.toml'
 
 runs:
   using: composite
@@ -16,8 +20,12 @@ runs:
 
     - name: Run ruff linter
       shell: bash
-      run: ruff check ${{ inputs.target-path }}
+      run: |
+        echo "🔍 Running ruff linter..."
+        ruff check ${{ inputs.target-path }} --config=${{ inputs.config-path }}
 
     - name: Run ruff formatter check
       shell: bash
-      run: ruff format --check ${{ inputs.target-path }}
+      run: |
+        echo "✨ Checking ruff formatting..."
+        ruff format --check ${{ inputs.target-path }} --config=${{ inputs.config-path }}
