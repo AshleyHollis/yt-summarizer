@@ -213,11 +213,11 @@ jobs:
             echo "⚠️  No code changes found in PR history"
             echo "📦 Falling back to most recent main branch image"
             
-            # Fetch main branch and walk its history to find last code change
+            # Fetch main branch and examine its history (don't checkout - stay on PR branch)
             git fetch origin main
-            git checkout origin/main
             
-            MAIN_COMMITS=$(git rev-list --max-count=50 HEAD)
+            # Get recent commits from main branch
+            MAIN_COMMITS=$(git rev-list --max-count=100 origin/main)
             
             for commit in $MAIN_COMMITS; do
               SHORT_SHA=$(git rev-parse --short=7 "$commit")
@@ -235,7 +235,7 @@ jobs:
             done
             
             if [ -z "$FOUND_IMAGE_TAG" ]; then
-              echo "::error::Could not find any code changes in main branch history"
+              echo "::error::Could not find any code changes in main branch history (searched last 100 commits)"
               exit 1
             fi
           fi
