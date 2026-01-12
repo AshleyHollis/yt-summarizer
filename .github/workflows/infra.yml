@@ -45,7 +45,7 @@ jobs:
     name: Check Changes
     runs-on: ubuntu-latest
     outputs:
-      terraform_changed: ${{ steps.filter.outputs.stage_validate_terraform }}
+      terraform_changed: ${{ steps.compute.outputs.terraform_changed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,6 +55,15 @@ jobs:
       - name: Detect changes
         id: filter
         uses: ./.github/actions/detect-pipeline-changes
+
+      - name: Compute terraform changed
+        id: compute
+        run: |
+          if [[ "${{ steps.filter.outputs.changed_areas }}" == *"infra/terraform"* ]]; then
+            echo "terraform_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "terraform_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   terraform:
     name: Terraform
