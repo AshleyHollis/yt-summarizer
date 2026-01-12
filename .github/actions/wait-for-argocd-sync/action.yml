@@ -16,39 +16,112 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Wait for namespace creation
+    - name: Wait for Argo CD sync and gather diagnostics
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
         TIMEOUT=${{ inputs.timeout-seconds }}
         INTERVAL=5
         MAX_ATTEMPTS=$((TIMEOUT / INTERVAL))
+        APP_NAME="preview-pr-${{ inputs.pr-number }}"
         
-        echo "Waiting for Argo CD to sync preview environment..."
-        echo "Namespace: ${NAMESPACE}"
-        echo "Timeout: ${TIMEOUT}s (${MAX_ATTEMPTS} attempts)"
+        echo "🔄 Waiting for Argo CD to sync preview environment..."
+        echo "  Namespace: ${NAMESPACE}"
+        echo "  Application: ${APP_NAME}"
+        echo "  Timeout: ${TIMEOUT}s (${MAX_ATTEMPTS} attempts)"
+        
+        # Check Argo CD Application status FIRST (proactive diagnostics)
+        echo ""
+        echo "::group::📋 Argo CD Application Status"
+        if kubectl get applications.argoproj.io ${APP_NAME} -n argocd &>/dev/null; then
+          echo "✅ Application ${APP_NAME} exists in Argo CD"
+          
+          # Get sync status
+          SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+          HEALTH_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+          
+          echo "  Sync Status: ${SYNC_STATUS}"
+          echo "  Health Status: ${HEALTH_STATUS}"
+          
+          # Show sync errors if any
+          SYNC_ERRORS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.conditions[?(@.type=="SyncError")].message}' 2>/dev/null || echo "")
+          if [ -n "$SYNC_ERRORS" ]; then
+            echo "::warning::Argo CD Sync Errors detected:"
+            echo "${SYNC_ERRORS}"
+          fi
+          
+          # Show operation state
+          OPERATION_STATE=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "")
+          if [ -n "$OPERATION_STATE" ]; then
+            echo "  Operation Phase: ${OPERATION_STATE}"
+          fi
+        else
+          echo "::warning::Application ${APP_NAME} not found in Argo CD"
+          echo "This may indicate an issue with the ApplicationSet or Application creation"
+        fi
+        echo "::endgroup::"
         
         # Wait for Argo CD to create/update the namespace
+        echo ""
         for i in $(seq 1 $MAX_ATTEMPTS); do
           if kubectl get namespace ${NAMESPACE} 2>/dev/null; then
             echo "✅ Namespace ${NAMESPACE} exists"
+            
+            # Verify namespace has Argo CD labels
+            MANAGED_BY=$(kubectl get namespace ${NAMESPACE} -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/instance}' 2>/dev/null || echo "")
+            if [ -n "$MANAGED_BY" ]; then
+              echo "  ✅ Managed by Argo CD application: ${MANAGED_BY}"
+            else
+              echo "  ::warning::Namespace exists but not labeled as managed by Argo CD"
+            fi
+            
             exit 0
           fi
+          
+          # Proactive check: Show why namespace might not be created yet
+          if [ $((i % 6)) -eq 0 ]; then  # Every 30s (6 * 5s interval)
+            echo "::group::🔍 Argo CD Status Update (${i}/${MAX_ATTEMPTS})"
+            SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            echo "  Current Sync Status: ${SYNC_STATUS}"
+            
+            # Check if application is even running a sync operation
+            OPERATION_RUNNING=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
+            if [ "$OPERATION_RUNNING" = "Running" ]; then
+              echo "  ⏳ Sync operation in progress..."
+            elif [ "$OPERATION_RUNNING" = "None" ] && [ "$SYNC_STATUS" != "Synced" ]; then
+              echo "  ::warning::No sync operation running but status is ${SYNC_STATUS}"
+              echo "  This may indicate Argo CD is not auto-syncing - check sync policy"
+            fi
+            echo "::endgroup::"
+          fi
+          
           echo "  Attempt $i/${MAX_ATTEMPTS} - Namespace not found, waiting ${INTERVAL}s..."
           sleep $INTERVAL
         done
         
-        # Namespace not created - gather diagnostics
+        # Namespace not created - COMPREHENSIVE diagnostics
         echo "::error::Namespace ${NAMESPACE} was not created by Argo CD after ${TIMEOUT}s"
-
-        APP_NAME="preview-pr-${{ inputs.pr-number }}"
-        echo "Attempting to fetch Argo CD Application status for ${APP_NAME}"
-        echo "--- Argo CD Application (yaml) ---"
-        kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o yaml || echo "No application named ${APP_NAME} found"
-        echo "--- Argo CD application events / status (describe) ---"
-        kubectl describe application ${APP_NAME} -n argocd || true
-
-        echo "--- All preview applications ---"
-        kubectl get applications.argoproj.io --all-namespaces | grep "preview-pr-" || true
-
+        echo ""
+        
+        echo "::group::🔴 FAILURE DIAGNOSTICS"
+        echo "--- Argo CD Application Full Status ---"
+        kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o yaml 2>/dev/null || echo "Application not found"
+        
+        echo ""
+        echo "--- Argo CD Application Events ---"
+        kubectl describe application ${APP_NAME} -n argocd 2>/dev/null || echo "Cannot describe application"
+        
+        echo ""
+        echo "--- All Preview Applications ---"
+        kubectl get applications.argoproj.io -n argocd | grep "preview-pr-" || echo "No preview applications found"
+        
+        echo ""
+        echo "--- Argo CD ApplicationSet Status ---"
+        kubectl get applicationsets.argoproj.io -n argocd -o yaml | grep -A 50 "name: preview" || echo "Cannot get ApplicationSet"
+        
+        echo ""
+        echo "--- Recent Argo CD Server Logs ---"
+        kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server --tail=50 || echo "Cannot get Argo CD logs"
+        echo "::endgroup::"
+        
         exit 1

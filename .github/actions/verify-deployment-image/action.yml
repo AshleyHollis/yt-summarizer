@@ -29,7 +29,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Verify deployment
+    - name: Verify deployment with enhanced diagnostics
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
@@ -41,39 +41,153 @@ runs:
         INTERVAL=5
         MAX_ATTEMPTS=$((TIMEOUT / INTERVAL))
         
-        echo "Waiting for ${DEPLOYMENT} deployment..."
-        echo "Expected image: ${REGISTRY}/${IMAGE_NAME}:${EXPECTED_TAG}"
+        echo "🔍 Verifying ${DEPLOYMENT} deployment..."
+        echo "  Expected image: ${REGISTRY}/${IMAGE_NAME}:${EXPECTED_TAG}"
+        echo "  Namespace: ${NAMESPACE}"
+        echo "  Timeout: ${TIMEOUT}s"
         
         for i in $(seq 1 $MAX_ATTEMPTS); do
-          if kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} 2>/dev/null; then
+          if kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} &>/dev/null; then
             echo "✅ ${DEPLOYMENT} deployment exists"
             
-            # Get the current image
-            CURRENT_IMAGE=$(kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[0].image}')
-            echo "Current image: ${CURRENT_IMAGE}"
+            # Get the current image from deployment spec
+            CURRENT_IMAGE=$(kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+            echo "  Current spec image: ${CURRENT_IMAGE}"
             
             # Check if it matches expected tag
             if [[ "${CURRENT_IMAGE}" == "${REGISTRY}/${IMAGE_NAME}:${EXPECTED_TAG}" ]]; then
-              echo "✅ ${DEPLOYMENT} is using the correct image tag"
+              echo "✅ ${DEPLOYMENT} spec has correct image tag"
+              
+              # Proactive check: Verify pods are actually using this image
+              echo ""
+              echo "::group::🔍 Pod Image Verification"
+              POD_IMAGES=$(kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o jsonpath='{.items[*].spec.containers[0].image}' 2>/dev/null)
+              if [ -n "$POD_IMAGES" ]; then
+                echo "  Pod images: ${POD_IMAGES}"
+                if echo "${POD_IMAGES}" | grep -q "${EXPECTED_TAG}"; then
+                  echo "  ✅ Pods are using expected tag"
+                else
+                  echo "  ::warning::Pods may still be using old image (rolling update in progress)"
+                fi
+              else
+                echo "  ::warning::No pods found for deployment ${DEPLOYMENT}"
+              fi
+              echo "::endgroup::"
               
               # Wait for deployment to be ready if requested
               if [ "${{ inputs.wait-for-ready }}" = "true" ]; then
+                echo ""
+                echo "⏳ Waiting for deployment rollout to complete..."
                 if kubectl rollout status deployment/${DEPLOYMENT} -n ${NAMESPACE} --timeout=120s; then
                   echo "✅ ${DEPLOYMENT} deployment is ready"
+                  
+                  # Final verification: Check pod status and events
+                  echo ""
+                  echo "::group::📋 Final Pod Status"
+                  kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o wide
+                  
+                  # Check for any pod errors
+                  FAILED_PODS=$(kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o jsonpath='{.items[?(@.status.phase!="Running")].metadata.name}' 2>/dev/null)
+                  if [ -n "$FAILED_PODS" ]; then
+                    echo "::warning::Some pods are not running: ${FAILED_PODS}"
+                    for pod in $FAILED_PODS; do
+                      echo "--- Events for ${pod} ---"
+                      kubectl describe pod ${pod} -n ${NAMESPACE} | tail -20
+                    done
+                  fi
+                  echo "::endgroup::"
+                  
                   exit 0
+                else
+                  # Rollout failed - gather diagnostics
+                  echo "::error::Deployment rollout failed"
+                  echo ""
+                  echo "::group::🔴 Rollout Failure Diagnostics"
+                  
+                  echo "--- Deployment Status ---"
+                  kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o wide
+                  
+                  echo ""
+                  echo "--- ReplicaSet Status ---"
+                  kubectl get replicasets -n ${NAMESPACE} -l app=${DEPLOYMENT} -o wide
+                  
+                  echo ""
+                  echo "--- Pod Status ---"
+                  kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o wide
+                  
+                  echo ""
+                  echo "--- Pod Events ---"
+                  for pod in $(kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o name); do
+                    echo "Events for ${pod}:"
+                    kubectl describe ${pod} -n ${NAMESPACE} | grep -A 20 "Events:" || true
+                  done
+                  
+                  echo ""
+                  echo "--- Container Logs (last 50 lines) ---"
+                  for pod in $(kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o name); do
+                    echo "Logs for ${pod}:"
+                    kubectl logs ${pod} -n ${NAMESPACE} --tail=50 2>&1 || echo "Cannot retrieve logs"
+                  done
+                  
+                  echo "::endgroup::"
+                  exit 1
                 fi
               else
                 exit 0
               fi
             else
-              echo "⚠️ Image tag mismatch - Argo CD may still be syncing"
+              # Image tag mismatch - show Argo CD sync status
+              echo "⚠️ Image tag mismatch"
+              echo "  Expected: ${REGISTRY}/${IMAGE_NAME}:${EXPECTED_TAG}"
+              echo "  Current:  ${CURRENT_IMAGE}"
+              
+              if [ $((i % 6)) -eq 0 ]; then  # Every 30s
+                echo ""
+                echo "::group::🔍 Argo CD Sync Status"
+                APP_NAME=$(kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/instance}' 2>/dev/null || echo "Unknown")
+                if [ "$APP_NAME" != "Unknown" ]; then
+                  SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+                  echo "  Argo CD App: ${APP_NAME}"
+                  echo "  Sync Status: ${SYNC_STATUS}"
+                  
+                  # Check if kustomization.yaml has the expected tag
+                  echo ""
+                  echo "  Checking overlay kustomization for expected tag..."
+                  KUSTOMIZE_TAG=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.spec.source.path}' 2>/dev/null || echo "")
+                  if [ -n "$KUSTOMIZE_TAG" ]; then
+                    echo "  Source path: ${KUSTOMIZE_TAG}"
+                  fi
+                else
+                  echo "  Cannot determine Argo CD application for this deployment"
+                fi
+                echo "::endgroup::"
+              fi
             fi
+          else
+            echo "⏳ Deployment ${DEPLOYMENT} does not exist yet (attempt $i/${MAX_ATTEMPTS})"
           fi
           
-          echo "  Attempt $i/${MAX_ATTEMPTS} - Waiting ${INTERVAL}s..."
-          sleep $INTERVAL
+          if [ $i -lt $MAX_ATTEMPTS ]; then
+            echo "  Waiting ${INTERVAL}s..."
+            sleep $INTERVAL
+          fi
         done
         
-        echo "::error::${DEPLOYMENT} deployment did not reach ready state after ${TIMEOUT}s"
-        kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o yaml || true
+        # Timeout reached - comprehensive failure diagnostics
+        echo "::error::${DEPLOYMENT} deployment did not reach expected state after ${TIMEOUT}s"
+        echo ""
+        echo "::group::🔴 TIMEOUT DIAGNOSTICS"
+        
+        echo "--- Deployment (if exists) ---"
+        kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o yaml 2>&1 || echo "Deployment not found"
+        
+        echo ""
+        echo "--- All Deployments in Namespace ---"
+        kubectl get deployments -n ${NAMESPACE} -o wide 2>&1 || echo "Cannot list deployments"
+        
+        echo ""
+        echo "--- Namespace Events ---"
+        kubectl get events -n ${NAMESPACE} --sort-by='.lastTimestamp' | tail -30 || echo "Cannot get events"
+        
+        echo "::endgroup::"
         exit 1
