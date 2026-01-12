@@ -68,32 +68,8 @@ runs:
         echo "$SUMMARY" >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"
 
-        # Extract resource changes - capture resource blocks with all content including closing braces
-        FORMATTED=""
-        IN_RESOURCE=false
-        while IFS= read -r line; do
-          # Start of a resource
-          if [[ "$line" =~ ^[[:space:]]*#[[:space:]] ]]; then
-            IN_RESOURCE=true
-            FORMATTED+="$line"$'\n'
-          # If we're in a resource, capture everything until we hit Plan: or similar
-          elif $IN_RESOURCE; then
-            if [[ "$line" =~ ^Plan:|^Changes\ to\ Outputs:|^Warning: ]]; then
-              IN_RESOURCE=false
-            else
-              # Capture the line if it has content or is a brace line
-              if [[ -n "$(echo "$line" | tr -d '[:space:]')" ]]; then
-                FORMATTED+="$line"$'\n'
-              fi
-            fi
-          fi
-        done < plan_output.txt
-
-        # If no formatted content, use full output
-        if [ -z "$FORMATTED" ]; then
-          FORMATTED=$(cat plan_output.txt)
-        fi
-
+        # Use the full plan output - don't filter anything
+        # The post-terraform-plan action will parse and format it
         echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
-        echo "$FORMATTED" >> "$GITHUB_OUTPUT"
+        cat plan_output.txt >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"
