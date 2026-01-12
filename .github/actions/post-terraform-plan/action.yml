@@ -54,9 +54,14 @@ runs:
           core.info(`Plan Outcome: ${planOutcome}`);
           core.info(`Summary: Add=${summary.add}, Change=${summary.change}, Destroy=${summary.destroy}`);
 
-          const statusEmoji = planOutcome === 'success' ? ':white_check_mark:' : ':x:';
-          const statusText = planOutcome === 'success' ? 'Plan Successful' : 'Plan Failed';
           const hasChanges = summary.has_changes;
+          const runNumber = context.runNumber;
+          const runId = context.runId;
+          const runUrl = `${context.payload.repository.html_url}/actions/runs/${runId}`;
+          const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+
+          // Unique marker for finding this comment - MUST be at the start
+          const COMMENT_MARKER = '<!-- terraform-plan-comment -->';
 
           // Parse resources from terraform plan output
           function parseResources(planOutput) {
@@ -112,75 +117,83 @@ runs:
           const destroys = resources.filter(r => r.action === 'destroy');
 
           function buildResourceSection(resource) {
-            const icons = { create: ':heavy_plus_sign:', update: ':arrows_counterclockwise:', replace: ':recycle:', destroy: ':wastebasket:' };
-            const icon = icons[resource.action] || ':book:';
+            const icons = { create: '+', update: '~', replace: '-/+', destroy: '-' };
+            const icon = icons[resource.action] || '?';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
-            return `<details>\n<summary>${icon} <code>${resource.address}</code></summary>\n\n\`\`\`hcl\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
+            return `<details>\n<summary><code>${icon}</code> <code>${resource.address}</code></summary>\n\n\`\`\`hcl\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
           }
 
           // Build the comment body
           const sections = [];
 
-          // Header with status
-          sections.push(`## ${statusEmoji} Terraform ${statusText}`);
+          // Hidden marker for comment detection
+          sections.push(COMMENT_MARKER);
           sections.push('');
 
-          // Run info table - moved to top for visibility
-          const runUrl = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
-          const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
-          sections.push('| :clock1: Last Updated | :bust_in_silhouette: Triggered By | :link: Workflow |');
-          sections.push('|:--:|:--:|:--:|');
-          sections.push(`| \`${timestamp}\` | @${context.actor} | [View Run](${runUrl}) |`);
-          sections.push('');
-
-          // Resource changes summary table
-          if (hasChanges) {
-            sections.push('### Resource Changes');
-            sections.push('');
-            sections.push('| Action | Count |');
-            sections.push('|:-------|------:|');
-            if (summary.add > 0) sections.push(`| :green_circle: **Add** | ${summary.add} |`);
-            if (summary.change > 0) sections.push(`| :yellow_circle: **Change** | ${summary.change} |`);
-            if (summary.destroy > 0) sections.push(`| :red_circle: **Destroy** | ${summary.destroy} |`);
-            sections.push('');
+          // Status header with outcome
+          if (planOutcome === 'success') {
+            sections.push('## :white_check_mark: Terraform Plan');
           } else {
-            sections.push('> :white_check_mark: **No changes.** Infrastructure matches configuration.');
-            sections.push('');
+            sections.push('## :x: Terraform Plan Failed');
           }
+          sections.push('');
 
+          // Compact info line with run number prominently displayed
+          sections.push(`> **Run #${runNumber}** | ${timestamp} | @${context.actor} | [View Workflow](${runUrl})`);
+          sections.push('');
+
+          // Summary section - compact inline badges
+          if (hasChanges) {
+            const badges = [];
+            if (summary.add > 0) badges.push(`:green_circle: **${summary.add}** to add`);
+            if (summary.change > 0) badges.push(`:yellow_circle: **${summary.change}** to change`);
+            if (summary.destroy > 0) badges.push(`:red_circle: **${summary.destroy}** to destroy`);
+            sections.push(`**Plan:** ${badges.join(' · ')}`);
+          } else {
+            sections.push('**Plan:** :white_check_mark: No changes. Infrastructure is up-to-date.');
+          }
+          sections.push('');
           sections.push('---');
           sections.push('');
 
-          // Resource details by action type
+          // Resource details by action type - more compact headers
           if (creates.length > 0) {
-            sections.push(`### :heavy_plus_sign: Resources to Create (${creates.length})`);
+            sections.push(`<details open>`);
+            sections.push(`<summary><strong>:green_circle: Create (${creates.length})</strong></summary>`);
             sections.push('');
             creates.forEach(r => sections.push(buildResourceSection(r)));
+            sections.push('</details>');
             sections.push('');
           }
           if (replaces.length > 0) {
-            sections.push(`### :recycle: Resources to Replace (${replaces.length})`);
+            sections.push(`<details open>`);
+            sections.push(`<summary><strong>:purple_circle: Replace (${replaces.length})</strong></summary>`);
             sections.push('');
             replaces.forEach(r => sections.push(buildResourceSection(r)));
+            sections.push('</details>');
             sections.push('');
           }
           if (updates.length > 0) {
-            sections.push(`### :arrows_counterclockwise: Resources to Update (${updates.length})`);
+            sections.push(`<details open>`);
+            sections.push(`<summary><strong>:yellow_circle: Update (${updates.length})</strong></summary>`);
             sections.push('');
             updates.forEach(r => sections.push(buildResourceSection(r)));
+            sections.push('</details>');
             sections.push('');
           }
           if (destroys.length > 0) {
-            sections.push(`### :wastebasket: Resources to Destroy (${destroys.length})`);
+            sections.push(`<details open>`);
+            sections.push(`<summary><strong>:red_circle: Destroy (${destroys.length})</strong></summary>`);
             sections.push('');
             destroys.forEach(r => sections.push(buildResourceSection(r)));
+            sections.push('</details>');
             sections.push('');
           }
 
           // Fallback: show raw plan if no resources parsed but has changes
           if (resources.length === 0 && hasChanges) {
             sections.push('<details>');
-            sections.push('<summary><strong>:clipboard: View Raw Plan Output</strong></summary>');
+            sections.push('<summary><strong>:page_facing_up: Raw Plan Output</strong></summary>');
             sections.push('');
             sections.push('```hcl');
             sections.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
@@ -199,8 +212,9 @@ runs:
             per_page: 100
           });
 
-          const botComment = comments.find(c => c.user.type === 'Bot' && (c.body.includes('Terraform Plan') || c.body.includes('Plan Successful') || c.body.includes('Plan Failed')));
-          core.info(`Found ${comments.length} comments, ${botComment ? 'updating existing' : 'creating new'}`);
+          // Find comment by unique marker (most reliable method)
+          const botComment = comments.find(c => c.body && c.body.includes(COMMENT_MARKER));
+          core.info(`Found ${comments.length} comments, ${botComment ? 'updating existing #' + botComment.id : 'creating new'}`);
 
           let commentId = null;
           try {
@@ -244,27 +258,31 @@ runs:
           const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
           const planOutcome = process.env.PLAN_OUTCOME;
           const hasChanges = summary.has_changes;
-
-          const statusEmoji = planOutcome === 'success' ? ':white_check_mark:' : ':x:';
-          const statusText = planOutcome === 'success' ? 'Plan Successful' : 'Plan Failed';
+          const runNumber = context.runNumber;
 
           const lines = [];
-          lines.push(`## ${statusEmoji} Terraform ${statusText}`);
+
+          // Header
+          if (planOutcome === 'success') {
+            lines.push('## :white_check_mark: Terraform Plan');
+          } else {
+            lines.push('## :x: Terraform Plan Failed');
+          }
+          lines.push('');
+          lines.push(`**Run #${runNumber}**`);
           lines.push('');
 
+          // Summary line
           if (hasChanges) {
-            lines.push('### Resource Changes');
-            lines.push('');
-            lines.push('| Action | Count |');
-            lines.push('|:-------|------:|');
-            if (summary.add > 0) lines.push(`| :green_circle: **Add** | ${summary.add} |`);
-            if (summary.change > 0) lines.push(`| :yellow_circle: **Change** | ${summary.change} |`);
-            if (summary.destroy > 0) lines.push(`| :red_circle: **Destroy** | ${summary.destroy} |`);
-            lines.push('');
+            const badges = [];
+            if (summary.add > 0) badges.push(`:green_circle: **${summary.add}** to add`);
+            if (summary.change > 0) badges.push(`:yellow_circle: **${summary.change}** to change`);
+            if (summary.destroy > 0) badges.push(`:red_circle: **${summary.destroy}** to destroy`);
+            lines.push(badges.join(' · '));
           } else {
-            lines.push('> :white_check_mark: **No changes.** Infrastructure matches configuration.');
-            lines.push('');
+            lines.push(':white_check_mark: No changes. Infrastructure is up-to-date.');
           }
+          lines.push('');
 
           await core.summary
             .addRaw(lines.join('\n'))
