@@ -13,12 +13,21 @@ runs:
     - name: Create summary
       shell: bash
       run: |
-        echo "## 🏗️ Infrastructure Deployment" >> $GITHUB_STEP_SUMMARY
+        echo "## 🏗️ Infrastructure Deployment Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
+        
         if [ "${{ inputs.terraform-changed }}" != "true" ]; then
           echo "⏭️ **Skipped** - No terraform changes in this commit" >> $GITHUB_STEP_SUMMARY
         else
+          echo "### Pipeline Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Terraform | ${{ inputs.terraform-result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "*Note: Detailed terraform plan results are available in the step summary above*" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "*PR comments with full plan details are also posted on the pull request*" >> $GITHUB_STEP_SUMMARY
+          fi
         fi
