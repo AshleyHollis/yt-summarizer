@@ -40,19 +40,26 @@ runs:
         echo "🔍 JavaScript Dependency Scan (depcheck)"
         echo "════════════════════════════════════════════════════════════════"
         echo ""
+        echo "ℹ️  Using .depcheckrc configuration file"
+        echo "   See .depcheckrc.md for documentation on ignored packages"
+        echo ""
         
-        if depcheck --ignores="@types/*,eslint-*,prettier,typescript,vitest,playwright"; then
+        # Run depcheck (automatically uses .depcheckrc config file)
+        if depcheck; then
           echo ""
           echo "✅ No dependency issues detected"
         else
           echo ""
           echo "════════════════════════════════════════════════════════════════"
-          echo "⚠️  DEPENDENCY ISSUES DETECTED"
+          echo "❌ DEPENDENCY ISSUES DETECTED"
           echo "════════════════════════════════════════════════════════════════"
           echo ""
           echo "📋 Action Required:"
-          echo "   Review missing/unused packages above"
-          echo "   Update package.json accordingly"
+          echo "   1. Review the packages listed above"
+          echo "   2. Run 'npx depcheck' locally to verify"
+          echo "   3. If genuinely unused, remove from package.json"
+          echo "   4. If used but undetectable (config files, CSS), add to .depcheckrc"
+          echo "      and document in .depcheckrc.md"
           echo ""
           echo "════════════════════════════════════════════════════════════════"
           exit 1

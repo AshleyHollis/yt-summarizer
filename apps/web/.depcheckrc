@@ -1,0 +1,18 @@
+{
+  "ignores": [
+    "@types/*",
+    "eslint-*",
+    "prettier",
+    "typescript",
+    "vitest",
+    "playwright",
+    "@copilotkit/runtime",
+    "@tailwindcss/postcss",
+    "@tailwindcss/typography",
+    "tailwindcss"
+  ],
+  "specials": [
+    "bin",
+    "webpack"
+  ]
+}
