@@ -140,13 +140,8 @@ module "aks" {
   node_pool_name = "system2"
 
   # ACR integration
-  acr_id = module.acr.id
-
-  # Enable Workload Identity for External Secrets
-  enable_workload_identity = true
-
-  tags = local.common_tags
-}
+  acr_id      = module.acr.id
+  attach_acr  = true
 
 # -----------------------------------------------------------------------------
 # Workload Identity for External Secrets Operator

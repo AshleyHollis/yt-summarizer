@@ -120,11 +120,33 @@ resource "azurerm_kubernetes_cluster" "aks" {
     os_disk_size_gb      = var.os_disk_size_gb
     max_pods             = var.max_pods
     auto_scaling_enabled = false  # Renamed from enable_auto_scaling in azurerm 4.x
+
+    # Ignore Azure-managed defaults that would cause cluster replacement
+    lifecycle {
+      ignore_changes = [
+        tags,
+        zones,
+        node_public_ip_enabled,
+        fips_enabled,
+        host_encryption_enabled,
+        only_critical_addons_enabled,
+        max_count,
+        min_count,
+        upgrade_settings,
+      ]
+    }
   }
 
   # Managed identity for AAD integration
   identity {
     type = "SystemAssigned"
+
+    # Ignore identity changes that would cause cluster replacement
+    lifecycle {
+      ignore_changes = [
+        identity_ids,
+      ]
+    }
   }
 
   # Network configuration
@@ -135,12 +157,39 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   tags = var.tags
+
+  # Ignore Azure-managed attributes that would cause cluster replacement
+  lifecycle {
+    ignore_changes = [
+      # Azure-managed add-ons and features
+      azure_policy_enabled,
+      http_application_routing_enabled,
+      local_account_disabled,
+      open_service_mesh_enabled,
+      custom_ca_trust_certificates_base64,
+      cost_analysis_enabled,
+
+      # Azure-managed networking
+      kubelet_identity,
+      network_profile[0].load_balancer_profile[0].effective_outbound_ips,
+      network_profile[0].load_balancer_profile[0].managed_outbound_ip_count,
+      network_profile[0].load_balancer_profile[0].idle_timeout_in_minutes,
+      network_profile[0].load_balancer_profile[0].managed_outbound_ipv6_count,
+      network_profile[0].load_balancer_profile[0].outbound_ip_address_ids,
+      network_profile[0].load_balancer_profile[0].outbound_ip_prefix_ids,
+      network_profile[0].load_balancer_profile[0].outbound_ports_allocated,
+      network_profile[0].load_balancer_profile[0].backend_pool_type,
+
+      # Azure-managed node provisioning
+      node_provisioning_profile,
+    ]
+  }
 }
 
 # Grant AKS access to pull images from ACR
 resource "azurerm_role_assignment" "acr_pull" {
   count                = var.attach_acr ? 1 : 0
-  principal_id         = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  principal_id         = try(azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id, null)
   role_definition_name = "AcrPull"
   scope                = var.acr_id
 }
