@@ -116,29 +116,13 @@ runs:
           const replaces = resources.filter(r => r.action === 'replace');
           const destroys = resources.filter(r => r.action === 'destroy');
 
-          function buildResourceSection(resource) {
-            const actionColors = {
-              create: '#22c55e',
-              update: '#f59e0b',
-              replace: '#a855f7',
-              destroy: '#ef4444'
-            };
-            const actionSymbols = {
-              create: '+ create',
-              update: '~ update',
-              replace: '-/+ replace',
-              destroy: '- destroy'
-            };
-            const color = actionColors[resource.action] || '#6b7280';
-            const symbol = actionSymbols[resource.action] || 'read';
+          // Build resource item - clean Terraform Cloud style
+          function buildResourceItem(resource) {
+            const symbols = { create: '+', update: '~', replace: '-/+', destroy: '-' };
+            const symbol = symbols[resource.action] || '?';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
 
-            return `<details>\n<summary>` +
-              `<strong style="color:${color};">${symbol}</strong> ` +
-              `<code>${resource.address}</code>` +
-              `</summary>\n\n` +
-              `\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n` +
-              `</details>`;
+            return `<details>\n<summary><code>${symbol}</code> ${resource.address}</summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
           }
 
           // Build the comment body
@@ -148,102 +132,69 @@ runs:
           sections.push(COMMENT_MARKER);
           sections.push('');
 
-          // Status header with outcome - more visual
-          if (planOutcome === 'success') {
-            sections.push('# <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/master/public/img/logo-terraform.svg" width="20" height="20" /> Terraform Plan');
-          } else {
-            sections.push('# <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/master/public/img/logo-terraform.svg" width="20" height="20" /> Terraform Plan Failed');
-          }
+          // Header - Terraform Cloud style "Plan finished"
+          const statusIcon = planOutcome === 'success' ? '✅' : '❌';
+          const statusText = planOutcome === 'success' ? 'Plan finished' : 'Plan errored';
+          sections.push(`## ${statusIcon} ${statusText}`);
           sections.push('');
 
-          // Metadata table - cleaner layout
-          sections.push('| | |');
-          sections.push('|:--|:--|');
-          sections.push(`| **Run** | [#${runNumber}](${runUrl}) ${planOutcome === 'success' ? '✅' : '❌'} |`);
-          sections.push(`| **Updated** | ${timestamp} |`);
-          sections.push(`| **Triggered by** | @${context.actor} |`);
+          // Run info line - clean and simple
+          sections.push(`Run [#${runNumber}](${runUrl}) · ${timestamp} · triggered by @${context.actor}`);
           sections.push('');
 
-          // Summary section with better visual hierarchy
+          // Resource summary like Terraform Cloud
           if (hasChanges) {
-            const totalChanges = summary.add + summary.change + summary.destroy;
-            sections.push(`### 📊 Summary: ${totalChanges} resource${totalChanges !== 1 ? 's' : ''} to change`);
-            sections.push('');
-            sections.push('| Action | Resources |');
-            sections.push('|:-------|----------:|');
-            if (summary.add > 0) {
-              sections.push(`| <span style="color:#22c55e;">**+ Create**</span> | **${summary.add}** |`);
-            }
-            if (summary.change > 0) {
-              sections.push(`| <span style="color:#f59e0b;">**~ Update**</span> | **${summary.change}** |`);
-            }
-            if (summary.destroy > 0) {
-              sections.push(`| <span style="color:#ef4444;">**- Destroy**</span> | **${summary.destroy}** |`);
-            }
-            sections.push('');
-
-            // Navigation hint
-            sections.push('> 💡 **Tip:** Click on sections below to expand/collapse resource details');
-            sections.push('');
-          } else {
-            sections.push('### ✅ No Changes');
-            sections.push('');
-            sections.push('> Infrastructure matches the configuration. No changes required.');
+            const parts = [];
+            if (summary.add > 0) parts.push(`**${summary.add}** to add`);
+            if (summary.change > 0) parts.push(`**${summary.change}** to change`);
+            if (summary.destroy > 0) parts.push(`**${summary.destroy}** to destroy`);
+            sections.push(`**Resources:** ${parts.join(', ')}`);
             sections.push('');
           }
 
-          sections.push('<hr/>');
+          sections.push('---');
           sections.push('');
 
-          // Resource details by action type - improved styling
+          // Resource sections with Terraform Cloud style headers
           if (creates.length > 0) {
-            sections.push(`### <span style="color:#22c55e;">➕ Resources to Create</span> <sup>${creates.length}</sup>`);
+            sections.push(`### \`+ ${creates.length} to create\``);
             sections.push('');
-            sections.push(`<details>`);
-            sections.push(`<summary>Click to expand all ${creates.length} resource${creates.length !== 1 ? 's' : ''}</summary>`);
-            sections.push('');
-            creates.forEach(r => sections.push(buildResourceSection(r)));
-            sections.push('</details>');
+            creates.forEach(r => sections.push(buildResourceItem(r)));
             sections.push('');
           }
 
           if (replaces.length > 0) {
-            sections.push(`### <span style="color:#a855f7;">♻️ Resources to Replace</span> <sup>${replaces.length}</sup>`);
+            sections.push(`### \`-/+ ${replaces.length} to replace\``);
             sections.push('');
-            sections.push(`<details>`);
-            sections.push(`<summary>Click to expand all ${replaces.length} resource${replaces.length !== 1 ? 's' : ''}</summary>`);
-            sections.push('');
-            replaces.forEach(r => sections.push(buildResourceSection(r)));
-            sections.push('</details>');
+            replaces.forEach(r => sections.push(buildResourceItem(r)));
             sections.push('');
           }
 
           if (updates.length > 0) {
-            sections.push(`### <span style="color:#f59e0b;">🔄 Resources to Update</span> <sup>${updates.length}</sup>`);
+            sections.push(`### \`~ ${updates.length} to update\``);
             sections.push('');
-            sections.push(`<details>`);
-            sections.push(`<summary>Click to expand all ${updates.length} resource${updates.length !== 1 ? 's' : ''}</summary>`);
-            sections.push('');
-            updates.forEach(r => sections.push(buildResourceSection(r)));
-            sections.push('</details>');
+            updates.forEach(r => sections.push(buildResourceItem(r)));
             sections.push('');
           }
 
           if (destroys.length > 0) {
-            sections.push(`### <span style="color:#ef4444;">🗑️ Resources to Destroy</span> <sup>${destroys.length}</sup>`);
+            sections.push(`### \`- ${destroys.length} to destroy\``);
             sections.push('');
-            sections.push(`<details>`);
-            sections.push(`<summary>⚠️ Click to expand all ${destroys.length} resource${destroys.length !== 1 ? 's' : ''}</summary>`);
+            destroys.forEach(r => sections.push(buildResourceItem(r)));
             sections.push('');
-            destroys.forEach(r => sections.push(buildResourceSection(r)));
-            sections.push('</details>');
+          }
+
+          if (!hasChanges) {
+            sections.push('### No changes');
+            sections.push('');
+            sections.push('Your infrastructure matches the configuration.');
             sections.push('');
           }
 
           // Fallback: show raw plan if no resources parsed but has changes
           if (resources.length === 0 && hasChanges) {
             sections.push('<details>');
-            sections.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
+            sections.push('<summary><strong>View raw plan output</strong></summary>');
             sections.push('');
             sections.push('```terraform');
             sections.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
@@ -251,6 +202,10 @@ runs:
             sections.push('</details>');
             sections.push('');
           }
+
+          // Footer with plan summary
+          sections.push('---');
+          sections.push(`<sub>Plan: ${summary.add} to add, ${summary.change} to change, ${summary.destroy} to destroy</sub>`);
 
           const commentBody = sections.join('\n');
 
@@ -315,7 +270,7 @@ runs:
           const runUrl = `${context.payload.repository.html_url}/actions/runs/${runId}`;
           const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
 
-          // Parse resources from terraform plan output (same as PR comment)
+          // Parse resources
           function parseResources(planOutput) {
             const resources = [];
             const lines = planOutput.split('\n');
@@ -366,128 +321,79 @@ runs:
           const replaces = resources.filter(r => r.action === 'replace');
           const destroys = resources.filter(r => r.action === 'destroy');
 
-          function buildResourceSection(resource) {
-            const actionColors = {
-              create: '#22c55e',
-              update: '#f59e0b',
-              replace: '#a855f7',
-              destroy: '#ef4444'
-            };
-            const actionSymbols = {
-              create: '+ create',
-              update: '~ update',
-              replace: '-/+ replace',
-              destroy: '- destroy'
-            };
-            const color = actionColors[resource.action] || '#6b7280';
-            const symbol = actionSymbols[resource.action] || 'read';
+          function buildResourceItem(resource) {
+            const symbols = { create: '+', update: '~', replace: '-/+', destroy: '-' };
+            const symbol = symbols[resource.action] || '?';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
 
-            return `<details>\n<summary>` +
-              `<strong style="color:${color};">${symbol}</strong> ` +
-              `<code>${resource.address}</code>` +
-              `</summary>\n\n` +
-              `\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n` +
-              `</details>`;
+            return `<details>\n<summary><code>${symbol}</code> ${resource.address}</summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
           }
 
           const lines = [];
 
-          // Header with Terraform branding
-          if (planOutcome === 'success') {
-            lines.push('# <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/master/public/img/logo-terraform.svg" width="20" height="20" /> Terraform Plan');
-          } else {
-            lines.push('# <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/master/public/img/logo-terraform.svg" width="20" height="20" /> Terraform Plan Failed');
-          }
+          // Header - Terraform Cloud style
+          const statusIcon = planOutcome === 'success' ? '✅' : '❌';
+          const statusText = planOutcome === 'success' ? 'Plan finished' : 'Plan errored';
+          lines.push(`## ${statusIcon} ${statusText}`);
           lines.push('');
 
-          // Metadata table
-          lines.push('| | |');
-          lines.push('|:--|:--|');
-          lines.push(`| **Run** | [#${runNumber}](${runUrl}) ${planOutcome === 'success' ? '✅' : '❌'} |`);
-          lines.push(`| **Updated** | ${timestamp} |`);
-          lines.push(`| **Triggered by** | @${context.actor} |`);
+          // Run info
+          lines.push(`Run [#${runNumber}](${runUrl}) · ${timestamp} · triggered by @${context.actor}`);
           lines.push('');
 
-          // Summary section
+          // Resource summary
           if (hasChanges) {
-            const totalChanges = summary.add + summary.change + summary.destroy;
-            lines.push(`### 📊 Summary: ${totalChanges} resource${totalChanges !== 1 ? 's' : ''} to change`);
-            lines.push('');
-            lines.push('| Action | Resources |');
-            lines.push('|:-------|----------:|');
-            if (summary.add > 0) {
-              lines.push(`| <span style="color:#22c55e;">**+ Create**</span> | **${summary.add}** |`);
-            }
-            if (summary.change > 0) {
-              lines.push(`| <span style="color:#f59e0b;">**~ Update**</span> | **${summary.change}** |`);
-            }
-            if (summary.destroy > 0) {
-              lines.push(`| <span style="color:#ef4444;">**- Destroy**</span> | **${summary.destroy}** |`);
-            }
-            lines.push('');
-
-            lines.push('> 💡 **Tip:** Click on sections below to expand/collapse resource details');
-            lines.push('');
-          } else {
-            lines.push('### ✅ No Changes');
-            lines.push('');
-            lines.push('> Infrastructure matches the configuration. No changes required.');
+            const parts = [];
+            if (summary.add > 0) parts.push(`**${summary.add}** to add`);
+            if (summary.change > 0) parts.push(`**${summary.change}** to change`);
+            if (summary.destroy > 0) parts.push(`**${summary.destroy}** to destroy`);
+            lines.push(`**Resources:** ${parts.join(', ')}`);
             lines.push('');
           }
 
-          lines.push('<hr/>');
+          lines.push('---');
           lines.push('');
 
-          // Resource details by action type
+          // Resource sections
           if (creates.length > 0) {
-            lines.push(`### <span style="color:#22c55e;">➕ Resources to Create</span> <sup>${creates.length}</sup>`);
+            lines.push(`### \`+ ${creates.length} to create\``);
             lines.push('');
-            lines.push(`<details>`);
-            lines.push(`<summary>Click to expand all ${creates.length} resource${creates.length !== 1 ? 's' : ''}</summary>`);
-            lines.push('');
-            creates.forEach(r => lines.push(buildResourceSection(r)));
-            lines.push('</details>');
+            creates.forEach(r => lines.push(buildResourceItem(r)));
             lines.push('');
           }
 
           if (replaces.length > 0) {
-            lines.push(`### <span style="color:#a855f7;">♻️ Resources to Replace</span> <sup>${replaces.length}</sup>`);
+            lines.push(`### \`-/+ ${replaces.length} to replace\``);
             lines.push('');
-            lines.push(`<details>`);
-            lines.push(`<summary>Click to expand all ${replaces.length} resource${replaces.length !== 1 ? 's' : ''}</summary>`);
-            lines.push('');
-            replaces.forEach(r => lines.push(buildResourceSection(r)));
-            lines.push('</details>');
+            replaces.forEach(r => lines.push(buildResourceItem(r)));
             lines.push('');
           }
 
           if (updates.length > 0) {
-            lines.push(`### <span style="color:#f59e0b;">🔄 Resources to Update</span> <sup>${updates.length}</sup>`);
+            lines.push(`### \`~ ${updates.length} to update\``);
             lines.push('');
-            lines.push(`<details>`);
-            lines.push(`<summary>Click to expand all ${updates.length} resource${updates.length !== 1 ? 's' : ''}</summary>`);
-            lines.push('');
-            updates.forEach(r => lines.push(buildResourceSection(r)));
-            lines.push('</details>');
+            updates.forEach(r => lines.push(buildResourceItem(r)));
             lines.push('');
           }
 
           if (destroys.length > 0) {
-            lines.push(`### <span style="color:#ef4444;">🗑️ Resources to Destroy</span> <sup>${destroys.length}</sup>`);
+            lines.push(`### \`- ${destroys.length} to destroy\``);
             lines.push('');
-            lines.push(`<details>`);
-            lines.push(`<summary>⚠️ Click to expand all ${destroys.length} resource${destroys.length !== 1 ? 's' : ''}</summary>`);
-            lines.push('');
-            destroys.forEach(r => lines.push(buildResourceSection(r)));
-            lines.push('</details>');
+            destroys.forEach(r => lines.push(buildResourceItem(r)));
             lines.push('');
           }
 
-          // Fallback: show raw plan if no resources parsed but has changes
+          if (!hasChanges) {
+            lines.push('### No changes');
+            lines.push('');
+            lines.push('Your infrastructure matches the configuration.');
+            lines.push('');
+          }
+
+          // Fallback
           if (resources.length === 0 && hasChanges) {
             lines.push('<details>');
-            lines.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
+            lines.push('<summary><strong>View raw plan output</strong></summary>');
             lines.push('');
             lines.push('```terraform');
             lines.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
@@ -495,6 +401,10 @@ runs:
             lines.push('</details>');
             lines.push('');
           }
+
+          // Footer
+          lines.push('---');
+          lines.push(`<sub>Plan: ${summary.add} to add, ${summary.change} to change, ${summary.destroy} to destroy</sub>`);
 
           await core.summary
             .addRaw(lines.join('\n'))
