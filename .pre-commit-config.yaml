@@ -1,0 +1,33 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        name: Check YAML syntax
+        args: ['--unsafe']  # Allows custom tags in GitHub Actions
+        exclude: ^k8s/.*\.yaml$  # K8s uses templates/overlays that may not validate standalone
+      
+      - id: check-json
+        name: Check JSON syntax
+      
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+      
+      - id: trailing-whitespace
+        name: Remove trailing whitespace
+        args: ['--markdown-linebreak-ext=md']
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.5
+    hooks:
+      - id: actionlint
+        name: Lint GitHub Actions workflows
+        files: ^\.github/workflows/.*\.ya?ml$
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: Lint YAML files
+        args: ['-d', '{extends: relaxed, rules: {line-length: {max: 200}, comments: {min-spaces-from-content: 1}}}']
+        exclude: ^k8s/.*\.yaml$  # K8s manifests often have long lines
