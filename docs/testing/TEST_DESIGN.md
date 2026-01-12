@@ -448,7 +448,7 @@ async def test_learning_path_orders_by_difficulty():
 
 ```typescript
 // In E2E tests
-test.skip(() => !process.env.LIVE_PROCESSING, 
+test.skip(() => !process.env.LIVE_PROCESSING,
   'Skipping - requires real LLM processing');
 ```
 
@@ -532,11 +532,11 @@ test.describe('Feature: [Name]', () => {
   test('user can [action]', async ({ page }) => {
     // Arrange
     await page.goto('/page');
-    
+
     // Act
     await page.fill('[data-testid="input"]', 'value');
     await page.click('[data-testid="submit"]');
-    
+
     // Assert
     await expect(page.locator('[data-testid="result"]')).toBeVisible();
   });
@@ -551,24 +551,24 @@ from fastapi import status
 
 class TestFeatureName:
     """Tests for [feature] endpoint."""
-    
+
     def test_endpoint_returns_expected_response(self, client, headers):
         """Test [specific behavior]."""
         response = client.get("/api/v1/endpoint", headers=headers)
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "expected_field" in data
-    
+
     @pytest.mark.asyncio
     async def test_service_handles_edge_case(self, mock_session):
         """Test [edge case] in service layer."""
         # Configure mock
         mock_session.execute.return_value.scalar_one_or_none.return_value = None
-        
+
         # Call service
         result = await my_service.get_something()
-        
+
         # Assert
         assert result is None
 ```

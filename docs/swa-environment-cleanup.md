@@ -58,7 +58,7 @@ This modular approach allows for:
 
 **Workflow:** [`.github/workflows/swa-cleanup-scheduled.yml`](.github/workflows/swa-cleanup-scheduled.yml)
 
-**Trigger:** 
+**Trigger:**
 - Daily at 2 AM UTC (cron schedule)
 - Manual dispatch with optional dry-run
 

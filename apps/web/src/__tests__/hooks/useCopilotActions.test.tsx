@@ -1,6 +1,6 @@
 /**
  * Tests for useCopilotActions hook
- * 
+ *
  * These tests verify:
  * 1. Relevance filtering for video cards (MIN_RELEVANCE_THRESHOLD = 0.50)
  * 2. Relevance filtering for evidence/sources
@@ -133,11 +133,11 @@ describe('useCopilotActions Filtering Logic', () => {
       const filteredVideoCards = data.videoCards?.filter(
         (video) => video.relevanceScore >= MIN_RELEVANCE_THRESHOLD
       ) || [];
-      
+
       const filteredEvidence = data.evidence?.filter(
         (item) => item.confidence >= MIN_RELEVANCE_THRESHOLD
       ) || [];
-      
+
       return {
         ...data,
         videoCards: filteredVideoCards,
@@ -244,7 +244,7 @@ describe('useCopilotActions Filtering Logic', () => {
 
 describe('Uncertainty Field Handling', () => {
   // Test the expected behavior of uncertainty field values
-  
+
   it('should treat null uncertainty as no warning needed', () => {
     const uncertainty: string | null = null;
     expect(uncertainty).toBeNull();
@@ -265,18 +265,18 @@ describe('Uncertainty Field Handling', () => {
   it('should NOT show the literal string "null" as uncertainty', () => {
     // This is the bug we fixed - LLM was returning "null" string
     const uncertaintyFromLLM = 'null';
-    
+
     // The frontend should NOT display "null" as a message
     // We expect the API to convert "null" string to actual null
     const shouldDisplay = uncertaintyFromLLM !== 'null' && uncertaintyFromLLM !== '';
-    
+
     expect(shouldDisplay).toBe(false);
   });
 });
 
 /**
  * Tests for Tool Call Message Creation
- * 
+ *
  * These tests verify the logic for creating properly structured messages
  * for frontend tool calls (like queryLibrary) that need to be persisted.
  */
@@ -359,8 +359,8 @@ describe('Tool Call Message Creation', () => {
     });
 
     it('should serialize object results to JSON', () => {
-      const result = { 
-        answer: 'You have 5 videos', 
+      const result = {
+        answer: 'You have 5 videos',
         videoCards: [{ title: 'Test Video' }],
         evidence: [],
         followups: ['Try another query'],
@@ -381,7 +381,7 @@ describe('Tool Call Message Creation', () => {
 
     it('should have toolCallId matching the assistant message toolCalls id', () => {
       const toolCallId = 'call_matching_id';
-      
+
       const assistantMsg = {
         id: toolCallId,
         role: 'assistant' as const,
@@ -416,7 +416,7 @@ describe('Tool Call Message Creation', () => {
       });
 
       expect(pendingResults.size).toBe(1);
-      
+
       const entry = pendingResults.get(messageId);
       expect(entry?.toolCallId).toBe(toolCallId);
       expect(entry?.toolName).toBe('queryLibrary');
@@ -436,7 +436,7 @@ describe('Tool Call Message Creation', () => {
       pendingResults.set('msg-2', { toolCallId: 'call_2', result: {}, toolName: 'queryLibrary', toolArgs: '{}' });
 
       const entries = Array.from(pendingResults.entries());
-      
+
       expect(entries).toHaveLength(2);
       expect(entries.map(([id]) => id)).toEqual(['msg-1', 'msg-2']);
     });
@@ -450,7 +450,7 @@ describe('Tool Call Message Creation', () => {
       }>();
 
       pendingResults.set('msg-1', { toolCallId: 'call_1', result: {}, toolName: 'queryLibrary', toolArgs: '{}' });
-      
+
       // Simulate processing and cleanup
       pendingResults.delete('msg-1');
 
@@ -480,11 +480,11 @@ describe('Tool Call Message Creation', () => {
 
     it('should detect existing assistant tool calls', () => {
       interface ToolCall { id: string; type: string; function: { name: string; arguments: string } }
-      
+
       const messages = [
         { id: 'user-1', role: 'user' as const },
-        { 
-          id: 'call_existing', 
+        {
+          id: 'call_existing',
           role: 'assistant' as const,
           toolCalls: [{ id: 'call_existing', type: 'function', function: { name: 'queryLibrary', arguments: '{}' } }]
         },
@@ -493,7 +493,7 @@ describe('Tool Call Message Creation', () => {
       const existingAssistantToolCallIds = new Set(
         messages
           .filter((m) => m.role === 'assistant')
-          .flatMap((m) => 
+          .flatMap((m) =>
             ((m as { toolCalls?: ToolCall[] }).toolCalls || []).map(tc => tc.id)
           )
       );
@@ -513,4 +513,3 @@ describe('Tool Call Message Creation', () => {
     });
   });
 });
-

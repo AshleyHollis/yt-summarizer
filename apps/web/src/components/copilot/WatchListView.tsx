@@ -98,7 +98,7 @@ function WatchListItemCard({
   const priorityConfig = getPriorityConfig(item.priority);
 
   return (
-    <div 
+    <div
       className={`${copilotBoxStyles.full} cursor-pointer`}
       onClick={() => setIsExpanded(!isExpanded)}
       role="button"
@@ -114,14 +114,14 @@ function WatchListItemCard({
       {/* Header */}
       <div className="flex items-start gap-3">
         {/* Priority indicator */}
-        <div 
+        <div
           className={`flex-shrink-0 px-2 py-1 rounded-md flex items-center gap-1 ${priorityConfig.bgClass} ${priorityConfig.textClass} ${copilotTextSizes.xs} font-medium`}
           title={priorityConfig.label}
         >
           {priorityConfig.icon}
           <span className="hidden sm:inline">{item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}</span>
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h4 className={`${copilotTextSizes.body} ${copilotColors.primary} font-medium truncate`}>
@@ -133,7 +133,7 @@ function WatchListItemCard({
               <ChevronRight className="w-4 h-4 text-[var(--copilot-kit-muted-color)] flex-shrink-0" />
             )}
           </div>
-          
+
           <div className="flex items-center gap-3 flex-wrap">
             <span className={`flex items-center gap-1 ${copilotTextSizes.small} ${copilotColors.muted}`}>
               <Clock className="w-3.5 h-3.5" />
@@ -209,7 +209,7 @@ function WatchListItemCard({
 
 /**
  * WatchListView - Displays a prioritized watch list of recommended videos
- * 
+ *
  * Features:
  * - Priority-based visual indicators (high/medium/low)
  * - Expandable items with reasons and tags

@@ -36,13 +36,13 @@ interface Tab {
 /**
  * Tab Button component
  */
-function TabButton({ 
-  tab, 
-  isActive, 
-  onClick 
-}: { 
-  tab: Tab; 
-  isActive: boolean; 
+function TabButton({
+  tab,
+  isActive,
+  onClick
+}: {
+  tab: Tab;
+  isActive: boolean;
   onClick: () => void;
 }) {
   const Icon = tab.icon;
@@ -129,7 +129,7 @@ export default function VideoDetailPage() {
       setError(null);
       const response = await libraryApi.getVideoDetail(videoId);
       setVideo(response);
-        
+
         // Set the video context for the copilot to use
         setCurrentVideo({
           videoId: response.video_id,
@@ -150,7 +150,7 @@ export default function VideoDetailPage() {
     if (videoId) {
       fetchVideo();
     }
-    
+
     // Clear the video context when leaving this page
     return () => {
       setCurrentVideo(null);
@@ -169,7 +169,7 @@ export default function VideoDetailPage() {
    */
   const handleReprocess = async () => {
     if (!video) return;
-    
+
     try {
       setReprocessing(true);
       setReprocessError(null);
@@ -329,7 +329,7 @@ export default function VideoDetailPage() {
                   <ArrowPathIcon className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
-                      {video.processing_status === 'failed' 
+                      {video.processing_status === 'failed'
                         ? 'Processing failed for this video'
                         : 'Missing content detected'}
                     </p>

@@ -69,7 +69,7 @@ Today we're going to learn about push-ups.
         # This is a key test - we don't want false positives!
         legitimate_transcript = """
         Welcome to this web scraping tutorial. Today we'll discuss how to handle
-        situations where websites use captcha to block automated queries. 
+        situations where websites use captcha to block automated queries.
         Sometimes you'll see unusual traffic warnings, but there are ethical ways
         to scrape data. Let's look at rate limiting strategies and how to respect
         robots.txt files. Remember, automated queries should be done responsibly.
@@ -81,7 +81,7 @@ Today we're going to learn about push-ups.
         legitimate_transcript = """
         I'm sorry to say that Google has changed their API again. This is frustrating
         for developers who rely on these services. Let me show you the workaround
-        that our team developed. We spent weeks on this solution after Google 
+        that our team developed. We spent weeks on this solution after Google
         deprecated the old endpoint. Sorry for the long explanation but it's important
         to understand the context here.
         """

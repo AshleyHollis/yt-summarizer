@@ -113,7 +113,7 @@ describe('TranscriptViewer', () => {
         text: async () => 'test test test',
       });
       render(<TranscriptViewer transcriptUrl="https://example.com/transcript.txt" />);
-      
+
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/search transcript/i)).toBeInTheDocument();
       });
@@ -134,7 +134,7 @@ describe('TranscriptViewer', () => {
         text: async () => mockTranscriptText,
       });
       render(<TranscriptViewer transcriptUrl="https://example.com/transcript.txt" />);
-      
+
       await waitFor(() => {
         expect(screen.getByText(/expand/i)).toBeInTheDocument();
       });
@@ -146,7 +146,7 @@ describe('TranscriptViewer', () => {
         text: async () => mockTranscriptText,
       });
       render(<TranscriptViewer transcriptUrl="https://example.com/transcript.txt" />);
-      
+
       await waitFor(() => {
         expect(screen.getByText(/expand/i)).toBeInTheDocument();
       });
@@ -156,4 +156,3 @@ describe('TranscriptViewer', () => {
     });
   });
 });
-

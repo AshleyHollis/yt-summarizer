@@ -26,14 +26,14 @@ runs:
       run: |
         MANIFEST="${{ inputs.manifest-file }}"
         RESOURCE_NAME="${{ inputs.resource-name }}"
-        
+
         if [ ! -f "$MANIFEST" ]; then
           echo "::error::Manifest file not found: $MANIFEST"
           exit 1
         fi
-        
+
         echo "Validating resource quotas for ${RESOURCE_NAME}..."
-        
+
         # Validate CPU if specified
         if [ -n "${{ inputs.max-cpu }}" ]; then
           if [ -f scripts/ci/validate_kustomize.py ]; then
@@ -48,7 +48,7 @@ runs:
             echo "⚠️ Skipping CPU validation (validate_kustomize.py not found)"
           fi
         fi
-        
+
         # Validate memory if specified
         if [ -n "${{ inputs.max-memory }}" ]; then
           if [ -f scripts/ci/validate_kustomize.py ]; then
@@ -63,7 +63,7 @@ runs:
             echo "⚠️ Skipping memory validation (validate_kustomize.py not found)"
           fi
         fi
-        
+
         if [ -z "${{ inputs.max-cpu }}" ] && [ -z "${{ inputs.max-memory }}" ]; then
           echo "⚠️ No quota limits specified - skipping validation"
         fi

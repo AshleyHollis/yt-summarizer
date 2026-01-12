@@ -109,7 +109,7 @@ runs:
             *) echo "❓ Unknown" ;;
           esac
         }
-        
+
         # Helper to format duration
         format_duration() {
           if [ -n "$1" ] && [ "$1" != "" ]; then
@@ -118,11 +118,11 @@ runs:
             echo "-"
           fi
         }
-        
+
         # Determine overall status
         OVERALL_STATUS="✅ Success"
         HAS_FAILURES=false
-        
+
         for result in "${{ inputs.lint-python-result }}" "${{ inputs.lint-frontend-result }}" \
                       "${{ inputs.scan-python-security-result }}" "${{ inputs.scan-javascript-security-result }}" \
                       "${{ inputs.test-shared-result }}" "${{ inputs.test-api-result }}" \
@@ -135,11 +135,11 @@ runs:
             break
           fi
         done
-        
+
         # Write summary header
         echo "# 🔧 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Meta information
         echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
         echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
@@ -152,7 +152,7 @@ runs:
           echo "| **Image Tag** | \`${{ inputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Changed areas section
         echo "## 📁 Changes Detected" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -175,7 +175,7 @@ runs:
           done
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Linting section
         echo "## 🧹 Linting" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -184,7 +184,7 @@ runs:
         echo "| Python (ruff) | $(format_status '${{ inputs.lint-python-result }}') |" >> $GITHUB_STEP_SUMMARY
         echo "| Frontend (ESLint) | $(format_status '${{ inputs.lint-frontend-result }}') |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Security section
         echo "## 🔒 Security" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -194,7 +194,7 @@ runs:
         echo "| JavaScript (npm audit) | $(format_status '${{ inputs.scan-javascript-security-result }}') |" >> $GITHUB_STEP_SUMMARY
         echo "| Secrets (gitleaks) | $(format_status '${{ inputs.secret-scanning-result }}') |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Testing section
         echo "## 🧪 Tests" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -205,7 +205,7 @@ runs:
         echo "| Workers | $(format_status '${{ inputs.test-workers-result }}') | $(format_duration '${{ inputs.test-workers-duration }}') |" >> $GITHUB_STEP_SUMMARY
         echo "| Frontend | $(format_status '${{ inputs.test-frontend-result }}') | - |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Validation section
         echo "## ✅ Validation" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -215,7 +215,7 @@ runs:
         echo "| Kustomize Overlays | $(format_status '${{ inputs.validate-kustomize-result }}') |" >> $GITHUB_STEP_SUMMARY
         echo "| Terraform | $(format_status '${{ inputs.validate-terraform-result }}') |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Build section
         if [ -n "${{ inputs.image-tag }}" ] || [ "${{ inputs.build-images-result }}" != "skipped" ]; then
           echo "## 🐳 Docker Images" >> $GITHUB_STEP_SUMMARY
@@ -231,7 +231,7 @@ runs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         # Links section
         echo "## 🔗 Links" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

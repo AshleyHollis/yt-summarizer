@@ -144,7 +144,7 @@ Azure Static Web Apps environments can be deleted using:
 
 **File:** `.github/actions/cleanup-stale-swa-environments/action.yml`
 
-**Previous Problem:** 
+**Previous Problem:**
 - Was sending `repository_dispatch` events that nothing listened to
 - Reported false positives ("Cleanup dispatched")
 - Did not actually delete environments

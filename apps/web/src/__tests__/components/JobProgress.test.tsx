@@ -43,7 +43,7 @@ describe('JobProgress', () => {
       );
 
       render(<JobProgress videoId="123" />);
-      
+
       // Loading shows animate-pulse skeleton
       expect(document.querySelector('.animate-pulse')).toBeInTheDocument();
     });
@@ -164,7 +164,7 @@ describe('JobProgress', () => {
     it('calls onFailed callback when overall_status is failed', async () => {
       const onFailed = vi.fn();
       vi.mocked(jobApi.getVideoProgress).mockResolvedValue(
-        createMockProgress({ 
+        createMockProgress({
           overall_status: 'failed',
           jobs: [
             { job_id: 'job-1', job_type: 'transcribe', status: 'succeeded' },

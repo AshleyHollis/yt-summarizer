@@ -2,23 +2,23 @@
 
 /**
  * Backend Tool Renderers (Pattern B)
- * 
+ *
  * These hooks use `useRenderToolCall` to render backend agent tool calls.
  * This is the proper CopilotKit API for rendering tool calls with custom UI.
- * 
+ *
  * The renderers react to AG-UI tool lifecycle events (TOOL_CALL_START,
  * TOOL_CALL_RESULT) and render appropriate UI.
- * 
+ *
  * ## CRITICAL: Tool Name Matching
- * 
+ *
  * The `name` parameter in useRenderToolCall MUST EXACTLY match:
  * 1. The tool name from the backend agent (Python: "query_library", snake_case)
  * 2. The inferred tool name in prepareMessagesForDisplay() for persisted threads
- * 
+ *
  * If these don't match, the rich UI won't render and you'll see:
  * - Blank messages (for new calls)
  * - Plain text instead of rich UI (for persisted threads)
- * 
+ *
  * Current registered tool names (snake_case):
  * - "query_library" - Primary RAG tool with answer, video cards, evidence
  * - "search_videos" - Search for videos
@@ -26,10 +26,10 @@
  * - "get_library_coverage" - Get library topic coverage
  * - "get_video_summary" - Get single video summary
  * - "get_topics_for_channel" - Get topics for a channel
- * 
+ *
  * @see threadPersistence.ts - prepareMessagesForDisplay() infers tool names for persistence
  * @see globals.css - CSS that hides duplicate text when tool render is present
- * 
+ *
  * See: https://docs.copilotkit.ai/langgraph/generative-ui/backend-tools
  */
 

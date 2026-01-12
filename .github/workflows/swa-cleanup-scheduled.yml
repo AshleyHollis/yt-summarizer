@@ -52,7 +52,7 @@ jobs:
           dry-run: ${{ github.event.inputs.dry-run || 'false' }}
           min-age-hours: '168'  # 7 days
           max-prs-to-check: '100'
-      
+
       - name: Report cleanup results
         if: always()
         run: |

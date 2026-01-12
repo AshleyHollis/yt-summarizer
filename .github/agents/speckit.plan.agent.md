@@ -1,6 +1,12 @@
 ---
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
-handoffs: 
+tools:
+  - read
+  - edit
+  - search
+  - execute
+target: vscode
+handoffs:
   - label: Create Tasks
     agent: speckit.tasks
     prompt: Break the plan into tasks

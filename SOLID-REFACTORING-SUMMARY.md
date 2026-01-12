@@ -10,7 +10,7 @@ Refactored the Azure Static Web Apps environment cleanup implementation to follo
 
 Each composite action now has one clear purpose:
 
-**Before:** 
+**Before:**
 - `cleanup-stale-swa-environments` tried to do everything (find, delete, report)
 
 **After:**

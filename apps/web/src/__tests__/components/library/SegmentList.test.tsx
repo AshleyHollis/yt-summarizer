@@ -106,7 +106,7 @@ describe('SegmentList', () => {
       );
 
       const links = screen.getAllByRole('link');
-      
+
       expect(links[0]).toHaveAttribute(
         'href',
         'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=0'

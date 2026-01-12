@@ -7,19 +7,19 @@ import { cn } from "./copilotStyles";
 interface WorkflowProgressPanelProps {
   /** Current progress state */
   progress: WorkflowProgress;
-  
+
   /** Optional: Show step details */
   showSteps?: boolean;
-  
+
   /** Optional: Compact mode */
   compact?: boolean;
-  
+
   /** Optional: Custom class name */
   className?: string;
-  
+
   /** Optional: Callback when retry is clicked (for failed states) */
   onRetry?: () => void;
-  
+
   /** Optional: Callback when cancel is clicked */
   onCancel?: () => void;
 }
@@ -34,7 +34,7 @@ const statusConfig: Record<WorkflowStatus, { icon: typeof CheckCircle; color: st
 
 /**
  * WorkflowProgressPanel - Renders workflow progress for both Pattern A and Pattern B.
- * 
+ *
  * Features:
  * - Progress bar with percentage
  * - Step counter
@@ -53,7 +53,7 @@ export function WorkflowProgressPanel({
   const config = statusConfig[progress.status];
   const StatusIcon = config.icon;
   const isAnimating = progress.status === "running";
-  
+
   if (compact) {
     return (
       <div className={cn(
@@ -62,12 +62,12 @@ export function WorkflowProgressPanel({
         "border-[var(--copilot-kit-separator-color)]",
         className
       )}>
-        <StatusIcon 
+        <StatusIcon
           className={cn(
             "w-4 h-4 flex-shrink-0",
             config.color,
             isAnimating && "animate-spin"
-          )} 
+          )}
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -79,7 +79,7 @@ export function WorkflowProgressPanel({
             </span>
           </div>
           <div className="mt-1 h-1 bg-[var(--copilot-kit-separator-color)] rounded-full overflow-hidden">
-            <div 
+            <div
               className={cn(
                 "h-full rounded-full transition-all duration-300",
                 progress.status === "failed" ? "bg-red-500" : "bg-[var(--copilot-kit-primary-color)]"
@@ -91,7 +91,7 @@ export function WorkflowProgressPanel({
       </div>
     );
   }
-  
+
   return (
     <div className={cn(
       "p-4 rounded-xl border",
@@ -105,12 +105,12 @@ export function WorkflowProgressPanel({
           "p-2 rounded-lg flex-shrink-0",
           config.bgColor
         )}>
-          <StatusIcon 
+          <StatusIcon
             className={cn(
               "w-5 h-5",
               config.color,
               isAnimating && "animate-spin"
-            )} 
+            )}
           />
         </div>
         <div className="flex-1 min-w-0">
@@ -125,10 +125,10 @@ export function WorkflowProgressPanel({
           {progress.percent}%
         </div>
       </div>
-      
+
       {/* Progress Bar */}
       <div className="h-2 bg-[var(--copilot-kit-separator-color)] rounded-full overflow-hidden mb-4">
-        <div 
+        <div
           className={cn(
             "h-full rounded-full transition-all duration-300",
             progress.status === "failed" ? "bg-red-500" : "bg-[var(--copilot-kit-primary-color)]",
@@ -137,7 +137,7 @@ export function WorkflowProgressPanel({
           style={{ width: `${progress.percent}%` }}
         />
       </div>
-      
+
       {/* Step Details */}
       {showSteps && progress.completedSteps && progress.completedSteps.length > 0 && (
         <div className="space-y-2 mb-4">
@@ -162,7 +162,7 @@ export function WorkflowProgressPanel({
           )}
         </div>
       )}
-      
+
       {/* Error Display */}
       {progress.error && (
         <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 mb-4">
@@ -179,7 +179,7 @@ export function WorkflowProgressPanel({
           </div>
         </div>
       )}
-      
+
       {/* Action Buttons */}
       {(onRetry || onCancel) && (
         <div className="flex gap-2 justify-end">
@@ -221,25 +221,25 @@ export function WorkflowProgressPanel({
  * WorkflowProgressInline - Minimal inline progress indicator.
  * Use in message bubbles or tight spaces.
  */
-export function WorkflowProgressInline({ 
+export function WorkflowProgressInline({
   progress,
   className,
-}: { 
+}: {
   progress: WorkflowProgress;
   className?: string;
 }) {
   const config = statusConfig[progress.status];
   const StatusIcon = config.icon;
   const isAnimating = progress.status === "running";
-  
+
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
-      <StatusIcon 
+      <StatusIcon
         className={cn(
           "w-3.5 h-3.5",
           config.color,
           isAnimating && "animate-spin"
-        )} 
+        )}
       />
       <span className="text-xs text-[var(--copilot-kit-muted-color)]">
         {progress.message} ({progress.percent}%)

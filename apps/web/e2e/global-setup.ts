@@ -1,9 +1,9 @@
 /**
  * Global setup for Playwright E2E tests.
- * 
+ *
  * This runs ONCE before all tests and ensures test videos are ingested.
  * Videos are only submitted if they don't already exist (409 = skip).
- * 
+ *
  * IMPORTANT: This setup waits for videos to be FULLY PROCESSED (have segments)
  * before allowing tests to run. This ensures copilot queries have content to search.
  */
@@ -23,10 +23,10 @@ const TEST_VIDEOS = [
   // === Python OOP Series (Corey Schafer) - Primary Learning Path Test Videos ===
   // These videos form a clear pedagogical progression for testing learning path ordering
   // All verified to have YouTube auto-captions
-  
+
   // Python OOP Tutorial 1: Classes and Instances - 15:28 - BEGINNER
   'https://www.youtube.com/watch?v=ZDa-Z5JzLYM',
-  // Python OOP Tutorial 2: Class Variables - ~12 min - BEGINNER  
+  // Python OOP Tutorial 2: Class Variables - ~12 min - BEGINNER
   'https://www.youtube.com/watch?v=BJ-VvGyQxho',
   // Python OOP Tutorial 3: classmethods and staticmethods - ~15 min - INTERMEDIATE
   'https://www.youtube.com/watch?v=rq8cL2XMM5M',
@@ -36,11 +36,11 @@ const TEST_VIDEOS = [
   'https://www.youtube.com/watch?v=3ohzBxoFHAY',
   // Python OOP Tutorial 6: Property Decorators - ~10 min - ADVANCED
   'https://www.youtube.com/watch?v=jCzT9XFZ5bw',
-  
+
   // === JavaScript Async Series - IMPLICIT ORDER Test Videos ===
   // NO explicit ordering in titles - tests LLM's ability to infer correct order from content
   // All verified to have YouTube auto-captions
-  
+
   // JavaScript in 100 Seconds (Fireship) - 2:36 - language overview
   'https://www.youtube.com/watch?v=DHjqpvDnNGE',
   // What is a callback? - 4:46 - fundamental async pattern
@@ -51,18 +51,18 @@ const TEST_VIDEOS = [
   'https://www.youtube.com/watch?v=V_Kr9OSfDeU',
   // Closures Explained in 100 Seconds (Fireship) - 4:57 - advanced function concept
   'https://www.youtube.com/watch?v=vKJpN5FAeF4',
-  
+
   // === Fitness Videos (for general copilot testing, relationship detection) ===
   // Kept shorter videos for cost-effective general testing
-  
+
   // The Perfect Push Up (Calisthenicmovement) - 3:37 - HAS AUTO CAPTIONS
   'https://www.youtube.com/watch?v=IODxDxX7oi4',
   // You CAN do pushups, my friend! (Hybrid Calisthenics) - 3:09 - HAS AUTO CAPTIONS
   'https://www.youtube.com/watch?v=0GsVJsS6474',
-  
+
   // === Kettlebell Cluster (2 videos - should relate to each other) ===
   // All verified to have YouTube auto-captions
-  
+
   // The BEST Kettlebell Swing Tutorial - 0:58 - HAS AUTO CAPTIONS
   'https://www.youtube.com/watch?v=aSYap2yhW8s',
   // How To Do Kettlebell Swings | Proper Form - 4:37 - HAS AUTO CAPTIONS
@@ -298,14 +298,14 @@ function formatTime(seconds: number | undefined): string {
 
 async function monitorBatchProgress(videoIds: Map<string, string>): Promise<boolean> {
   const startTime = Date.now();
-  
+
   console.log(`\n[global-setup] Monitoring batch progress for ${videoIds.size} videos...`);
   console.log('[global-setup] ┌──────────────────────────────────────────────────────────────────┐');
-  
+
   while (Date.now() - startTime < MAX_WAIT_TIME_MS) {
     const elapsed = Math.round((Date.now() - startTime) / 1000);
     const progressList: VideoProgress[] = [];
-    
+
     // Fetch progress for all videos
     for (const [videoId] of videoIds) {
       const progress = await getVideoProgress(videoId);
@@ -313,21 +313,21 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
         progressList.push(progress);
       }
     }
-    
+
     // Count statuses
     const completed = progressList.filter(p => p.status === 'completed').length;
     const processing = progressList.filter(p => p.status === 'processing').length;
     const pending = progressList.filter(p => p.status === 'pending').length;
     const failed = progressList.filter(p => p.status === 'failed').length;
-    
+
     // Find current processing video for details
     const currentVideo = progressList.find(p => p.status === 'processing');
-    const queueInfo = currentVideo 
+    const queueInfo = currentVideo
       ? `stage=${currentVideo.stage}, queue=${currentVideo.queuePosition ?? '-'}, eta=${formatTime(currentVideo.eta)}`
       : '';
-    
+
     console.log(`[global-setup] │ [${elapsed}s] ✓${completed} ⚙${processing} ⏳${pending} ✗${failed} ${queueInfo}`);
-    
+
     // Check completion via coverage endpoint
     try {
       const coverageResponse = await fetch(`${API_URL}/api/v1/copilot/coverage`, {
@@ -335,15 +335,15 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-      
+
       if (coverageResponse.ok) {
         const coverage = await coverageResponse.json();
         const segments = coverage.segmentCount || 0;
-        
+
         if (segments >= MIN_SEGMENTS_REQUIRED) {
           console.log('[global-setup] └──────────────────────────────────────────────────────────────────┘');
           console.log(`[global-setup] ✓ Ready! ${segments} segments indexed, ${completed} videos completed`);
-          
+
           // Log final processing stats
           console.log('\n[global-setup] Processing Summary:');
           for (const progress of progressList) {
@@ -351,17 +351,17 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
               console.log(`  ✓ ${progress.id.slice(0, 8)}... wait=${formatTime(progress.waitSeconds)} proc=${formatTime(progress.processingSeconds)}`);
             }
           }
-          
+
           return true;
         }
       }
     } catch {
       // Ignore coverage check errors
     }
-    
+
     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
   }
-  
+
   console.log('[global-setup] └──────────────────────────────────────────────────────────────────┘');
   console.log(`[global-setup] ⚠ Timeout waiting for video processing. Tests may fail.`);
   return false;
@@ -369,9 +369,9 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
 
 async function waitForVideoProcessing(): Promise<boolean> {
   const startTime = Date.now();
-  
+
   console.log(`[global-setup] Waiting for videos to be processed (need ${MIN_SEGMENTS_REQUIRED}+ segments)...`);
-  
+
   while (Date.now() - startTime < MAX_WAIT_TIME_MS) {
     try {
       const coverageResponse = await fetch(`${API_URL}/api/v1/copilot/coverage`, {
@@ -379,14 +379,14 @@ async function waitForVideoProcessing(): Promise<boolean> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-      
+
       if (coverageResponse.ok) {
         const coverage = await coverageResponse.json();
         const segments = coverage.segmentCount || 0;
         const elapsed = Math.round((Date.now() - startTime) / 1000);
-        
+
         console.log(`[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments (${elapsed}s elapsed)`);
-        
+
         if (segments >= MIN_SEGMENTS_REQUIRED) {
           console.log(`[global-setup] ✓ Ready! ${segments} segments indexed`);
           return true;
@@ -395,10 +395,10 @@ async function waitForVideoProcessing(): Promise<boolean> {
     } catch (error) {
       console.log(`[global-setup] Coverage check failed: ${error}`);
     }
-    
+
     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
   }
-  
+
   console.log(`[global-setup] ⚠ Timeout waiting for video processing. Tests may fail.`);
   return false;
 }
@@ -411,11 +411,11 @@ async function globalSetup(config: FullConfig) {
   }
 
   console.log('[global-setup] Seeding test videos...');
-  
+
   let submitted = 0;
   let skipped = 0;
   let failed = 0;
-  
+
   // Track video IDs for progress monitoring
   const videoIds = new Map<string, string>(); // id -> url
 
@@ -460,7 +460,7 @@ async function globalSetup(config: FullConfig) {
   // Store video IDs for tests to use
   // Tests that need to monitor progress can access these
   process.env.SEEDED_VIDEO_IDS = JSON.stringify(Array.from(videoIds.keys()));
-  
+
   // If WATCH_QUEUE_PROGRESS is set, don't wait here - let the test do it
   // This allows Playwright to watch the UI update during processing
   if (process.env.WATCH_QUEUE_PROGRESS === 'true') {

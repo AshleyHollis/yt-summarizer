@@ -71,7 +71,7 @@ interface CopilotMessageProps {
 
 /**
  * Custom react-markdown components for copilot message styling
- * 
+ *
  * Note: Source attribution is handled via structured data (aiSettingsEcho)
  * rendered in the "Searched:" badge row, not via markdown text parsing.
  */
@@ -83,20 +83,20 @@ const markdownComponents: Components = {
 
 /**
  * CopilotMessage Component
- * 
+ *
  * Renders the rich UI for tool call results in the chat interface.
  * This component is used by useRenderToolCall in useBackendToolRenderers.tsx.
- * 
+ *
  * ## Rich UI Elements
  * - Video cards with thumbnails and relevance scores
  * - Answer text rendered with react-markdown
  * - Sources section from structured evidence data
  * - Follow-up question buttons
- * 
+ *
  * ## Text Size Note
  * The answer text uses `text-base` (16px) for better readability.
  * Previously `text-sm` (14px) was too small for comfortable reading.
- * 
+ *
  * @see useBackendToolRenderers.tsx - registers this component with useRenderToolCall
  * @see threadPersistence.ts - prepareMessagesForDisplay reconstructs toolCalls for this to render
  * @see globals.css - CSS that hides CopilotKit's duplicate markdown text
@@ -114,64 +114,64 @@ export function CopilotMessage({
   // Get current video and scope context for scope-aware uncertainty messages
   const { currentVideo } = useVideoContext();
   const { scope, clearScope } = useScope();
-  
+
   // Check if we have a narrow scope (video-specific or filtered)
-  const hasNarrowScope = 
+  const hasNarrowScope =
     (scope.videoIds && scope.videoIds.length > 0) ||
     (scope.channels && scope.channels.length > 0) ||
     (scope.facets && scope.facets.length > 0);
-  
+
   // Handler to broaden scope and potentially retry query
   const handleBroadenScope = () => {
     clearScope();
     // The user can ask their question again now that scope is cleared
   };
-  
+
   // State for expand/collapse of related videos
   const [isVideosExpanded, setIsVideosExpanded] = useState(false);
-  
+
   // Show 3 videos by default, all when expanded
   const visibleVideos = isVideosExpanded ? videoCards : videoCards.slice(0, 3);
   const hasMoreVideos = videoCards.length > 3;
-  
+
   // Build knowledge sources badge content
   const knowledgeSources: string[] = [];
   if (aiSettingsEcho) {
     if (aiSettingsEcho.useVideoContext) knowledgeSources.push('Your Videos');
     if (aiSettingsEcho.useLLMKnowledge) knowledgeSources.push('AI Knowledge');
   }
-  
+
   // Derive scope level from scopeEcho object
   const deriveScopeLevel = (): { label: string; icon: 'video' | 'channel' | 'library' } | null => {
     if (!scopeEcho) return null;
-    
+
     // If specific videos are scoped, it's video-level
     if (scopeEcho.videoIds && scopeEcho.videoIds.length > 0) {
-      return { 
+      return {
         label: scopeEcho.videoIds.length === 1 ? 'This Video' : `${scopeEcho.videoIds.length} Videos`,
         icon: 'video'
       };
     }
-    
+
     // If channels are specified, it's channel-level
     if (scopeEcho.channels && scopeEcho.channels.length > 0) {
-      return { 
+      return {
         label: scopeEcho.channels.length === 1 ? 'This Channel' : `${scopeEcho.channels.length} Channels`,
         icon: 'channel'
       };
     }
-    
+
     // Default to full library
     return { label: 'All Videos', icon: 'library' };
   };
-  
+
   const scopeInfo = deriveScopeLevel();
-  
+
   return (
     <div className="w-full space-y-3 animate-in fade-in duration-200">
       {/* Uncertainty warning if present */}
       {uncertainty && (
-        <UncertaintyMessage 
+        <UncertaintyMessage
           message={uncertainty}
           showBroadenOption={hasNarrowScope}
           currentVideoTitle={currentVideo?.title}
@@ -278,7 +278,7 @@ export function CopilotMessage({
               {answer}
             </ReactMarkdown>
           </div>
-          
+
           {/* Sources from structured evidence data */}
           {evidence.length > 0 && (
             <div className="mt-3 pt-3 border-t border-[var(--copilot-kit-separator-color)]">

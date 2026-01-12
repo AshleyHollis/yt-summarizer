@@ -139,7 +139,7 @@ scripts/
 └── bootstrap-argocd.ps1       # One-time Argo CD installation
 ```
 
-**Structure Notes**: 
+**Structure Notes**:
 - **No `k8s/overlays/previews/pr-*/` directories** - Pull Request Generator doesn't need them
 - **`k8s/overlays/preview/`** exists as a template in PR branches, not in main
 - **No `preview-cleanup.yml`** - Pull Request Generator handles cleanup automatically

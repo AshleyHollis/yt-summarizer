@@ -10,7 +10,7 @@ useDefault = true
 # Allowlist rules for false positives
 [allowlist]
   description = "Allowlist for false positives"
-  
+
   # Terraform variable definitions (not actual secrets)
   paths = [
     '''infra/terraform/modules/.*/variables\.tf''',
@@ -29,7 +29,7 @@ useDefault = true
     # Documentation (all markdown)
     '''\.md$''',
   ]
-  
+
   # Regex patterns that are not secrets (matches in the secret value itself)
   regexes = [
     # Variable placeholder patterns

@@ -12,7 +12,7 @@
 
 **Decision**: Use path filters with job dependencies
 
-**Rationale**: 
+**Rationale**:
 - GitHub Actions supports `paths` filters in workflow triggers
 - Jobs can be conditionally skipped based on changed files using `dorny/paths-filter`
 - For this project, always run all tests on PR (comprehensive) but use path filters for quick feedback

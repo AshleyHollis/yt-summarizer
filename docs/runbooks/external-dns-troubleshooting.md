@@ -178,7 +178,7 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
 **Common Causes & Solutions:**
 
 1. **Missing or incorrect annotation:**
-   
+
    ```bash
    # Add annotation to HTTPRoute
    kubectl annotate httproute api-httproute -n preview-pr-<NUMBER> \
@@ -186,11 +186,11 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
    ```
 
 2. **HTTPRoute not referencing Gateway:**
-   
+
    ```bash
    # Verify HTTPRoute has parentRef to main-gateway
    kubectl get httproute api-httproute -n preview-pr-<NUMBER> -o yaml | grep -A5 parentRefs
-   
+
    # Expected:
    # parentRefs:
    # - name: main-gateway
@@ -199,40 +199,40 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
    ```
 
 3. **Gateway not PROGRAMMED:**
-   
+
    ```bash
    # Check Gateway status
    kubectl get gateway main-gateway -n gateway-system
-   
+
    # Expected:
    # NAME           CLASS   ADDRESS           PROGRAMMED   AGE
    # main-gateway   nginx   20.187.186.135    True         1d
    ```
 
 4. **Cloudflare API token issues:**
-   
+
    ```bash
    # Check ExternalSecret for Cloudflare token
    kubectl get externalsecret cloudflare-api-token -n external-dns
-   
+
    # Expected:
    # NAME                   STORE                       REFRESH   STATUS
    # cloudflare-api-token   azure-keyvault-cluster      1h        SecretSynced
-   
+
    # If not synced, force refresh:
    kubectl delete secret cloudflare-api-token -n external-dns
    # Secret will be recreated automatically within 1 minute
    ```
 
 5. **Domain filter mismatch:**
-   
+
    ```bash
    # Check ExternalDNS deployment args
    kubectl get deployment external-dns -n external-dns -o yaml | grep domain-filter
-   
+
    # Expected:
    # - --domain-filter=apps.ashleyhollis.com
-   
+
    # Hostname must match: *.yt-summarizer.apps.ashleyhollis.com
    ```
 
@@ -258,31 +258,31 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
 **Common Causes & Solutions:**
 
 1. **ExternalDNS didn't detect deletion:**
-   
+
    ```bash
    # Restart ExternalDNS to force re-sync
    kubectl rollout restart deployment external-dns -n external-dns
-   
+
    # ExternalDNS will re-sync all records and delete orphaned ones
    ```
 
 2. **Cloudflare API rate limiting:**
-   
+
    ```bash
    # Check logs for rate limit errors
    kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns | grep -i "rate limit"
-   
+
    # Solution: Wait 5-10 minutes, ExternalDNS will retry
    ```
 
 3. **Manual cleanup required:**
-   
+
    If record persists after 15+ minutes:
-   
+
    ```bash
    # Option 1: Delete via Cloudflare Dashboard
    # Login → DNS → Records → Delete the specific record
-   
+
    # Option 2: Use Cloudflare API (if you have API token)
    # First get zone ID and record ID, then delete via API
    ```
@@ -311,19 +311,19 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --previous
 **Solutions:**
 
 1. **Verify Cloudflare secret exists:**
-   
+
    ```bash
    kubectl get secret cloudflare-api-token -n external-dns
-   
+
    # If missing, check ExternalSecret
    kubectl describe externalsecret cloudflare-api-token -n external-dns
    ```
 
 2. **Check deployment configuration:**
-   
+
    ```bash
    kubectl describe deployment external-dns -n external-dns
-   
+
    # Look for:
    # - Correct image version
    # - Secret volume mount
@@ -331,7 +331,7 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --previous
    ```
 
 3. **Restart deployment:**
-   
+
    ```bash
    kubectl rollout restart deployment external-dns -n external-dns
    kubectl rollout status deployment external-dns -n external-dns

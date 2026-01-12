@@ -1,6 +1,6 @@
 /**
  * Tests for ScopeIndicator component
- * 
+ *
  * Tests the AI knowledge settings and scope selection controls
  */
 
@@ -88,7 +88,7 @@ describe('ScopeIndicator', () => {
 
     it('renders all three scope options when video is selected', () => {
       mockUseVideoContext.mockReturnValue(videoContext);
-      
+
       render(<ScopeIndicator />);
 
       expect(screen.getByText('All Videos')).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('ScopeIndicator', () => {
 
     it('calls setScope with channel when This Channel is clicked', () => {
       mockUseVideoContext.mockReturnValue(videoContext);
-      
+
       render(<ScopeIndicator />);
 
       fireEvent.click(screen.getByText('This Channel'));
@@ -110,7 +110,7 @@ describe('ScopeIndicator', () => {
 
     it('calls setScope with videoIds when This Video is clicked', () => {
       mockUseVideoContext.mockReturnValue(videoContext);
-      
+
       render(<ScopeIndicator />);
 
       fireEvent.click(screen.getByText('This Video'));
@@ -126,7 +126,7 @@ describe('ScopeIndicator', () => {
         ...defaultScopeContext,
         scope: { channels: ['Test Channel'] },
       });
-      
+
       render(<ScopeIndicator />);
 
       fireEvent.click(screen.getByText('All Videos'));
@@ -268,7 +268,7 @@ describe('ScopeIndicator', () => {
       // Active settings show "Disable" in title
       expect(screen.getByTitle(/Disable.*Search transcripts/)).toBeInTheDocument();
       expect(screen.getByTitle(/Disable.*general knowledge/)).toBeInTheDocument();
-      
+
       // Inactive setting shows "Enable" in title
       expect(screen.getByTitle(/Enable.*Search the web/)).toBeInTheDocument();
     });

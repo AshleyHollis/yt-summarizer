@@ -20,16 +20,16 @@ export interface ProcessingHistoryProps {
  */
 function formatVariance(variance: number | null, variancePercent: number | null): React.ReactNode {
   if (variance === null) return null;
-  
+
   const isPositive = variance > 0;
   const isNegative = variance < 0;
   const sign = isPositive ? '+' : '';
-  const colorClass = isPositive 
-    ? 'text-red-600 dark:text-red-400' 
-    : isNegative 
-      ? 'text-green-600 dark:text-green-400' 
+  const colorClass = isPositive
+    ? 'text-red-600 dark:text-red-400'
+    : isNegative
+      ? 'text-green-600 dark:text-green-400'
       : 'text-gray-500';
-  
+
   return (
     <span className={colorClass}>
       {sign}{formatElapsedTime(Math.abs(variance))}
@@ -45,17 +45,17 @@ function formatVariance(variance: number | null, variancePercent: number | null)
  */
 function StageRow({ stage, showWait }: { stage: StageHistoryItem; showWait: boolean }) {
   const statusIcon = stage.status === 'succeeded' ? '✓' : stage.status === 'failed' ? '✗' : '○';
-  const statusColorClass = 
-    stage.status === 'succeeded' 
-      ? 'text-green-500' 
-      : stage.status === 'failed' 
-        ? 'text-red-500' 
+  const statusColorClass =
+    stage.status === 'succeeded'
+      ? 'text-green-500'
+      : stage.status === 'failed'
+        ? 'text-red-500'
         : 'text-gray-400';
-  
+
   // Note: estimated_seconds already includes enforced delay (baked into historical avg)
   // The delay is shown separately just for informational purposes
   const hasDelay = (stage.estimated_delay_seconds ?? 0) > 0;
-  
+
   return (
     <tr className="border-b border-gray-100 dark:border-gray-700 last:border-b-0">
       <td className="py-3 pr-4">
@@ -75,8 +75,8 @@ function StageRow({ stage, showWait }: { stage: StageHistoryItem; showWait: bool
       </td>
       {showWait && (
         <td className="py-3 px-4 text-right font-mono text-sm text-gray-500 dark:text-gray-500">
-          {stage.wait_seconds !== null && stage.wait_seconds > 0.5 
-            ? formatElapsedTime(stage.wait_seconds) 
+          {stage.wait_seconds !== null && stage.wait_seconds > 0.5
+            ? formatElapsedTime(stage.wait_seconds)
             : '-'}
         </td>
       )}
@@ -104,7 +104,7 @@ function StageRow({ stage, showWait }: { stage: StageHistoryItem; showWait: bool
 function PercentileBadge({ percentile }: { percentile: number }) {
   let colorClass = 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
   let label = 'Average';
-  
+
   if (percentile >= 75) {
     colorClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
     label = 'Fast';
@@ -118,7 +118,7 @@ function PercentileBadge({ percentile }: { percentile: number }) {
     colorClass = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300';
     label = 'Below Average';
   }
-  
+
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
       {label} ({percentile}th percentile)
@@ -338,7 +338,7 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
             <span className="text-gray-500">Last job completed:</span>
             <span className="text-gray-700 dark:text-gray-300">{formatDateTime(history.last_job_completed_at)}</span>
           </div>
-          
+
           {/* Per-stage timestamps */}
           <div className="pt-1">
             <p className="text-gray-500 mb-2">Stage timestamps:</p>

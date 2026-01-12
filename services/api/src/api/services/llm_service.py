@@ -629,12 +629,12 @@ When videos contain relevant info:
 
 When videos don't cover the topic but you can help with AI knowledge:
   "**From your videos:** Your library doesn't cover [topic].
-  
+
   **From AI knowledge:** [helpful information]"
 
 When videos partially cover the topic:
   "**From your videos:** [relevant video content with citations]
-  
+
   **From AI knowledge:** Additionally, [supplementary info not in videos]\""""
             else:
                 instructions = """INSTRUCTIONS:

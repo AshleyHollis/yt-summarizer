@@ -62,7 +62,7 @@ kubectl describe certificate yt-summarizer-wildcard -n gateway-system
 kubectl get secret yt-summarizer-wildcard-tls -n gateway-system
 ```
 
-**Pass Criteria**: 
+**Pass Criteria**:
 - Certificate shows `READY: True`
 - Secret exists with `tls.crt` and `tls.key`
 

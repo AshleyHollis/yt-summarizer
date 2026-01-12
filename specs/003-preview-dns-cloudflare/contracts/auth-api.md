@@ -82,11 +82,11 @@ https://{AUTH0_DOMAIN}/authorize?
 
 **Set-Cookie Header**:
 ```
-Set-Cookie: session={encrypted_session}; 
-  HttpOnly; 
-  Secure; 
-  Path=/; 
-  SameSite=None; 
+Set-Cookie: session={encrypted_session};
+  HttpOnly;
+  Secure;
+  Path=/;
+  SameSite=None;
   Max-Age=86400
 ```
 
@@ -128,11 +128,11 @@ Set-Cookie: session={encrypted_session};
 
 **Set-Cookie Header**:
 ```
-Set-Cookie: session=; 
-  HttpOnly; 
-  Secure; 
-  Path=/; 
-  SameSite=None; 
+Set-Cookie: session=;
+  HttpOnly;
+  Secure;
+  Path=/;
+  SameSite=None;
   Max-Age=0
 ```
 
@@ -186,10 +186,10 @@ Set-Cookie: session=;
 ALLOWED_ORIGINS = [
     # Production web
     "https://web.yt-summarizer.apps.ashleyhollis.com",
-    
+
     # Staging web  
     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
-    
+
     # SWA preview domains (regex pattern in implementation)
     # Pattern: https://*.azurestaticapps.net
 ]
