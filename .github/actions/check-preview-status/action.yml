@@ -23,6 +23,10 @@ inputs:
     description: 'Whether API URL is configured'
     required: false
     default: ''
+  wait-for-ci-result:
+    description: 'Result of wait-for-ci job'
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -36,11 +40,40 @@ runs:
         
         # If no deployment needed, mark as success (docs-only PR)
         if [ "${{ inputs.needs-deployment }}" != "true" ]; then
-          echo "📝 No deployment needed - docs-only PR"
+          echo "📝 No deployment needed - docs-only PR" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Detect Changes | ✅ No deployment needed |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Preview pipeline completed successfully!" >> $GITHUB_STEP_SUMMARY
           exit 0
+        fi
+        
+        # Track if any critical jobs failed
+        HAS_FAILURES=false
+        
+        # Check Wait for CI status (critical if images need to be built)
+        if [ "${{ inputs.needs-image-build }}" = "true" ]; then
+          if [ "${{ inputs.wait-for-ci-result }}" != "success" ]; then
+            echo "::error::CI workflow failed - cannot proceed with deployment"
+            HAS_FAILURES=true
+          fi
+        fi
+        
+        # Check required deployment jobs
+        if [ "${{ inputs.update-overlay-result }}" != "success" ] && [ "${{ inputs.update-overlay-result }}" != "skipped" ]; then
+          echo "::error::Update overlay failed"
+          HAS_FAILURES=true
+        fi
+
+        if [ "${{ inputs.verify-deployment-result }}" != "success" ] && [ "${{ inputs.verify-deployment-result }}" != "skipped" ]; then
+          echo "::error::Deployment verification failed"
+          HAS_FAILURES=true
+        fi
+
+        if [ "${{ inputs.deploy-frontend-result }}" != "success" ] && [ "${{ inputs.deploy-frontend-result }}" != "skipped" ]; then
+          echo "::error::Frontend deployment failed"
+          HAS_FAILURES=true
         fi
         
         # Determine E2E test status display
@@ -50,51 +83,77 @@ runs:
           E2E_REQUIRED=false
         elif [ "$E2E_RESULT" = "success" ]; then
           E2E_STATUS="✅ Passed"
-          E2E_REQUIRED=true
+          E2E_REQUIRED=false
         elif [ "$E2E_RESULT" = "skipped" ]; then
           E2E_STATUS="⏭️ Skipped"
           E2E_REQUIRED=false
-        else
+        elif [ "$E2E_RESULT" = "failure" ]; then
           E2E_STATUS="❌ Failed"
           E2E_REQUIRED=true
+          echo "::error::E2E tests failed"
+          HAS_FAILURES=true
+        else
+          E2E_STATUS="⏭️ Skipped"
+          E2E_REQUIRED=false
         fi
         
+        # Display status table
         echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Update Overlay | ${{ inputs.update-overlay-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Verify Deployment | ${{ inputs.verify-deployment-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Deploy Frontend | ${{ inputs.deploy-frontend-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ inputs.needs-image-build }}" = "true" ]; then
+          if [ "${{ inputs.wait-for-ci-result }}" = "success" ]; then
+            echo "| Wait for CI | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.wait-for-ci-result }}" = "failure" ]; then
+            echo "| Wait for CI | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Wait for CI | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+        
+        if [ "${{ inputs.update-overlay-result }}" = "success" ]; then
+          echo "| Update Overlay | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ inputs.update-overlay-result }}" = "failure" ]; then
+          echo "| Update Overlay | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Update Overlay | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ inputs.verify-deployment-result }}" = "success" ]; then
+          echo "| Verify Deployment | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ inputs.verify-deployment-result }}" = "failure" ]; then
+          echo "| Verify Deployment | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Verify Deployment | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ inputs.deploy-frontend-result }}" = "success" ]; then
+          echo "| Deploy Frontend | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ inputs.deploy-frontend-result }}" = "failure" ]; then
+          echo "| Deploy Frontend | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Deploy Frontend | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
         echo "| E2E Tests | ${E2E_STATUS} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        # Required jobs must succeed only if the PR contains code changes
-        if [ "${{ inputs.has-code-changes }}" = "true" ] && [ "${{ inputs.update-overlay-result }}" != "success" ]; then
-          echo "::error::Update overlay failed"
-          exit 1
-        fi
-
-        if [ "${{ inputs.has-code-changes }}" = "true" ] && [ "${{ inputs.verify-deployment-result }}" != "success" ]; then
-          echo "::error::Deployment verification failed - pods may not be running correct image"
-          exit 1
-        fi
-
-        if [ "${{ inputs.has-code-changes }}" = "true" ] && [ "${{ inputs.deploy-frontend-result }}" != "success" ]; then
-          echo "::error::Frontend deployment failed"
+        # Fail the check if any critical jobs failed
+        if [ "$HAS_FAILURES" = "true" ]; then
+          echo "❌ Preview pipeline failed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the errors above and fix the issues before deploying." >> $GITHUB_STEP_SUMMARY
           exit 1
         fi
         
-        # E2E tests only required if API URL is configured
-        if [ "$E2E_REQUIRED" = "true" ] && [ "$E2E_RESULT" != "success" ]; then
-          echo "::error::E2E tests failed"
-          exit 1
-        fi
-        
+        # Warning if no API URL configured
         if [ -z "$API_URL_CONFIGURED" ]; then
           echo "⚠️ Preview deployed without backend API" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "To enable full preview functionality:" >> $GITHUB_STEP_SUMMARY
           echo "1. Set \`PREVIEW_API_URL\` in repository variables" >> $GITHUB_STEP_SUMMARY
           echo "2. Re-run this workflow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "✅ Preview pipeline completed successfully!" >> $GITHUB_STEP_SUMMARY

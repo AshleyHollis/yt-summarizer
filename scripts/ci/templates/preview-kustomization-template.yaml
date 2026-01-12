@@ -13,7 +13,7 @@ metadata:
 namespace: preview-pr-__PR_NUMBER__
 
 resources:
-  - ../../base
+  - ../../base-preview
   - resource-quota.yaml
   - limit-range.yaml
 
@@ -29,9 +29,10 @@ patches:
   - path: patches/externalsecret-db-patch.yaml
   - path: patches/externalsecret-openai-patch.yaml
   - path: patches/externalsecret-storage-patch.yaml
-  - path: patches/secretstore-delete-patch.yaml
   - path: patches/configmap-patch.yaml
-  - path: patches/ingress-patch.yaml
+  - path: patches/api-deployment-patch.yaml
+  - path: patches/ingress-delete-patch.yaml
+  - path: patches/httproute-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
   - path: patches/migration-job-patch.yaml

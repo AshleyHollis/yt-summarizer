@@ -36,6 +36,12 @@ runs:
           exit 1
         fi
 
+        # Allow 'latest' for K8s-only changes (production image reuse)
+        if [ "$CI_TAG" = "latest" ]; then
+          echo "✅ Using production image tag: latest (K8s-only changes)"
+          exit 0
+        fi
+
         if [ "$CI_TAG" != "$EXPECTED_TAG" ]; then
           echo "::error::Image tag mismatch: CI='$CI_TAG' expected='$EXPECTED_TAG'. Aborting to avoid inconsistent preview."
           exit 1

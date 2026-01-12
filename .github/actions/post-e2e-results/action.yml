@@ -1,5 +1,5 @@
 name: Post E2E Test Results
-description: Post or update E2E test results comment on PR
+description: Post or update E2E test results comment on PR with detailed information
 
 inputs:
   github-token:
@@ -32,17 +32,53 @@ runs:
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const status = '${{ inputs.test-outcome }}' === 'success' ? '✅ Passed' : '❌ Failed';
-          const emoji = '${{ inputs.test-outcome }}' === 'success' ? '✅' : '❌';
+          const outcome = '${{ inputs.test-outcome }}';
+          const isSuccess = outcome === 'success';
+          const status = isSuccess ? '✅ All Tests Passed' : '❌ Tests Failed';
+          const emoji = isSuccess ? '✅' : '❌';
+          const headerEmoji = isSuccess ? '🎉' : '⚠️';
           const reportUrl = `https://github.com/${{ inputs.repository }}/actions/runs/${{ inputs.run-id }}`;
+          const artifactUrl = `https://github.com/${{ inputs.repository }}/actions/runs/${{ inputs.run-id }}#artifacts`;
+          const commitSha = '${{ inputs.commit-sha }}';
           
-          const body = `## ${emoji} E2E Test Results\n\n` +
+          let body = `## ${headerEmoji} E2E Test Results\n\n`;
+          
+          if (isSuccess) {
+            body += `All end-to-end tests passed successfully! ✨\n\n`;
+          } else {
+            body += `Some tests failed. Please review the test report for details.\n\n`;
+          }
+          
+          body += `### 📊 Test Summary\n\n` +
             `| Property | Value |\n` +
             `|----------|-------|\n` +
             `| **Status** | ${status} |\n` +
-            `| **Environment** | ${{ inputs.preview-url }} |\n` +
-            `| **Commit** | \`${{ inputs.commit-sha }}\` |\n\n` +
-            `[📊 View Playwright Report](${reportUrl})`;
+            `| **Environment** | [${{ inputs.preview-url }}](${{ inputs.preview-url }}) |\n` +
+            `| **Commit** | [\`${commitSha.substring(0, 7)}\`](https://github.com/${{ inputs.repository }}/commit/${commitSha}) |\n\n`;
+          
+          body += `### 🔗 Reports & Artifacts\n\n` +
+            `- 📋 [View Workflow Logs](${reportUrl})\n` +
+            `- 📦 [Download Playwright Report](${artifactUrl})\n\n`;
+          
+          if (!isSuccess) {
+            body += `### 🔍 Debugging Tips\n\n` +
+              `<details>\n` +
+              `<summary>Click to expand troubleshooting steps</summary>\n\n` +
+              `1. **Download the Playwright report** from the artifacts link above\n` +
+              `2. **Check the test logs** in the workflow run for specific failures\n` +
+              `3. **Verify the preview environment** is healthy:\n` +
+              `   \`\`\`bash\n` +
+              `   curl -s ${{ inputs.preview-url }}/health/ready | jq\n` +
+              `   \`\`\`\n` +
+              `4. **Run tests locally** with:\n` +
+              `   \`\`\`bash\n` +
+              `   cd apps/web\n` +
+              `   USE_EXTERNAL_SERVER=true BASE_URL=${{ inputs.preview-url }} npx playwright test\n` +
+              `   \`\`\`\n` +
+              `</details>\n\n`;
+          }
+          
+          body += `---\n_E2E tests run on every preview deployment to catch integration issues early._`;
           
           // Find existing E2E comment to update
           const { data: comments } = await github.rest.issues.listComments({
@@ -63,6 +99,7 @@ runs:
               comment_id: e2eComment.id,
               body: body
             });
+            console.log('Updated existing E2E comment');
           } else {
             await github.rest.issues.createComment({
               issue_number: ${{ inputs.pr-number }},
@@ -70,4 +107,31 @@ runs:
               repo: context.repo.repo,
               body: body
             });
+            console.log('Created new E2E comment');
           }
+
+    - name: Create E2E summary
+      shell: bash
+      run: |
+        OUTCOME="${{ inputs.test-outcome }}"
+        if [ "$OUTCOME" = "success" ]; then
+          echo "## ✅ E2E Tests Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All end-to-end tests completed successfully!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ❌ E2E Tests Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Some tests failed. Check the Playwright report artifact for details." >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Environment" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Preview URL** | ${{ inputs.preview-url }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Commit** | \`${{ inputs.commit-sha }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 **Playwright Report**: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY

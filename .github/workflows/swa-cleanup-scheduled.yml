@@ -1,0 +1,64 @@
+# =============================================================================
+# Scheduled SWA Environment Cleanup
+# =============================================================================
+# Runs daily to clean up stale Azure Static Web Apps staging environments
+# for PRs that have been closed/merged
+#
+# Uses Azure CLI to list and delete environments by matching build metadata
+# to closed PRs.
+
+name: SWA Cleanup (Scheduled)
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run mode (report only, no deletions)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  cleanup-stale-environments:
+    name: Cleanup Stale SWA Environments
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Cleanup stale SWA environments
+        id: cleanup
+        uses: ./.github/actions/cleanup-stale-swa-environments
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          swa-name: ${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          dry-run: ${{ github.event.inputs.dry-run || 'false' }}
+          min-age-hours: '168'  # 7 days
+          max-prs-to-check: '100'
+      
+      - name: Report cleanup results
+        if: always()
+        run: |
+          if [[ "${{ steps.cleanup.outputs.deleted-count }}" != "0" ]]; then
+            echo "✅ Cleaned up ${{ steps.cleanup.outputs.deleted-count }} stale environment(s)"
+            echo "💡 Deleted environments for PRs: ${{ steps.cleanup.outputs.stale-prs }}"
+          else
+            echo "✅ No stale environments found or all cleanup completed"
+          fi

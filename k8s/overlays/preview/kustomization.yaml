@@ -1,26 +1,27 @@
 # Preview overlay - updated by GitHub Actions
-# PR: #4
-# Image Tag: pr-4-d93cb45
-# Commit: d93cb45551755a76218607f3105a8f63635550cb
-# Updated: 2026-01-11T10:43:14Z
+# PR: #6
+# Image Tag: pr-6-bc2f7d4
+# Commit: bc2f7d41cb6caa43c440c58071381b0e893fbcf3
+# Updated: 2026-01-12T01:17:57Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 metadata:
   annotations:
     config.kubernetes.io/local-config: "true"
-namespace: preview-pr-4
+namespace: preview-pr-6
 resources:
-  - ../../base
+  - ../../base-preview
   - resource-quota.yaml
   - limit-range.yaml
 patches:
   - path: patches/externalsecret-db-patch.yaml
   - path: patches/externalsecret-openai-patch.yaml
   - path: patches/externalsecret-storage-patch.yaml
-  - path: patches/secretstore-delete-patch.yaml
   - path: patches/configmap-patch.yaml
-  - path: patches/ingress-patch.yaml
+  - path: patches/api-deployment-patch.yaml
+  - path: patches/ingress-delete-patch.yaml
+  - path: patches/httproute-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
   - path: patches/migration-job-patch.yaml
@@ -28,8 +29,8 @@ images:
   - 
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: pr-4-d93cb45
+    newTag: pr-6-bc2f7d4
   - 
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: pr-4-d93cb45
+    newTag: pr-6-bc2f7d4

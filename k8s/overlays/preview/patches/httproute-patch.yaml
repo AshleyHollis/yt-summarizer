@@ -1,0 +1,15 @@
+# HTTPRoute patch for preview environment
+# Placeholders are substituted by GitHub Actions workflow
+# Only patches hostname and annotations, preserves rules from base
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-httproute
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: api-pr-6.yt-summarizer.apps.ashleyhollis.com
+spec:
+  hostnames:
+  - "api-pr-6.yt-summarizer.apps.ashleyhollis.com"
+  # Rules are inherited from base (PathPrefix: /)
+  # This patch only updates the hostname for the preview environment

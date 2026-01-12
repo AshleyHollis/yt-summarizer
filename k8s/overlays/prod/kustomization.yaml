@@ -20,6 +20,7 @@ images:
 patches:
 - path: patches/configmap-patch.yaml
 - path: patches/ingress-patch.yaml
+- path: patches/httproute-patch.yaml
 - target:
     group: apps
     version: v1

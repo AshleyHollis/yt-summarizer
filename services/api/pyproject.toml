@@ -18,7 +18,11 @@ dependencies = [
     "tenacity>=9.0.0",
     "httpx>=0.27.0",
     "yt-dlp>=2024.12.6",
-    "agent-framework",
+    "youtube-transcript-api>=0.6.2",  # For fetching YouTube transcripts
+    # Agent Framework - pinned to compatible versions to avoid import errors
+    # agent-framework-ag-ui 1.0.0b260107 requires agent-framework with use_instrumentation
+    "agent-framework>=1.0.0b260107",  # Ensure we get latest with required features
+    "agent-framework-ag-ui>=1.0.0b260107",
     # OpenTelemetry for observability (T185)
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
@@ -71,3 +75,17 @@ markers = [
 # By default, run all tests except live E2E tests (which require infrastructure)
 addopts = "-m 'not live'"
 
+[tool.deptry]
+# Dependency checker configuration - catches missing/unused dependencies
+# See: https://deptry.com/
+extend_exclude = ["tests", "test_.*"]
+
+[tool.deptry.per_rule_ignores]
+# DEP002: Missing dependencies in pyproject.toml
+# These are handled by mapping import names to package names
+DEP002 = ["azure", "opentelemetry"]  # Multi-package namespaces
+
+[tool.bandit]
+# Security scanner configuration
+exclude_dirs = ["tests", "test_.*", ".venv", "venv"]
+skips = ["B101"]  # Skip assert_used (used in tests)

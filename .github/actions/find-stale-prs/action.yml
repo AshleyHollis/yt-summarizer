@@ -1,0 +1,88 @@
+name: Find Stale PRs
+description: Identifies closed PRs that may have stale SWA staging environments
+
+inputs:
+  github-token:
+    description: GitHub token for API access
+    required: true
+  min-age-hours:
+    description: Minimum age in hours before a closed PR is considered stale
+    required: false
+    default: '1'
+  max-prs-to-check:
+    description: Maximum number of closed PRs to check
+    required: false
+    default: '100'
+
+outputs:
+  stale-prs:
+    description: Comma-separated list of stale PR numbers
+    value: ${{ steps.find.outputs.stale_prs }}
+  stale-count:
+    description: Number of stale PRs found
+    value: ${{ steps.find.outputs.stale_count }}
+
+runs:
+  using: composite
+  steps:
+    - name: Find stale PRs
+      id: find
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        MIN_AGE_HOURS: ${{ inputs.min-age-hours }}
+        MAX_PRS: ${{ inputs.max-prs-to-check }}
+      run: |
+        set -euo pipefail
+        
+        echo "🔍 Finding stale PRs (closed > ${MIN_AGE_HOURS}h ago)..."
+        
+        # Get all open PRs
+        open_prs=$(gh pr list --state open --json number --jq '.[].number' | tr '\n' ' ' || echo "")
+        echo "📋 Currently open PRs: ${open_prs:-none}"
+        
+        # Create associative array for fast lookup
+        declare -A active_prs
+        for pr in $open_prs; do
+          active_prs[$pr]=1
+        done
+        
+        # Get recently closed PRs
+        echo "📋 Checking last ${MAX_PRS} closed PRs..."
+        closed_prs=$(gh pr list --state closed --limit ${MAX_PRS} --json number,closedAt \
+          --jq '.[] | select(.closedAt != null) | "\(.number)|\(.closedAt)"' || echo "")
+        
+        # Find stale PRs
+        stale_prs=()
+        current_time=$(date +%s)
+        min_age_seconds=$((MIN_AGE_HOURS * 3600))
+        
+        while IFS='|' read -r pr_number closed_at; do
+          [[ -z "$pr_number" ]] && continue
+          [[ -v active_prs[$pr_number] ]] && continue
+          
+          # Calculate age
+          closed_timestamp=$(date -d "$closed_at" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$closed_at" +%s 2>/dev/null || echo "0")
+          age_seconds=$((current_time - closed_timestamp))
+          
+          # Only include if older than minimum age
+          if [[ $age_seconds -ge $min_age_seconds ]]; then
+            age_hours=$((age_seconds / 3600))
+            echo "  ✓ PR #$pr_number (closed ${age_hours}h ago)"
+            stale_prs+=("$pr_number")
+          fi
+        done <<< "$closed_prs"
+        
+        # Output results
+        stale_count=${#stale_prs[@]}
+        echo "stale_count=$stale_count" >> $GITHUB_OUTPUT
+        
+        if [[ $stale_count -gt 0 ]]; then
+          stale_list=$(IFS=,; echo "${stale_prs[*]}")
+          echo "stale_prs=$stale_list" >> $GITHUB_OUTPUT
+          echo ""
+          echo "🗑️  Found $stale_count stale PR(s): $stale_list"
+        else
+          echo "stale_prs=" >> $GITHUB_OUTPUT
+          echo "✅ No stale PRs found"
+        fi

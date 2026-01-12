@@ -1,0 +1,104 @@
+# Scan JavaScript/TypeScript Dependencies and Quality
+# Checks for missing deps, vulnerabilities, and code quality issues
+# Uses: npm audit, depcheck, eslint
+
+name: 'Scan JavaScript Dependencies and Quality'
+description: 'Scan JavaScript/TypeScript for missing dependencies and security issues'
+
+inputs:
+  working-directory:
+    description: 'Directory containing package.json (e.g., apps/web)'
+    required: true
+  check-missing-deps:
+    description: 'Check for missing dependencies using depcheck'
+    required: false
+    default: 'true'
+  check-security:
+    description: 'Run npm audit for security vulnerabilities'
+    required: false
+    default: 'true'
+  audit-level:
+    description: 'Minimum severity level for npm audit (low, moderate, high, critical)'
+    required: false
+    default: 'high'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install scanning tools
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        npm install -g depcheck
+
+    - name: Check for missing dependencies with depcheck
+      if: inputs.check-missing-deps == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "════════════════════════════════════════════════════════════════"
+        echo "🔍 JavaScript Dependency Scan (depcheck)"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+        
+        if depcheck --ignores="@types/*,eslint-*,prettier,typescript,vitest,playwright"; then
+          echo ""
+          echo "✅ No dependency issues detected"
+        else
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo "⚠️  DEPENDENCY ISSUES DETECTED"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📋 Action Required:"
+          echo "   Review missing/unused packages above"
+          echo "   Update package.json accordingly"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          exit 1
+        fi
+
+    - name: Run npm audit for security vulnerabilities
+      if: inputs.check-security == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo ""
+        echo "════════════════════════════════════════════════════════════════"
+        echo "🔒 Security Vulnerability Scan (npm audit)"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+        
+        if npm audit --audit-level=${{ inputs.audit-level }}; then
+          echo ""
+          echo "✅ No security vulnerabilities detected"
+        else
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo "⚠️  SECURITY VULNERABILITIES FOUND"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📋 Action Required:"
+          echo "   1. Review the vulnerability report above"
+          echo "   2. Run 'npm audit fix' to auto-fix where possible"
+          echo "   3. For breaking changes, use 'npm audit fix --force'"
+          echo "   4. Update package.json for manual updates"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          exit 1
+        fi
+
+    - name: Verify no missing peer dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "🔍 Checking peer dependencies..."
+        npm ls --depth=0 || {
+          echo "⚠️  Peer dependency issues detected"
+          exit 1
+        }
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "✅ JavaScript dependency scan complete"

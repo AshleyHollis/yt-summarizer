@@ -143,6 +143,23 @@ if (-not $envCredExists) {
     Write-Host "  Environment credential already exists" -ForegroundColor Yellow
 }
 
+# Repo-wide credential (for workflow_dispatch from any branch)
+$repoCredName = "github-repo"
+$repoCredExists = $existingCreds | Where-Object { $_.name -eq $repoCredName }
+if (-not $repoCredExists) {
+    $repoCredential = @{
+        name = $repoCredName
+        issuer = "https://token.actions.githubusercontent.com"
+        subject = "repo:${GitHubOrg}/${GitHubRepo}"
+        audiences = @("api://AzureADTokenExchange")
+    } | ConvertTo-Json -Compress
+
+    az ad app federated-credential create --id $clientId --parameters $repoCredential
+    Write-Host "  [OK] Created credential for repo-wide access" -ForegroundColor Green
+} else {
+    Write-Host "  Repo-wide credential already exists" -ForegroundColor Yellow
+}
+
 # Assign Contributor role on subscription
 Write-Host "Assigning Contributor role on subscription..." -ForegroundColor Yellow
 $roleAssignments = az role assignment list --assignee $clientId --scope "/subscriptions/$SubscriptionId" 2>$null | ConvertFrom-Json

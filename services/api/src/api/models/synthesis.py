@@ -183,7 +183,7 @@ class SynthesizeResponse(BaseResponse):
 
 
 # Import QueryScope for type hint - must be at bottom to avoid circular import
-from .copilot import QueryScope
+from .copilot import QueryScope  # noqa: E402
 
 # Update forward reference
 SynthesizeRequest.model_rebuild()

@@ -1,9 +1,20 @@
 # =============================================================================
-# CI Workflow - Automated Testing on Pull Request
+# CI Workflow - Automated Testing and Image Building
 # =============================================================================
-# Runs all tests when a PR is created or updated
-# Builds Docker images to validate Dockerfile and catch build errors
-# User Story 1: Automated Testing on PR
+# TRIGGERS: PR opened/updated, push to main, manual dispatch
+#
+# EXECUTION FLOWS:
+# 1. Code Changes → Lint → Test → Build Images (if ACR configured)
+# 2. K8s Only Changes → Validate manifests (no images built)
+# 3. Docs/CI Changes → Validate YAML/workflows (no tests or builds)
+# 4. No ACR → Validate builds without push
+#
+# KEY PATTERN - always() for conditional dependencies:
+#   Jobs with always() run even when dependencies skip/fail
+#   Used when job needs to evaluate complex conditions based on multiple dependency results
+#   Downstream jobs depending on always() jobs must also use always() + check result
+#
+# =============================================================================
 
 name: CI
 
@@ -30,9 +41,15 @@ defaults:
     shell: bash -e {0}  # Exit immediately if any command fails
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Detect Changes - Smart pipeline execution
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # PHASE 1: CHANGE DETECTION
+  # ===========================================================================
+  # Analyzes PR diff to determine what changed, enabling smart job execution
+  # Outputs:
+  #   - changed_areas: Space-separated list (e.g., "services/api k8s")
+  #   - has_code_changes: Boolean for security scanning
+  # Used by all subsequent jobs to decide if they should run
+  # ===========================================================================
   detect-changes:
     name: Detect Changes
     runs-on: ubuntu-latest
@@ -49,9 +66,14 @@ jobs:
         id: changes
         uses: ./.github/actions/detect-pipeline-changes
 
-  # ---------------------------------------------------------------------------
-  # Linting
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # PHASE 2: LINTING
+  # ===========================================================================
+  # Runs only when relevant code areas change
+  # Python: services/api, services/workers, services/shared
+  # Frontend: apps/web
+  # Blocks tests if lint fails (fail-fast pattern)
+  # ===========================================================================
   lint-python:
     name: Lint Python
     runs-on: ubuntu-latest
@@ -92,22 +114,115 @@ jobs:
         working-directory: apps/web
         run: npm run lint
 
-  # ---------------------------------------------------------------------------
-  # Python Tests
-  # ---------------------------------------------------------------------------
-  # BEST PRACTICE: Job conditions check changed_areas directly
-  # - Use contains() to check if relevant area changed
-  # - Combine multiple areas with || for OR logic
-  # - Enforce fail-fast by checking lint result (no always())
-  # Example: API tests run if services/api OR services/shared changed
-  # ---------------------------------------------------------------------------
-  test-shared:
-    name: Test Shared Package
+  # ===========================================================================
+  # PHASE 3: SECURITY SCANNING
+  # ===========================================================================
+  # Runs after linting passes, before tests
+  # Provides security feedback early in pipeline
+  # Scans: bandit (code security), pip-audit (dependency vulnerabilities), deptry (dependency consistency)
+  # ===========================================================================
+  scan-python-security:
+    name: Scan Python Security
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python]
     if: |
-      contains(needs.detect-changes.outputs.changed_areas, 'services/shared') &&
+      (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          service-package: services/api
+
+      - name: Scan API security
+        if: contains(needs.detect-changes.outputs.changed_areas, 'services/api')
+        uses: ./.github/actions/scan-python-security
+        with:
+          service-path: services/api
+          check-security: 'true'
+          check-types: 'false'
+
+      - name: Scan Workers security
+        if: contains(needs.detect-changes.outputs.changed_areas, 'services/workers')
+        uses: ./.github/actions/scan-python-security
+        with:
+          service-path: services/workers
+          check-security: 'true'
+          check-types: 'false'
+
+      - name: Validate API dependencies
+        if: contains(needs.detect-changes.outputs.changed_areas, 'services/api')
+        uses: ./.github/actions/validate-python-dependencies
+        with:
+          service-path: services/api
+          check-missing: 'true'
+          check-unused: 'false'
+          check-security: 'true'
+          fail-on-warnings: 'false'
+
+      - name: Validate Workers dependencies
+        if: contains(needs.detect-changes.outputs.changed_areas, 'services/workers')
+        uses: ./.github/actions/validate-python-dependencies
+        with:
+          service-path: services/workers
+          check-missing: 'true'
+          check-unused: 'false'
+          check-security: 'true'
+          fail-on-warnings: 'false'
+
+  scan-javascript-security:
+    name: Scan JavaScript Security
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-frontend]
+    if: |
+      contains(needs.detect-changes.outputs.changed_areas, 'apps/web') &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          working-directory: apps/web
+
+      - name: Scan JavaScript dependencies
+        uses: ./.github/actions/scan-javascript-dependencies
+        with:
+          working-directory: apps/web
+          check-missing-deps: 'true'
+          check-security: 'true'
+          audit-level: 'high'
+
+  # ===========================================================================
+  # PHASE 4: TESTING
+  # ===========================================================================
+  # Runs only when relevant code changes
+  # Dependencies: lint AND security must pass (fail-fast)
+  # 
+  # Test Execution Rules:
+  # - test-shared: runs if services/shared changed
+  # - test-api: runs if services/api OR services/shared changed
+  # - test-workers: runs if services/workers OR services/shared changed
+  # - test-frontend: runs if apps/web changed
+  #
+  # Shared changes trigger API + Workers tests (they depend on shared code)
+  # ===========================================================================
+  test-shared:
+    name: Test Shared Package
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-python, scan-python-security]
+    if: |
+      contains(needs.detect-changes.outputs.changed_areas, 'services/shared') &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -126,10 +241,11 @@ jobs:
   test-api:
     name: Test API
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python]
+    needs: [detect-changes, lint-python, scan-python-security]
     if: |
       (contains(needs.detect-changes.outputs.changed_areas, 'services/api') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     outputs:
       test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
@@ -166,10 +282,11 @@ jobs:
   test-workers:
     name: Test Workers
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python]
+    needs: [detect-changes, lint-python, scan-python-security]
     if: |
       (contains(needs.detect-changes.outputs.changed_areas, 'services/workers') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     outputs:
       test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
@@ -202,16 +319,14 @@ jobs:
           start-time: ${{ steps.start.outputs.started_at }}
           test-name: Workers Tests
 
-  # ---------------------------------------------------------------------------
-  # Frontend Tests
-  # ---------------------------------------------------------------------------
   test-frontend:
     name: Test Frontend
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-frontend]
+    needs: [detect-changes, lint-frontend, scan-javascript-security]
     if: |
       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
+      (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -225,12 +340,16 @@ jobs:
       - name: Run Vitest
         uses: ./.github/actions/run-frontend-tests
 
-  # ---------------------------------------------------------------------------
-  # Kubernetes Validation (YAML, Kustomize, ArgoCD)
-  # ---------------------------------------------------------------------------
-  # Validates Kubernetes manifests, kustomize builds, and ArgoCD Applications
-  # to catch configuration errors before deployment.
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # PHASE 5: KUBERNETES VALIDATION
+  # ===========================================================================
+  # Runs only when k8s/ directory changes
+  # Validates:
+  #   1. YAML syntax (all manifests)
+  #   2. Kustomize builds (base + overlays)
+  #   3. ArgoCD Application paths exist
+  # Catches k8s config errors before they reach cluster
+  # ===========================================================================
   kubernetes-validate:
     name: Kubernetes Validation
     runs-on: ubuntu-latest
@@ -283,40 +402,51 @@ jobs:
         uses: ./.github/actions/validate-argocd-paths
 
 
-  # ---------------------------------------------------------------------------
-  # Build Docker Images (conditional - only when image-building changes detected)
-  # ---------------------------------------------------------------------------
-  # CRITICAL: This job ONLY runs when specific areas change that require image building.
-  # The conditions here MUST match what detect-pr-code-changes checks in preview workflow.
-  # If they don't match, preview will run but no images will be available (causing failures).
-  # ---------------------------------------------------------------------------
-  # Builds and pushes Docker images to ACR. This validates:
-  # - Dockerfile syntax and build steps
-  # - Frontend npm run build (catches TypeScript errors)
-  # - All dependencies install correctly
+  # ===========================================================================
+  # PHASE 6: IMAGE BUILDING (Conditional)
+  # ===========================================================================
+  # WHEN: Only when code requiring images changes (services/, apps/web, docker/)
+  # WHY: Avoid rebuilding images for k8s manifest or docs changes
   # 
-  # Images are pushed with tags that can be used by preview/prod workflows:
-  # - PRs: pr-<number>-<sha>
-  # - Main: sha-<sha>
-  # ---------------------------------------------------------------------------
+  # TWO-STAGE PROCESS:
+  # 1. build-images-meta: Generate image tag (pr-123-abc123f)
+  # 2. build-images: Build and push images with that tag
+  #
+  # CRITICAL always() PATTERN:
+  # - build-images-meta uses always() to run when lint/security/test jobs skip
+  # - build-images MUST also use always() + check meta result == 'success'
+  # - Without this, build-images skips even when meta succeeds
+  # 
+  # FLOW 1 (ACR configured):
+  #   Lint → Security → Tests pass → build-images-meta generates tag → build-images builds + pushes
+  # FLOW 2 (No ACR):
+  #   Lint → Security → Tests pass → build-images-validate builds without pushing (validation only)
+  # 
+  # Image Tags:
+  # - PRs: pr-<number>-<sha> (e.g., pr-42-abc123f)
+  # - Main: sha-<sha> (e.g., sha-abc123f)
+  # ===========================================================================
   build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, lint-frontend, test-shared, test-api, test-workers, test-frontend]
+    needs: [detect-changes, lint-python, lint-frontend, scan-python-security, scan-javascript-security, test-shared, test-api, test-workers, test-frontend]
     # CONDITIONAL IMAGE BUILDING: Only runs when changes require new images
     # vars.ACR_NAME != '': Azure Container Registry must be configured
     # changed_areas contains: Only these areas trigger image builds (MUST match preview workflow logic)
-    # lint and test results: Ensure code passes basic checks before building images
+    # lint, security, and test results: Ensure code passes all checks before building images
+    # always(): Run even if some dependencies were skipped, then check their results
     if: |
+      always() &&
       vars.ACR_NAME != '' &&
       (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'k8s')) &&
+       contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped') &&
+      (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped') &&
       (needs.test-shared.result == 'success' || needs.test-shared.result == 'skipped') &&
       (needs.test-api.result == 'success' || needs.test-api.result == 'skipped') &&
       (needs.test-workers.result == 'success' || needs.test-workers.result == 'skipped') &&
@@ -355,14 +485,19 @@ jobs:
     name: Build Images (parallel)
     runs-on: ubuntu-latest
     needs: [detect-changes, build-images-meta]
+    # CRITICAL always() dependency:
+    # - build-images-meta uses always() so it runs when frontend tests skip
+    # - This job MUST use always() + check meta result, or it will skip
+    # - GitHub Actions won't run jobs depending on always() jobs unless they also use always()
     if: |
+      always() &&
+      needs.build-images-meta.result == 'success' &&
       vars.ACR_NAME != '' &&
       (contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'k8s'))
+       contains(needs.detect-changes.outputs.changed_areas, 'docker'))
     strategy:
       matrix:
         include:
@@ -395,10 +530,12 @@ jobs:
           push: true
 
 
-  # Build Docker Images (Validation Only - No Push)
   # ---------------------------------------------------------------------------
-  # When ACR is not configured, still validate that Docker images build
-  # This catches Dockerfile errors without requiring Azure credentials
+  # BUILD VALIDATION (No ACR)
+  # ---------------------------------------------------------------------------
+  # FLOW: No ACR configured → Build images locally without pushing
+  # PURPOSE: Validate Dockerfiles work without requiring Azure credentials
+  # WHEN: ACR_NAME is empty AND code changes require images
   # ---------------------------------------------------------------------------
   build-images-validate:
     name: Build Images (Validate - parallel)
@@ -432,19 +569,20 @@ jobs:
           image-tag: validate
           push: false
 
-  # ---------------------------------------------------------------------------
-  # E2E Tests - Run against Preview Environment
-  # ---------------------------------------------------------------------------
-  # NOTE: E2E tests are designed to run against PR preview environments,
-  # not in CI with docker-compose. This will be enabled once preview
-  # environments are configured via Argo CD ApplicationSets.
-  #
-  # For local E2E testing, use: npm run e2e (with Aspire running)
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # E2E TESTING - Runs in Preview Workflow
+  # ===========================================================================
+  # E2E tests run against live preview environments (preview.yml workflow)
+  # Not run in CI because they require full deployed environment
+  # Local testing: npm run e2e (with Aspire running)
+  # ===========================================================================
 
-  # ---------------------------------------------------------------------------
-  # Infrastructure Validation
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # PHASE 6: INFRASTRUCTURE VALIDATION
+  # ===========================================================================
+  # Terraform: Validates HCL syntax and plan (when infra/terraform/ changes)
+  # Kustomize: Validates base and overlays build correctly (always runs)
+  # ===========================================================================
   validate-terraform:
     name: Validate Terraform
     runs-on: ubuntu-latest
@@ -487,9 +625,12 @@ jobs:
           overlay-path: k8s/overlays/prod
           overlay-name: prod
 
-  # ---------------------------------------------------------------------------
-  # Security Scanning
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # PHASE 7: SECURITY SCANNING
+  # ===========================================================================
+  # Runs gitleaks to detect secrets in code
+  # Only runs when has_code_changes == true (skips for pure k8s/docs changes)
+  # ===========================================================================
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
@@ -507,19 +648,33 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
-  # ---------------------------------------------------------------------------
-  # Final Status Check
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # PHASE 8: FINAL STATUS CHECK
+  # ===========================================================================
+  # always() ensures this runs regardless of job results
+  # Validates that:
+  #   1. Required jobs ran (based on changed_areas)
+  #   2. All jobs that ran passed (result == 'success')
+  #   3. Jobs that should skip did skip (result == 'skipped')
+  # 
+  # Replicates job conditions to ensure pipeline executed correctly
+  # Fails if expected jobs didn't run or ran when they shouldn't
+  # ===========================================================================
   ci-status:
     name: CI Status
     runs-on: ubuntu-latest
     needs:
       - detect-changes
+      - lint-python
+      - lint-frontend
+      - scan-python-security
+      - scan-javascript-security
       - test-shared
       - test-api
       - test-workers
       - test-frontend
       - build-images
+      - build-images-meta
       - build-images-validate
       - validate-terraform
       - validate-kustomize
@@ -529,6 +684,32 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Create CI Summary
+        uses: ./.github/actions/create-ci-summary
+        with:
+          changed-areas: ${{ needs.detect-changes.outputs.changed_areas }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          pr-number: ${{ github.event.pull_request.number }}
+          lint-python-result: ${{ needs.lint-python.result }}
+          lint-frontend-result: ${{ needs.lint-frontend.result }}
+          scan-python-security-result: ${{ needs.scan-python-security.result }}
+          scan-javascript-security-result: ${{ needs.scan-javascript-security.result }}
+          secret-scanning-result: ${{ needs.secret-scanning.result }}
+          test-shared-result: ${{ needs.test-shared.result }}
+          test-shared-duration: ${{ needs.test-shared.outputs.test_duration }}
+          test-api-result: ${{ needs.test-api.result }}
+          test-api-duration: ${{ needs.test-api.outputs.test_duration }}
+          test-workers-result: ${{ needs.test-workers.result }}
+          test-workers-duration: ${{ needs.test-workers.outputs.test_duration }}
+          test-frontend-result: ${{ needs.test-frontend.result }}
+          kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
+          validate-kustomize-result: ${{ needs.validate-kustomize.result }}
+          validate-terraform-result: ${{ needs.validate-terraform.result }}
+          build-images-result: ${{ needs.build-images.result }}
+          image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.run_id }}
 
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results
@@ -545,4 +726,5 @@ jobs:
           secret-scanning-should-run: ${{ needs.detect-changes.outputs.has_code_changes }}
           build-images-result: ${{ needs.build-images.result }}
           build-images-validate-result: ${{ needs.build-images-validate.result }}
+          acr-configured: ${{ vars.ACR_NAME != '' }}
 

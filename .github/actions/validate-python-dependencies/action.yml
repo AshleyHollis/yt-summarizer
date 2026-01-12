@@ -1,0 +1,138 @@
+# Validate Python Dependencies
+# Scans codebase for missing/unused/vulnerable dependencies
+# Uses industry-standard tools: deptry, pip-audit, pipdeptree
+
+name: 'Validate Python Dependencies'
+description: 'Scan for missing dependencies, unused dependencies, and security vulnerabilities'
+
+inputs:
+  service-path:
+    description: 'Path to the service directory (e.g., services/api)'
+    required: true
+  check-missing:
+    description: 'Check for missing dependencies (imports not in pyproject.toml)'
+    required: false
+    default: 'true'
+  check-unused:
+    description: 'Check for unused dependencies (in pyproject.toml but never imported)'
+    required: false
+    default: 'false'
+  check-security:
+    description: 'Check for security vulnerabilities in dependencies'
+    required: false
+    default: 'true'
+  fail-on-warnings:
+    description: 'Fail if warnings are found'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dependency scanning tools
+      shell: bash
+      run: |
+        pip install deptry pip-audit pipdeptree
+
+    - name: Display dependency tree
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      run: |
+        echo "════════════════════════════════════════════════════════════════"
+        echo "📦 Dependency Tree (pipdeptree - first 50 lines)"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+        pipdeptree --python $(which python) 2>/dev/null | head -n 50 || true
+        echo ""
+        echo "(Output truncated for readability)"
+
+    - name: Check for missing dependencies with deptry
+      if: inputs.check-missing == 'true'
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      run: |
+        echo "════════════════════════════════════════════════════════════════"
+        echo "🔍 Scanning for Missing Dependencies (deptry)"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+        
+        # Auto-detect source directory
+        if [ -d "src" ]; then
+          SRC_DIR="src"
+        else
+          SRC_DIR="."
+        fi
+        
+        echo "📁 Source directory: $SRC_DIR"
+        echo ""
+        
+        # Ignore DEP003 (transitive dependencies) for editable local packages
+        # Ignore DEP002 (unused deps) for dev/test/infrastructure packages
+        if deptry "$SRC_DIR" --extend-exclude "test.*" --ignore DEP003,DEP002; then
+          echo ""
+          echo "✅ No missing dependencies detected"
+        else
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo "❌ MISSING DEPENDENCIES DETECTED"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📋 Action Required:"
+          echo "   Add the packages listed above to pyproject.toml"
+          echo "   under [project.dependencies]"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          exit 1
+        fi
+
+    - name: Check for unused dependencies with deptry
+      if: inputs.check-unused == 'true'
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      continue-on-error: ${{ inputs.fail-on-warnings == 'false' }}
+      run: |
+        echo "🔍 Scanning for unused dependencies..."
+        deptry src --extend-exclude "test.*" --ignore-obsolete DEP004 || {
+          echo "⚠️  UNUSED DEPENDENCIES DETECTED"
+          echo "Consider removing unused packages from pyproject.toml"
+          exit 1
+        }
+
+    - name: Check for security vulnerabilities with pip-audit
+      if: inputs.check-security == 'true'
+      shell: bash
+      working-directory: ${{ inputs.service-path }}
+      continue-on-error: ${{ inputs.fail-on-warnings == 'false' }}
+      run: |
+        echo ""
+        echo "════════════════════════════════════════════════════════════════"
+        echo "🔒 Security Vulnerability Scan (pip-audit)"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+        
+        if pip-audit --desc --skip-editable; then
+          echo ""
+          echo "✅ No security vulnerabilities detected"
+        else
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo "⚠️  SECURITY VULNERABILITIES FOUND"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📋 Action Required:"
+          echo "   1. Review the vulnerability report above"
+          echo "   2. Update affected packages in pyproject.toml"
+          echo "   3. Run 'uv sync' to update lock file"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          exit 1
+        fi
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "✅ Dependency validation complete"
+        echo "Checks performed:"
+        echo "  - Missing dependencies: ${{ inputs.check-missing }}"
+        echo "  - Unused dependencies: ${{ inputs.check-unused }}"
+        echo "  - Security vulnerabilities: ${{ inputs.check-security }}"
