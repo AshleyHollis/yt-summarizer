@@ -13,6 +13,43 @@ metadata:
     app.kubernetes.io/name: yt-summarizer
     app.kubernetes.io/component: preview
     app.kubernetes.io/part-of: yt-summarizer
+# =============================================================================
+# Argo CD ApplicationSet - Preview Environments
+# =============================================================================
+# Uses Pull Request Generator to automatically create preview apps for open PRs
+# Overlay files live in the PR branch itself (k8s/overlays/preview/)
+#
+# AUTHENTICATION OPTIONS:
+#
+# Option 1: GitHub App (RECOMMENDED - no expiration, higher rate limits)
+#   1. Create GitHub App: scripts/github-app-argocd-manifest.json
+#   2. Install app on repository
+#   3. Create secret:
+#      kubectl create secret generic github-app -n argocd \
+#        --from-literal=appID=<APP_ID> \
+#        --from-literal=installationID=<INSTALLATION_ID> \
+#        --from-file=privateKey=<app-private-key.pem>
+#   4. Use: appSecretName: github-app
+#
+# Option 2: GitHub PAT with External Secrets (auto-rotation via Key Vault)
+#   1. Store PAT in Azure Key Vault
+#   2. Apply: k8s/argocd/github-token-externalsecret.yaml
+#   3. Use: tokenRef (as configured below)
+#
+# Option 3: GitHub PAT (manual rotation - NOT RECOMMENDED)
+#   kubectl create secret generic github-token -n argocd \
+#     --from-literal=token=<YOUR_GITHUB_PAT>
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: yt-summarizer-previews
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/component: preview
+    app.kubernetes.io/part-of: yt-summarizer
 spec:
   # Pull Request Generator discovers open PRs targeting main
   generators:
@@ -20,10 +57,18 @@ spec:
         github:
           owner: AshleyHollis
           repo: yt-summarizer
-          # GitHub token for API access (create secret: kubectl create secret generic github-token -n argocd --from-literal=token=<YOUR_GITHUB_PAT>)
+          
+          # AUTHENTICATION: Choose ONE of the following:
+          
+          # GitHub App (recommended - no expiration, 5000 req/hour)
+          # Uncomment when GitHub App is configured:
+          # appSecretName: github-app
+          
+          # GitHub PAT (current - requires rotation, 60 req/hour)
           tokenRef:
             secretName: github-token
             key: token
+          
           # Optional: filter by labels
           # labels:
           #   - preview
