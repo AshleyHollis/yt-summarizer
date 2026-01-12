@@ -208,23 +208,36 @@ jobs:
             fi
           done
           
-          # If no code changes found in PR, fallback to production tag
+          # If no code changes found in PR, find most recent image from main branch
           if [ -z "$FOUND_IMAGE_TAG" ]; then
             echo "⚠️  No code changes found in PR history"
-            echo "📦 Falling back to production image tag from main branch"
+            echo "📦 Falling back to most recent main branch image"
             
+            # Fetch main branch and walk its history to find last code change
             git fetch origin main
-            git checkout origin/main -- k8s/overlays/prod/kustomization.yaml
+            git checkout origin/main
             
-            PROD_TAG=$(grep -oP 'newTag: \K.*' k8s/overlays/prod/kustomization.yaml | head -1)
+            MAIN_COMMITS=$(git rev-list --max-count=50 HEAD)
             
-            if [ -z "$PROD_TAG" ]; then
-              echo "::error::Could not find production image tag"
+            for commit in $MAIN_COMMITS; do
+              SHORT_SHA=$(git rev-parse --short=7 "$commit")
+              
+              # Check if this commit changed code areas
+              CHANGED_FILES=$(git diff-tree --no-commit-tree --name-only -r -m "$commit" 2>/dev/null || true)
+              
+              if echo "$CHANGED_FILES" | grep -qE '^(services/api|services/workers|services/shared|apps/web|docker)/'; then
+                # Main branch uses sha-<sha> tag format
+                FOUND_IMAGE_TAG="sha-${SHORT_SHA}"
+                echo "✅ Found main branch code change at commit $SHORT_SHA"
+                echo "   Using image tag: $FOUND_IMAGE_TAG"
+                break
+              fi
+            done
+            
+            if [ -z "$FOUND_IMAGE_TAG" ]; then
+              echo "::error::Could not find any code changes in main branch history"
               exit 1
             fi
-            
-            echo "✅ Using production tag: $PROD_TAG"
-            FOUND_IMAGE_TAG="$PROD_TAG"
           fi
           
           echo "image_tag=$FOUND_IMAGE_TAG" >> $GITHUB_OUTPUT
