@@ -80,6 +80,44 @@ pre-commit autoupdate
 
 Pre-commit will automatically download actionlint on first run. Just wait for it to complete.
 
+### Push blocked due to pre-commit.ci changes
+
+If you installed the pre-commit.ci GitHub app, it may automatically commit fixes to your branch. When you try to push again, Git will block you because the remote has commits you don't have locally.
+
+**Quick fix:**
+```powershell
+# Pull the pre-commit.ci automatic fixes
+git pull --rebase
+
+# Now push
+git push
+```
+
+**Alternative (merge instead of rebase):**
+```powershell
+git pull --no-rebase
+git push
+```
+
+**Use the helper script:**
+```powershell
+# Pulls pre-commit fixes and rebases them
+.\scripts\pull-pre-commit-fixes.ps1
+
+# Or with merge
+.\scripts\pull-pre-commit-fixes.ps1 -Merge
+
+# Dry run to see what would happen
+.\scripts\pull-pre-commit-fixes.ps1 -DryRun
+```
+
+**Prevent the issue locally:**
+Run pre-commit before pushing to minimize CI fixes:
+```powershell
+# Run on all changed files
+python -m pre_commit run --all-files
+```
+
 ### YAML validation fails on Kubernetes files
 
 Kubernetes manifests with templates/overlays are excluded via the config. If you need to validate them separately, use:

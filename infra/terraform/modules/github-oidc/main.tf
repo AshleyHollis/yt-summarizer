@@ -110,3 +110,6 @@ resource "azurerm_role_assignment" "acr_push" {
   role_definition_name = "AcrPush"
   principal_id         = azuread_service_principal.github_actions.object_id
 }
+
+# Note: Key Vault permissions are provided via Contributor role at subscription level
+# when RBAC authorization is enabled on the Key Vault

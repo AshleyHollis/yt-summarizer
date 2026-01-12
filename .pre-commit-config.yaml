@@ -1,3 +1,10 @@
+ci:
+  autofix_prs: true  # Automatically create PRs with fixes
+  autofix_commit_msg: "style: pre-commit.ci auto fixes"
+  autoupdate_schedule: weekly  # Update hooks weekly
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  skip: []  # Hooks to skip in CI (empty = run all)
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

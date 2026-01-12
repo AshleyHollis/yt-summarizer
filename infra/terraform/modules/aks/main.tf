@@ -195,7 +195,7 @@ output "cluster_ca_certificate" {
 
 output "kubelet_identity_object_id" {
   description = "Object ID of the kubelet managed identity"
-  value       = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  value       = try(azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id, null)
 }
 
 output "identity_principal_id" {
