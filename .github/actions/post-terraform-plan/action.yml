@@ -63,72 +63,57 @@ runs:
           // Unique marker for finding this comment - MUST be at the start
           const COMMENT_MARKER = '<!-- terraform-plan-comment -->';
 
-          // Parse resources from terraform plan output
+          // Parse resources from terraform plan output - simple approach
           function parseResources(planOutput) {
             const resources = [];
             const lines = planOutput.split('\n');
             let currentResource = null;
             let currentDetails = [];
-            let inResource = false;
-            let braceDepth = 0;
 
-            for (const line of lines) {
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              
               // Match resource header: # resource.address will be created/updated/etc
               const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
               if (resourceMatch) {
-                // Save previous resource if exists (new header = previous is complete)
+                // Save previous resource if exists
                 if (currentResource && currentDetails.length > 0) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                 }
+                
                 const actionText = resourceMatch[3];
                 let action = 'read';
                 if (actionText === 'created') action = 'create';
                 else if (actionText === 'updated in-place') action = 'update';
                 else if (actionText === 'replaced') action = 'replace';
                 else if (actionText === 'destroyed') action = 'destroy';
+                
                 currentResource = { address: resourceMatch[1], action };
                 currentDetails = [];
-                inResource = true;
-                braceDepth = 0;
                 continue;
               }
 
-              if (inResource) {
-                // Check for section boundaries that end resource capture
-                if (line.match(/^Plan:|^Changes to Outputs:|^Warning:/)) {
-                  if (currentResource && currentDetails.length > 0) {
-                    resources.push({ ...currentResource, details: currentDetails.join('\n') });
-                    currentResource = null;
-                    currentDetails = [];
-                  }
-                  inResource = false;
-                  continue;
-                }
-
-                // Capture the line
-                if (line.trim()) {
-                  currentDetails.push(line);
-                }
-
-                // Track brace depth
-                const openBraces = (line.match(/{/g) || []).length;
-                const closeBraces = (line.match(/}/g) || []).length;
-                braceDepth += openBraces - closeBraces;
-
-                // If we've closed all braces at the top level, resource is complete
-                if (braceDepth === 0 && currentDetails.length > 0 && line.match(/^\s*}\s*$/)) {
+              // Check for section boundaries (end of all resources)
+              if (line.match(/^Plan:|^Changes to Outputs:|^Warning:/)) {
+                if (currentResource && currentDetails.length > 0) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                   currentResource = null;
                   currentDetails = [];
-                  inResource = false;
-                  braceDepth = 0;
                 }
+                break;
+              }
+
+              // If we're in a resource, capture the line
+              if (currentResource && line.trim()) {
+                currentDetails.push(line);
               }
             }
-            // Don't forget the last resource
+            
+            // Save the last resource if exists
             if (currentResource && currentDetails.length > 0) {
               resources.push({ ...currentResource, details: currentDetails.join('\n') });
             }
+            
             return resources;
           }
 
@@ -302,72 +287,57 @@ runs:
           const runUrl = `${context.payload.repository.html_url}/actions/runs/${runId}`;
           const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
 
-          // Parse resources
+          // Parse resources - simple approach
           function parseResources(planOutput) {
             const resources = [];
             const lines = planOutput.split('\n');
             let currentResource = null;
             let currentDetails = [];
-            let inResource = false;
-            let braceDepth = 0;
 
-            for (const line of lines) {
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              
               // Match resource header: # resource.address will be created/updated/etc
               const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
               if (resourceMatch) {
-                // Save previous resource if exists (new header = previous is complete)
+                // Save previous resource if exists
                 if (currentResource && currentDetails.length > 0) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                 }
+                
                 const actionText = resourceMatch[3];
                 let action = 'read';
                 if (actionText === 'created') action = 'create';
                 else if (actionText === 'updated in-place') action = 'update';
                 else if (actionText === 'replaced') action = 'replace';
                 else if (actionText === 'destroyed') action = 'destroy';
+                
                 currentResource = { address: resourceMatch[1], action };
                 currentDetails = [];
-                inResource = true;
-                braceDepth = 0;
                 continue;
               }
 
-              if (inResource) {
-                // Check for section boundaries that end resource capture
-                if (line.match(/^Plan:|^Changes to Outputs:|^Warning:/)) {
-                  if (currentResource && currentDetails.length > 0) {
-                    resources.push({ ...currentResource, details: currentDetails.join('\n') });
-                    currentResource = null;
-                    currentDetails = [];
-                  }
-                  inResource = false;
-                  continue;
-                }
-
-                // Capture the line
-                if (line.trim()) {
-                  currentDetails.push(line);
-                }
-
-                // Track brace depth
-                const openBraces = (line.match(/{/g) || []).length;
-                const closeBraces = (line.match(/}/g) || []).length;
-                braceDepth += openBraces - closeBraces;
-
-                // If we've closed all braces at the top level, resource is complete
-                if (braceDepth === 0 && currentDetails.length > 0 && line.match(/^\s*}\s*$/)) {
+              // Check for section boundaries (end of all resources)
+              if (line.match(/^Plan:|^Changes to Outputs:|^Warning:/)) {
+                if (currentResource && currentDetails.length > 0) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                   currentResource = null;
                   currentDetails = [];
-                  inResource = false;
-                  braceDepth = 0;
                 }
+                break;
+              }
+
+              // If we're in a resource, capture the line
+              if (currentResource && line.trim()) {
+                currentDetails.push(line);
               }
             }
-            // Don't forget the last resource
+            
+            // Save the last resource if exists
             if (currentResource && currentDetails.length > 0) {
               resources.push({ ...currentResource, details: currentDetails.join('\n') });
             }
+            
             return resources;
           }
 
