@@ -282,8 +282,8 @@ runs:
             sections.push('<details>');
             sections.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
             sections.push('');
-            sections.push('```terraform');
-            sections.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
+            sections.push('```json');
+            sections.push(planJson.length > 60000 ? planJson.substring(0, 60000) + '\n...(truncated)' : planJson);
             sections.push('```');
             sections.push('</details>');
             sections.push('');
@@ -536,8 +536,8 @@ runs:
             lines.push('<details>');
             lines.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
             lines.push('');
-            lines.push('```terraform');
-            lines.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
+            lines.push('```json');
+            lines.push(planJson.length > 60000 ? planJson.substring(0, 60000) + '\n...(truncated)' : planJson);
             lines.push('```');
             lines.push('</details>');
             lines.push('');
