@@ -123,10 +123,16 @@ jobs:
           FORMATTED_PLAN: ${{ steps.plan.outputs.formatted_plan }}
           PLAN_OUTCOME: ${{ steps.plan.outcome }}
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
             const formattedPlan = process.env.FORMATTED_PLAN || 'No plan output available';
             const planOutcome = process.env.PLAN_OUTCOME;
+
+            console.log('Posting Terraform plan to PR...');
+            console.log('Issue number:', context.issue.number);
+            console.log('Plan outcome:', planOutcome);
+            console.log('Plan summary:', JSON.stringify(summary, null, 2));
 
             // Determine status emoji and color
             const statusEmoji = planOutcome === 'success' ? '✅' : '❌';
@@ -183,20 +189,34 @@ jobs:
               comment.body.includes('Terraform Plan')
             );
 
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body
-              });
+            console.log('Found existing Terraform comment:', !!botComment);
+            console.log('Total comments:', comments.length);
+
+            try {
+              if (botComment) {
+                console.log('Updating existing comment:', botComment.id);
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: body
+                });
+                console.log('Updated comment successfully');
+              } else {
+                console.log('Creating new comment');
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: body
+                });
+                console.log('Created comment successfully');
+              }
+            } catch (error) {
+              console.error('Error posting comment:', error);
+              console.error('Error message:', error.message);
+              console.error('Error status:', error.status);
+              throw error;
             }
 
       - name: Plan Status
