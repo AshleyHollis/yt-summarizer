@@ -63,36 +63,3 @@ jobs:
           else
             echo "✅ No stale environments found or all cleanup completed"
           fi
-
-      - name: Set AKS Context for secret cleanup
-        if: always() && steps.cleanup.outputs.stale-prs
-        uses: azure/aks-set-context@v3
-        with:
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Cleanup image pull secrets for stale PR previews
-        if: always() && steps.cleanup.outputs.stale-prs
-        shell: bash
-        run: |
-          set -euo pipefail
-          PRS="${{ steps.cleanup.outputs.stale-prs }}"
-          echo "Stale PRs: $PRS"
-          IFS=',' read -ra PR_ARR <<< "$PRS"
-          for pr in "${PR_ARR[@]}"; do
-            ns="preview-pr-$pr"
-            echo "Processing namespace: $ns"
-            if ! kubectl get ns "$ns" &>/dev/null; then
-              echo "  Namespace $ns not found, skipping"
-              continue
-            fi
-            mapfile -t secrets < <(kubectl get secret -n "$ns" -o json 2>/dev/null | jq -r '.items[] | select(.type=="kubernetes.io/dockerconfigjson") | .metadata.name' || true)
-            if [ ${#secrets[@]} -eq 0 ]; then
-              echo "  No docker-registry secrets found in $ns"
-              continue
-            fi
-            for s in "${secrets[@]}"; do
-              echo "  Deleting secret $s in $ns"
-              kubectl delete secret "$s" -n "$ns" --ignore-not-found=true || true
-            done
-          done

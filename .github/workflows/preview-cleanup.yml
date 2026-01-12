@@ -91,12 +91,6 @@ jobs:
           pr-number: ${{ github.event.pull_request.number }}
           pr-merged: ${{ github.event.pull_request.merged }}
 
-      - name: Cleanup image pull secrets (preview namespace)
-        if: always()
-        uses: ./.github/actions/cleanup-image-pull-secrets
-        with:
-          pr-number: ${{ github.event.pull_request.number }}
-
   # ---------------------------------------------------------------------------
   # Optional: Clean up ACR images for the PR
   # ---------------------------------------------------------------------------
