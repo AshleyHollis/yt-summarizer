@@ -147,28 +147,98 @@ jobs:
           timeout-seconds: '1800'
 
   # ===========================================================================
-  # PHASE 2B: GET PRODUCTION TAG FOR K8S-ONLY CHANGES
+  # PHASE 2B: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
   # ===========================================================================
-  # For K8s-only changes (needs_image_build=false), use the production tag.
-  # This is deterministic because it's read from prod/kustomization.yaml
-  # which is updated by the production deployment workflow.
+  # For K8s-only changes (needs_image_build=false), we need a deterministic
+  # image tag. Strategy:
+  #   1. Walk backwards through PR's git history
+  #   2. Find most recent commit that changed code (services/apps/docker)
+  #   3. Use that commit's image tag: pr-<number>-<sha>
+  #   4. If no commits in PR built images, fallback to production tag (read prod kustomization.yaml)
+  # 
+  # This ensures K8s changes are tested with the PR's own code, not random
+  # production code. Fully deterministic as it's tied to git history.
   # ===========================================================================
   get-production-tag:
-    name: Get Production Tag
+    name: Find PR Image Tag
     runs-on: ubuntu-latest
     needs: [detect-changes, wait-for-ci]
     if: |
       needs.detect-changes.outputs.needs_deployment == 'true' &&
       needs.detect-changes.outputs.needs_image_build == 'false'
     outputs:
-      image_tag: ${{ steps.get-tag.outputs.image_tag }}
+      image_tag: ${{ steps.find-tag.outputs.image_tag }}
     steps:
-      - name: Checkout code
+      - name: Checkout PR branch with full history
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.detect-changes.outputs.pr_head_ref }}
+          fetch-depth: 0  # Need full history to walk commits
 
-      - name: Get production image tag
-        id: get-tag
-        uses: ./.github/actions/get-production-image-tag
+      - name: Find most recent image-building commit in PR
+        id: find-tag
+        shell: bash
+        run: |
+          PR_NUMBER="${{ needs.detect-changes.outputs.pr_number }}"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref || 'main' }}"
+          
+          echo "🔍 Searching PR #$PR_NUMBER history for most recent code change..."
+          
+          # Get list of commits in this PR (from base branch to HEAD)
+          git fetch origin "$BASE_BRANCH"
+          COMMITS=$(git rev-list "origin/$BASE_BRANCH"..HEAD)
+          
+          FOUND_IMAGE_TAG=""
+          FOUND_COMMIT=""
+          
+          # Walk commits from newest to oldest
+          for commit in $COMMITS; do
+            SHORT_SHA=$(git rev-parse --short=7 "$commit")
+            
+            # Check if this commit changed code areas that trigger image builds
+            # Skip merge commits by checking parent count
+            PARENT_COUNT=$(git rev-list --parents -n 1 "$commit" | awk '{print NF-1}')
+            
+            if [ "$PARENT_COUNT" -le 1 ]; then
+              # Regular commit, not a merge
+              CHANGED_FILES=$(git diff-tree --no-commit-tree --name-only -r "$commit" 2>/dev/null || true)
+              
+              if echo "$CHANGED_FILES" | grep -qE '^(services/api|services/workers|services/shared|apps/web|docker)/'; then
+                FOUND_COMMIT="$commit"
+                FOUND_IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
+                echo "✅ Found code change at commit $SHORT_SHA"
+                echo "   Files changed: $(echo "$CHANGED_FILES" | grep -E '^(services/api|services/workers|services/shared|apps/web|docker)/' | head -3 | tr '\n' ' ')"
+                break
+              fi
+            fi
+          done
+          
+          # If no code changes found in PR, fallback to production tag
+          if [ -z "$FOUND_IMAGE_TAG" ]; then
+            echo "⚠️  No code changes found in PR history"
+            echo "📦 Falling back to production image tag from main branch"
+            
+            # Read production kustomization.yaml for deterministic SHA-based tag
+            git fetch origin main
+            PROD_TAG=$(git show origin/main:k8s/overlays/prod/kustomization.yaml | grep -oP 'newTag: \K.*' | head -1)
+            
+            if [ -z "$PROD_TAG" ]; then
+              echo "::error::Could not find production image tag in kustomization.yaml"
+              exit 1
+            fi
+            
+            if [ "$PROD_TAG" = "latest" ]; then
+              echo "::error::Production kustomization is using 'latest' tag - not deterministic!"
+              echo "::error::Production deployment must use SHA-based tags (e.g., sha-abc123f)"
+              exit 1
+            fi
+            
+            echo "✅ Using production tag: $PROD_TAG"
+            FOUND_IMAGE_TAG="$PROD_TAG"
+          fi
+          
+          echo "image_tag=$FOUND_IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "🎯 Final image tag for K8s-only preview: $FOUND_IMAGE_TAG"
 
   # ===========================================================================
   # PHASE 3: CONCURRENCY LIMIT CHECK
