@@ -40,50 +40,29 @@ runs:
         echo "🔍 JavaScript Dependency Scan (depcheck)"
         echo "════════════════════════════════════════════════════════════════"
         echo ""
+        echo "ℹ️  Using .depcheckrc configuration file"
+        echo "   See .depcheckrc.md for documentation on ignored packages"
+        echo ""
         
-        # Run depcheck (uses .depcheckrc config if present)
-        DEPCHECK_OUTPUT=$(depcheck 2>&1) || true
-        echo "$DEPCHECK_OUTPUT"
-        
-        # Check for genuinely problematic issues (not in our known false positives list)
-        if echo "$DEPCHECK_OUTPUT" | grep -E "(Unused dependencies|Missing dependencies)" > /dev/null; then
-          # Filter out known false positives
-          FILTERED_OUTPUT=$(echo "$DEPCHECK_OUTPUT" | grep -v "@copilotkit/runtime" | grep -v "@tailwindcss/postcss" | grep -v "@tailwindcss/typography" | grep -v "^* tailwindcss$")
-          
-          if echo "$FILTERED_OUTPUT" | grep -E "^\* " > /dev/null; then
-            # Found dependencies that aren't in the known false positives list
-            echo ""
-            echo "════════════════════════════════════════════════════════════════"
-            echo "❌ UNEXPECTED DEPENDENCY ISSUES"
-            echo "════════════════════════════════════════════════════════════════"
-            echo ""
-            echo "The following dependencies are flagged and NOT in the known false"
-            echo "positives list. These should be investigated:"
-            echo ""
-            echo "$FILTERED_OUTPUT"
-            echo ""
-            echo "════════════════════════════════════════════════════════════════"
-            exit 1
-          else
-            # Only known false positives detected
-            echo ""
-            echo "════════════════════════════════════════════════════════════════"
-            echo "✅ PASSED (Known False Positives Only)"
-            echo "════════════════════════════════════════════════════════════════"
-            echo ""
-            echo "📋 The following packages appear unused but are required:"
-            echo "   • @copilotkit/runtime - Used in next.config.ts optimizePackageImports"
-            echo "   • @tailwindcss/postcss - PostCSS plugin in postcss.config.mjs"
-            echo "   • @tailwindcss/typography - Provides prose-* utility classes"
-            echo "   • tailwindcss - Core CSS framework (imported in globals.css)"
-            echo ""
-            echo "   These are documented in apps/web/README.md"
-            echo ""
-            echo "════════════════════════════════════════════════════════════════"
-          fi
-        else
+        # Run depcheck (automatically uses .depcheckrc config file)
+        if depcheck; then
           echo ""
           echo "✅ No dependency issues detected"
+        else
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo "❌ DEPENDENCY ISSUES DETECTED"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📋 Action Required:"
+          echo "   1. Review the packages listed above"
+          echo "   2. Run 'npx depcheck' locally to verify"
+          echo "   3. If genuinely unused, remove from package.json"
+          echo "   4. If used but undetectable (config files, CSS), add to .depcheckrc"
+          echo "      and document in .depcheckrc.md"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          exit 1
         fi
 
     - name: Run npm audit for security vulnerabilities

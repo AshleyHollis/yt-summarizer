@@ -5,7 +5,11 @@
     "prettier",
     "typescript",
     "vitest",
-    "playwright"
+    "playwright",
+    "@copilotkit/runtime",
+    "@tailwindcss/postcss",
+    "@tailwindcss/typography",
+    "tailwindcss"
   ],
   "specials": [
     "bin",
