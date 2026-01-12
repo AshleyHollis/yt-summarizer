@@ -40,26 +40,26 @@ runs:
           const reportUrl = `https://github.com/${{ inputs.repository }}/actions/runs/${{ inputs.run-id }}`;
           const artifactUrl = `https://github.com/${{ inputs.repository }}/actions/runs/${{ inputs.run-id }}#artifacts`;
           const commitSha = '${{ inputs.commit-sha }}';
-          
+
           let body = `## ${headerEmoji} E2E Test Results\n\n`;
-          
+
           if (isSuccess) {
             body += `All end-to-end tests passed successfully! ✨\n\n`;
           } else {
             body += `Some tests failed. Please review the test report for details.\n\n`;
           }
-          
+
           body += `### 📊 Test Summary\n\n` +
             `| Property | Value |\n` +
             `|----------|-------|\n` +
             `| **Status** | ${status} |\n` +
             `| **Environment** | [${{ inputs.preview-url }}](${{ inputs.preview-url }}) |\n` +
             `| **Commit** | [\`${commitSha.substring(0, 7)}\`](https://github.com/${{ inputs.repository }}/commit/${commitSha}) |\n\n`;
-          
+
           body += `### 🔗 Reports & Artifacts\n\n` +
             `- 📋 [View Workflow Logs](${reportUrl})\n` +
             `- 📦 [Download Playwright Report](${artifactUrl})\n\n`;
-          
+
           if (!isSuccess) {
             body += `### 🔍 Debugging Tips\n\n` +
               `<details>\n` +
@@ -77,21 +77,21 @@ runs:
               `   \`\`\`\n` +
               `</details>\n\n`;
           }
-          
+
           body += `---\n_E2E tests run on every preview deployment to catch integration issues early._`;
-          
+
           // Find existing E2E comment to update
           const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: ${{ inputs.pr-number }},
           });
-          
-          const e2eComment = comments.find(c => 
-            c.user.type === 'Bot' && 
+
+          const e2eComment = comments.find(c =>
+            c.user.type === 'Bot' &&
             c.body.includes('E2E Test Results')
           );
-          
+
           if (e2eComment) {
             await github.rest.issues.updateComment({
               owner: context.repo.owner,

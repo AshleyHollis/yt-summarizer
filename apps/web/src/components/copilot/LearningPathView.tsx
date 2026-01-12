@@ -63,7 +63,7 @@ function formatTimestamp(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
@@ -90,13 +90,13 @@ function LearningPathItemCard({
     <div className="relative">
       {/* Connector line */}
       {!isLast && (
-        <div 
-          className="absolute left-4 top-10 w-0.5 h-[calc(100%+8px)] bg-[var(--copilot-kit-separator-color)]" 
+        <div
+          className="absolute left-4 top-10 w-0.5 h-[calc(100%+8px)] bg-[var(--copilot-kit-separator-color)]"
           aria-hidden="true"
         />
       )}
-      
-      <div 
+
+      <div
         className={`${copilotBoxStyles.full} cursor-pointer relative z-10`}
         onClick={() => setIsExpanded(!isExpanded)}
         role="button"
@@ -112,13 +112,13 @@ function LearningPathItemCard({
         {/* Header */}
         <div className="flex items-start gap-3">
           {/* Step number */}
-          <div 
+          <div
             className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--copilot-kit-primary-color)] text-white flex items-center justify-center text-sm font-medium"
             aria-label={`Step ${item.order}`}
           >
             {item.order}
           </div>
-          
+
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h4 className={`${copilotTextSizes.body} ${copilotColors.primary} font-medium truncate`}>
@@ -130,7 +130,7 @@ function LearningPathItemCard({
                 <ChevronRight className="w-4 h-4 text-[var(--copilot-kit-muted-color)] flex-shrink-0" />
               )}
             </div>
-            
+
             <div className="flex items-center gap-3">
               <span className={`flex items-center gap-1 ${copilotTextSizes.small} ${copilotColors.muted}`}>
                 <Clock className="w-3.5 h-3.5" />
@@ -173,8 +173,8 @@ function LearningPathItemCard({
                 </h5>
                 <ul className="space-y-1">
                   {item.learningObjectives.map((objective, idx) => (
-                    <li 
-                      key={idx} 
+                    <li
+                      key={idx}
                       className={`flex items-start gap-2 ${copilotTextSizes.small} ${copilotColors.primary}`}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-green-500 flex-shrink-0" />
@@ -236,7 +236,7 @@ function LearningPathItemCard({
 
 /**
  * LearningPathView - Displays a structured learning path with ordered videos
- * 
+ *
  * Features:
  * - Visual step-by-step ordering with connector lines
  * - Expandable items with rationale, objectives, and evidence

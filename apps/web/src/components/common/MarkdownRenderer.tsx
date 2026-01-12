@@ -107,7 +107,7 @@ interface MarkdownRendererProps {
 
 /**
  * Shared Markdown renderer component with consistent styling
- * 
+ *
  * @example
  * ```tsx
  * <MarkdownRenderer content={summaryText} variant="compact" />
@@ -122,7 +122,7 @@ export function MarkdownRenderer({
   const proseClasses = PROSE_VARIANTS[variant];
   // Add prose-summary class for CSS-based h2 styling
   const variantClass = variant === 'summary' ? 'prose-summary' : '';
-  
+
   return (
     <article className={`${proseClasses} ${variantClass} ${className}`}>
       <ReactMarkdown components={components}>

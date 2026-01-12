@@ -1,6 +1,6 @@
 /**
  * Shared types for Copilot actions.
- * 
+ *
  * These types match the API response schemas and are used by both
  * frontend tools (Pattern A) and backend tool renderers (Pattern B).
  */

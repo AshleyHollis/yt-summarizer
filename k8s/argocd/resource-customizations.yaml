@@ -30,7 +30,7 @@ data:
     - .webhooks[].namespaceSelector
     - .webhooks[].rules
     - .webhooks[].timeoutSeconds
-  
+
   # -------------------------------------------------------------------------
   # Ignore differences for LoadBalancer Service status
   # -------------------------------------------------------------------------
@@ -39,7 +39,7 @@ data:
   resource.customizations.ignoreDifferences.v1_Service: |
     jqPathExpressions:
     - .status.loadBalancer.ingress
-  
+
   # -------------------------------------------------------------------------
   # Health check for cert-manager ValidatingWebhookConfiguration
   # -------------------------------------------------------------------------
@@ -54,7 +54,7 @@ data:
       hs.message = "Webhook not configured"
     end
     return hs
-  
+
   # -------------------------------------------------------------------------
   # Ignore differences for ExternalSecret status
   # -------------------------------------------------------------------------

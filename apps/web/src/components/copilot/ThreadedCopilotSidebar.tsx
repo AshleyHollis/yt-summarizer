@@ -104,11 +104,11 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  
+
   // Scope and AI Settings from providers
   const { scope, setScope } = useScope();
   const { settings: aiSettings, updateSettings: setAISettings } = useAISettings();
-  
+
   // Memoized getters for scope and AI settings (stable references)
   const getScope = useCallback(() => scope, [scope]);
   const getAISettings = useCallback(() => aiSettings, [aiSettings]);
@@ -167,7 +167,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     getAISettings,
     setAISettings,
   });
-  
+
   // Save settings to thread when scope or AI settings change mid-conversation
   // Skip during restoration to avoid overwriting loaded settings
   useEffect(() => {

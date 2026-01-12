@@ -44,7 +44,7 @@ runs:
           const commitSha = '${{ inputs.commit-sha }}';
           const runId = '${{ inputs.run-id }}' || context.runId;
           const repo = '${{ inputs.repository }}' || `${context.repo.owner}/${context.repo.repo}`;
-          
+
           const body = `## 🚀 Preview Environment Deployed\n\n` +
             `### 🌐 Environment URLs\n\n` +
             `| Environment | URL |\n` +
@@ -84,19 +84,19 @@ runs:
             `</details>\n\n` +
             `---\n` +
             `_This preview will be automatically cleaned up when the PR is closed or merged._`;
-          
+
           // Find existing preview comment to update
           const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: ${{ inputs.pr-number }},
           });
-          
-          const previewComment = comments.find(c => 
-            c.user.type === 'Bot' && 
+
+          const previewComment = comments.find(c =>
+            c.user.type === 'Bot' &&
             c.body.includes('Preview Environment Deployed')
           );
-          
+
           if (previewComment) {
             await github.rest.issues.updateComment({
               owner: context.repo.owner,
@@ -139,4 +139,3 @@ runs:
         echo "| **Image Tag** | \`${{ inputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
         echo "| **Commit** | \`${{ inputs.commit-sha }}\` |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-

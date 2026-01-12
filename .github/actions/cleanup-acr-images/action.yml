@@ -18,23 +18,23 @@ runs:
       shell: bash
       run: |
         echo "Cleaning up images for PR #${{ inputs.pr-number }}..."
-        
+
         IFS=',' read -ra REPOS <<< "${{ inputs.repositories }}"
         for REPO in "${REPOS[@]}"; do
           echo "Checking repository: $REPO"
-          
+
           # Get tags with pr-N- prefix
           TAGS=$(az acr repository show-tags \
             --name ${{ inputs.acr-name }} \
             --repository "$REPO" \
             --query "[?starts_with(@, 'pr-${{ inputs.pr-number }}-')]" \
             --output tsv 2>/dev/null || echo "")
-          
+
           if [ -z "$TAGS" ]; then
             echo "  No images found for PR #${{ inputs.pr-number }} in $REPO"
             continue
           fi
-          
+
           # Delete each tag
           while IFS= read -r tag; do
             if [ -n "$tag" ]; then
@@ -46,5 +46,5 @@ runs:
             fi
           done <<< "$TAGS"
         done
-        
+
         echo "✅ Image cleanup complete"

@@ -404,7 +404,7 @@ ORDER BY Distance ASC;
 
 ```sql
 -- Related videos (1-hop)
-SELECT 
+SELECT
     r.TargetVideoId,
     r.RelationshipType,
     r.Confidence,
@@ -416,7 +416,7 @@ WHERE r.SourceVideoId = @videoId
 ORDER BY r.Confidence DESC;
 
 -- Topics in scope (facet counts)
-SELECT 
+SELECT
     f.Name AS Topic,
     COUNT(DISTINCT vf.VideoId) AS VideoCount
 FROM Facets f

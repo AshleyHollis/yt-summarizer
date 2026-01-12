@@ -43,7 +43,7 @@ runs:
         echo "ℹ️  Using .depcheckrc configuration file"
         echo "   See .depcheckrc.md for documentation on ignored packages"
         echo ""
-        
+
         # Run depcheck (automatically uses .depcheckrc config file)
         if depcheck; then
           echo ""
@@ -75,7 +75,7 @@ runs:
         echo "🔒 Security Vulnerability Scan (npm audit)"
         echo "════════════════════════════════════════════════════════════════"
         echo ""
-        
+
         if npm audit --audit-level=${{ inputs.audit-level }}; then
           echo ""
           echo "✅ No security vulnerabilities detected"

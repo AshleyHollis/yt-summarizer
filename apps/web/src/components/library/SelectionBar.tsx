@@ -23,12 +23,12 @@ export function SelectionBar() {
   const handleChatWithSelected = () => {
     // Set the scope to include only selected video IDs
     setScope({ videoIds: selectedVideos.map(v => v.video_id) });
-    
+
     // Navigate to library with chat open
     const params = new URLSearchParams(searchParams.toString());
     params.set('chat', 'open');
     router.push(`/library?${params.toString()}`);
-    
+
     // Exit selection mode but keep the scope
     exitSelectionMode();
   };
@@ -57,9 +57,9 @@ export function SelectionBar() {
         {/* Thumbnail strip */}
         <div className="flex items-center gap-1">
           {displayedVideos.map((video) => {
-            const thumbnailUrl = video.thumbnail_url || 
+            const thumbnailUrl = video.thumbnail_url ||
               `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`;
-            
+
             return (
               <div
                 key={video.video_id}

@@ -51,22 +51,22 @@ runs:
         FORCE_LABELS="${{ inputs.force-preview-labels }}"
         PR_NUMBER="${{ inputs.pr-number }}"
         FORCE_DEPLOY="${{ inputs.force-deploy }}"
-        
+
         echo "Comparing: $BASE_SHA...$HEAD_SHA"
-        
+
         # Check for force preview labels if PR number provided
         FORCE_DEPLOY=false
         if [ -n "$PR_NUMBER" ] && [ -n "$FORCE_LABELS" ]; then
           echo "Checking for force preview labels on PR #$PR_NUMBER..."
-          
+
           # Get PR labels using GitHub API
           if [ -n "$GITHUB_TOKEN" ]; then
             API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
             LABELS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$API_URL" | jq -r '.labels[].name' 2>/dev/null || echo "")
-            
+
             if [ -n "$LABELS" ]; then
               echo "PR labels: $LABELS"
-              
+
               # Check if any force label is present
               IFS=',' read -ra LABEL_ARRAY <<< "$FORCE_LABELS"
               for label in "${LABEL_ARRAY[@]}"; do
@@ -84,26 +84,26 @@ runs:
             echo "No GITHUB_TOKEN available for API calls"
           fi
         fi
-        
+
         # For manual workflow_dispatch triggers, always force deploy (no PR context needed)
         if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ "$FORCE_DEPLOY" = "true" ]; then
           echo "🚀 Force deployment requested - proceeding with deployment"
           FORCE_DEPLOY=true
         fi
-        
+
         if [ "$FORCE_DEPLOY" = "true" ]; then
           echo "needs_image_build=false" >> $GITHUB_OUTPUT
           echo "needs_deployment=true" >> $GITHUB_OUTPUT
           echo "🚀 Force deploying - using existing images"
           exit 0
         fi
-        
+
         # Get all changed files using git diff
         # Use merge-base for reliable comparison
         echo "🔍 Attempting to detect changed files..."
         echo "   BASE_SHA: $BASE_SHA"
         echo "   HEAD_SHA: $HEAD_SHA"
-        
+
         # For PRs, use merge-base to ensure reliable diff
         if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
           MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "$BASE_SHA")
@@ -112,9 +112,9 @@ runs:
         else
           FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
         fi
-        
+
         echo "   git diff result: $(echo "$FILES" | wc -l) files found"
-        
+
         # If still empty, try git show for all commits in the range
         if [ -z "$FILES" ]; then
           echo "   git diff failed, trying git log --name-only..."
@@ -125,7 +125,7 @@ runs:
           fi
           echo "   git log result: $(echo "$FILES" | wc -l) files found"
         fi
-        
+
         if [ -z "$FILES" ]; then
           echo "⚠️ Could not fetch changed files - assuming no deployment needed for safety"
           echo "needs_image_build=false" >> $GITHUB_OUTPUT
@@ -141,7 +141,7 @@ runs:
         #
         # IMAGE BUILD TRIGGERS (CI actually builds new images):
         # - services/api/** (API service)
-        # - services/workers/** (background workers) 
+        # - services/workers/** (background workers)
         # - services/shared/** (shared libraries)
         # - apps/web/** (frontend application)
         # - **/Dockerfile* (Docker files)
@@ -180,7 +180,7 @@ runs:
         echo "📊 Analysis Results:"
         echo "   needs_image_build=$HAS_IMAGE_BUILD"
         echo "   needs_deployment=$HAS_DEPLOYMENT"
-        
+
         # Set outputs
         echo "needs_image_build=$HAS_IMAGE_BUILD" >> $GITHUB_OUTPUT
         echo "needs_deployment=$HAS_DEPLOYMENT" >> $GITHUB_OUTPUT

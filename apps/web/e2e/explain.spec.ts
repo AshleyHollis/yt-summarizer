@@ -33,13 +33,13 @@ test.describe('US5: Explain Why Feature', () => {
       if (await chatInput.isVisible().catch(() => false)) {
         await chatInput.fill('What are the best techniques?');
         await chatInput.press('Enter');
-        
+
         // Wait for response
         await page.waitForTimeout(5000);
 
         // Look for "Why this?" button on any video card
         const whyThisButton = page.getByRole('button', { name: /why this/i });
-        
+
         // If videos with explanations are returned, the button should be visible
         const buttonCount = await whyThisButton.count();
         // We don't strictly require it since it depends on LLM generating explanations
@@ -63,12 +63,12 @@ test.describe('US5: Explain Why Feature', () => {
       if (await chatInput.isVisible().catch(() => false)) {
         await chatInput.fill('Tell me about training fundamentals');
         await chatInput.press('Enter');
-        
+
         await page.waitForTimeout(5000);
 
         // Find and click "Why this?" button if present
         const whyThisButton = page.getByRole('button', { name: /why this/i }).first();
-        
+
         if (await whyThisButton.isVisible().catch(() => false)) {
           // Initially, explanation panel should not be visible
           const explanationPanel = page.locator('[data-testid="explanation-panel"]');
@@ -76,14 +76,14 @@ test.describe('US5: Explain Why Feature', () => {
 
           // Click to expand
           await whyThisButton.click();
-          
+
           // Now explanation panel should be visible
           await expect(explanationPanel.first()).toBeVisible();
 
           // Click again to collapse
           await whyThisButton.click();
           await page.waitForTimeout(300);
-          
+
           // Panel should be hidden again
           await expect(explanationPanel).not.toBeVisible();
         }
@@ -106,18 +106,18 @@ test.describe('US5: Explain Why Feature', () => {
       if (await chatInput.isVisible().catch(() => false)) {
         await chatInput.fill('What techniques should I learn?');
         await chatInput.press('Enter');
-        
+
         await page.waitForTimeout(5000);
 
         const whyThisButton = page.getByRole('button', { name: /why this/i }).first();
-        
+
         if (await whyThisButton.isVisible().catch(() => false)) {
           await whyThisButton.click();
 
           // Explanation panel should have text content
           const explanationPanel = page.locator('[data-testid="explanation-panel"]');
           await expect(explanationPanel.first()).toBeVisible();
-          
+
           // Should contain some text (the summary)
           const panelText = await explanationPanel.first().textContent();
           expect(panelText?.length).toBeGreaterThan(10);
@@ -138,11 +138,11 @@ test.describe('US5: Explain Why Feature', () => {
       if (await chatInput.isVisible().catch(() => false)) {
         await chatInput.fill('Show me beginner content');
         await chatInput.press('Enter');
-        
+
         await page.waitForTimeout(5000);
 
         const whyThisButton = page.getByRole('button', { name: /why this/i }).first();
-        
+
         if (await whyThisButton.isVisible().catch(() => false)) {
           await whyThisButton.click();
           await page.waitForTimeout(300);
@@ -150,7 +150,7 @@ test.describe('US5: Explain Why Feature', () => {
           // Check for key moment links (if present)
           const keyMomentLinks = page.locator('[data-testid="key-moment-link"]');
           const linkCount = await keyMomentLinks.count();
-          
+
           if (linkCount > 0) {
             // Verify links point to YouTube
             const firstLink = keyMomentLinks.first();
@@ -174,11 +174,11 @@ test.describe('US5: Explain Why Feature', () => {
       if (await chatInput.isVisible().catch(() => false)) {
         await chatInput.fill('Find videos in a series');
         await chatInput.press('Enter');
-        
+
         await page.waitForTimeout(5000);
 
         const whyThisButton = page.getByRole('button', { name: /why this/i }).first();
-        
+
         if (await whyThisButton.isVisible().catch(() => false)) {
           await whyThisButton.click();
           await page.waitForTimeout(300);
@@ -186,7 +186,7 @@ test.describe('US5: Explain Why Feature', () => {
           // Check for relationship badge (may or may not be present depending on data)
           const relationshipBadge = page.locator('[data-testid="relationship-badge"]');
           const badgeCount = await relationshipBadge.count();
-          
+
           // Badge is optional - only shown when video has relationship data
           expect(badgeCount >= 0).toBeTruthy();
         }
@@ -208,11 +208,11 @@ test.describe('US5: Explain Why Feature', () => {
       if (await chatInput.isVisible().catch(() => false)) {
         await chatInput.fill('Test query');
         await chatInput.press('Enter');
-        
+
         await page.waitForTimeout(5000);
 
         const whyThisButton = page.getByRole('button', { name: /why this/i }).first();
-        
+
         if (await whyThisButton.isVisible().catch(() => false)) {
           // Button should have aria-expanded attribute
           const ariaExpanded = await whyThisButton.getAttribute('aria-expanded');

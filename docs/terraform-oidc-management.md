@@ -73,7 +73,7 @@ The Terraform module creates and manages:
    ```bash
    # View all GitHub secrets
    terraform output github_oidc_secrets
-   
+
    # Or get individual values
    terraform output github_oidc_application_id
    terraform output github_oidc_tenant_id
@@ -96,7 +96,7 @@ To add/modify federated credentials:
 1. **Edit Terraform configuration**:
    ```hcl
    # infra/terraform/modules/github-oidc/main.tf
-   
+
    # Example: Add credential for staging environment
    resource "azuread_application_federated_identity_credential" "staging" {
      application_id = azuread_application.github_actions.id

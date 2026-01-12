@@ -110,7 +110,7 @@ kubectl logs -n cert-manager -l app=cert-manager --tail=100 | grep -i error
 2. **"Cloudflare API Error... Could not route to /zones//dns_records"**
    - **Cause:** Zone ID missing in DELETE request (cleanup phase)
    - **Solution:** Delete stuck challenge, cert-manager will recreate:
-   
+
    ```bash
    kubectl delete challenge <challenge-name> -n gateway-system
    ```
@@ -185,18 +185,18 @@ kubectl get secret cloudflare-api-token -n cert-manager
    - Zone Resources: `Include - All Zones`
 
 2. **Regenerate token if needed:**
-   
+
    ```bash
    # Update token in Azure Key Vault
    az keyvault secret set \
      --vault-name <keyvault-name> \
      --name cloudflare-api-token \
      --value "<new-token>"
-   
+
    # Force ExternalSecret refresh
    kubectl delete secret cloudflare-api-token -n gateway-system
    kubectl delete secret cloudflare-api-token -n cert-manager
-   
+
    # Secrets will be recreated automatically within 1 minute
    ```
 
@@ -222,7 +222,7 @@ kubectl get challenge -n gateway-system -o yaml
    - Verify records exist and match challenge tokens
 
 2. **Manual propagation check:**
-   
+
    ```bash
    # Query Cloudflare nameservers directly
    dig @ns1.cloudflare.com _acme-challenge.yt-summarizer.apps.ashleyhollis.com TXT
@@ -253,17 +253,17 @@ kubectl get certificate yt-summarizer-wildcard -n gateway-system -o yaml | grep 
 cert-manager should automatically renew 30 days before expiry. If renewal failed:
 
 1. **Check cert-manager logs:**
-   
+
    ```bash
    kubectl logs -n cert-manager -l app=cert-manager --tail=200 | grep -i renew
    ```
 
 2. **Force renewal:**
-   
+
    ```bash
    # Delete certificate to trigger immediate renewal
    kubectl delete certificate yt-summarizer-wildcard -n gateway-system
-   
+
    # Certificate will be recreated by ArgoCD
    # Or manually apply:
    kubectl apply -f k8s/argocd/certificates/yt-summarizer-wildcard.yaml
@@ -292,7 +292,7 @@ curl -v https://api.yt-summarizer.apps.ashleyhollis.com
 **Resolution:**
 
 1. **Verify Gateway listener configuration:**
-   
+
    ```yaml
    listeners:
    - name: https
@@ -307,13 +307,13 @@ curl -v https://api.yt-summarizer.apps.ashleyhollis.com
    ```
 
 2. **Restart NGINX Gateway Fabric if needed:**
-   
+
    ```bash
    kubectl rollout restart deployment nginx-gateway -n gateway-system
    ```
 
 3. **Check NGINX Gateway logs:**
-   
+
    ```bash
    kubectl logs -n gateway-system -l app.kubernetes.io/name=nginx-gateway-fabric
    ```
@@ -373,7 +373,7 @@ rm /tmp/tls.key /tmp/tls.crt
 To add or remove domains from the certificate:
 
 1. **Edit certificate manifest:**
-   
+
    ```yaml
    # k8s/argocd/certificates/yt-summarizer-wildcard.yaml
    spec:
@@ -384,13 +384,13 @@ To add or remove domains from the certificate:
    ```
 
 2. **Apply changes:**
-   
+
    ```bash
    kubectl apply -f k8s/argocd/certificates/yt-summarizer-wildcard.yaml
    ```
 
 3. **Monitor re-issuance:**
-   
+
    ```bash
    kubectl get certificate -n gateway-system -w
    ```
@@ -399,7 +399,7 @@ To add or remove domains from the certificate:
 
 1. **Create new token in Cloudflare dashboard**
 2. **Update Azure Key Vault:**
-   
+
    ```bash
    az keyvault secret set \
      --vault-name <keyvault-name> \
@@ -408,14 +408,14 @@ To add or remove domains from the certificate:
    ```
 
 3. **Force secret refresh:**
-   
+
    ```bash
    kubectl delete secret cloudflare-api-token -n gateway-system
    kubectl delete secret cloudflare-api-token -n cert-manager
    ```
 
 4. **Verify secrets recreated:**
-   
+
    ```bash
    kubectl get externalsecret cloudflare-api-token -n gateway-system
    kubectl get secret cloudflare-api-token -n gateway-system

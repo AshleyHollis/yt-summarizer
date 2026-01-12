@@ -72,7 +72,7 @@ function SelectionModeToggle() {
 function LibraryContentWithParams() {
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get('status');
-  
+
   // Validate status from URL is a valid ProcessingStatusFilter
   const validStatus = statusFromUrl && VALID_STATUSES.includes(statusFromUrl as ProcessingStatusFilter)
     ? (statusFromUrl as ProcessingStatusFilter)
@@ -85,7 +85,7 @@ function LibraryContentWithParams() {
  * Library page content that displays videos
  */
 function LibraryContent({ initialStatus }: { initialStatus: ProcessingStatusFilter | null }) {
-  
+
   const [filters, setFilters] = useState<FilterState>(() => ({
     ...DEFAULT_FILTERS,
     status: initialStatus,
@@ -102,7 +102,7 @@ function LibraryContent({ initialStatus }: { initialStatus: ProcessingStatusFilt
    */
   const hasVideosNeedingUpdates = useCallback((videoList: VideoCardType[]): boolean => {
     return videoList.some(
-      (video) => video.processing_status === 'pending' || 
+      (video) => video.processing_status === 'pending' ||
                  video.processing_status === 'processing' ||
                  video.processing_status === 'rate_limited'
     );
@@ -297,7 +297,7 @@ function LibraryContent({ initialStatus }: { initialStatus: ProcessingStatusFilt
           </div>
         </div>
       </main>
-      
+
       {/* Floating selection bar */}
       <SelectionBar />
     </div>

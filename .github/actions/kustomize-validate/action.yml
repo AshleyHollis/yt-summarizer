@@ -40,27 +40,27 @@ runs:
       shell: bash
       run: |
         set -eo pipefail
-        
+
         OVERLAY_DIR="${{ inputs.overlay-path }}"
         OVERLAY_NAME="${{ inputs.overlay-name }}"
         OVERLAY_FILE="$OVERLAY_DIR/kustomization.yaml"
-        
+
         # Determine output file
         if [ -n "${{ inputs.output-file }}" ]; then
           TMP_MANIFEST="${{ inputs.output-file }}"
         else
           TMP_MANIFEST="/tmp/${OVERLAY_NAME}-manifest.yaml"
         fi
-        
+
         ERR_FILE="/tmp/kustomize-${OVERLAY_NAME}.err"
-        
+
         echo "::group::Building $OVERLAY_NAME overlay"
-        
+
         # Display git context for debugging
         echo "--- Git Context ---"
         git rev-parse --abbrev-ref HEAD 2>&1 || true
         git log -1 --oneline 2>&1 || true
-        
+
         # Display overlay file for debugging
         echo "--- Overlay File ---"
         if [ -f "$OVERLAY_FILE" ]; then
@@ -70,20 +70,20 @@ runs:
         else
           echo "⚠️  Overlay file not found: $OVERLAY_FILE"
         fi
-        
+
         # Display patch files
         if [ -d "$OVERLAY_DIR/patches" ]; then
           echo "--- Patch Files ---"
           ls -lh "$OVERLAY_DIR/patches" || true
         fi
-        
+
         # Build with kustomize
         echo "--- Building manifests ---"
         if ! kustomize build "$OVERLAY_DIR" > "$TMP_MANIFEST" 2> "$ERR_FILE"; then
           echo "::error::kustomize build FAILED for overlay '$OVERLAY_NAME'"
           echo "--- Error Output ---"
           cat "$ERR_FILE" || true
-          
+
           # Try to identify problematic patch files
           if grep -q "path:" "$ERR_FILE"; then
             echo "--- Problematic Files ---"
@@ -98,16 +98,16 @@ runs:
               fi
             done
           fi
-          
+
           echo "::endgroup::"
           exit 1
         fi
-        
+
         # Get manifest size
         MANIFEST_SIZE=$(wc -c < "$TMP_MANIFEST")
         echo "✅ Built $OVERLAY_NAME overlay: $MANIFEST_SIZE bytes"
         echo "::endgroup::"
-        
+
         # Output for next steps
         echo "manifest_path=$TMP_MANIFEST" >> $GITHUB_OUTPUT
         echo "manifest_size=$MANIFEST_SIZE" >> $GITHUB_OUTPUT
@@ -116,7 +116,7 @@ runs:
       shell: bash
       run: |
         MANIFEST="${{ steps.build.outputs.manifest_path }}"
-        
+
         echo "::group::Validating YAML syntax"
         if ! python3 scripts/ci/parse_yaml.py "$MANIFEST" 2>&1; then
           echo "::error::YAML validation failed"
@@ -135,7 +135,7 @@ runs:
         MANIFEST="${{ steps.build.outputs.manifest_path }}"
         MAX_CPU="${{ inputs.max-cpu }}"
         OVERLAY_NAME="${{ inputs.overlay-name }}"
-        
+
         echo "::group::Validating CPU quotas (max: ${MAX_CPU}m)"
         if ! python3 scripts/ci/validate_kustomize.py \
           --file "$MANIFEST" \
@@ -154,7 +154,7 @@ runs:
       run: |
         MANIFEST="${{ steps.build.outputs.manifest_path }}"
         OVERLAY_NAME="${{ inputs.overlay-name }}"
-        
+
         echo "::group::Kubernetes server-side dry-run"
         if ! kubectl apply --server-dry-run=server -f "$MANIFEST" 2>&1; then
           echo "::error::Server dry-run failed for $OVERLAY_NAME"

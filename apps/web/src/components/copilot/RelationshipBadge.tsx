@@ -21,7 +21,7 @@ export function RelationshipBadge({
   }
 
   // Determine icon based on relationship content
-  const isSeries = relatedTo.toLowerCase().includes("series") || 
+  const isSeries = relatedTo.toLowerCase().includes("series") ||
                    relatedTo.toLowerCase().includes("part");
   const Icon = isSeries ? Layers : Link2;
 
@@ -29,10 +29,10 @@ export function RelationshipBadge({
     <div
       data-testid="relationship-badge"
       className={`
-        inline-flex items-center gap-1.5 
-        px-2 py-1 
-        bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 
-        text-xs font-medium 
+        inline-flex items-center gap-1.5
+        px-2 py-1
+        bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300
+        text-xs font-medium
         rounded-full
         ${className}
       `}

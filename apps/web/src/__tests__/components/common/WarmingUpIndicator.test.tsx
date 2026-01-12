@@ -15,7 +15,7 @@ describe('WarmingUpIndicator', () => {
 
   it('should render warming up message when status is degraded', () => {
     render(<WarmingUpIndicator status="degraded" />);
-    
+
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.getByText(/warming up/i)).toBeInTheDocument();
     expect(screen.getByText(/database is starting/i)).toBeInTheDocument();
@@ -23,7 +23,7 @@ describe('WarmingUpIndicator', () => {
 
   it('should render service unavailable message when status is unhealthy', () => {
     render(<WarmingUpIndicator status="unhealthy" show={true} />);
-    
+
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.getByText(/service unavailable/i)).toBeInTheDocument();
   });
@@ -31,13 +31,13 @@ describe('WarmingUpIndicator', () => {
   it('should render custom message when provided', () => {
     const customMessage = 'Custom warming message';
     render(<WarmingUpIndicator status="degraded" message={customMessage} />);
-    
+
     expect(screen.getByText(customMessage)).toBeInTheDocument();
   });
 
   it('should show indicator when show prop is true regardless of status', () => {
     render(<WarmingUpIndicator status="healthy" show={true} message="Forced display" />);
-    
+
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.getByText('Forced display')).toBeInTheDocument();
   });
@@ -61,14 +61,14 @@ describe('WarmingUpIndicator', () => {
 
   it('should apply yellow styling for degraded status', () => {
     render(<WarmingUpIndicator status="degraded" />);
-    
+
     const indicator = screen.getByTestId('warming-up-indicator');
     expect(indicator.className).toContain('bg-yellow');
   });
 
   it('should apply red styling for unhealthy status', () => {
     render(<WarmingUpIndicator status="unhealthy" show={true} />);
-    
+
     const indicator = screen.getByTestId('warming-up-indicator');
     expect(indicator.className).toContain('bg-red');
   });

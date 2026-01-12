@@ -6,7 +6,7 @@ tools:
   - search
   - execute
 target: vscode
-handoffs: 
+handoffs:
   - label: Create Tasks
     agent: speckit.tasks
     prompt: Break the plan into tasks

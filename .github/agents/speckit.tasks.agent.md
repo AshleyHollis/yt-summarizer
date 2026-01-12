@@ -6,7 +6,7 @@ tools:
   - search
   - execute
 target: vscode
-handoffs: 
+handoffs:
   - label: Analyze For Consistency
     agent: speckit.analyze
     prompt: Run a project analysis for consistency

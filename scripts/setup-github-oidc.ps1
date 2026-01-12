@@ -28,13 +28,13 @@
 param(
     [Parameter(Mandatory=$true)]
     [string]$SubscriptionId,
-    
+
     [Parameter(Mandatory=$true)]
     [string]$ResourceGroupName,
-    
+
     [Parameter(Mandatory=$true)]
     [string]$GitHubOrg,
-    
+
     [Parameter(Mandatory=$true)]
     [string]$GitHubRepo
 )

@@ -72,8 +72,8 @@ New comprehensive reference document containing:
 
 Added note at top:
 ```markdown
-> **Note**: This file provides Aspire-specific guidance for AI coding agents. 
-> For comprehensive repository-wide instructions including available tools, 
+> **Note**: This file provides Aspire-specific guidance for AI coding agents.
+> For comprehensive repository-wide instructions including available tools,
 > scripts, and workflows, see [.github/copilot-instructions.md](.github/copilot-instructions.md).
 ```
 
@@ -82,7 +82,7 @@ Added note at top:
 ### 1. **Explicit Tool Awareness**
 Agents now have explicit `tools` declarations in their frontmatter, making it clear what capabilities are available.
 
-### 2. **GitHub CLI Visibility** 
+### 2. **GitHub CLI Visibility**
 Multiple mentions of `gh` CLI with specific examples throughout:
 - In copilot-instructions.md "Available Tools & Capabilities" section
 - In TOOLS_REFERENCE.md with detailed usage patterns

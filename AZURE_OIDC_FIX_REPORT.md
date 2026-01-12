@@ -109,7 +109,7 @@ The configuration looks correct - both PR and main branch should match valid cre
 
 ```powershell
 # Verify no auth-type: OIDC remains
-Get-ChildItem -Path ".github" -Recurse -Include "*.yml","*.yaml" | 
+Get-ChildItem -Path ".github" -Recurse -Include "*.yml","*.yaml" |
   Select-String -Pattern "auth-type.*OIDC" -SimpleMatch
 
 # Should return no results

@@ -49,7 +49,7 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 
 ```powershell
 # Option 1: From Kubernetes secret
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | 
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" |
     ForEach-Object { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
 
 # Option 2: From Azure Key Vault

@@ -40,7 +40,7 @@ function Add-TestResult {
         [string]$Status,
         [string]$FailureOutput
     )
-    
+
     $script:results += [PSCustomObject]@{
         Suite = $Suite
         Passed = $Passed
@@ -48,7 +48,7 @@ function Add-TestResult {
         Skipped = $Skipped
         Status = $Status
     }
-    
+
     if ($Failed -gt 0) {
         $script:allPassed = $false
         $script:failures += @{
@@ -66,7 +66,7 @@ function Write-FailureLog {
         $logContent += "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
         $logContent += "=" * 80
         $logContent += ""
-        
+
         foreach ($failure in $script:failures) {
             $logContent += "-" * 80
             $logContent += "SUITE: $($failure.Suite)"
@@ -74,7 +74,7 @@ function Write-FailureLog {
             $logContent += $failure.Output
             $logContent += ""
         }
-        
+
         $logContent | Out-File -FilePath $failureLogPath -Encoding UTF8
         Write-Host "  Failure details saved to: $failureLogPath" -ForegroundColor Yellow
     }
@@ -147,8 +147,8 @@ $frontendOutput = npm run test:run 2>&1 | Out-String
 # Vitest outputs "Test Files  X passed" then "Tests  Y passed" - we want Y
 # Match all "N passed" patterns and take the last one (which is total tests)
 $allPassedMatches = [regex]::Matches($frontendOutput, "(\d+) passed")
-$frontendPassed = if ($allPassedMatches.Count -ge 2) { 
-    [int]$allPassedMatches[$allPassedMatches.Count - 1].Groups[1].Value 
+$frontendPassed = if ($allPassedMatches.Count -ge 2) {
+    [int]$allPassedMatches[$allPassedMatches.Count - 1].Groups[1].Value
 } elseif ($allPassedMatches.Count -eq 1) {
     [int]$allPassedMatches[0].Groups[1].Value
 } else { 0 }
@@ -167,7 +167,7 @@ if ($frontendFailed -eq 0 -and $frontendPassed -gt 0) {
 # 5. E2E Tests (requires Aspire running)
 if ($SkipE2E -eq $false) {
     Write-Host "[5/5] Running E2E Tests..." -ForegroundColor Yellow
-    
+
     # Check if Aspire is running by testing the API endpoint
     $aspireRunning = $false
     try {
@@ -176,7 +176,7 @@ if ($SkipE2E -eq $false) {
     } catch {
         $aspireRunning = $false
     }
-    
+
     if ($aspireRunning -eq $false) {
         Write-Host "  [WARN] Aspire not running - starting it..." -ForegroundColor Yellow
         Push-Location "$repoRoot\services\aspire\AppHost"
@@ -185,7 +185,7 @@ if ($SkipE2E -eq $false) {
         Write-Host "  Waiting 45 seconds for services to start..." -ForegroundColor Yellow
         Start-Sleep -Seconds 45
     }
-    
+
     Push-Location "$repoRoot\apps\web"
     $env:USE_EXTERNAL_SERVER = "true"
     $e2eOutput = npx playwright test 2>&1 | Out-String
@@ -196,7 +196,7 @@ if ($SkipE2E -eq $false) {
     $e2eSkipMatch = [regex]::Match($e2eOutput, "(\d+) skipped")
     $e2eSkipped = if ($e2eSkipMatch.Success) { [int]$e2eSkipMatch.Groups[1].Value } else { 0 }
     Pop-Location
-    
+
     if ($e2eFailed -eq 0 -and $e2ePassed -gt 0) {
         Write-Host "  [PASS] E2E Tests: $e2ePassed passed, $e2eSkipped skipped" -ForegroundColor Green
         Add-TestResult -Suite "E2E" -Passed $e2ePassed -Failed 0 -Skipped $e2eSkipped -Status "PASS" -FailureOutput ""

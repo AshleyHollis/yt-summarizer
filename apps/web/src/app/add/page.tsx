@@ -14,7 +14,7 @@ import {
 
 /**
  * Unified Add Content Page
- * 
+ *
  * Smart URL detection allows users to paste any YouTube URL:
  * - Video URLs → Immediate processing with redirect to video detail
  * - Channel URLs → Browse and select videos for batch ingestion

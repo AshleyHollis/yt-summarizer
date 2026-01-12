@@ -108,7 +108,7 @@ Changes in 1.0.1:
 3. **Video relationships**: Videos MAY be linked to each other. Relationships SHOULD store:
    - Relationship type (e.g., `series`, `progression`, `related`, `references`, `same-topic`)
    - Evidence pointer (which segment or metadata suggested the connection)
-   
+
    Examples:
    - Series: "Part 1 of 5" → enables watch order
    - Progression: "Beginner → Intermediate → Advanced" → enables learning paths
@@ -135,7 +135,7 @@ Changes in 1.0.1:
 3. **Observability**: All components MUST emit:
    - **Structured logs** (JSON, queryable fields).
    - **Distributed traces** with correlation IDs propagated from UI → API → workers.
-   
+
    Metrics (request counts, latencies, queue depth) are recommended but not required initially.
 
 4. **GitOps deployments**:

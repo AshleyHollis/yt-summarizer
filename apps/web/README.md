@@ -37,7 +37,7 @@ This uses the configuration in `.depcheckrc` and will match CI behavior. For det
 Some dependencies are used in configuration files or at build time, which static analysis can't detect. These are documented in `.depcheckrc` and include:
 
 - **@copilotkit/runtime** - Referenced in `next.config.ts` for bundle optimization (`optimizePackageImports`)
-- **@tailwindcss/postcss** - PostCSS plugin used in `postcss.config.mjs` 
+- **@tailwindcss/postcss** - PostCSS plugin used in `postcss.config.mjs`
 - **@tailwindcss/typography** - Provides `prose-*` utility classes used throughout the app
 - **tailwindcss** - Core CSS framework loaded via `@import "tailwindcss"` in `src/app/globals.css`
 
@@ -57,4 +57,3 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-

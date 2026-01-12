@@ -437,7 +437,7 @@ terraform refresh
 ### "ImagePullBackOff"
 
 **Cause**: Kubernetes can't pull image from ACR
-**Fix**: 
+**Fix**:
 1. Verify ACR attachment to AKS
 2. Check image tag exists
 3. Verify AcrPull role assignment

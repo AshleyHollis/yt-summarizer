@@ -60,7 +60,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       // The page should show either "Processing" section or status
       const processingIndicator = page.getByText(/processing|pending|running/i).first();
       const completedIndicator = page.getByText(/completed|summary|transcript/i).first();
-      
+
       // Wait for either processing to start or already be completed
       await expect(processingIndicator.or(completedIndicator)).toBeVisible({ timeout: 10_000 });
     });
@@ -70,7 +70,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await page.goto('/submit');
       const urlInput = page.getByLabel(/YouTube Video URL/i);
       await urlInput.fill(TEST_VIDEO_URL);
-      
+
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
@@ -86,7 +86,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       const jobSection = page.locator('section, div').filter({
         hasText: /transcribe|summarize|embed|relationship|progress|status/i,
       });
-      
+
       // At least one should be visible (either progress or completed content)
       await expect(jobSection.first()).toBeVisible({ timeout: 10_000 });
     });
@@ -96,7 +96,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await page.goto('/submit');
       const urlInput = page.getByLabel(/YouTube Video URL/i);
       await urlInput.fill(TEST_VIDEO_URL);
-      
+
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
@@ -131,16 +131,16 @@ test.describe('User Story 1: Video Submission Flow', () => {
       // Submit a video once and reuse for subsequent tests
       const page = await browser.newPage();
       await page.goto('/submit');
-      
+
       const urlInput = page.getByLabel(/YouTube Video URL/i);
       await urlInput.fill(TEST_VIDEO_URL);
-      
+
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
       await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
       existingVideoId = page.url().split('/videos/')[1];
-      
+
       // Wait for processing to complete
       await waitForVideoCompletion(page, PROCESSING_TIMEOUT);
       await page.close();
@@ -148,26 +148,26 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
     test('can navigate back to submit page', async ({ page }) => {
       test.skip(!existingVideoId, 'No video ID from setup');
-      
+
       await page.goto(`/videos/${existingVideoId}`);
-      
+
       // Find and click back link
       const backLink = page.getByRole('link', { name: /back|submit|new/i });
       await expect(backLink.first()).toBeVisible();
       await backLink.first().click();
-      
+
       // Should be on submit page
       await expect(page).toHaveURL('/submit');
     });
 
     test('displays video metadata', async ({ page }) => {
       test.skip(!existingVideoId, 'No video ID from setup');
-      
+
       await page.goto(`/videos/${existingVideoId}`);
-      
+
       // Wait for content to load
       await expect(page.locator('main')).toBeVisible();
-      
+
       // Should show video title or ID
       const titleOrId = page.getByText(/video|du8qD6fiX7Y/i);
       await expect(titleOrId.first()).toBeVisible({ timeout: 5_000 });
@@ -175,9 +175,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
     test('shows completion status for finished video', async ({ page }) => {
       test.skip(!existingVideoId, 'No video ID from setup');
-      
+
       await page.goto(`/videos/${existingVideoId}`);
-      
+
       // For a completed video, should show success indicators or content
       const completionIndicator = page.locator('text=/completed|success|summary|transcript/i');
       await expect(completionIndicator.first()).toBeVisible({ timeout: 10_000 });
@@ -185,18 +185,18 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
     test('transcript content is readable', async ({ page }) => {
       test.skip(!existingVideoId, 'No video ID from setup');
-      
+
       await page.goto(`/videos/${existingVideoId}`);
-      
+
       // Wait for video to be loaded
       await expect(page.locator('main')).toBeVisible();
-      
+
       // Find transcript section
       const transcriptSection = page.locator('[data-testid="transcript"], .transcript, section:has-text("Transcript")').first();
-      
+
       // Either find specific transcript section or general text content
       const transcriptContent = transcriptSection.or(page.locator('pre, .prose, .markdown').first());
-      
+
       if (await transcriptContent.isVisible()) {
         // Verify there's actual text content
         const text = await transcriptContent.textContent();
@@ -207,18 +207,18 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
     test('summary content is readable', async ({ page }) => {
       test.skip(!existingVideoId, 'No video ID from setup');
-      
+
       await page.goto(`/videos/${existingVideoId}`);
-      
+
       // Wait for video to be loaded
       await expect(page.locator('main')).toBeVisible();
-      
+
       // Find summary section
       const summarySection = page.locator('[data-testid="summary"], .summary, section:has-text("Summary")').first();
-      
+
       // Either find specific summary section or general markdown content
       const summaryContent = summarySection.or(page.locator('.prose, .markdown, article').first());
-      
+
       if (await summaryContent.isVisible()) {
         // Verify there's actual text content
         const text = await summaryContent.textContent();
@@ -231,7 +231,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
   test.describe('Error Handling', () => {
     test('shows error for invalid video ID', async ({ page }) => {
       await page.goto('/videos/invalid-uuid-format');
-      
+
       // Should show error message
       const errorMessage = page.getByText(/error|not found|invalid|failed/i);
       await expect(errorMessage.first()).toBeVisible({ timeout: 10_000 });
@@ -240,7 +240,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
     test('shows error for non-existent video', async ({ page }) => {
       // Use a valid UUID format but non-existent
       await page.goto('/videos/00000000-0000-0000-0000-000000000000');
-      
+
       // Should show not found or error
       const errorMessage = page.getByText(/error|not found|failed/i);
       await expect(errorMessage.first()).toBeVisible({ timeout: 10_000 });
@@ -254,7 +254,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       });
 
       await page.goto('/videos/00000000-0000-0000-0000-000000000001');
-      
+
       // Should show loading or error state
       const statusIndicator = page.getByText(/loading|error|timeout|failed/i);
       await expect(statusIndicator.first()).toBeVisible({ timeout: 15_000 });
@@ -264,10 +264,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
   test.describe('Polling and Auto-refresh', () => {
     test('page auto-refreshes during processing', async ({ page }) => {
       await page.goto('/submit');
-      
+
       const urlInput = page.getByLabel(/YouTube Video URL/i);
       await urlInput.fill(TEST_VIDEO_URL);
-      
+
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
@@ -302,7 +302,7 @@ test.describe('Reprocessing Flow', () => {
     await page.goto('/submit');
     const urlInput = page.getByLabel(/YouTube Video URL/i);
     await urlInput.fill(TEST_VIDEO_URL);
-    
+
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
@@ -313,10 +313,10 @@ test.describe('Reprocessing Flow', () => {
 
     // Look for reprocess button
     const reprocessButton = page.getByRole('button', { name: /reprocess|retry|re-run/i });
-    
+
     if (await reprocessButton.isVisible()) {
       await reprocessButton.click();
-      
+
       // Should start processing again
       const processingIndicator = page.getByText(/processing|pending|running/i);
       await expect(processingIndicator.first()).toBeVisible({ timeout: 10_000 });
@@ -329,13 +329,13 @@ test.describe('Reprocessing Flow', () => {
  */
 async function waitForVideoCompletion(page: Page, timeout: number): Promise<void> {
   const startTime = Date.now();
-  
+
   while (Date.now() - startTime < timeout) {
     // Check for completion indicators
     const completedText = page.getByText(/completed/i);
     const summarySection = page.locator('section, div').filter({ hasText: /summary/i });
     const transcriptSection = page.locator('section, div').filter({ hasText: /transcript/i });
-    
+
     // Check if any completion indicator is visible
     const isCompleted = await Promise.race([
       completedText.first().isVisible().catch(() => false),

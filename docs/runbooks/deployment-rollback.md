@@ -145,7 +145,7 @@ kubectl set image deployment/api \
 kubectl set image deployment/transcribe-worker \
   worker=acrytsumm.azurecr.io/workers:sha-previous \
   -n yt-summarizer
-  
+
 # Repeat for other workers...
 ```
 

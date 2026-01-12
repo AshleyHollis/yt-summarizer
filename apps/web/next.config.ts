@@ -69,7 +69,7 @@ const nextConfig: NextConfig = {
   // Note: Exclude .swa paths for Azure Static Web Apps health checks
   async rewrites() {
     let backendUrl = process.env.API_URL || 'http://localhost:8000';
-    
+
     // Attempt to load dynamically injected backend URL (for CI/CD previews)
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -122,4 +122,3 @@ const nextConfig: NextConfig = {
 };
 
 export default withBundleAnalyzer(nextConfig);
-

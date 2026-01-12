@@ -5,7 +5,7 @@ tools:
   - edit
   - search
 target: vscode
-handoffs: 
+handoffs:
   - label: Build Technical Plan
     agent: speckit.plan
     prompt: Create a plan for the spec. I am building with...

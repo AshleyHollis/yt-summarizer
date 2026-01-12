@@ -23,7 +23,7 @@ export interface HealthStatusProviderProps {
  * Provider component that wraps the app and shares health status.
  * Health is polled automatically and more frequently when degraded.
  */
-export function HealthStatusProvider({ 
+export function HealthStatusProvider({
   children,
   pollInterval = 5000,
 }: HealthStatusProviderProps): ReactElement {
@@ -46,11 +46,11 @@ export function HealthStatusProvider({
  */
 export function useHealthStatus(): HealthStatusContextType {
   const context = useContext(HealthStatusContext);
-  
+
   if (!context) {
     throw new Error('useHealthStatus must be used within a HealthStatusProvider');
   }
-  
+
   return context;
 }
 

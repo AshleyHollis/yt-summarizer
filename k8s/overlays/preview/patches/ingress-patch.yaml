@@ -2,7 +2,7 @@
 # Preview Ingress Patch
 # =============================================================================
 # Routes traffic to preview API pods via sslip.io wildcard DNS
-# 
+#
 # CRITICAL: TLS/HTTPS REQUIREMENTS
 # ---------------------------------
 # - Frontend served from Azure Static Web Apps over HTTPS

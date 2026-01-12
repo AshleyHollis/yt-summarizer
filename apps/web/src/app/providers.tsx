@@ -204,36 +204,36 @@ interface ProvidersProps {
 
 /**
  * Root Providers Component
- * 
+ *
  * ## CHAT WINDOW / THREAD ARCHITECTURE
- * 
+ *
  * This is where CopilotKit is initialized. Understanding this is CRITICAL
  * to avoid breaking the chat/thread functionality.
- * 
+ *
  * ### Key Components and Their Roles:
- * 
+ *
  * 1. **CopilotKit** (this file)
  *    - Initializes the CopilotKit runtime connection
  *    - Receives `threadId` from URL to load correct thread
  *    - ⚠️ DO NOT use `key={threadId}` - causes full remount and UI flash
- * 
+ *
  * 2. **ThreadedCopilotSidebar** (components/copilot/ThreadedCopilotSidebar.tsx)
  *    - The actual chat UI component
  *    - Manages thread list dropdown and switching
  *    - Uses useThreadPersistence hook for thread operations
- * 
+ *
  * 3. **useThreadPersistence** (hooks/useThreadPersistence.ts)
  *    - React hook for all thread CRUD operations
  *    - Handles debounced auto-save of messages
  *    - Syncs thread ID with URL via callback
- * 
+ *
  * 4. **threadPersistence.ts** (services/threadPersistence.ts)
  *    - Stateless API layer for server communication
  *    - prepareMessagesForDisplay() - reconstructs toolCalls for rich UI
  *    - copilotToThreadMessages() - converts CopilotKit messages for saving
- * 
+ *
  * ### Data Flow:
- * 
+ *
  * ```
  * URL (?thread=xxx)
  *   ↓
@@ -245,14 +245,14 @@ interface ProvidersProps {
  *   ↓
  * useThreadPersistence syncs URL ↔ saves messages
  * ```
- * 
+ *
  * ### Common Mistakes to Avoid:
- * 
+ *
  * ❌ Using `key={threadId}` on CopilotKit - causes full component remount
  * ❌ Managing threadId in React state instead of URL - causes sync issues
  * ❌ Calling setMessages without prepareMessagesForDisplay - breaks rich UI
  * ❌ Saving messages without copilotToThreadMessages - loses tool call info
- * 
+ *
  * @see ThreadedCopilotSidebar.tsx - Chat UI component
  * @see useThreadPersistence.ts - Thread operations hook
  * @see threadPersistence.ts - API layer and message transformation
@@ -281,7 +281,7 @@ function ProvidersInner({ children }: ProvidersProps) {
   // Configure NEXT_PUBLIC_API_URL to point to your backend
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const runtimeUrl = `${apiUrl}/api/copilotkit`;
-  
+
   // Debug logging for production troubleshooting
   if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENVIRONMENT === 'preview') {
     console.log('[CopilotKit Debug]', {
@@ -291,7 +291,7 @@ function ProvidersInner({ children }: ProvidersProps) {
       NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
     });
   }
-  
+
   // ============================================================================
   // THREAD ID FROM URL - The Single Source of Truth
   // ============================================================================
@@ -299,10 +299,10 @@ function ProvidersInner({ children }: ProvidersProps) {
   // Changes flow: ThreadedCopilotSidebar → URL → re-render with new threadId
   const searchParams = useSearchParams();
   const urlThreadId = searchParams.get("thread");
-  
+
   // Track mounted state for hydration
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -313,12 +313,12 @@ function ProvidersInner({ children }: ProvidersProps) {
   // NOTE: We intentionally DO NOT use key={threadId} here!
   // Using key causes full component remount which destroys UI state and
   // causes the "page refresh" effect. CopilotKit handles threadId changes internally.
-  
+
   return (
     <CopilotErrorBoundary>
-      <CopilotKit 
-        runtimeUrl={runtimeUrl} 
-        agent="yt-summarizer" 
+      <CopilotKit
+        runtimeUrl={runtimeUrl}
+        agent="yt-summarizer"
         showDevConsole={false}
         enableInspector={false}
         threadId={mounted ? (urlThreadId ?? undefined) : undefined}
@@ -340,14 +340,14 @@ function ProvidersInner({ children }: ProvidersProps) {
  */
 function HealthStatusBanner() {
   const { health, isDegraded, isUnhealthy } = useHealthStatus();
-  
+
   if (!isDegraded && !isUnhealthy) {
     return null;
   }
-  
+
   return (
-    <WarmingUpIndicator 
-      status={health?.status || 'unhealthy'} 
+    <WarmingUpIndicator
+      status={health?.status || 'unhealthy'}
       show={isDegraded || isUnhealthy}
     />
   );

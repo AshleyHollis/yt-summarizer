@@ -22,9 +22,9 @@ export function WhyThisButton({
     <button
       onClick={onClick}
       className={`
-        inline-flex items-center gap-1 
-        text-xs font-medium 
-        text-gray-500 hover:text-red-600 
+        inline-flex items-center gap-1
+        text-xs font-medium
+        text-gray-500 hover:text-red-600
         transition-colors
         ${isExpanded ? "text-red-600" : ""}
         ${className}

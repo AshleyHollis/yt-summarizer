@@ -7,13 +7,13 @@ async function handler(req: NextRequest, props: { params: Promise<{ path: string
   const paramsValue = await props.params;
   const path = (paramsValue?.path || []).join('/');
   const query = req.nextUrl.search;
-  
+
   // URL priority:
   // 1. Env var API_BASE_URL (Runtime env from SWA/Container)
   // 2. Env var REAL_BACKEND_URL (Legacy support)
   // 3. backend-config.json (File injected at build time)
   let baseUrl = process.env.API_BASE_URL || process.env.REAL_BACKEND_URL;
-  
+
   if (!baseUrl) {
     try {
       // Fallback: Try reading config file if env vars missing
@@ -33,7 +33,7 @@ async function handler(req: NextRequest, props: { params: Promise<{ path: string
   if (!baseUrl) {
     console.error('API Proxy: No backend URL configured');
     return NextResponse.json(
-      { error: 'API Proxy configuration missing. Please check API_BASE_URL environment variable.' }, 
+      { error: 'API Proxy configuration missing. Please check API_BASE_URL environment variable.' },
       { status: 500 }
     );
   }
@@ -45,24 +45,24 @@ async function handler(req: NextRequest, props: { params: Promise<{ path: string
   // We want to forward to BASE_URL/info ?
   // If BASE_URL is `http://IP/api`, then `http://IP/api/info`.
   // If BASE_URL is `http://IP`, then `http://IP/api/info`.
-  
+
   // The preview.yml sets URL to `.../api` (e.g. `https://INGRESS_IP/api`).
   // So we append the path. `.../api/info`. Correct.
-  
+
   // Remove trailing slash from baseUrl if present
   baseUrl = baseUrl.replace(/\/$/, '');
-  
+
   const targetUrl = `${baseUrl}/${path}${query}`;
   // console.log(`Proxying ${req.method} ${req.nextUrl.pathname} -> ${targetUrl}`);
 
   try {
     const headers = new Headers(req.headers);
-    
+
     // Cleanup headers
     headers.delete('host');
     headers.delete('connection');
     headers.delete('content-length');
-    
+
     // Add X-Forwarded headers
     headers.set('X-Forwarded-Host', req.headers.get('host') || '');
     headers.set('X-Forwarded-Proto', req.headers.get('x-forwarded-proto') || 'https');
@@ -90,10 +90,10 @@ async function handler(req: NextRequest, props: { params: Promise<{ path: string
     const responseHeaders = new Headers(response.headers);
     responseHeaders.set('X-Debug-Target-Url', targetUrl);
     responseHeaders.set('X-Debug-Base-Url', baseUrl);
-    
+
     // Fix CORS if needed (though proxy usually avoids it)
     // SWA might handle CORS on its own edge.
-    
+
     return new NextResponse(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -104,7 +104,7 @@ async function handler(req: NextRequest, props: { params: Promise<{ path: string
     const message = error instanceof Error ? error.message : String(error);
     console.error('Proxy Request Failed:', message);
     return NextResponse.json(
-      { error: 'Proxy Request Failed', details: message }, 
+      { error: 'Proxy Request Failed', details: message },
       { status: 502 }
     );
   }

@@ -1,6 +1,6 @@
 /**
  * Tests for FilterSidebar component
- * 
+ *
  * These tests verify:
  * - Valid status filter values are accepted
  * - Status filter correctly maps to API enum values
@@ -63,13 +63,13 @@ describe('FilterSidebar', () => {
       // Check all valid status options are present
       const options = statusSelect.querySelectorAll('option');
       const optionValues = Array.from(options).map((opt) => opt.value);
-      
+
       expect(optionValues).toContain('');  // All Status
       expect(optionValues).toContain('completed');
       expect(optionValues).toContain('processing');
       expect(optionValues).toContain('pending');
       expect(optionValues).toContain('failed');
-      
+
       // 'ready' should NOT be a valid option
       expect(optionValues).not.toContain('ready');
     });
@@ -123,7 +123,7 @@ describe('FilterSidebar', () => {
      * CRITICAL: These tests ensure the frontend status filter values
      * match what the API expects. The API uses ProcessingStatusFilter enum
      * with values: 'pending', 'processing', 'completed', 'failed'
-     * 
+     *
      * Any mismatch (like using 'ready' instead of 'completed') will cause
      * API errors when filtering.
      */

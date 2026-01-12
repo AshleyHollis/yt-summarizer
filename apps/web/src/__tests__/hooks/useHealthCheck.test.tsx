@@ -137,7 +137,7 @@ describe('useHealthCheck', () => {
 
     // Now switch to healthy and trigger refresh
     returnHealthy = true;
-    
+
     await act(async () => {
       await result.current.refresh();
     });
@@ -145,14 +145,14 @@ describe('useHealthCheck', () => {
     await waitFor(() => {
       expect(result.current.isHealthy).toBe(true);
     });
-    
+
     // Should have called at least twice (initial + refresh)
     expect(mockHealthApi.getHealth.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it('should poll more frequently when degraded', async () => {
     vi.useFakeTimers();
-    
+
     mockHealthApi.getHealth.mockResolvedValue(mockDegradedResponse);
 
     renderHook(() => useHealthCheck({ enabled: true, pollInterval: 5000 }));
@@ -172,7 +172,7 @@ describe('useHealthCheck', () => {
 
     // Should have polled again
     expect(mockHealthApi.getHealth.mock.calls.length).toBeGreaterThan(initialCallCount);
-    
+
     vi.useRealTimers();
   });
 });
