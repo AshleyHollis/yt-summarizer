@@ -54,8 +54,14 @@ spec:
           # tokenRef:
           #   secretName: github-token
           #   key: token
-        # Poll every 30s to quickly detect PR branch updates (overlay commits)
-        requeueAfterSeconds: 30
+
+          # Optional: filter by labels
+          # labels:
+          #   - preview
+        # Poll every 15s to quickly detect PR branch updates (overlay commits)
+        # Fast polling ensures Argo CD picks up overlay changes within 15s
+        requeueAfterSeconds: 15
+
 
   # Template for each discovered PR
   template:
@@ -72,6 +78,8 @@ spec:
         preview.yt-summarizer/pr-number: '{{number}}'
         preview.yt-summarizer/pr-branch: '{{branch}}'
         preview.yt-summarizer/pr-head-sha: '{{head_sha}}'
+        # Force hard refresh on every sync to bypass cache
+        argocd.argoproj.io/refresh: hard
       finalizers:
         - resources-finalizer.argocd.argoproj.io
     spec:
