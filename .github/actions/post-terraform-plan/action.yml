@@ -117,10 +117,28 @@ runs:
           const destroys = resources.filter(r => r.action === 'destroy');
 
           function buildResourceSection(resource) {
-            const icons = { create: '+', update: '~', replace: '-/+', destroy: '-' };
-            const icon = icons[resource.action] || '?';
+            const actionColors = {
+              create: '#22c55e',
+              update: '#f59e0b', 
+              replace: '#a855f7',
+              destroy: '#ef4444'
+            };
+            const actionSymbols = {
+              create: '+ create',
+              update: '~ update',
+              replace: '-/+ replace',
+              destroy: '- destroy'
+            };
+            const color = actionColors[resource.action] || '#6b7280';
+            const symbol = actionSymbols[resource.action] || 'read';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
-            return `<details>\n<summary><code>${icon}</code> <code>${resource.address}</code></summary>\n\n\`\`\`hcl\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
+            
+            return `<details>\n<summary>` +
+              `<strong style="color:${color};">${symbol}</strong> ` +
+              `<code>${resource.address}</code>` +
+              `</summary>\n\n` +
+              `\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n` +
+              `</details>`;
           }
 
           // Build the comment body
@@ -130,60 +148,92 @@ runs:
           sections.push(COMMENT_MARKER);
           sections.push('');
 
-          // Status header with outcome
+          // Status header with outcome - more visual
           if (planOutcome === 'success') {
-            sections.push('## :white_check_mark: Terraform Plan');
+            sections.push('# <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/master/public/img/logo-terraform.svg" width="20" height="20" /> Terraform Plan');
           } else {
-            sections.push('## :x: Terraform Plan Failed');
+            sections.push('# <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/master/public/img/logo-terraform.svg" width="20" height="20" /> Terraform Plan Failed');
           }
           sections.push('');
 
-          // Compact info line with run number prominently displayed
-          sections.push(`> **Run #${runNumber}** | ${timestamp} | @${context.actor} | [View Workflow](${runUrl})`);
+          // Metadata table - cleaner layout
+          sections.push('| | |');
+          sections.push('|:--|:--|');
+          sections.push(`| **Run** | [#${runNumber}](${runUrl}) ${planOutcome === 'success' ? '✅' : '❌'} |`);
+          sections.push(`| **Updated** | ${timestamp} |`);
+          sections.push(`| **Triggered by** | @${context.actor} |`);
           sections.push('');
 
-          // Summary section - compact inline badges
+          // Summary section with better visual hierarchy
           if (hasChanges) {
-            const badges = [];
-            if (summary.add > 0) badges.push(`:green_circle: **${summary.add}** to add`);
-            if (summary.change > 0) badges.push(`:yellow_circle: **${summary.change}** to change`);
-            if (summary.destroy > 0) badges.push(`:red_circle: **${summary.destroy}** to destroy`);
-            sections.push(`**Plan:** ${badges.join(' · ')}`);
+            const totalChanges = summary.add + summary.change + summary.destroy;
+            sections.push(`### 📊 Summary: ${totalChanges} resource${totalChanges !== 1 ? 's' : ''} to change`);
+            sections.push('');
+            sections.push('| Action | Resources |');
+            sections.push('|:-------|----------:|');
+            if (summary.add > 0) {
+              sections.push(`| <span style="color:#22c55e;">**+ Create**</span> | **${summary.add}** |`);
+            }
+            if (summary.change > 0) {
+              sections.push(`| <span style="color:#f59e0b;">**~ Update**</span> | **${summary.change}** |`);
+            }
+            if (summary.destroy > 0) {
+              sections.push(`| <span style="color:#ef4444;">**- Destroy**</span> | **${summary.destroy}** |`);
+            }
+            sections.push('');
+            
+            // Navigation hint
+            sections.push('> 💡 **Tip:** Click on sections below to expand/collapse resource details');
+            sections.push('');
           } else {
-            sections.push('**Plan:** :white_check_mark: No changes. Infrastructure is up-to-date.');
+            sections.push('### ✅ No Changes');
+            sections.push('');
+            sections.push('> Infrastructure matches the configuration. No changes required.');
+            sections.push('');
           }
-          sections.push('');
-          sections.push('---');
+
+          sections.push('<hr/>');
           sections.push('');
 
-          // Resource details by action type - more compact headers
+          // Resource details by action type - improved styling
           if (creates.length > 0) {
-            sections.push(`<details open>`);
-            sections.push(`<summary><strong>:green_circle: Create (${creates.length})</strong></summary>`);
+            sections.push(`### <span style="color:#22c55e;">➕ Resources to Create</span> <sup>${creates.length}</sup>`);
+            sections.push('');
+            sections.push(`<details>`);
+            sections.push(`<summary>Click to expand all ${creates.length} resource${creates.length !== 1 ? 's' : ''}</summary>`);
             sections.push('');
             creates.forEach(r => sections.push(buildResourceSection(r)));
             sections.push('</details>');
             sections.push('');
           }
+          
           if (replaces.length > 0) {
-            sections.push(`<details open>`);
-            sections.push(`<summary><strong>:purple_circle: Replace (${replaces.length})</strong></summary>`);
+            sections.push(`### <span style="color:#a855f7;">♻️ Resources to Replace</span> <sup>${replaces.length}</sup>`);
+            sections.push('');
+            sections.push(`<details>`);
+            sections.push(`<summary>Click to expand all ${replaces.length} resource${replaces.length !== 1 ? 's' : ''}</summary>`);
             sections.push('');
             replaces.forEach(r => sections.push(buildResourceSection(r)));
             sections.push('</details>');
             sections.push('');
           }
+          
           if (updates.length > 0) {
-            sections.push(`<details open>`);
-            sections.push(`<summary><strong>:yellow_circle: Update (${updates.length})</strong></summary>`);
+            sections.push(`### <span style="color:#f59e0b;">🔄 Resources to Update</span> <sup>${updates.length}</sup>`);
+            sections.push('');
+            sections.push(`<details>`);
+            sections.push(`<summary>Click to expand all ${updates.length} resource${updates.length !== 1 ? 's' : ''}</summary>`);
             sections.push('');
             updates.forEach(r => sections.push(buildResourceSection(r)));
             sections.push('</details>');
             sections.push('');
           }
+          
           if (destroys.length > 0) {
-            sections.push(`<details open>`);
-            sections.push(`<summary><strong>:red_circle: Destroy (${destroys.length})</strong></summary>`);
+            sections.push(`### <span style="color:#ef4444;">🗑️ Resources to Destroy</span> <sup>${destroys.length}</sup>`);
+            sections.push('');
+            sections.push(`<details>`);
+            sections.push(`<summary>⚠️ Click to expand all ${destroys.length} resource${destroys.length !== 1 ? 's' : ''}</summary>`);
             sections.push('');
             destroys.forEach(r => sections.push(buildResourceSection(r)));
             sections.push('</details>');
@@ -193,9 +243,9 @@ runs:
           // Fallback: show raw plan if no resources parsed but has changes
           if (resources.length === 0 && hasChanges) {
             sections.push('<details>');
-            sections.push('<summary><strong>:page_facing_up: Raw Plan Output</strong></summary>');
+            sections.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
             sections.push('');
-            sections.push('```hcl');
+            sections.push('```terraform');
             sections.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
             sections.push('```');
             sections.push('</details>');
@@ -317,66 +367,117 @@ runs:
           const destroys = resources.filter(r => r.action === 'destroy');
 
           function buildResourceSection(resource) {
-            const icons = { create: '+', update: '~', replace: '-/+', destroy: '-' };
-            const icon = icons[resource.action] || '?';
+            const actionColors = {
+              create: '#22c55e',
+              update: '#f59e0b',
+              replace: '#a855f7',
+              destroy: '#ef4444'
+            };
+            const actionSymbols = {
+              create: '+ create',
+              update: '~ update',
+              replace: '-/+ replace',
+              destroy: '- destroy'
+            };
+            const color = actionColors[resource.action] || '#6b7280';
+            const symbol = actionSymbols[resource.action] || 'read';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
-            return `<details>\n<summary><code>${icon}</code> <code>${resource.address}</code></summary>\n\n\`\`\`hcl\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
+            
+            return `<details>\n<summary>` +
+              `<strong style="color:${color};">${symbol}</strong> ` +
+              `<code>${resource.address}</code>` +
+              `</summary>\n\n` +
+              `\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n` +
+              `</details>`;
           }
 
           const lines = [];
 
-          // Header
+          // Header with Terraform branding
           if (planOutcome === 'success') {
-            lines.push('## :white_check_mark: Terraform Plan');
+            lines.push('# <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/master/public/img/logo-terraform.svg" width="20" height="20" /> Terraform Plan');
           } else {
-            lines.push('## :x: Terraform Plan Failed');
+            lines.push('# <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/master/public/img/logo-terraform.svg" width="20" height="20" /> Terraform Plan Failed');
           }
-          lines.push('');
-          lines.push(`> **Run #${runNumber}** | ${timestamp} | @${context.actor} | [View Workflow](${runUrl})`);
           lines.push('');
 
-          // Summary line
-          if (hasChanges) {
-            const badges = [];
-            if (summary.add > 0) badges.push(`:green_circle: **${summary.add}** to add`);
-            if (summary.change > 0) badges.push(`:yellow_circle: **${summary.change}** to change`);
-            if (summary.destroy > 0) badges.push(`:red_circle: **${summary.destroy}** to destroy`);
-            lines.push(`**Plan:** ${badges.join(' · ')}`);
-          } else {
-            lines.push('**Plan:** :white_check_mark: No changes. Infrastructure is up-to-date.');
-          }
+          // Metadata table
+          lines.push('| | |');
+          lines.push('|:--|:--|');
+          lines.push(`| **Run** | [#${runNumber}](${runUrl}) ${planOutcome === 'success' ? '✅' : '❌'} |`);
+          lines.push(`| **Updated** | ${timestamp} |`);
+          lines.push(`| **Triggered by** | @${context.actor} |`);
           lines.push('');
-          lines.push('---');
+
+          // Summary section
+          if (hasChanges) {
+            const totalChanges = summary.add + summary.change + summary.destroy;
+            lines.push(`### 📊 Summary: ${totalChanges} resource${totalChanges !== 1 ? 's' : ''} to change`);
+            lines.push('');
+            lines.push('| Action | Resources |');
+            lines.push('|:-------|----------:|');
+            if (summary.add > 0) {
+              lines.push(`| <span style="color:#22c55e;">**+ Create**</span> | **${summary.add}** |`);
+            }
+            if (summary.change > 0) {
+              lines.push(`| <span style="color:#f59e0b;">**~ Update**</span> | **${summary.change}** |`);
+            }
+            if (summary.destroy > 0) {
+              lines.push(`| <span style="color:#ef4444;">**- Destroy**</span> | **${summary.destroy}** |`);
+            }
+            lines.push('');
+            
+            lines.push('> 💡 **Tip:** Click on sections below to expand/collapse resource details');
+            lines.push('');
+          } else {
+            lines.push('### ✅ No Changes');
+            lines.push('');
+            lines.push('> Infrastructure matches the configuration. No changes required.');
+            lines.push('');
+          }
+
+          lines.push('<hr/>');
           lines.push('');
 
           // Resource details by action type
           if (creates.length > 0) {
-            lines.push(`<details open>`);
-            lines.push(`<summary><strong>:green_circle: Create (${creates.length})</strong></summary>`);
+            lines.push(`### <span style="color:#22c55e;">➕ Resources to Create</span> <sup>${creates.length}</sup>`);
+            lines.push('');
+            lines.push(`<details>`);
+            lines.push(`<summary>Click to expand all ${creates.length} resource${creates.length !== 1 ? 's' : ''}</summary>`);
             lines.push('');
             creates.forEach(r => lines.push(buildResourceSection(r)));
             lines.push('</details>');
             lines.push('');
           }
+
           if (replaces.length > 0) {
-            lines.push(`<details open>`);
-            lines.push(`<summary><strong>:purple_circle: Replace (${replaces.length})</strong></summary>`);
+            lines.push(`### <span style="color:#a855f7;">♻️ Resources to Replace</span> <sup>${replaces.length}</sup>`);
+            lines.push('');
+            lines.push(`<details>`);
+            lines.push(`<summary>Click to expand all ${replaces.length} resource${replaces.length !== 1 ? 's' : ''}</summary>`);
             lines.push('');
             replaces.forEach(r => lines.push(buildResourceSection(r)));
             lines.push('</details>');
             lines.push('');
           }
+
           if (updates.length > 0) {
-            lines.push(`<details open>`);
-            lines.push(`<summary><strong>:yellow_circle: Update (${updates.length})</strong></summary>`);
+            lines.push(`### <span style="color:#f59e0b;">🔄 Resources to Update</span> <sup>${updates.length}</sup>`);
+            lines.push('');
+            lines.push(`<details>`);
+            lines.push(`<summary>Click to expand all ${updates.length} resource${updates.length !== 1 ? 's' : ''}</summary>`);
             lines.push('');
             updates.forEach(r => lines.push(buildResourceSection(r)));
             lines.push('</details>');
             lines.push('');
           }
+
           if (destroys.length > 0) {
-            lines.push(`<details open>`);
-            lines.push(`<summary><strong>:red_circle: Destroy (${destroys.length})</strong></summary>`);
+            lines.push(`### <span style="color:#ef4444;">🗑️ Resources to Destroy</span> <sup>${destroys.length}</sup>`);
+            lines.push('');
+            lines.push(`<details>`);
+            lines.push(`<summary>⚠️ Click to expand all ${destroys.length} resource${destroys.length !== 1 ? 's' : ''}</summary>`);
             lines.push('');
             destroys.forEach(r => lines.push(buildResourceSection(r)));
             lines.push('</details>');
@@ -386,9 +487,9 @@ runs:
           // Fallback: show raw plan if no resources parsed but has changes
           if (resources.length === 0 && hasChanges) {
             lines.push('<details>');
-            lines.push('<summary><strong>:page_facing_up: Raw Plan Output</strong></summary>');
+            lines.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
             lines.push('');
-            lines.push('```hcl');
+            lines.push('```terraform');
             lines.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
             lines.push('```');
             lines.push('</details>');
