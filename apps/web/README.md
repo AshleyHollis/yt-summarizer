@@ -20,18 +20,28 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Dependency Notes
+## Dependency Management
+
+### Checking for unused dependencies
+
+Run depcheck locally to scan for unused or missing dependencies:
+
+```bash
+npx depcheck
+```
+
+This uses the configuration in `.depcheckrc` and will match CI behavior. For details on why certain packages are ignored, see `.depcheckrc.md`.
 
 ### Packages that appear "unused" but are actually required
 
-Some dependencies may be flagged as unused by static analysis tools like `depcheck`, but they are actually used in configuration files or at build time:
+Some dependencies are used in configuration files or at build time, which static analysis can't detect. These are documented in `.depcheckrc` and include:
 
 - **@copilotkit/runtime** - Referenced in `next.config.ts` for bundle optimization (`optimizePackageImports`)
 - **@tailwindcss/postcss** - PostCSS plugin used in `postcss.config.mjs` 
 - **@tailwindcss/typography** - Provides `prose-*` utility classes used throughout the app
 - **tailwindcss** - Core CSS framework loaded via `@import "tailwindcss"` in `src/app/globals.css`
 
-These are all legitimately required dependencies. Removing them will break the build or runtime functionality.
+See `.depcheckrc.md` for complete documentation.
 
 ## Learn More
 
