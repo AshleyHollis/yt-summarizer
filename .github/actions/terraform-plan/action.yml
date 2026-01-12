@@ -43,16 +43,19 @@ runs:
         exit $PLAN_EXIT_CODE
       continue-on-error: true
 
-    - name: Format plan output
+    - name: Get JSON plan
       id: format
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        # Parse plan summary
-        ADD=$(grep -oP 'Plan: \K\d+(?= to add)' plan_output.txt || echo "0")
-        CHANGE=$(grep -oP '\d+(?= to change)' plan_output.txt || echo "0")
-        DESTROY=$(grep -oP '\d+(?= to destroy)' plan_output.txt || echo "0")
-
+        # Get structured JSON output from terraform
+        terraform show -json tfplan > plan.json
+        
+        # Parse plan summary from JSON
+        ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"]))) | length' plan.json)
+        CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | contains(["update"]))) | length' plan.json)
+        DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | contains(["delete"]))) | length' plan.json)
+        
         # Create JSON summary
         SUMMARY=$(cat <<EOF
         {
@@ -68,8 +71,7 @@ runs:
         echo "$SUMMARY" >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"
 
-        # Use the full plan output - don't filter anything
-        # The post-terraform-plan action will parse and format it
+        # Output the full JSON plan for parsing
         echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
-        cat plan_output.txt >> "$GITHUB_OUTPUT"
+        cat plan.json >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"

@@ -48,7 +48,7 @@ runs:
         retries: 3
         script: |
           const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
-          const rawPlan = process.env.FORMATTED_PLAN || 'No plan output available';
+          const planJson = process.env.FORMATTED_PLAN || '{}';
           const planOutcome = process.env.PLAN_OUTCOME;
 
           core.info(`Plan Outcome: ${planOutcome}`);
@@ -63,62 +63,127 @@ runs:
           // Unique marker for finding this comment - MUST be at the start
           const COMMENT_MARKER = '<!-- terraform-plan-comment -->';
 
-          // Parse resources from terraform plan output - simple approach
-          function parseResources(planOutput) {
-            const resources = [];
-            const lines = planOutput.split('\n');
-            let currentResource = null;
-            let currentDetails = [];
+          // Parse JSON plan to extract resource changes
+          function parseJsonPlan(jsonString) {
+            try {
+              const plan = JSON.parse(jsonString);
+              const resources = [];
 
-            for (let i = 0; i < lines.length; i++) {
-              const line = lines[i];
+              if (!plan.resource_changes) {
+                core.warning('No resource_changes in plan JSON');
+                return resources;
+              }
 
-              // Match resource header: # resource.address will be created/updated/etc
-              const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
-              if (resourceMatch) {
-                // Save previous resource if exists
-                if (currentResource && currentDetails.length > 0) {
-                  resources.push({ ...currentResource, details: currentDetails.join('\n') });
+              for (const change of plan.resource_changes) {
+                if (!change.change || !change.change.actions || change.change.actions.includes('no-op')) {
+                  continue;
                 }
 
-                const actionText = resourceMatch[3];
+                const actions = change.change.actions;
                 let action = 'read';
-                if (actionText === 'created') action = 'create';
-                else if (actionText === 'updated in-place') action = 'update';
-                else if (actionText === 'replaced') action = 'replace';
-                else if (actionText === 'destroyed') action = 'destroy';
+                if (actions.includes('create')) action = 'create';
+                else if (actions.includes('delete') && actions.includes('create')) action = 'replace';
+                else if (actions.includes('update')) action = 'update';
+                else if (actions.includes('delete')) action = 'destroy';
 
-                currentResource = { address: resourceMatch[1], action };
-                currentDetails = [];
-                continue;
+                const address = change.address;
+                const resourceType = change.type;
+                const resourceName = change.name;
+
+                // Build formatted details from before/after
+                const details = formatResourceChange(change, action);
+
+                resources.push({ address, action, type: resourceType, name: resourceName, details });
               }
 
-              // Check for section boundaries (end of all resources)
-              if (line.match(/^Plan:|^Changes to Outputs:|^Warning:/)) {
-                if (currentResource && currentDetails.length > 0) {
-                  resources.push({ ...currentResource, details: currentDetails.join('\n') });
-                  currentResource = null;
-                  currentDetails = [];
-                }
-                break;
-              }
-
-              // If we're in a resource, capture the line
-              if (currentResource && line.trim()) {
-                currentDetails.push(line);
-              }
+              return resources;
+            } catch (error) {
+              core.error(`Failed to parse JSON plan: ${error.message}`);
+              return [];
             }
-
-            // Save the last resource if exists
-            if (currentResource && currentDetails.length > 0) {
-              resources.push({ ...currentResource, details: currentDetails.join('\n') });
-            }
-
-            return resources;
           }
 
-          const resources = parseResources(rawPlan);
-          core.info(`Parsed ${resources.length} resources from plan`);
+          // Format resource change details
+          function formatResourceChange(change, action) {
+            const lines = [];
+            const before = change.change.before || {};
+            const after = change.change.after || {};
+            const afterUnknown = change.change.after_unknown || {};
+
+            const symbol = action === 'create' ? '+' : action === 'update' ? '~' : action === 'replace' ? '-/+' : '-';
+            lines.push(`${symbol} resource "${change.type}" "${change.name}" {`);
+
+            // For creates, show all new attributes
+            if (action === 'create') {
+              for (const [key, value] of Object.entries(after)) {
+                if (value === null || value === undefined) continue;
+                if (afterUnknown[key] === true) {
+                  lines.push(`    + ${key} = (known after apply)`);
+                } else {
+                  const formatted = typeof value === 'object' ? JSON.stringify(value) : `"${value}"`;
+                  lines.push(`    + ${key} = ${formatted}`);
+                }
+              }
+            }
+            // For updates, show changed attributes
+            else if (action === 'update') {
+              for (const [key, afterValue] of Object.entries(after)) {
+                const beforeValue = before[key];
+                if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
+                  if (typeof afterValue === 'object' && afterValue !== null) {
+                    lines.push(`  ~ ${key} {`);
+                    // Show nested changes
+                    const nestedChanges = findNestedChanges(beforeValue || {}, afterValue, afterUnknown[key] || {});
+                    nestedChanges.forEach(line => lines.push(`      ${line}`));
+                    lines.push(`    }`);
+                  } else {
+                    const formattedBefore = beforeValue !== null && beforeValue !== undefined ? JSON.stringify(beforeValue) : 'null';
+                    const formattedAfter = afterUnknown[key] === true ? '(known after apply)' : JSON.stringify(afterValue);
+                    lines.push(`    ~ ${key} = ${formattedBefore} -> ${formattedAfter}`);
+                  }
+                }
+              }
+              // Check for attributes in before but not in after (removed)
+              for (const key in before) {
+                if (!(key in after)) {
+                  lines.push(`    - ${key} = ${JSON.stringify(before[key])}`);
+                }
+              }
+            }
+            // For destroy, show what's being removed
+            else if (action === 'destroy') {
+              for (const [key, value] of Object.entries(before)) {
+                if (value === null || value === undefined) continue;
+                const formatted = typeof value === 'object' ? JSON.stringify(value) : `"${value}"`;
+                lines.push(`    - ${key} = ${formatted}`);
+              }
+            }
+
+            lines.push(`  }`);
+            return lines.join('\n');
+          }
+
+          // Find nested changes in objects
+          function findNestedChanges(before, after, afterUnknown) {
+            const changes = [];
+            const allKeys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+
+            for (const key of allKeys) {
+              const beforeVal = before?.[key];
+              const afterVal = after?.[key];
+
+              if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
+                const formattedBefore = beforeVal !== null && beforeVal !== undefined ? JSON.stringify(beforeVal) : 'null';
+                const formattedAfter = afterUnknown?.[key] === true ? '(known after apply)' : JSON.stringify(afterVal);
+                changes.push(`~ ${key} = ${formattedBefore} -> ${formattedAfter}`);
+              }
+            }
+
+            return changes;
+          }
+
+          const resources = parseJsonPlan(planJson);
+          core.info(`Parsed ${resources.length} resources from JSON plan`);
 
           const creates = resources.filter(r => r.action === 'create');
           const updates = resources.filter(r => r.action === 'update');
@@ -279,7 +344,7 @@ runs:
       with:
         script: |
           const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
-          const rawPlan = process.env.FORMATTED_PLAN || 'No plan output available';
+          const planJson = process.env.FORMATTED_PLAN || '{}';
           const planOutcome = process.env.PLAN_OUTCOME;
           const hasChanges = summary.has_changes;
           const runNumber = context.runNumber;
@@ -287,61 +352,99 @@ runs:
           const runUrl = `${context.payload.repository.html_url}/actions/runs/${runId}`;
           const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
 
-          // Parse resources - simple approach
-          function parseResources(planOutput) {
-            const resources = [];
-            const lines = planOutput.split('\n');
-            let currentResource = null;
-            let currentDetails = [];
+          // Reuse same JSON parsing logic as PR comment
+          function parseJsonPlan(jsonString) {
+            try {
+              const plan = JSON.parse(jsonString);
+              const resources = [];
 
-            for (let i = 0; i < lines.length; i++) {
-              const line = lines[i];
+              if (!plan.resource_changes) return resources;
 
-              // Match resource header: # resource.address will be created/updated/etc
-              const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
-              if (resourceMatch) {
-                // Save previous resource if exists
-                if (currentResource && currentDetails.length > 0) {
-                  resources.push({ ...currentResource, details: currentDetails.join('\n') });
+              for (const change of plan.resource_changes) {
+                if (!change.change || !change.change.actions || change.change.actions.includes('no-op')) {
+                  continue;
                 }
 
-                const actionText = resourceMatch[3];
+                const actions = change.change.actions;
                 let action = 'read';
-                if (actionText === 'created') action = 'create';
-                else if (actionText === 'updated in-place') action = 'update';
-                else if (actionText === 'replaced') action = 'replace';
-                else if (actionText === 'destroyed') action = 'destroy';
+                if (actions.includes('create')) action = 'create';
+                else if (actions.includes('delete') && actions.includes('create')) action = 'replace';
+                else if (actions.includes('update')) action = 'update';
+                else if (actions.includes('delete')) action = 'destroy';
 
-                currentResource = { address: resourceMatch[1], action };
-                currentDetails = [];
-                continue;
+                const address = change.address;
+                const resourceType = change.type;
+                const resourceName = change.name;
+                const details = formatResourceChange(change, action);
+
+                resources.push({ address, action, type: resourceType, name: resourceName, details });
               }
 
-              // Check for section boundaries (end of all resources)
-              if (line.match(/^Plan:|^Changes to Outputs:|^Warning:/)) {
-                if (currentResource && currentDetails.length > 0) {
-                  resources.push({ ...currentResource, details: currentDetails.join('\n') });
-                  currentResource = null;
-                  currentDetails = [];
-                }
-                break;
-              }
-
-              // If we're in a resource, capture the line
-              if (currentResource && line.trim()) {
-                currentDetails.push(line);
-              }
+              return resources;
+            } catch (error) {
+              return [];
             }
-
-            // Save the last resource if exists
-            if (currentResource && currentDetails.length > 0) {
-              resources.push({ ...currentResource, details: currentDetails.join('\n') });
-            }
-
-            return resources;
           }
 
-          const resources = parseResources(rawPlan);
+          function formatResourceChange(change, action) {
+            const lines = [];
+            const before = change.change.before || {};
+            const after = change.change.after || {};
+            const afterUnknown = change.change.after_unknown || {};
+
+            const symbol = action === 'create' ? '+' : action === 'update' ? '~' : action === 'replace' ? '-/+' : '-';
+            lines.push(`${symbol} resource "${change.type}" "${change.name}" {`);
+
+            if (action === 'create') {
+              for (const [key, value] of Object.entries(after)) {
+                if (value === null || value === undefined) continue;
+                if (afterUnknown[key] === true) {
+                  lines.push(`    + ${key} = (known after apply)`);
+                } else {
+                  const formatted = typeof value === 'object' ? JSON.stringify(value) : `"${value}"`;
+                  lines.push(`    + ${key} = ${formatted}`);
+                }
+              }
+            }
+            else if (action === 'update') {
+              for (const [key, afterValue] of Object.entries(after)) {
+                const beforeValue = before[key];
+                if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
+                  if (typeof afterValue === 'object' && afterValue !== null) {
+                    lines.push(`  ~ ${key} {`);
+                    const nestedChanges = findNestedChanges(beforeValue || {}, afterValue, afterUnknown[key] || {});
+                    nestedChanges.forEach(line => lines.push(`      ${line}`));
+                    lines.push(`    }`);
+                  } else {
+                    const formattedBefore = beforeValue !== null && beforeValue !== undefined ? JSON.stringify(beforeValue) : 'null';
+                    const formattedAfter = afterUnknown[key] === true ? '(known after apply)' : JSON.stringify(afterValue);
+                    lines.push(`    ~ ${key} = ${formattedBefore} -> ${formattedAfter}`);
+                  }
+                }
+              }
+            }
+
+            lines.push(`  }`);
+            return lines.join('\n');
+          }
+
+          function findNestedChanges(before, after, afterUnknown) {
+            const changes = [];
+            const allKeys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+
+            for (const key of allKeys) {
+              const beforeVal = before?.[key];
+              const afterVal = after?.[key];
+              if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
+                const formattedBefore = beforeVal !== null && beforeVal !== undefined ? JSON.stringify(beforeVal) : 'null';
+                const formattedAfter = afterUnknown?.[key] === true ? '(known after apply)' : JSON.stringify(afterVal);
+                changes.push(`~ ${key} = ${formattedBefore} -> ${formattedAfter}`);
+              }
+            }
+            return changes;
+          }
+
+          const resources = parseJsonPlan(planJson);
           const creates = resources.filter(r => r.action === 'create');
           const updates = resources.filter(r => r.action === 'update');
           const replaces = resources.filter(r => r.action === 'replace');
