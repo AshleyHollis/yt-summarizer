@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@copilotkit/react-core": "^1.50.1",
-    "@copilotkit/react-ui": "^0.2.0",
+    "@copilotkit/react-ui": "^1.50.1",
     "@copilotkit/runtime": "^1.50.1",
     "@copilotkit/runtime-client-gql": "^1.50.1",
     "@copilotkit/shared": "^1.50.1",
@@ -53,5 +53,8 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.16"
+  },
+  "overrides": {
+    "prismjs": "^1.30.0"
   }
 }
