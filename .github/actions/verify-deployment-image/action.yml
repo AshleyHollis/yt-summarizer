@@ -280,6 +280,109 @@ runs:
         }
         
         # ========================================================================
+        # PRE-FLIGHT: ACR PULL CAPABILITY CHECK
+        # ========================================================================
+        # Test if Kubernetes can actually pull from ACR before waiting for deployment
+        # This catches auth/permission issues immediately instead of after timeout
+        
+        echo "::group::🔐 Pre-flight: Verify ACR Pull Capability"
+        echo "Testing if Kubernetes pods can pull images from ${REGISTRY}.azurecr.io..."
+        echo ""
+        
+        TEST_IMAGE="${REGISTRY}.azurecr.io/${IMAGE_NAME}:${EXPECTED_TAG}"
+        TEST_POD_NAME="acr-pull-test-$(date +%s)"
+        TEST_NAMESPACE_ORIGINAL="${NAMESPACE}"
+        
+        # Try to use preview namespace if it exists, otherwise create temp namespace
+        if ! kubectl get namespace "${NAMESPACE}" &>/dev/null; then
+          echo "  ⚠️  Target namespace ${NAMESPACE} doesn't exist yet, using default for test"
+          TEST_NAMESPACE_ORIGINAL="default"
+        fi
+        
+        # Create a minimal test pod
+        cat <<EOF | kubectl apply -n "${TEST_NAMESPACE_ORIGINAL}" -f - &>/dev/null
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${TEST_POD_NAME}
+spec:
+  restartPolicy: Never
+  serviceAccountName: yt-summarizer-sa
+  containers:
+    - name: test
+      image: ${TEST_IMAGE}
+      command: ["sh", "-c", "echo 'ACR pull test successful' && exit 0"]
+EOF
+        
+        echo "  ⏳ Testing image pull (max 45s)..."
+        PULL_TEST_PASSED=false
+        
+        for test_attempt in {1..45}; do
+          POD_PHASE=$(kubectl get pod ${TEST_POD_NAME} -n "${TEST_NAMESPACE_ORIGINAL}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+          CONTAINER_STATE=$(kubectl get pod ${TEST_POD_NAME} -n "${TEST_NAMESPACE_ORIGINAL}" -o jsonpath='{.status.containerStatuses[0].state}' 2>/dev/null || echo "")
+          
+          if [ "$POD_PHASE" = "Running" ] || [ "$POD_PHASE" = "Succeeded" ]; then
+            echo "  ✅ ACR Pull Test PASSED - Kubernetes can pull images from ACR"
+            PULL_TEST_PASSED=true
+            break
+          elif [[ "$CONTAINER_STATE" == *"ImagePullBackOff"* ]] || [[ "$CONTAINER_STATE" == *"ErrImagePull"* ]]; then
+            echo "  ❌ ACR Pull Test FAILED - Kubernetes CANNOT pull images from ACR"
+            echo ""
+            echo "  Failure Details:"
+            kubectl describe pod ${TEST_POD_NAME} -n "${TEST_NAMESPACE_ORIGINAL}" 2>/dev/null | grep -A 15 "Events:" | sed 's/^/  /' || echo "  Could not retrieve events"
+            echo ""
+            
+            ERROR_MSG=$(kubectl get pod ${TEST_POD_NAME} -n "${TEST_NAMESPACE_ORIGINAL}" -o jsonpath='{.status.containerStatuses[0].state.waiting.message}' 2>/dev/null || echo "Unknown error")
+            
+            echo "::error::❌ CRITICAL: ACR Authentication/Permission Issue Detected!"
+            echo "::error:: "
+            echo "::error::  Image: ${TEST_IMAGE}"
+            echo "::error::  Error: ${ERROR_MSG}"
+            echo "::error:: "
+            echo "::error::  Root Cause Analysis:"
+            
+            if [[ "$ERROR_MSG" == *"401 Unauthorized"* ]] || [[ "$ERROR_MSG" == *"failed to authorize"* ]]; then
+              echo "::error::  → AKS kubelet identity does NOT have AcrPull permission on ACR"
+              echo "::error:: "
+              echo "::error::  Fix Options:"
+              echo "::error::  1. Grant AcrPull role to AKS kubelet identity:"
+              echo "::error::     az role assignment create --assignee <kubelet-identity> \\"
+              echo "::error::       --role AcrPull --scope /subscriptions/.../resourceGroups/.../providers/Microsoft.ContainerRegistry/registries/${REGISTRY}"
+              echo "::error:: "
+              echo "::error::  2. Enable ACR admin credentials and add imagePullSecrets:"
+              echo "::error::     - Enable admin on ACR: az acr update -n ${REGISTRY} --admin-enabled true"
+              echo "::error::     - Create K8s secret: kubectl create secret docker-registry acr-pull-secret \\"
+              echo "::error::         --docker-server=${REGISTRY}.azurecr.io --docker-username=... --docker-password=..."
+              echo "::error::     - Add imagePullSecrets to pod specs in manifests"
+            elif [[ "$ERROR_MSG" == *"not found"* ]] || [[ "$ERROR_MSG" == *"manifest unknown"* ]]; then
+              echo "::error::  → Image tag does not exist in ACR (already caught earlier, but double-check)"
+            elif [[ "$ERROR_MSG" == *"network"* ]] || [[ "$ERROR_MSG" == *"timeout"* ]]; then
+              echo "::error::  → Network connectivity issue between AKS and ACR"
+              echo "::error::  → Check ACR firewall rules and AKS subnet access"
+            else
+              echo "::error::  → Unknown ACR pull issue: ${ERROR_MSG}"
+            fi
+            
+            # Cleanup and fail fast
+            kubectl delete pod ${TEST_POD_NAME} -n "${TEST_NAMESPACE_ORIGINAL}" --ignore-not-found=true &>/dev/null || true
+            echo "::endgroup::"
+            exit 1
+          fi
+          
+          sleep 1
+        done
+        
+        # Cleanup test pod
+        kubectl delete pod ${TEST_POD_NAME} -n "${TEST_NAMESPACE_ORIGINAL}" --ignore-not-found=true &>/dev/null || true
+        
+        if [ "$PULL_TEST_PASSED" = "false" ]; then
+          echo "  ⚠️  ACR pull test timed out (45s) - proceeding anyway but this may indicate slow image pulls"
+        fi
+        
+        echo "::endgroup::"
+        echo ""
+        
+        # ========================================================================
         # MAIN VERIFICATION LOOP WITH FAIL-FAST CHECKS
         # ========================================================================
         
