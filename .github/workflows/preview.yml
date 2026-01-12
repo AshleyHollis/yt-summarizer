@@ -519,6 +519,8 @@ jobs:
           image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
           frontend-url: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}
+          run-id: ${{ github.run_id }}
+          repository: ${{ github.repository }}
 
       - name: Create deployment summary
         uses: ./.github/actions/create-preview-summary

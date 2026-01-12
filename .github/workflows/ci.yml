@@ -665,11 +665,16 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - detect-changes
+      - lint-python
+      - lint-frontend
+      - scan-python-security
+      - scan-javascript-security
       - test-shared
       - test-api
       - test-workers
       - test-frontend
       - build-images
+      - build-images-meta
       - build-images-validate
       - validate-terraform
       - validate-kustomize
@@ -679,6 +684,32 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Create CI Summary
+        uses: ./.github/actions/create-ci-summary
+        with:
+          changed-areas: ${{ needs.detect-changes.outputs.changed_areas }}
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          pr-number: ${{ github.event.pull_request.number }}
+          lint-python-result: ${{ needs.lint-python.result }}
+          lint-frontend-result: ${{ needs.lint-frontend.result }}
+          scan-python-security-result: ${{ needs.scan-python-security.result }}
+          scan-javascript-security-result: ${{ needs.scan-javascript-security.result }}
+          secret-scanning-result: ${{ needs.secret-scanning.result }}
+          test-shared-result: ${{ needs.test-shared.result }}
+          test-shared-duration: ${{ needs.test-shared.outputs.test_duration }}
+          test-api-result: ${{ needs.test-api.result }}
+          test-api-duration: ${{ needs.test-api.outputs.test_duration }}
+          test-workers-result: ${{ needs.test-workers.result }}
+          test-workers-duration: ${{ needs.test-workers.outputs.test_duration }}
+          test-frontend-result: ${{ needs.test-frontend.result }}
+          kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
+          validate-kustomize-result: ${{ needs.validate-kustomize.result }}
+          validate-terraform-result: ${{ needs.validate-terraform.result }}
+          build-images-result: ${{ needs.build-images.result }}
+          image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.run_id }}
 
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results
