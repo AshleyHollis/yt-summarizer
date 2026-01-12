@@ -196,7 +196,8 @@ jobs:
             SHORT_SHA=$(git rev-parse --short=7 "$commit")
             
             # Check if this commit changed code areas that trigger image builds
-            CHANGED_FILES=$(git diff-tree --no-commit-tree --name-only -r "$commit")
+            # Use -m flag to handle merge commits (show changes relative to each parent)
+            CHANGED_FILES=$(git diff-tree --no-commit-tree --name-only -r -m "$commit" 2>/dev/null || true)
             
             if echo "$CHANGED_FILES" | grep -qE '^(services/api|services/workers|services/shared|apps/web|docker)/'; then
               FOUND_COMMIT="$commit"
