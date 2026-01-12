@@ -119,14 +119,14 @@ spec:
           - CreateNamespace=true
           - PrunePropagationPolicy=foreground
           - PruneLast=true
-          - Replace=true
-          - ServerSideApply=true
+          # Removed Replace=true and ServerSideApply=true - they conflict with each other
+          # and cause "Partial sync" issues. Using default client-side apply.
         retry:
-          limit: 3
+          limit: 5
           backoff:
             duration: 5s
             factor: 2
-            maxDuration: 1m
+            maxDuration: 3m
 
       revisionHistoryLimit: 3
 
