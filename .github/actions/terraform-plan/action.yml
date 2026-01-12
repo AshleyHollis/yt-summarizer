@@ -68,11 +68,24 @@ runs:
         echo "$SUMMARY" >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"
 
-        # Extract resource changes (lines with +, ~, -, or #)
+        # Extract resource changes - capture resource blocks with all content including closing braces
         FORMATTED=""
+        IN_RESOURCE=false
         while IFS= read -r line; do
-          if [[ "$line" =~ ^[[:space:]]*(#|\+|~|-|<-)[[:space:]] ]]; then
+          # Start of a resource
+          if [[ "$line" =~ ^[[:space:]]*#[[:space:]] ]]; then
+            IN_RESOURCE=true
             FORMATTED+="$line"$'\n'
+          # If we're in a resource, capture everything until we hit Plan: or similar
+          elif $IN_RESOURCE; then
+            if [[ "$line" =~ ^Plan:|^Changes\ to\ Outputs:|^Warning: ]]; then
+              IN_RESOURCE=false
+            else
+              # Capture the line if it has content or is a brace line
+              if [[ -n "$(echo "$line" | tr -d '[:space:]')" ]]; then
+                FORMATTED+="$line"$'\n'
+              fi
+            fi
           fi
         done < plan_output.txt
 
