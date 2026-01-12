@@ -116,13 +116,18 @@ runs:
           const replaces = resources.filter(r => r.action === 'replace');
           const destroys = resources.filter(r => r.action === 'destroy');
 
-          // Build resource item - clean Terraform Cloud style
+          // Build resource item with emoji indicators
           function buildResourceItem(resource) {
-            const symbols = { create: '+', update: '~', replace: '-/+', destroy: '-' };
-            const symbol = symbols[resource.action] || '?';
+            const indicators = {
+              create: '🟢 `+`',
+              update: '🟡 `~`',
+              replace: '🟣 `-/+`',
+              destroy: '🔴 `-`'
+            };
+            const indicator = indicators[resource.action] || '⚪ `?`';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
 
-            return `<details>\n<summary><code>${symbol}</code> ${resource.address}</summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
+            return `<details>\n<summary>${indicator} <code>${resource.address}</code></summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
           }
 
           // Build the comment body
@@ -155,37 +160,37 @@ runs:
           sections.push('---');
           sections.push('');
 
-          // Resource sections with Terraform Cloud style headers
+          // Resource sections with icons and colors
           if (creates.length > 0) {
-            sections.push(`### \`+ ${creates.length} to create\``);
+            sections.push(`### 🟢 ${creates.length} to create`);
             sections.push('');
             creates.forEach(r => sections.push(buildResourceItem(r)));
             sections.push('');
           }
 
           if (replaces.length > 0) {
-            sections.push(`### \`-/+ ${replaces.length} to replace\``);
+            sections.push(`### 🟣 ${replaces.length} to replace`);
             sections.push('');
             replaces.forEach(r => sections.push(buildResourceItem(r)));
             sections.push('');
           }
 
           if (updates.length > 0) {
-            sections.push(`### \`~ ${updates.length} to update\``);
+            sections.push(`### 🟡 ${updates.length} to update`);
             sections.push('');
             updates.forEach(r => sections.push(buildResourceItem(r)));
             sections.push('');
           }
 
           if (destroys.length > 0) {
-            sections.push(`### \`- ${destroys.length} to destroy\``);
+            sections.push(`### 🔴 ${destroys.length} to destroy`);
             sections.push('');
             destroys.forEach(r => sections.push(buildResourceItem(r)));
             sections.push('');
           }
 
           if (!hasChanges) {
-            sections.push('### No changes');
+            sections.push('### ✨ No changes');
             sections.push('');
             sections.push('Your infrastructure matches the configuration.');
             sections.push('');
@@ -322,11 +327,16 @@ runs:
           const destroys = resources.filter(r => r.action === 'destroy');
 
           function buildResourceItem(resource) {
-            const symbols = { create: '+', update: '~', replace: '-/+', destroy: '-' };
-            const symbol = symbols[resource.action] || '?';
+            const indicators = {
+              create: '🟢 `+`',
+              update: '🟡 `~`',
+              replace: '🟣 `-/+`',
+              destroy: '🔴 `-`'
+            };
+            const indicator = indicators[resource.action] || '⚪ `?`';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
 
-            return `<details>\n<summary><code>${symbol}</code> ${resource.address}</summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
+            return `<details>\n<summary>${indicator} <code>${resource.address}</code></summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
           }
 
           const lines = [];
@@ -354,37 +364,37 @@ runs:
           lines.push('---');
           lines.push('');
 
-          // Resource sections
+          // Resource sections with icons
           if (creates.length > 0) {
-            lines.push(`### \`+ ${creates.length} to create\``);
+            lines.push(`### 🟢 ${creates.length} to create`);
             lines.push('');
             creates.forEach(r => lines.push(buildResourceItem(r)));
             lines.push('');
           }
 
           if (replaces.length > 0) {
-            lines.push(`### \`-/+ ${replaces.length} to replace\``);
+            lines.push(`### 🟣 ${replaces.length} to replace`);
             lines.push('');
             replaces.forEach(r => lines.push(buildResourceItem(r)));
             lines.push('');
           }
 
           if (updates.length > 0) {
-            lines.push(`### \`~ ${updates.length} to update\``);
+            lines.push(`### 🟡 ${updates.length} to update`);
             lines.push('');
             updates.forEach(r => lines.push(buildResourceItem(r)));
             lines.push('');
           }
 
           if (destroys.length > 0) {
-            lines.push(`### \`- ${destroys.length} to destroy\``);
+            lines.push(`### 🔴 ${destroys.length} to destroy`);
             lines.push('');
             destroys.forEach(r => lines.push(buildResourceItem(r)));
             lines.push('');
           }
 
           if (!hasChanges) {
-            lines.push('### No changes');
+            lines.push('### ✨ No changes');
             lines.push('');
             lines.push('Your infrastructure matches the configuration.');
             lines.push('');
