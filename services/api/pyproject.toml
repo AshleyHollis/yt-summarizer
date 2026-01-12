@@ -19,8 +19,10 @@ dependencies = [
     "httpx>=0.27.0",
     "yt-dlp>=2024.12.6",
     "youtube-transcript-api>=0.6.2",  # For fetching YouTube transcripts
-    "agent-framework",
-    "agent-framework-ag-ui",
+    # Agent Framework - pinned to compatible versions to avoid import errors
+    # agent-framework-ag-ui 1.0.0b260107 requires agent-framework with use_instrumentation
+    "agent-framework>=1.0.0b260107",  # Ensure we get latest with required features
+    "agent-framework-ag-ui>=1.0.0b260107",
     # OpenTelemetry for observability (T185)
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
