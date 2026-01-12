@@ -21,35 +21,65 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Generate plan section
-      id: generate-sections
+    - name: Save plan data to files
+      id: save-data
       shell: bash
       run: |
-        # Parse inputs
-        PLAN_SUMMARY='${{ inputs.plan-summary }}'
-        FORMATTED_PLAN='${{ inputs.formatted-plan }}'
-        PLAN_OUTCOME='${{ inputs.plan-outcome }}'
+        # Write data to files (safer than passing large JSON through env vars)
+        cat << 'PLAN_SUMMARY_EOF' > ${{ github.action_path }}/plan-summary.json
+        ${{ inputs.plan-summary }}
+        PLAN_SUMMARY_EOF
 
-        # Write to output file for later steps
-        echo "$PLAN_SUMMARY" > ${{ github.action_path }}/plan-summary.json
-        echo "$FORMATTED_PLAN" > ${{ github.action_path }}/formatted-plan.txt
-        echo "$PLAN_OUTCOME" > ${{ github.action_path }}/plan-outcome.txt
+        cat << 'FORMATTED_PLAN_EOF' > ${{ github.action_path }}/formatted-plan.json
+        ${{ inputs.formatted-plan }}
+        FORMATTED_PLAN_EOF
+
+        cat << 'PLAN_OUTCOME_EOF' > ${{ github.action_path }}/plan-outcome.txt
+        ${{ inputs.plan-outcome }}
+        PLAN_OUTCOME_EOF
 
     - name: Post to PR
       id: post-pr
       if: ${{ inputs.skip-pr-comment != 'true' && github.event_name == 'pull_request' }}
       uses: actions/github-script@v7
       env:
-        PLAN_SUMMARY: ${{ inputs.plan-summary }}
-        FORMATTED_PLAN: ${{ inputs.formatted-plan }}
         PLAN_OUTCOME: ${{ inputs.plan-outcome }}
       with:
         github-token: ${{ github.token }}
         retries: 3
         script: |
-          const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
-          const planJson = process.env.FORMATTED_PLAN || '{}';
-          const planOutcome = process.env.PLAN_OUTCOME;
+          const fs = require('fs');
+          const path = require('path');
+
+          // Read plan data from files instead of environment variables
+          const planSummaryPath = '${{ github.action_path }}/plan-summary.json';
+          const formattedPlanPath = '${{ github.action_path }}/formatted-plan.json';
+          const planOutcomePath = '${{ github.action_path }}/plan-outcome.txt';
+
+          let summary, planJson, planOutcome;
+
+          try {
+            const summaryContent = fs.readFileSync(planSummaryPath, 'utf8');
+            summary = JSON.parse(summaryContent);
+          } catch (error) {
+            core.warning(`Failed to read plan summary file: ${error.message}`);
+            summary = { add: 0, change: 0, destroy: 0, has_changes: false };
+          }
+
+          try {
+            const planContent = fs.readFileSync(formattedPlanPath, 'utf8');
+            planJson = planContent;
+          } catch (error) {
+            core.warning(`Failed to read formatted plan file: ${error.message}`);
+            planJson = '{}';
+          }
+
+          try {
+            planOutcome = fs.readFileSync(planOutcomePath, 'utf8').trim();
+          } catch (error) {
+            core.warning(`Failed to read plan outcome file: ${error.message}`);
+            planOutcome = process.env.PLAN_OUTCOME || 'unknown';
+          }
 
           core.info(`Plan Outcome: ${planOutcome}`);
           core.info(`Summary: Add=${summary.add}, Change=${summary.change}, Destroy=${summary.destroy}`);
@@ -204,7 +234,7 @@ runs:
             return `<details>\n<summary>${indicator} <code>${resource.address}</code></summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
           }
 
-          // Build the comment body
+          // Build comment body
           const sections = [];
 
           // Hidden marker for comment detection
@@ -338,14 +368,42 @@ runs:
     - name: Update pipeline summary
       uses: actions/github-script@v7
       env:
-        PLAN_SUMMARY: ${{ inputs.plan-summary }}
-        FORMATTED_PLAN: ${{ inputs.formatted-plan }}
         PLAN_OUTCOME: ${{ inputs.plan-outcome }}
       with:
         script: |
-          const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
-          const planJson = process.env.FORMATTED_PLAN || '{}';
-          const planOutcome = process.env.PLAN_OUTCOME;
+          const fs = require('fs');
+          const path = require('path');
+
+          // Read plan data from files instead of environment variables
+          const planSummaryPath = '${{ github.action_path }}/plan-summary.json';
+          const formattedPlanPath = '${{ github.action_path }}/formatted-plan.json';
+          const planOutcomePath = '${{ github.action_path }}/plan-outcome.txt';
+
+          let summary, planJson, planOutcome;
+
+          try {
+            const summaryContent = fs.readFileSync(planSummaryPath, 'utf8');
+            summary = JSON.parse(summaryContent);
+          } catch (error) {
+            core.warning(`Failed to read plan summary file: ${error.message}`);
+            summary = { add: 0, change: 0, destroy: 0, has_changes: false };
+          }
+
+          try {
+            const planContent = fs.readFileSync(formattedPlanPath, 'utf8');
+            planJson = planContent;
+          } catch (error) {
+            core.warning(`Failed to read formatted plan file: ${error.message}`);
+            planJson = '{}';
+          }
+
+          try {
+            planOutcome = fs.readFileSync(planOutcomePath, 'utf8').trim();
+          } catch (error) {
+            core.warning(`Failed to read plan outcome file: ${error.message}`);
+            planOutcome = process.env.PLAN_OUTCOME || 'unknown';
+          }
+
           const hasChanges = summary.has_changes;
           const runNumber = context.runNumber;
           const runId = context.runId;
