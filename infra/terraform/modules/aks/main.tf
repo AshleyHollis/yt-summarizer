@@ -120,33 +120,11 @@ resource "azurerm_kubernetes_cluster" "aks" {
     os_disk_size_gb      = var.os_disk_size_gb
     max_pods             = var.max_pods
     auto_scaling_enabled = false  # Renamed from enable_auto_scaling in azurerm 4.x
-
-    # Ignore Azure-managed defaults that would cause cluster replacement
-    lifecycle {
-      ignore_changes = [
-        tags,
-        zones,
-        node_public_ip_enabled,
-        fips_enabled,
-        host_encryption_enabled,
-        only_critical_addons_enabled,
-        max_count,
-        min_count,
-        upgrade_settings,
-      ]
-    }
   }
 
   # Managed identity for AAD integration
   identity {
     type = "SystemAssigned"
-
-    # Ignore identity changes that would cause cluster replacement
-    lifecycle {
-      ignore_changes = [
-        identity_ids,
-      ]
-    }
   }
 
   # Network configuration
@@ -182,6 +160,20 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
       # Azure-managed node provisioning
       node_provisioning_profile,
+
+      # Azure-managed node pool defaults
+      default_node_pool[0].tags,
+      default_node_pool[0].zones,
+      default_node_pool[0].node_public_ip_enabled,
+      default_node_pool[0].fips_enabled,
+      default_node_pool[0].host_encryption_enabled,
+      default_node_pool[0].only_critical_addons_enabled,
+      default_node_pool[0].max_count,
+      default_node_pool[0].min_count,
+      default_node_pool[0].upgrade_settings,
+
+      # Azure-managed identity defaults
+      identity[0].identity_ids,
     ]
   }
 }
