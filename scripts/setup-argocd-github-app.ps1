@@ -54,34 +54,78 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✓ gh CLI authenticated" -ForegroundColor Green
 Write-Host ""
 
-# Step 1: Create GitHub App via manifest
+# Step 1: Create GitHub App
 Write-Host "📝 Step 1: Create GitHub App" -ForegroundColor Cyan
-Write-Host "Opening browser to create GitHub App..."
 Write-Host ""
-Write-Host "IMPORTANT: After app creation:" -ForegroundColor Yellow
-Write-Host "  1. Click 'Generate a private key' and download the .pem file" -ForegroundColor Yellow
-Write-Host "  2. Note the App ID from the settings page" -ForegroundColor Yellow
-Write-Host "  3. Install the app on your repository" -ForegroundColor Yellow
-Write-Host "  4. Note the Installation ID from the URL" -ForegroundColor Yellow
+Write-Host "I'll guide you through creating a GitHub App with the correct permissions." -ForegroundColor White
 Write-Host ""
+Write-Host "Opening GitHub App creation page in your browser..." -ForegroundColor Yellow
+Start-Sleep -Seconds 2
 
-$manifestPath = Join-Path $PSScriptRoot "github-app-argocd-manifest.json"
-if (!(Test-Path $manifestPath)) {
-    Write-Error "Manifest file not found: $manifestPath"
-}
-
-# Open GitHub app creation page
 $owner = $Repository.Split('/')[0]
-$manifestUrl = "https://github.com/settings/apps/new"
-Write-Host "Opening: $manifestUrl" -ForegroundColor Gray
-Start-Process $manifestUrl
+$createUrl = "https://github.com/settings/apps/new"
+Start-Process $createUrl
 
 Write-Host ""
-Write-Host "Press Enter after you have:" -ForegroundColor Yellow
-Write-Host "  - Created the app" -ForegroundColor Yellow
-Write-Host "  - Generated and downloaded the private key" -ForegroundColor Yellow
-Write-Host "  - Installed the app on $Repository" -ForegroundColor Yellow
-Read-Host
+Write-Host "✏️  Fill in the form with these values:" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  GitHub App name: " -NoNewline -ForegroundColor Gray
+Write-Host "$AppName" -ForegroundColor Green
+Write-Host "  Homepage URL: " -NoNewline -ForegroundColor Gray
+Write-Host "https://argocd.yt-summarizer.com" -ForegroundColor Green
+Write-Host "  Webhook: " -NoNewline -ForegroundColor Gray
+Write-Host "Uncheck 'Active'" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Repository permissions:" -ForegroundColor Gray
+Write-Host "    - Contents: " -NoNewline -ForegroundColor Gray
+Write-Host "Read-only" -ForegroundColor Green
+Write-Host "    - Pull requests: " -NoNewline -ForegroundColor Gray
+Write-Host "Read-only" -ForegroundColor Green
+Write-Host "    - Metadata: " -NoNewline -ForegroundColor Gray
+Write-Host "Read-only (auto-selected)" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Where can this GitHub App be installed?" -ForegroundColor Gray
+Write-Host "    - Select: " -NoNewline -ForegroundColor Gray
+Write-Host "Only on this account" -ForegroundColor Green
+Write-Host ""
+Write-Host "Then click 'Create GitHub App'" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+Read-Host "Press Enter after creating the app"
+
+# Step 1b: Generate private key
+Write-Host ""
+Write-Host "🔑 Step 1b: Generate Private Key" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "In the app settings page:" -ForegroundColor White
+Write-Host "  1. Scroll down to 'Private keys' section" -ForegroundColor Gray
+Write-Host "  2. Click 'Generate a private key'" -ForegroundColor Gray
+Write-Host "  3. Save the downloaded .pem file" -ForegroundColor Gray
+Write-Host ""
+Write-Host "Also note the App ID (shown at the top of the settings page)" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+Read-Host "Press Enter after downloading the private key"
+
+# Step 1c: Install app
+Write-Host ""
+Write-Host "📦 Step 1c: Install App on Repository" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "In the app settings page:" -ForegroundColor White
+Write-Host "  1. Click 'Install App' in the left sidebar" -ForegroundColor Gray
+Write-Host "  2. Click 'Install' next to your account" -ForegroundColor Gray
+Write-Host "  3. Select 'Only select repositories'" -ForegroundColor Gray
+Write-Host "  4. Choose: " -NoNewline -ForegroundColor Gray
+Write-Host "$Repository" -ForegroundColor Green
+Write-Host "  5. Click 'Install'" -ForegroundColor Gray
+Write-Host ""
+Write-Host "After installation, note the Installation ID from the URL:" -ForegroundColor Yellow
+Write-Host "  Example: https://github.com/settings/installations/12345678" -ForegroundColor DarkGray
+Write-Host "  Installation ID: " -NoNewline -ForegroundColor DarkGray
+Write-Host "12345678" -ForegroundColor Green
+Write-Host ""
+Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+Read-Host "Press Enter after installing the app"
 
 # Step 2: Collect information
 Write-Host ""
