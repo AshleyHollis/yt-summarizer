@@ -18,7 +18,7 @@ paths:
       description: |
         Send a natural language query to the copilot with optional scope filters.
         Returns an answer with citations and recommended videos.
-        
+
         **This is a read-only operation.** The copilot cannot:
         - Trigger ingestion or reprocessing
         - Modify any data

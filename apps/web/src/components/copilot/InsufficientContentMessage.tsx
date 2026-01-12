@@ -13,7 +13,7 @@ interface InsufficientContentMessageProps {
 
 /**
  * InsufficientContentMessage - Displays when synthesis can't find enough content
- * 
+ *
  * Provides helpful messaging and actionable suggestions for the user
  * to either:
  * 1. Broaden their scope/query
@@ -51,7 +51,7 @@ export function InsufficientContentMessage({
           <Lightbulb className="w-4 h-4 text-yellow-500" />
           Suggestions to create a {typeLabel}:
         </h4>
-        
+
         <ul className="space-y-3">
           <li className={`${copilotTextSizes.body} ${copilotColors.primary}`}>
             <strong>Try a broader query:</strong> Use more general terms related to your topic.
@@ -61,11 +61,11 @@ export function InsufficientContentMessage({
               </span>
             )}
           </li>
-          
+
           <li className={`${copilotTextSizes.body} ${copilotColors.primary}`}>
             <strong>Remove scope filters:</strong> Expand your search to include all channels and topics in your library.
           </li>
-          
+
           <li className={`${copilotTextSizes.body} ${copilotColors.primary}`}>
             <strong>Add more videos:</strong> Ingest additional videos on this topic to build up your library.
           </li>
@@ -82,7 +82,7 @@ export function InsufficientContentMessage({
             Clear Filters
           </button>
         )}
-        
+
         {onIngestMore && (
           <button
             onClick={onIngestMore}
@@ -96,5 +96,3 @@ export function InsufficientContentMessage({
     </div>
   );
 }
-
-

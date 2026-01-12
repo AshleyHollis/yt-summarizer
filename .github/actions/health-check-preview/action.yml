@@ -34,14 +34,14 @@ runs:
         NAMESPACE="${{ inputs.namespace }}"
         MAX_ATTEMPTS="${{ inputs.max-attempts }}"
         INTERVAL="${{ inputs.interval-seconds }}"
-        
+
         echo "::group::🔍 Internal Cluster Health Check"
         echo "Namespace: ${NAMESPACE}"
-        
+
         INTERNAL_HEALTHY=false
         for i in $(seq 1 $MAX_ATTEMPTS); do
           echo "Attempt $i/$MAX_ATTEMPTS..."
-          
+
           # Run curl from within the cluster to check internal service
           if kubectl run curl-test-internal-${i} \
             --image=curlimages/curl:latest \
@@ -53,7 +53,7 @@ runs:
             INTERNAL_HEALTHY=true
             break
           fi
-          
+
           if [ $i -lt $MAX_ATTEMPTS ]; then
             echo "  ⏳ Waiting ${INTERVAL}s before retry..."
             sleep $INTERVAL
@@ -64,7 +64,7 @@ runs:
             exit 1
           fi
         done
-        
+
         echo "::endgroup::"
         echo "healthy=${INTERNAL_HEALTHY}" >> $GITHUB_OUTPUT
 
@@ -72,24 +72,24 @@ runs:
       shell: bash
       run: |
         EXTERNAL_URL="${{ inputs.external-url }}"
-        
+
         # Extract hostname from URL
         HOSTNAME=$(echo "$EXTERNAL_URL" | sed -E 's|https?://([^/]+).*|\1|')
-        
+
         echo "::group::🌐 DNS Resolution Check"
         echo "Hostname: ${HOSTNAME}"
-        
+
         # Try to resolve the hostname
         if command -v nslookup >/dev/null 2>&1; then
           echo "--- nslookup output ---"
           nslookup ${HOSTNAME} || echo "::warning::DNS resolution failed"
         fi
-        
+
         if command -v dig >/dev/null 2>&1; then
           echo "--- dig output ---"
           dig +short ${HOSTNAME} || echo "::warning::dig failed"
         fi
-        
+
         # Check if hostname resolves to expected IP
         RESOLVED_IP=$(getent hosts ${HOSTNAME} | awk '{ print $1 }' || echo "")
         if [ -n "$RESOLVED_IP" ]; then
@@ -103,14 +103,14 @@ runs:
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
-        
+
         echo "::group::🔐 TLS Certificate Status"
-        
+
         # Check for Gateway API wildcard certificate in gateway-system namespace
         WILDCARD_CERT="yt-summarizer-wildcard"
         CERT_NAMESPACE="gateway-system"
         CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
-        
+
         if [ "$CERT_READY" = "True" ]; then
           echo "✅ Gateway API wildcard certificate is ready"
           CERT_NOT_AFTER=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.notAfter}' 2>/dev/null || echo "")
@@ -120,7 +120,7 @@ runs:
           echo "::warning::Wildcard TLS certificate not ready in ${CERT_NAMESPACE} namespace"
           CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "Unknown")
           echo "  Message: ${CERT_MESSAGE}"
-          
+
           # Check for rate limiting
           if echo "$CERT_MESSAGE" | grep -q "rateLimited"; then
             echo "::error::Let's Encrypt rate limit detected!"
@@ -133,19 +133,19 @@ runs:
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
-        
+
         echo "::group::🔧 HTTPRoute Configuration"
-        
+
         # Get HTTPRoute details
         kubectl get httproute -n ${NAMESPACE} -o wide || echo "::warning::Failed to get HTTPRoute"
-        
+
         # Check HTTPRoute status
         echo "--- HTTPRoute Status ---"
         HTTPROUTE_NAME=$(kubectl get httproute -n ${NAMESPACE} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
         if [ -n "$HTTPROUTE_NAME" ]; then
           echo "HTTPRoute: $HTTPROUTE_NAME"
           kubectl get httproute $HTTPROUTE_NAME -n ${NAMESPACE} -o jsonpath='{.status}' | jq '.' 2>/dev/null || echo "No status available"
-          
+
           # Get hostname
           HOSTNAME=$(kubectl get httproute $HTTPROUTE_NAME -n ${NAMESPACE} -o jsonpath='{.spec.hostnames[0]}' 2>/dev/null || echo "")
           echo "✅ HTTPRoute configured for: ${HOSTNAME}"
@@ -158,16 +158,16 @@ runs:
       shell: bash
       run: |
         NAMESPACE="${{ inputs.namespace }}"
-        
+
         echo "::group::🔌 Service and Endpoints"
-        
+
         # Check service
         kubectl get svc api -n ${NAMESPACE} -o wide || echo "::warning::Service not found"
-        
+
         # Check endpoints
         echo "--- Endpoints ---"
         kubectl get endpoints api -n ${NAMESPACE} || echo "::warning::Endpoints not found"
-        
+
         # Check if endpoints have addresses
         ENDPOINT_COUNT=$(kubectl get endpoints api -n ${NAMESPACE} -o jsonpath='{.subsets[0].addresses}' 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
         if [ "$ENDPOINT_COUNT" != "0" ]; then
@@ -185,48 +185,48 @@ runs:
         MAX_ATTEMPTS="${{ inputs.max-attempts }}"
         INTERVAL="${{ inputs.interval-seconds }}"
         NAMESPACE="${{ inputs.namespace }}"
-        
+
         echo "::group::🌐 External Ingress Health Check"
         echo "URL: ${EXTERNAL_URL}/health/live"
-        
+
         # Check certificate status first - FAIL FAST if not ready
         WILDCARD_CERT="yt-summarizer-wildcard"
         CERT_NAMESPACE="gateway-system"
         CERT_READY=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         CERT_MESSAGE=$(kubectl get certificate ${WILDCARD_CERT} -n ${CERT_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
-        
+
         # If certificate is NOT ready, fail immediately without doing external checks
         if [ "$CERT_READY" != "True" ]; then
           echo "::error::Gateway API wildcard TLS certificate is NOT ready"
           echo "::error::Certificate: ${WILDCARD_CERT} (namespace: ${CERT_NAMESPACE})"
           echo "::error::Status: ${CERT_READY}"
           echo "::error::Message: ${CERT_MESSAGE}"
-          
+
           # Provide specific guidance based on cert status
           if echo "$CERT_MESSAGE" | grep -qi "rateLimited"; then
             echo "::error::Let's Encrypt rate limit detected!"
             echo "::notice::Rate limit: 5 certificates per exact domain set per 168 hours"
             echo "::notice::Wait for rate limit to expire or use staging certificates for testing"
           fi
-          
+
           echo "::notice::External access requires a valid TLS certificate"
           echo "::notice::Fix the certificate issue before the preview environment will be accessible"
           echo "healthy=false-cert-not-ready" >> $GITHUB_OUTPUT
           exit 1
         fi
-        
+
         echo "✅ TLS certificate is ready - proceeding with external health checks"
-        
+
         # DNS propagation can take a few minutes - give it some time
         echo "::notice::Waiting 30 seconds for DNS propagation..."
         sleep 30
-        
+
         EXTERNAL_HEALTHY=false
         for i in $(seq 1 $MAX_ATTEMPTS); do
           echo "Attempt $i/$MAX_ATTEMPTS (external)..."
-          
+
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" 2>&1 || echo "000")
-          
+
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ External API health check passed (HTTP $HTTP_CODE)"
             EXTERNAL_HEALTHY=true
@@ -234,31 +234,31 @@ runs:
           else
             echo "  ❌ Status: $HTTP_CODE (expected: 200)"
           fi
-          
+
           if [ $i -lt $MAX_ATTEMPTS ]; then
             echo "  ⏳ Waiting ${INTERVAL}s before retry..."
             sleep $INTERVAL
           fi
         done
-        
+
         # If external check passed, we're done
         if [ "$EXTERNAL_HEALTHY" = "true" ]; then
           echo "::endgroup::"
           echo "healthy=true" >> $GITHUB_OUTPUT
           exit 0
         fi
-        
+
         # External check failed - perform diagnostics and fail
         echo ""
         echo "::error::External API health check failed after $MAX_ATTEMPTS attempts"
-        
+
         # Check if it's a cert issue (diagnostic only)
         INSECURE_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 5 "${EXTERNAL_URL}/health/live" 2>/dev/null || echo "000")
         if [ "$INSECURE_CODE" = "200" ]; then
           echo "::warning::API responds successfully when bypassing SSL verification (-k flag)"
           echo "::notice::This indicates a TLS certificate configuration issue"
         fi
-        
+
         # Provide diagnostic information
         echo "::notice::Diagnostic information:"
         echo "::notice::- External check: $MAX_ATTEMPTS attempts failed (HTTP $HTTP_CODE)"
@@ -271,7 +271,7 @@ runs:
         echo "::notice::- Gateway not routing traffic correctly"
         echo "::notice::- Service/pod not ready or unhealthy"
         echo "::notice::- Backend service port mismatch"
-        
+
         # ALWAYS fail if external check fails
         echo "::endgroup::"
         echo "healthy=false" >> $GITHUB_OUTPUT

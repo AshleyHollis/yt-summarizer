@@ -55,17 +55,17 @@ runs:
         echo "🔍 Scanning for Missing Dependencies (deptry)"
         echo "════════════════════════════════════════════════════════════════"
         echo ""
-        
+
         # Auto-detect source directory
         if [ -d "src" ]; then
           SRC_DIR="src"
         else
           SRC_DIR="."
         fi
-        
+
         echo "📁 Source directory: $SRC_DIR"
         echo ""
-        
+
         # Ignore DEP003 (transitive dependencies) for editable local packages
         # Ignore DEP002 (unused deps) for dev/test/infrastructure packages
         if deptry "$SRC_DIR" --extend-exclude "test.*" --ignore DEP003,DEP002; then
@@ -109,7 +109,7 @@ runs:
         echo "🔒 Security Vulnerability Scan (pip-audit)"
         echo "════════════════════════════════════════════════════════════════"
         echo ""
-        
+
         if pip-audit --desc --skip-editable; then
           echo ""
           echo "✅ No security vulnerabilities detected"

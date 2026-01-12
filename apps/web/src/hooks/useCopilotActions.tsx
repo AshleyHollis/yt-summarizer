@@ -2,16 +2,16 @@
 
 /**
  * Copilot Actions Hook (Optimized)
- * 
+ *
  * This is the main entry point for registering all Copilot tools and actions.
- * 
+ *
  * Architecture:
  * - Pattern B (Backend Tools): The agent calls backend tools (query_library, search_videos, etc.)
  *   which run on the server with low latency. The frontend renders results via useBackendToolRenderers.
- * 
+ *
  * - Pattern A (Frontend Tools): For UI-only operations (wizards, confirmations).
  *   Currently only used for simple utility operations.
- * 
+ *
  * - Copilot Readable: Context provided to the agent (scope, current video)
  */
 
@@ -24,10 +24,10 @@ import { useFrontendTools } from "./useFrontendTools";
 import { useBackendToolRenderers } from "./useBackendToolRenderers";
 
 // Re-export types for consumers
-export type { 
-  Evidence, 
-  RecommendedVideo, 
-  QueryResponse, 
+export type {
+  Evidence,
+  RecommendedVideo,
+  QueryResponse,
   CoverageResponse,
   ScoredSegment,
   SegmentSearchResponse,
@@ -38,7 +38,7 @@ export { formatTime, API_URL } from "./copilot-utils";
 
 /**
  * Main hook to register all Copilot actions.
- * 
+ *
  * This hook:
  * 1. Provides readable context to the agent (scope, AI settings)
  * 2. Registers backend tool renderers (Pattern B) - PRIMARY

@@ -108,7 +108,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **Kubernetes/k8s**: `*.secret.yaml`, `secrets/`, `.kube/`, `kubeconfig*`, `*.key`, `*.crt`
 
 5. **⚠️ CRITICAL: Development Environment Setup**:
-   
+
    When running services for testing or development, **NEVER** use blocking terminal commands. All services MUST be started as background processes.
 
    **Starting .NET Aspire (REQUIRED for E2E tests)**:
@@ -117,7 +117,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WindowStyle Hidden
    Start-Sleep -Seconds 30  # Wait for services to initialize
    ```
-   
+
    **🚫 NEVER DO THIS**:
    ```powershell
    # ❌ WRONG: These block the terminal and get killed on next command
@@ -125,14 +125,14 @@ You **MUST** consider the user input before proceeding (if not empty).
    dotnet run --project services\aspire\AppHost\AppHost.csproj
    cd services/aspire/AppHost && dotnet run
    ```
-   
+
    **Starting Frontend Dev Server**:
    ```powershell
    # ✅ CORRECT: Start as background process
    Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "apps\web" -WindowStyle Hidden
    Start-Sleep -Seconds 10
    ```
-   
+
    **Fixed ports**: API runs on `http://localhost:8000`, Web runs on `http://localhost:3000`.
 
 6. Parse tasks.md structure and extract:
@@ -167,33 +167,33 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **DO NOT mark any task as complete until ALL automated tests pass**
    - **NO MANUAL TESTING REQUIRED** - all verification is automated
    - Run ALL test suites after completing a phase:
-   
+
    **API Tests:**
    ```powershell
    cd services/api && python -m pytest tests/ -v -p no:asyncio
    ```
-   
+
    **Worker Tests (including Message Contracts):**
    ```powershell
    cd services/workers && python -m pytest tests/ -v -p no:asyncio
    ```
-   
+
    **Shared Package Tests:**
    ```powershell
    cd services/shared && python -m pytest tests/ -v -p no:asyncio
    ```
-   
+
    **Frontend Tests:**
    ```powershell
    cd apps/web && npm run test:run
    ```
-   
+
    **E2E Tests:**
    ```powershell
    cd apps/web && $env:USE_EXTERNAL_SERVER = "true"; npx playwright test
    ```
-   
-   - **If any test fails**: 
+
+   - **If any test fails**:
      - Fix the failing test or implementation
      - Re-run tests until all pass
      - Only THEN mark the task as [X]

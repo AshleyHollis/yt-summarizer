@@ -236,7 +236,7 @@ kubectl wait --for=condition=available deployment/argocd-server `
 
 # Get initial admin password
 $argoPassword = kubectl -n argocd get secret argocd-initial-admin-secret `
-  -o jsonpath="{.data.password}" | 
+  -o jsonpath="{.data.password}" |
   % { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
 
 Write-Host "Argo CD admin password: $argoPassword"
@@ -290,7 +290,7 @@ After CI passes, a preview environment is deployed:
    - Preview URL
    - Link to Argo CD sync status
 
-**View preview**: 
+**View preview**:
 - URL posted as PR comment (e.g., `https://pr-123.preview.ytsummarizer.dev`)
 - Argo CD: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
 
@@ -321,7 +321,7 @@ When you merge a PR to `main`:
    - Builds Next.js frontend
    - Deploys to Azure Static Web Apps production
 
-**View production**: 
+**View production**:
 - App: `https://ytsummarizer.azurestaticapps.net`
 - Argo CD: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
 

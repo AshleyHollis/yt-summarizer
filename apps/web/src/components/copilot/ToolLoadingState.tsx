@@ -13,7 +13,7 @@ interface ToolLoadingStateProps {
 
 /**
  * Reusable loading state component for tool execution.
- * 
+ *
  * Used by both frontend tools (Pattern A) and backend tool renderers (Pattern B)
  * to provide consistent loading UI during tool execution.
  */

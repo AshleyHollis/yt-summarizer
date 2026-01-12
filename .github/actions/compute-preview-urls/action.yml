@@ -42,25 +42,25 @@ runs:
         # New URL scheme uses Gateway API with wildcard DNS
         # Format: api-pr-{number}.{base-domain}
         # Example: api-pr-123.yt-summarizer.apps.ashleyhollis.com
-        
+
         # Compute preview hostname
         PREVIEW_HOST="api-pr-${PR_NUMBER}.${BASE_DOMAIN}"
-        
+
         # Preview URL (always HTTPS with wildcard certificate)
         PREVIEW_URL="https://${PREVIEW_HOST}"
-        
+
         # TLS secret name (shared wildcard certificate from gateway-system namespace)
         # Note: Gateway terminates TLS, no per-preview secret needed
         TLS_SECRET="yt-summarizer-wildcard-tls"
-        
+
         # Namespace
         NAMESPACE="preview-pr-${PR_NUMBER}"
-        
+
         echo "preview_url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
         echo "preview_host=${PREVIEW_HOST}" >> $GITHUB_OUTPUT
         echo "tls_secret=${TLS_SECRET}" >> $GITHUB_OUTPUT
         echo "namespace=${NAMESPACE}" >> $GITHUB_OUTPUT
-        
+
         echo "✅ Preview URLs computed:"
         echo "   URL: ${PREVIEW_URL}"
         echo "   Host: ${PREVIEW_HOST}"

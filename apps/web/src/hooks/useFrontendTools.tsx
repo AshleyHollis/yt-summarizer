@@ -2,11 +2,11 @@
 
 /**
  * Frontend Tools (Pattern A)
- * 
+ *
  * These hooks register frontend-only tools for:
  * - UI interactions (wizards, confirmations)
  * - Client-side operations
- * 
+ *
  * NOTE: The main `query_library` tool is now a BACKEND tool (Pattern B).
  * See useBackendToolRenderers.tsx for the query_library renderer.
  */
@@ -18,12 +18,12 @@ import type { SegmentSearchResponse, CoverageResponse } from "@/types/copilot-ty
 
 /**
  * Register all frontend tools (Pattern A).
- * 
+ *
  * These are tools that need to run on the frontend only.
  * Most query/search operations are now backend tools for better latency.
  */
 export function useFrontendTools() {
-  // These remaining tools make direct API calls because they're 
+  // These remaining tools make direct API calls because they're
   // simple operations that don't benefit from agent orchestration.
   // They can be migrated to backend tools in the future.
   useSearchSegmentsTool();

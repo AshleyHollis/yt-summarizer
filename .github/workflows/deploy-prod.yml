@@ -155,13 +155,13 @@ jobs:
           file-path: 'k8s/overlays/prod/kustomization.yaml'
           commit-message: |
             chore(prod): deploy ${{ needs.meta.outputs.image_tag }} to production
-            
+
             API Image: ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-api:${{ needs.meta.outputs.image_tag }}
             Workers Image: ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-workers:${{ needs.meta.outputs.image_tag }}
-            
+
             Commit: ${{ github.sha }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            
+
             [skip ci]
           git-branch: 'main'
 
@@ -250,4 +250,3 @@ jobs:
           update-overlay-result: ${{ needs.update-overlay.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend.result }}
           health-check-result: ${{ needs.health-check.result }}
-

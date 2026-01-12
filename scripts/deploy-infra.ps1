@@ -19,7 +19,7 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet("staging", "production")]
     [string]$Environment,
-    
+
     [switch]$Plan,
     [switch]$AutoApprove,
     [switch]$Destroy
@@ -72,18 +72,18 @@ try {
     if ($Destroy) {
         Write-Host "`n🔴 DESTROYING INFRASTRUCTURE..." -ForegroundColor Red
         Write-Host "Environment: $Environment" -ForegroundColor Red
-        
+
         if ($AutoApprove) {
             terraform destroy -auto-approve
         } else {
             terraform destroy
         }
-        
+
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Terraform destroy failed"
             exit 1
         }
-        
+
         Write-Host "`n✅ Infrastructure destroyed successfully!" -ForegroundColor Green
         exit 0
     }
@@ -115,7 +115,7 @@ try {
         Write-Host "Review the plan above and confirm to proceed..." -ForegroundColor Yellow
         terraform apply $planFile
     }
-    
+
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Terraform apply failed"
         exit 1

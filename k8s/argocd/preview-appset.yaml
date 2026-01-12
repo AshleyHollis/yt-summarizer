@@ -42,19 +42,19 @@ spec:
         github:
           owner: AshleyHollis
           repo: yt-summarizer
-          
+
           # AUTHENTICATION: Choose ONE of the following:
-          
+
           # GitHub App (recommended - no expiration, 5000 req/hour)
           # Using GitHub App for authentication
           appSecretName: github-app
-          
+
           # GitHub PAT (fallback - requires rotation, 60 req/hour)
           # Uncomment to use PAT instead of GitHub App:
           # tokenRef:
           #   secretName: github-token
           #   key: token
-          
+
           # Optional: filter by labels
           # labels:
           #   - preview

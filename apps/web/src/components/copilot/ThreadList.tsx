@@ -29,7 +29,7 @@ interface ThreadListProps {
 
 /**
  * ThreadList - Dropdown list of chat threads
- * 
+ *
  * Extracted from ThreadedCopilotSidebar for better maintainability.
  */
 export function ThreadList({
@@ -47,7 +47,7 @@ export function ThreadList({
     <div className={styles.threadDropdown}>
       {sortedThreads.map((thread) => {
         const isActive = thread.id === activeThreadId;
-        
+
         return (
           <div
             key={thread.id}
@@ -58,7 +58,7 @@ export function ThreadList({
             className={`${styles.threadItem} ${isActive ? styles.active : ""}`}
           >
             <MessageSquare className={styles.threadIcon} />
-            
+
             <div className={styles.threadInfo}>
               <div className={styles.threadTitle}>
                 {thread.title}
@@ -68,7 +68,7 @@ export function ThreadList({
                 {thread.messageCount > 0 && ` • ${thread.messageCount}`}
               </div>
             </div>
-            
+
             {threads.length > 1 && (
               <button
                 onClick={(e) => {

@@ -115,7 +115,7 @@ def write_patch_item(f, patch_item, indent):
         f.write(f'{indent_str}- target:\n')
         target = patch_item['target']
         target_order = ['group', 'version', 'apiVersion', 'kind', 'name', 'namespace']
-        # Use extra indentation so fields become children of 'target' (list item uses '- ') 
+        # Use extra indentation so fields become children of 'target' (list item uses '- ')
         child_indent = '  ' * (indent + 2)
         for key in target_order:
             if key in target:

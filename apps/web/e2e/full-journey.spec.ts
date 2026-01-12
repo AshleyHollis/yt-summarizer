@@ -66,7 +66,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // STEP 2: Wait for video processing to complete
     // =========================================================================
     console.log('Step 2: Waiting for video processing to complete...');
-    
+
     // Poll for completion by checking for summary/transcript content
     // or a "completed" status indicator
     const processingComplete = await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
@@ -77,7 +77,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // STEP 3: Open the copilot and ask a question about the video
     // =========================================================================
     console.log('Step 3: Opening copilot and asking question...');
-    
+
     // Navigate to library where copilot is available
     await page.goto('/library');
     await page.waitForLoadState('networkidle');
@@ -89,7 +89,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // Type a question about the video
     const question = 'What is this video about? Can you summarize it?';
     await chatInput!.fill(question);
-    
+
     // Submit the question - prefer pressing Enter which works regardless of button visibility
     // The send button may be outside viewport on smaller screens
     await chatInput!.press('Enter');
@@ -100,7 +100,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // STEP 4: Verify the agent responds
     // =========================================================================
     console.log('Step 4: Waiting for copilot response...');
-    
+
     const responseReceived = await waitForCopilotResponse(page, AGENT_RESPONSE_TIMEOUT);
     expect(responseReceived).toBe(true);
     console.log('Step 4: Copilot responded!');
@@ -124,12 +124,12 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     await page.goto('/add');
     const urlInput = page.getByLabel(/YouTube URL/i);
     await urlInput.fill(TEST_VIDEO_URL);
-    
+
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
     await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
-    
+
     // Wait for processing
     await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
 
@@ -160,7 +160,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     await page.waitForLoadState('networkidle');
 
     const chatInput = await findChatInput(page);
-    
+
     // Skip if chat input not found (copilot may not be visible)
     if (!chatInput) {
       console.log('Chat input not found - skipping test');
@@ -178,7 +178,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // Response should not crash or show raw errors
     const responseContent = await getCopilotResponseContent(page);
     const lowerResponse = responseContent.toLowerCase();
-    
+
     // Check for various error indicators
     const errorIndicators = [
       'exception',
@@ -187,10 +187,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
       'search failed',
       'failed:',
       '500',
-      '401', 
+      '401',
       '404',
     ];
-    
+
     for (const indicator of errorIndicators) {
       expect(lowerResponse).not.toContain(indicator);
     }
@@ -204,7 +204,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     await page.waitForLoadState('networkidle');
 
     const chatInput = await findChatInput(page);
-    
+
     if (!chatInput) {
       console.log('Chat input not found - skipping test');
       return;
@@ -236,12 +236,12 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     ];
 
     const lowerResponse = responseContent.toLowerCase();
-    const askedForClarification = clarificationPhrases.some(phrase => 
+    const askedForClarification = clarificationPhrases.some(phrase =>
       lowerResponse.includes(phrase)
     );
 
     expect(askedForClarification).toBe(false);
-    
+
     // Verify no backend errors are shown in the response
     const errorPhrases = [
       'internal server error',
@@ -254,11 +254,11 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
       '401',
       '404',
     ];
-    
-    const hasBackendError = errorPhrases.some(phrase => 
+
+    const hasBackendError = errorPhrases.some(phrase =>
       lowerResponse.includes(phrase)
     );
-    
+
     expect(hasBackendError).toBe(false);
   });
 });
@@ -282,12 +282,12 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     await page.goto('/add');
     const urlInput = page.getByLabel(/YouTube URL/i);
     await urlInput.fill(TEST_VIDEO_URL);
-    
+
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
     await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
-    
+
     // Wait for processing to complete
     const processingComplete = await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
     expect(processingComplete).toBe(true);
@@ -311,11 +311,11 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     const responseContent = await getCopilotResponseContent(page);
     console.log('Agent response:', responseContent.substring(0, 500));
     console.log(`Response length: ${responseContent.length}`);
-    
+
     // Response should have some content (not just an error or empty)
     // LLM responses can be concise, so we check for minimal content
     expect(responseContent.length).toBeGreaterThan(10);
-    
+
     // Should not be a generic "I don't know" without attempting search
     const unhelpfulPhrases = [
       'i cannot access',
@@ -323,15 +323,15 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
       'i am unable to',
       'as an ai',
     ];
-    
+
     const lowerResponse = responseContent.toLowerCase();
     const isUnhelpful = unhelpfulPhrases.some(phrase => lowerResponse.includes(phrase));
-    
+
     // If the response seems unhelpful, it should at least mention searching
     if (isUnhelpful) {
       expect(lowerResponse).toMatch(/search|found|library|video/);
     }
-    
+
     console.log('✅ Citation test passed - agent provided substantive response');
   });
 
@@ -342,14 +342,14 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     await page.goto('/add');
     const urlInput = page.getByLabel(/YouTube URL/i);
     await urlInput.fill(TEST_VIDEO_URL);
-    
+
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
     await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
     const videoUrl = page.url();
     const videoId = videoUrl.split('/videos/')[1];
-    
+
     await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
 
     // Query about specific video content
@@ -367,7 +367,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     expect(responseReceived).toBe(true);
 
     const responseContent = await getCopilotResponseContent(page);
-    
+
     // The agent should mention something about the search results
     const searchRelatedPhrases = [
       'found',
@@ -377,10 +377,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
       'result',
       'segment',
     ];
-    
+
     const lowerResponse = responseContent.toLowerCase();
     const mentionsSearch = searchRelatedPhrases.some(phrase => lowerResponse.includes(phrase));
-    
+
     expect(mentionsSearch).toBe(true);
     console.log('✅ Agent references search results in response');
   });
@@ -392,7 +392,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     await page.goto('/add');
     const urlInput = page.getByLabel(/YouTube URL/i);
     await urlInput.fill(TEST_VIDEO_URL);
-    
+
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
@@ -414,28 +414,28 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
 
     // Check for citation/evidence UI elements in the response
     const chatArea = page.locator('[class*="chat" i], [class*="copilot" i], [class*="message" i]');
-    
+
     // Look for any links (could be citations)
     const links = chatArea.locator('a[href*="youtube"], a[href*="/videos/"]');
     const linksCount = await links.count();
-    
+
     // Look for citation-like elements
     const citationElements = page.locator(
       '[class*="citation" i], [class*="evidence" i], [class*="source" i], [class*="reference" i]'
     );
     const citationsCount = await citationElements.count();
-    
+
     // Look for timestamp patterns in the text (e.g., "0:00", "1:23")
     const responseText = await getCopilotResponseContent(page);
     const hasTimestamps = /\d{1,2}:\d{2}/.test(responseText);
-    
+
     console.log(`Links found: ${linksCount}, Citations found: ${citationsCount}, Has timestamps: ${hasTimestamps}`);
     console.log(`Response text length: ${responseText.length}`);
-    
+
     // At minimum, the response should exist (even short responses are valid)
     // The LLM may provide brief responses for simple queries
     expect(responseText.length).toBeGreaterThan(10);
-    
+
     console.log('✅ Response quality check passed');
   });
 
@@ -445,7 +445,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     // This test verifies the agent's behavior via API to check tool usage
     // First, check if API is accessible
     const healthCheck = await request.get('/health').catch(() => null);
-    
+
     if (!healthCheck || healthCheck.status() !== 200) {
       console.log('API not accessible - skipping API-level test');
       return;
@@ -463,7 +463,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     if (queryResponse) {
       // The search endpoint should work
       expect([200, 500]).toContain(queryResponse.status());
-      
+
       if (queryResponse.status() === 200) {
         const body = await queryResponse.json();
         // Verify the response structure
@@ -513,7 +513,7 @@ async function waitForVideoProcessing(page: Page, timeout: number): Promise<bool
 
     // Wait before next poll
     await page.waitForTimeout(pollInterval);
-    
+
     // Refresh the page to get latest status
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -548,7 +548,7 @@ async function findChatInput(page: Page) {
   if (await toggleButton.isVisible().catch(() => false)) {
     await toggleButton.click();
     await page.waitForTimeout(500);
-    
+
     // Try again after opening
     for (const input of possibleInputs) {
       if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -576,14 +576,14 @@ async function waitForCopilotResponse(page: Page, timeout: number): Promise<bool
   while (Date.now() - startTime < timeout) {
     // Check if loading indicator is gone (response received)
     const isLoading = await loadingIndicator.isVisible().catch(() => false);
-    
+
     // Look for assistant message content
     const responseMessages = page.locator(
       '[class*="assistant" i], [class*="response" i], [class*="message" i]:not([class*="user" i])'
     );
-    
+
     const messageCount = await responseMessages.count();
-    
+
     // If we have messages and not loading, we're done
     if (messageCount > 0 && !isLoading) {
       // Wait a moment for any streaming to complete
@@ -621,7 +621,7 @@ async function getCopilotResponseContent(page: Page): Promise<string> {
   for (const selector of responseSelectors) {
     const elements = page.locator(selector);
     const count = await elements.count();
-    
+
     if (count > 0) {
       const lastElement = elements.last();
       const text = await lastElement.textContent().catch(() => '');

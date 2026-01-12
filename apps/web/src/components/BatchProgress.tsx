@@ -87,7 +87,7 @@ export function BatchProgress({
         clearTimeout(sseTimeoutId);
         sseTimeoutId = null;
       }
-      
+
       setBatch(data);
       setError(null);
       setIsLoading(false);

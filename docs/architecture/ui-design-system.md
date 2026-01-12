@@ -79,8 +79,8 @@ This document defines the consistent UI patterns used throughout the yt-summariz
 
 **Canonical Pattern:**
 ```tsx
-className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg 
-           hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed 
+className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg
+           hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed
            transition-colors"
 ```
 
@@ -95,10 +95,10 @@ className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg
 
 **Canonical Pattern:**
 ```tsx
-className="px-3 py-1.5 text-sm font-medium rounded-lg 
-           border border-gray-300 dark:border-gray-600 
-           text-gray-700 dark:text-gray-300 
-           hover:bg-gray-100 dark:hover:bg-gray-800 
+className="px-3 py-1.5 text-sm font-medium rounded-lg
+           border border-gray-300 dark:border-gray-600
+           text-gray-700 dark:text-gray-300
+           hover:bg-gray-100 dark:hover:bg-gray-800
            transition-colors"
 ```
 
@@ -108,10 +108,10 @@ className="px-3 py-1.5 text-sm font-medium rounded-lg
 
 **Canonical Pattern:**
 ```tsx
-className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg 
-           border-2 border-red-500 bg-red-500/10 
-           text-red-600 dark:text-red-400 
-           hover:bg-red-500/20 
+className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg
+           border-2 border-red-500 bg-red-500/10
+           text-red-600 dark:text-red-400
+           hover:bg-red-500/20
            transition-colors"
 ```
 
@@ -121,19 +121,19 @@ className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg
 
 **For CopilotKit components:**
 ```tsx
-className="p-1.5 rounded-lg border border-transparent 
-           hover:border-[var(--copilot-kit-primary-color)] 
-           hover:bg-[var(--copilot-kit-secondary-color)] 
-           text-[var(--copilot-kit-muted-color)] 
-           hover:text-[var(--copilot-kit-primary-color)] 
+className="p-1.5 rounded-lg border border-transparent
+           hover:border-[var(--copilot-kit-primary-color)]
+           hover:bg-[var(--copilot-kit-secondary-color)]
+           text-[var(--copilot-kit-muted-color)]
+           hover:text-[var(--copilot-kit-primary-color)]
            transition-all duration-150"
 ```
 
 **For main app:**
 ```tsx
-className="p-2 rounded-lg text-gray-500 dark:text-gray-400 
-           hover:bg-gray-100 dark:hover:bg-gray-800 
-           hover:text-gray-900 dark:hover:text-white 
+className="p-2 rounded-lg text-gray-500 dark:text-gray-400
+           hover:bg-gray-100 dark:hover:bg-gray-800
+           hover:text-gray-900 dark:hover:text-white
            transition-colors"
 ```
 
@@ -146,8 +146,8 @@ className="bg-[var(--copilot-kit-primary-color)] text-white font-medium"
 
 **Inactive state:**
 ```tsx
-className="text-[var(--copilot-kit-muted-color)] 
-           hover:text-[var(--copilot-kit-secondary-contrast-color)] 
+className="text-[var(--copilot-kit-muted-color)]
+           hover:text-[var(--copilot-kit-secondary-contrast-color)]
            hover:bg-[var(--copilot-kit-background-color)]"
 ```
 
@@ -173,8 +173,8 @@ function getStatusBadgeClass(status: string): string {
 ### 2. Facet/Tag Chip
 
 ```tsx
-className="inline-flex items-center rounded-full px-2.5 py-0.5 
-           text-xs font-medium bg-gray-100 dark:bg-gray-700 
+className="inline-flex items-center rounded-full px-2.5 py-0.5
+           text-xs font-medium bg-gray-100 dark:bg-gray-700
            text-gray-700 dark:text-gray-300"
 ```
 
@@ -184,12 +184,12 @@ className="inline-flex items-center rounded-full px-2.5 py-0.5
 
 **Tailwind equivalent:**
 ```tsx
-<button className="group/clear flex items-center gap-0.5 px-1.5 py-0.5 
-                   text-[10px] rounded 
-                   bg-[var(--copilot-kit-primary-color)] text-white font-medium 
+<button className="group/clear flex items-center gap-0.5 px-1.5 py-0.5
+                   text-[10px] rounded
+                   bg-[var(--copilot-kit-primary-color)] text-white font-medium
                    hover:brightness-110 transition-all">
   <span>3 Videos Selected</span>
-  <span className="inline-flex items-center justify-center ml-0.5 rounded-sm 
+  <span className="inline-flex items-center justify-center ml-0.5 rounded-sm
                    group-hover/clear:bg-white/20 transition-colors">
     <XMarkIcon className="h-2.5 w-2.5" />
   </span>
@@ -199,7 +199,7 @@ className="inline-flex items-center rounded-full px-2.5 py-0.5
 ### 4. Count Badge (Notification Style)
 
 ```tsx
-className="ml-1 px-1.5 py-0.5 text-xs font-bold rounded-full 
+className="ml-1 px-1.5 py-0.5 text-xs font-bold rounded-full
            bg-red-500 text-white"
 ```
 
@@ -211,13 +211,13 @@ className="ml-1 px-1.5 py-0.5 text-xs font-bold rounded-full
 
 **Canonical Pattern:**
 ```tsx
-className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 
-           rounded-lg bg-white dark:bg-[#1a1a1a] 
-           text-gray-900 dark:text-white 
-           placeholder-gray-400 
-           hover:border-red-400 
-           focus:ring-2 focus:ring-red-500 focus:border-red-500 
-           focus:outline-none 
+className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600
+           rounded-lg bg-white dark:bg-[#1a1a1a]
+           text-gray-900 dark:text-white
+           placeholder-gray-400
+           hover:border-red-400
+           focus:ring-2 focus:ring-red-500 focus:border-red-500
+           focus:outline-none
            transition-all"
 ```
 
@@ -225,16 +225,16 @@ className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600
 
 **Canonical Pattern (Library filters):**
 ```tsx
-className="block w-full rounded-xl 
-           border border-gray-200 dark:border-gray-700 
-           bg-gray-50/50 dark:bg-gray-800/50 
-           px-3 py-2.5 text-sm 
-           text-gray-900 dark:text-gray-100 
-           placeholder-gray-400 dark:placeholder-gray-500 
-           shadow-sm 
-           hover:border-red-400 
-           focus:border-red-400 focus:bg-white dark:focus:bg-gray-800 
-           focus:outline-none focus:ring-2 focus:ring-red-100 dark:focus:ring-red-900/30 
+className="block w-full rounded-xl
+           border border-gray-200 dark:border-gray-700
+           bg-gray-50/50 dark:bg-gray-800/50
+           px-3 py-2.5 text-sm
+           text-gray-900 dark:text-gray-100
+           placeholder-gray-400 dark:placeholder-gray-500
+           shadow-sm
+           hover:border-red-400
+           focus:border-red-400 focus:bg-white dark:focus:bg-gray-800
+           focus:outline-none focus:ring-2 focus:ring-red-100 dark:focus:ring-red-900/30
            transition-all"
 ```
 
@@ -250,10 +250,10 @@ Same as Filter Sidebar Input with `appearance-none cursor-pointer`
 
 ```tsx
 // Card with subtle background hover (like chat follow-up buttons)
-className="group relative flex flex-col overflow-hidden rounded-xl 
-           border-2 bg-white dark:bg-[#1a1a1a] 
-           shadow-sm 
-           transition-all duration-150 
+className="group relative flex flex-col overflow-hidden rounded-xl
+           border-2 bg-white dark:bg-[#1a1a1a]
+           shadow-sm
+           transition-all duration-150
            hover:bg-gray-50 dark:hover:bg-[#252525]"
 
 // Selected state
@@ -307,8 +307,8 @@ This follows the principle: *"Only surface information that requires attention."
 ### 2. Content Card (Panels, Sections)
 
 ```tsx
-className="rounded-lg border border-gray-200 dark:border-gray-700 
-           bg-white dark:bg-gray-800 
+className="rounded-lg border border-gray-200 dark:border-gray-700
+           bg-white dark:bg-gray-800
            p-6"
 ```
 
@@ -316,22 +316,22 @@ className="rounded-lg border border-gray-200 dark:border-gray-700
 
 **Error:**
 ```tsx
-className="p-3 rounded-lg 
-           bg-red-50 dark:bg-red-900/30 
+className="p-3 rounded-lg
+           bg-red-50 dark:bg-red-900/30
            border border-red-200 dark:border-red-800"
 ```
 
 **Success:**
 ```tsx
-className="p-4 rounded-lg 
-           bg-green-50 dark:bg-green-900/30 
+className="p-4 rounded-lg
+           bg-green-50 dark:bg-green-900/30
            border border-green-200 dark:border-green-800"
 ```
 
 **Warning:**
 ```tsx
-className="p-3 rounded-lg 
-           bg-yellow-50 dark:bg-yellow-900/30 
+className="p-3 rounded-lg
+           bg-yellow-50 dark:bg-yellow-900/30
            border border-yellow-200 dark:border-yellow-800"
 ```
 
@@ -350,17 +350,17 @@ className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
 ### 2. Inline Text Link (in paragraphs)
 
 ```tsx
-className="text-red-600 dark:text-red-400 
-           hover:text-red-700 dark:hover:text-red-300 
-           hover:underline 
+className="text-red-600 dark:text-red-400
+           hover:text-red-700 dark:hover:text-red-300
+           hover:underline
            transition-colors"
 ```
 
 ### 3. Citation Link (in chat)
 
 ```tsx
-className="text-red-500 font-semibold ml-0.5 
-           hover:text-red-600 
+className="text-red-500 font-semibold ml-0.5
+           hover:text-red-600
            transition-colors"
 ```
 

@@ -48,18 +48,18 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}): UseHealthCh
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
 
   const fetchHealth = useCallback(async () => {
     if (!enabled) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
       const status = await healthApi.getHealth();
-      
+
       if (mountedRef.current) {
         setHealth(status);
       }
@@ -86,7 +86,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}): UseHealthCh
   // Initial fetch and polling setup
   useEffect(() => {
     mountedRef.current = true;
-    
+
     if (!enabled) {
       return;
     }
@@ -102,7 +102,7 @@ export function useHealthCheck(options: UseHealthCheckOptions = {}): UseHealthCh
 
       // Poll more frequently when degraded (every 2 seconds vs normal interval)
       const interval = health?.status === 'degraded' ? 2000 : pollInterval;
-      
+
       // Only poll if continuous mode is enabled or if we're degraded/unhealthy
       if (continuous || health?.status === 'degraded' || health?.status === 'unhealthy') {
         pollIntervalRef.current = setInterval(fetchHealth, interval);

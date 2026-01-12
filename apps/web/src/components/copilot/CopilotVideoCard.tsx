@@ -125,11 +125,11 @@ function RelevanceIndicator({ score }: { score: number }) {
   const maxScore = 0.6;
   const minDisplay = 70;
   const maxDisplay = 100;
-  
+
   const clampedScore = Math.max(minScore, Math.min(score, maxScore));
   const rescaledScore = minDisplay + ((clampedScore - minScore) / (maxScore - minScore)) * (maxDisplay - minDisplay);
   const percentage = Math.round(rescaledScore);
-  
+
   // Color based on display percentage
   const getColorClass = (): string => {
     if (percentage >= 90) return 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10';
@@ -138,7 +138,7 @@ function RelevanceIndicator({ score }: { score: number }) {
   };
 
   return (
-    <div 
+    <div
       className={`flex items-center justify-center px-2 py-1 rounded-lg text-[10px] font-bold ${getColorClass()} border border-current/20`}
       title={`${percentage}% match with your query`}
     >

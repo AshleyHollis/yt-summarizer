@@ -101,7 +101,7 @@ This concludes the summary.`;
         text: async () => 'Summary text',
       });
       render(<SummaryCard summaryUrl="https://example.com/summary.txt" />);
-      
+
       await waitFor(() => {
         expect(screen.getByText('Copy')).toBeInTheDocument();
       });
@@ -110,20 +110,20 @@ This concludes the summary.`;
     it('copies summary to clipboard when copy clicked', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, { clipboard: { writeText } });
-      
+
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         text: async () => 'Summary to copy',
       });
       render(<SummaryCard summaryUrl="https://example.com/summary.txt" />);
-      
+
       await waitFor(() => {
         expect(screen.getByText('Copy')).toBeInTheDocument();
       });
 
       const copyButton = screen.getByText('Copy');
       fireEvent.click(copyButton);
-      
+
       await waitFor(() => {
         expect(writeText).toHaveBeenCalledWith('Summary to copy');
       });
@@ -132,20 +132,20 @@ This concludes the summary.`;
     it('shows copied confirmation after copy', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, { clipboard: { writeText } });
-      
+
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         text: async () => 'Summary text',
       });
       render(<SummaryCard summaryUrl="https://example.com/summary.txt" />);
-      
+
       await waitFor(() => {
         expect(screen.getByText('Copy')).toBeInTheDocument();
       });
 
       const copyButton = screen.getByText('Copy');
       fireEvent.click(copyButton);
-      
+
       await waitFor(() => {
         expect(screen.getByText(/copied/i)).toBeInTheDocument();
       });
@@ -159,7 +159,7 @@ This concludes the summary.`;
         text: async () => 'Test summary content',
       });
       render(<SummaryCard summaryUrl="https://example.com/summary.txt" />);
-      
+
       await waitFor(() => {
         // The component has an "AI Summary" heading
         expect(screen.getByText('AI Summary')).toBeInTheDocument();
@@ -180,7 +180,7 @@ This concludes the summary.`;
         text: async () => 'Summary text',
       });
       render(<SummaryCard summaryUrl="https://example.com/summary.txt" />);
-      
+
       await waitFor(() => {
         const copyButton = screen.getByText('Copy').closest('button');
         expect(copyButton).toHaveAttribute('title', 'Copy summary');

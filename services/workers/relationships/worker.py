@@ -139,8 +139,8 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
             # Use CAST to convert VECTOR to VARCHAR for reliable retrieval
             result = await session.execute(
                 sa.text("""
-                    SELECT CAST(Embedding AS VARCHAR(MAX)) FROM Segments 
-                    WHERE video_id = :video_id 
+                    SELECT CAST(Embedding AS VARCHAR(MAX)) FROM Segments
+                    WHERE video_id = :video_id
                     AND Embedding IS NOT NULL
                     ORDER BY sequence_number
                 """),
@@ -207,8 +207,8 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
             # First, get distinct video IDs (excluding current video)
             video_ids_result = await session.execute(
                 sa.text("""
-                    SELECT DISTINCT video_id FROM Segments 
-                    WHERE video_id != :current_video_id 
+                    SELECT DISTINCT video_id FROM Segments
+                    WHERE video_id != :current_video_id
                     AND Embedding IS NOT NULL
                 """),
                 {"current_video_id": str(current_video_id)},
@@ -267,7 +267,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
 
         result = await session.execute(
             sa.text(f"""
-                SELECT video_id, CAST(Embedding AS VARCHAR(MAX)) FROM Segments 
+                SELECT video_id, CAST(Embedding AS VARCHAR(MAX)) FROM Segments
                 WHERE video_id IN ({placeholders})
                 AND Embedding IS NOT NULL
             """),

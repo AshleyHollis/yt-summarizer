@@ -7,7 +7,7 @@
     Analyzes git changes and outputs a list of changed top-level directories/areas.
     Pipeline jobs then decide for themselves whether to run based on that data.
     This decouples change detection from pipeline logic, making it more maintainable.
-    
+
     To add a new component/service:
     1. Add it to the $areaPatterns below
     2. Jobs can check: if: contains(needs.detect-changes.outputs.changed_areas, 'your/path')
@@ -34,10 +34,10 @@
 param(
     [Parameter()]
     [string]$BaseSha = "",
-    
+
     [Parameter()]
     [string]$HeadSha = "HEAD",
-    
+
     [Parameter()]
     [ValidateSet('github-actions', 'json', 'text')]
     [string]$OutputFormat = 'github-actions'
@@ -49,7 +49,7 @@ $ErrorActionPreference = "Stop"
 # Area Detection Patterns
 # =============================================================================
 # Define detectable areas that jobs can check against.
-# 
+#
 # ADDING A NEW AREA:
 # 1. Add pattern here (e.g., 'services/new' = @('services/new/**'))
 # 2. Jobs can immediately check: contains(changed_areas, 'services/new')
@@ -96,13 +96,13 @@ Write-Host "Comparing: $BaseSha...$HeadSha"
 # Get changed files
 try {
     $changedFiles = git diff --name-only "$BaseSha" "$HeadSha" 2>&1
-    
+
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "git diff failed: $changedFiles"
         Write-Host "Falling back to git show HEAD"
         $changedFiles = git show --name-only --pretty=format: HEAD 2>&1
     }
-    
+
     $changedFiles = @($changedFiles | Where-Object { $_ -and $_.Trim() })
 }
 catch {
@@ -129,17 +129,17 @@ $changedAreas = New-Object System.Collections.Generic.HashSet[string]
 
 function ConvertTo-RegexPattern {
     param([string]$GlobPattern)
-    
+
     # Escape special regex chars except * and ?
     $pattern = [regex]::Escape($GlobPattern)
-    
+
     # Convert glob wildcards to regex
     $pattern = $pattern -replace '\\\*\\\*/', '([^/]+/)*'  # **/ matches zero or more path segments
     $pattern = $pattern -replace '/\\\*\\\*', '(/.*)?'      # /** matches / followed by anything (optional)
     $pattern = $pattern -replace '\\\*\\\*', '.*'           # ** matches anything
     $pattern = $pattern -replace '\\\*', '[^/]*'            # * matches anything except /
     $pattern = $pattern -replace '\\\?', '.'                # ? matches single char
-    
+
     return "^$pattern$"
 }
 
@@ -147,7 +147,7 @@ foreach ($file in $changedFiles) {
     foreach ($area in $areaPatterns.Keys) {
         foreach ($pattern in $areaPatterns[$area]) {
             $regexPattern = ConvertTo-RegexPattern -GlobPattern $pattern
-            
+
             if ($file -match $regexPattern) {
                 [void]$changedAreas.Add($area)
                 break
@@ -190,45 +190,45 @@ switch ($OutputFormat) {
     'github-actions' {
         # Space-separated string for easy contains() checks in workflow conditions
         $areasString = $changedAreasArray -join ' '
-        
+
         if ($env:GITHUB_OUTPUT) {
             Add-Content -Path $env:GITHUB_OUTPUT -Value "changed_areas=$areasString"
         }
         else {
             Write-Host "::set-output name=changed_areas::$areasString"
         }
-        
+
         Write-Host "`nGitHub Actions Output:"
         Write-Host "  changed_areas=$areasString"
-        
+
         # Convenience flag: has_code_changes (excludes docs-only changes)
         $hasCodeChanges = ($changedAreasArray | Where-Object { $_ -ne 'docs' }).Count -gt 0
-        
+
         if ($env:GITHUB_OUTPUT) {
             Add-Content -Path $env:GITHUB_OUTPUT -Value "has_code_changes=$($hasCodeChanges.ToString().ToLower())"
         }
         else {
             Write-Host "::set-output name=has_code_changes::$($hasCodeChanges.ToString().ToLower())"
         }
-        
+
         Write-Host "  has_code_changes=$($hasCodeChanges.ToString().ToLower())"
     }
-    
+
     'json' {
         $output = @{
             changed_areas = $changedAreasArray
             has_code_changes = ($changedAreasArray | Where-Object { $_ -ne 'docs' }).Count -gt 0
             total_files = $changedFiles.Count
         }
-        
+
         $output | ConvertTo-Json -Depth 10
     }
-    
+
     'text' {
         Write-Host "`nSummary:"
         Write-Host "  Changed files: $($changedFiles.Count)"
         Write-Host "  Changed areas: $($changedAreasArray -join ', ')"
-        
+
         $hasCodeChanges = ($changedAreasArray | Where-Object { $_ -ne 'docs' }).Count -gt 0
         Write-Host "  Has code changes: $hasCodeChanges"
     }

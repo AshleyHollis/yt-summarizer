@@ -18,10 +18,10 @@ runs:
         import yaml
         import os
         import sys
-        
+
         exit_code = 0
         search_dir = "${{ inputs.directory }}" if "${{ inputs.directory }}" != "." else "."
-        
+
         for root, dirs, files in os.walk(search_dir):
             for file in files:
                 if file.endswith(('.yaml', '.yml')):
@@ -36,11 +36,11 @@ runs:
                     except Exception as e:
                         print(f'❌ Error in {filepath}: {e}')
                         exit_code = 1
-        
+
         if exit_code == 0:
             print('✅ All YAML files have valid syntax')
         else:
             print('::error::YAML syntax validation failed')
-        
+
         sys.exit(exit_code)
         EOF

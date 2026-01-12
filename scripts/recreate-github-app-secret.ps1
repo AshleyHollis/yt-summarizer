@@ -15,10 +15,10 @@
 param(
     [Parameter(Mandatory=$true)]
     [string]$AppID,
-    
+
     [Parameter(Mandatory=$true)]
     [string]$InstallationID,
-    
+
     [Parameter(Mandatory=$true)]
     [string]$PrivateKeyPath
 )

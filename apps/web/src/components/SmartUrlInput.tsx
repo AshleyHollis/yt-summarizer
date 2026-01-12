@@ -30,10 +30,10 @@ const CHANNEL_URL_REGEX =
 function detectUrlType(url: string): UrlType {
   const trimmed = url.trim();
   if (!trimmed) return 'unknown';
-  
+
   if (VIDEO_URL_REGEX.test(trimmed)) return 'video';
   if (CHANNEL_URL_REGEX.test(trimmed)) return 'channel';
-  
+
   return 'unknown';
 }
 
@@ -78,7 +78,7 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
     try {
       const response = await videoApi.submit({ url: url.trim() });
       setSuccess(response);
-      
+
       // Navigate to video page after short delay
       setTimeout(() => {
         router.push(`/videos/${response.video_id}`);
@@ -242,11 +242,11 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
               </div>
             )}
           </div>
-          
+
           {/* URL type hint */}
           {urlType !== 'unknown' && (
             <p id="url-type" className="text-sm text-gray-500 dark:text-gray-400">
-              {urlType === 'video' 
+              {urlType === 'video'
                 ? '📹 Video detected — will process and generate AI summary'
                 : '📺 Channel detected — will show videos for batch selection'}
             </p>
@@ -305,8 +305,8 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
             text-white transition-colors duration-200
             focus:outline-none focus:ring-2 focus:ring-offset-2
             disabled:opacity-50 disabled:cursor-not-allowed
-            ${urlType === 'channel' 
-              ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500' 
+            ${urlType === 'channel'
+              ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500'
               : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'}
           `}
         >

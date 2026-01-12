@@ -28,7 +28,7 @@ export function TopicsPanel({ onTopicClick }: TopicsPanelProps) {
       try {
         setLoading(true);
         setError(null);
-        
+
         const response = await fetch(`${API_URL}/api/v1/copilot/topics`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

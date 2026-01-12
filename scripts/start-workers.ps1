@@ -37,7 +37,7 @@ foreach ($worker in $workers) {
     $startInfo.EnvironmentVariables["ConnectionStrings__queues"] = $azurite_conn
     $startInfo.EnvironmentVariables["ConnectionStrings__sql"] = $sql_conn
     $startInfo.EnvironmentVariables["AZURE_HTTP_LOGGING_LEVEL"] = "WARNING"
-    
+
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $startInfo
     $process.Start() | Out-Null

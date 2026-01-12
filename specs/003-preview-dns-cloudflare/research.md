@@ -16,7 +16,7 @@ This document captures research findings for migrating from nip.io/sslip.io to a
 
 ### Decision: NGINX Gateway Fabric
 
-**Rationale**: 
+**Rationale**:
 - Official F5/NGINX implementation with strong community support
 - Mature and production-ready (v1.5.x as of Jan 2026)
 - Comprehensive Gateway API v1.2.0 support
@@ -228,7 +228,7 @@ https://*.azurestaticapps.net
 
 ### Decision: Use ReferenceGrant for Certificate Access
 
-**Problem**: 
+**Problem**:
 Gateway in `gateway-system` needs to reference HTTPRoutes in app namespaces.
 
 **Solution**:

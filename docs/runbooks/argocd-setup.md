@@ -153,7 +153,7 @@ kubectl label secret github-repo -n argocd argocd.argoproj.io/secret-type=reposi
    # Note your App ID from the app settings page
    $APP_ID = "123456"  # Replace with your App ID
    $INSTALLATION_ID = "789012"  # From installation URL
-   
+
    # Create secret with private key
    kubectl create secret generic github-app \
      --namespace=argocd \

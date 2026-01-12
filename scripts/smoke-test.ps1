@@ -8,7 +8,7 @@
     2. Video submission endpoint
     3. Job listing endpoint
     4. Frontend accessibility
-    
+
     This is designed to run fast and give immediate feedback.
 
 .PARAMETER ApiUrl
@@ -49,9 +49,9 @@ function Test-Endpoint {
         [object]$Body = $null,
         [int[]]$ExpectedStatus = @(200)
     )
-    
+
     Write-Host "Testing: $Name... " -NoNewline
-    
+
     try {
         $params = @{
             Uri = $Url
@@ -59,14 +59,14 @@ function Test-Endpoint {
             UseBasicParsing = $true
             ErrorAction = 'Stop'
         }
-        
+
         if ($Body) {
             $params.Body = ($Body | ConvertTo-Json)
             $params.ContentType = "application/json"
         }
-        
+
         $response = Invoke-WebRequest @params
-        
+
         if ($ExpectedStatus -contains $response.StatusCode) {
             Write-Host "[PASS] ($($response.StatusCode))" -ForegroundColor Green
             $script:passed++
@@ -95,14 +95,14 @@ function Test-Certificate {
     param(
         [string]$Url
     )
-    
+
     Write-Host "Testing certificate for $Url... " -NoNewline
-    
+
     try {
         # Extract host from URL
         $uri = [System.Uri]$Url
         $hostName = $uri.Host
-        
+
         # Use .NET to validate certificate
         $tcpClient = New-Object System.Net.Sockets.TcpClient
         $tcpClient.Connect($hostName, 443)
@@ -112,11 +112,11 @@ function Test-Certificate {
             return $true
         })
         $sslStream.AuthenticateAsClient($hostName)
-        
+
         $cert = $sslStream.RemoteCertificate
         $chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
         $chain.Build($cert)
-        
+
         # Check if certificate is valid
         $now = Get-Date
         if ($cert.NotBefore -gt $now -or $cert.NotAfter -lt $now) {
@@ -124,7 +124,7 @@ function Test-Certificate {
             $script:failed++
             return $false
         }
-        
+
         # Check for Let's Encrypt R3 intermediate
         $hasLetsEncryptR3 = $false
         foreach ($chainElement in $chain.ChainElements) {
@@ -133,11 +133,11 @@ function Test-Certificate {
                 break
             }
         }
-        
+
         if (-not $hasLetsEncryptR3) {
             Write-Host "[WARN] Let's Encrypt R3 intermediate not found" -ForegroundColor Yellow
         }
-        
+
         Write-Host "[PASS] Certificate valid" -ForegroundColor Green
         $script:passed++
         return $true

@@ -73,7 +73,7 @@ function getStatusLabel(status: string): string {
 export function VideoCard({ video }: VideoCardProps) {
   const { selectionMode, isSelected, toggleSelection } = useVideoSelection();
   const selected = isSelected(video.video_id);
-  
+
   const thumbnailUrl =
     video.thumbnail_url ||
     `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`;
@@ -96,8 +96,8 @@ export function VideoCard({ video }: VideoCardProps) {
       href={`/library/${video.video_id}`}
       onClick={handleClick}
       className={`group relative flex flex-col overflow-hidden rounded-xl border-2 bg-white dark:bg-[#1a1a1a] shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-[#252525] ${
-        selected 
-          ? 'border-red-500 dark:border-red-500 ring-2 ring-red-500/20' 
+        selected
+          ? 'border-red-500 dark:border-red-500 ring-2 ring-red-500/20'
           : 'border-gray-200/60 dark:border-gray-700/60'
       } ${selectionMode ? 'cursor-pointer' : ''}`}
     >
@@ -146,9 +146,9 @@ export function VideoCard({ video }: VideoCardProps) {
             {getStatusLabel(video.processing_status)}
           </span>
         )}
-        
+
         {/* Title - with tooltip for full text */}
-        <h3 
+        <h3
           className="line-clamp-2 text-sm font-semibold text-gray-900 dark:text-gray-100 transition-colors group-hover:text-red-500"
           title={video.title}
         >

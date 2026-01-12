@@ -414,7 +414,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 await session.execute(
                     sa.text("""
                         IF NOT EXISTS (
-                            SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+                            SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
                             WHERE TABLE_NAME = 'Segments' AND COLUMN_NAME = 'Embedding'
                         )
                         BEGIN

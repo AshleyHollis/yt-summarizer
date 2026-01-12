@@ -34,17 +34,17 @@ test.describe('US6: Synthesis Feature UI', () => {
       // Find the chat input
       const chatInput = page.getByRole('textbox').first();
       await expect(chatInput).toBeVisible({ timeout: 5000 });
-      
+
       // Type a learning path request
       await chatInput.fill('Create a learning path for Python programming');
       await expect(chatInput).toHaveValue('Create a learning path for Python programming');
-      
+
       // Submit the request
       await chatInput.press('Enter');
-      
+
       // Verify a response area appears (loading state or actual response)
       const responseArea = page.locator('[class*="message" i], [class*="response" i], [class*="assistant" i]');
-      
+
       // Wait for agent to start responding
       await expect(responseArea.first()).toBeVisible({ timeout: 30000 });
     });
@@ -52,13 +52,13 @@ test.describe('US6: Synthesis Feature UI', () => {
     test('can submit watch list request', async ({ page }) => {
       const chatInput = page.getByRole('textbox').first();
       await expect(chatInput).toBeVisible({ timeout: 5000 });
-      
+
       await chatInput.fill('Give me a watch list for Python OOP videos');
       await chatInput.press('Enter');
-      
+
       // Wait for response to appear
       await page.waitForTimeout(15000);
-      
+
       // The page should show some response content
       const responseContent = page.locator('[class*="message" i], [class*="card" i]');
       await expect(responseContent.first()).toBeVisible({ timeout: 5000 });
@@ -72,7 +72,7 @@ test.describe('US6: Synthesis Feature UI', () => {
         if (msg.type() === 'error') {
           const text = msg.text().toLowerCase();
           // Filter out expected/non-critical errors
-          if (!text.includes('failed to fetch') && 
+          if (!text.includes('failed to fetch') &&
               !text.includes('net::err') &&
               !text.includes('dev mode') &&
               !text.includes('hydrat') &&
@@ -83,11 +83,11 @@ test.describe('US6: Synthesis Feature UI', () => {
           }
         }
       });
-      
+
       await page.goto('/library');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
-      
+
       // Should have no critical console errors
       expect(errors.length).toBe(0);
     });
@@ -95,11 +95,11 @@ test.describe('US6: Synthesis Feature UI', () => {
     test('chat interface is accessible on library page', async ({ page }) => {
       await page.goto('/library');
       await page.waitForLoadState('networkidle');
-      
+
       // Chat input should be visible
       const chatInput = page.getByRole('textbox').first();
       await expect(chatInput).toBeVisible({ timeout: 5000 });
-      
+
       // Should have accessible label or placeholder
       const placeholder = await chatInput.getAttribute('placeholder');
       expect(placeholder).toBeTruthy();

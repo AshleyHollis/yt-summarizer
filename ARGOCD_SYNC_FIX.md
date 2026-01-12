@@ -183,10 +183,10 @@ This is why the image tag hasn't updated.
    ```bash
    # Get current HEAD:
    git rev-parse HEAD | cut -c1-7
-   
+
    # Check Argo CD synced revision:
    kubectl get application preview-pr-9 -n argocd -o jsonpath='{.status.sync.revision}' | cut -c1-7
-   
+
    # Should match within 30s (ApplicationSet polling interval)
    ```
 
@@ -214,7 +214,7 @@ This is why the image tag hasn't updated.
    ```bash
    # Proved the fix works by manually applying kustomization:
    kustomize build k8s/overlays/preview | kubectl apply -f - -n preview-pr-9
-   
+
    # Deployment image immediately updated:
    kubectl get deployment api -n preview-pr-9 -o jsonpath='{.spec.template.spec.containers[0].image}'
    # Output: acrytsummprd.azurecr.io/yt-summarizer-api:sha-9116ea1 ✅
@@ -224,7 +224,7 @@ This is why the image tag hasn't updated.
    ```bash
    kubectl apply -f k8s/argocd/preview-appset.yaml
    # ApplicationSet updated with fixed sync options
-   
+
    kubectl -n argocd patch application preview-pr-9 --type merge \
      -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
    # Re-enabled automated sync with corrected configuration

@@ -50,42 +50,42 @@ runs:
         TIMEOUT="${{ inputs.timeout-seconds }}"
         EXPECTED_STATUS="${{ inputs.expected-status }}"
         SERVICE_NAME="${{ inputs.service-name }}"
-        
+
         echo "Waiting for $SERVICE_NAME to become healthy..."
         echo "URL: $URL"
         echo "Max attempts: $MAX_ATTEMPTS (interval: ${INTERVAL}s)"
-        
+
         ATTEMPT=1
         HEALTHY=false
-        
+
         while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
           echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
-          
+
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --max-time $TIMEOUT \
             --connect-timeout $TIMEOUT \
             "$URL" 2>/dev/null || echo "000")
-          
+
           if [ "$HTTP_STATUS" = "$EXPECTED_STATUS" ]; then
             echo "✅ $SERVICE_NAME is healthy (HTTP $HTTP_STATUS)"
             HEALTHY=true
             break
           else
             echo "  Status: $HTTP_STATUS (expected: $EXPECTED_STATUS)"
-            
+
             if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
               echo "  Waiting ${INTERVAL}s before next attempt..."
               sleep $INTERVAL
             fi
           fi
-          
+
           ATTEMPT=$((ATTEMPT + 1))
         done
-        
+
         if [ "$HEALTHY" = "false" ]; then
           echo "::error::$SERVICE_NAME did not become healthy after $MAX_ATTEMPTS attempts"
           exit 1
         fi
-        
+
         echo "healthy=true" >> $GITHUB_OUTPUT
         echo "attempts=$ATTEMPT" >> $GITHUB_OUTPUT

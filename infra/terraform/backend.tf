@@ -10,7 +10,7 @@ terraform {
     # -backend-config="storage_account_name=stytsummarizertfstate"
     # -backend-config="container_name=tfstate"
     # -backend-config="key=<environment>.tfstate"
-    
+
     # State locking is enabled by default via Azure Blob lease
     use_oidc = true  # Use OIDC authentication in GitHub Actions
   }

@@ -2,7 +2,7 @@
 # Detect Pipeline Changes - Smart Change Detection
 # =============================================================================
 # DESIGN DECISION: Dumb detection, smart consumption
-# 
+#
 # This action outputs RAW change data, not execution decisions:
 #   - changed_areas: space-separated list of changed paths
 #   - has_code_changes: boolean flag (excludes docs)

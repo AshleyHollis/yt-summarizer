@@ -191,7 +191,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o"
     embedding_model: str = "text-embedding-3-small"
     azure_storage_connection_string: str = ""
-    
+
     class Config:
         env_file = ".env"
 ```

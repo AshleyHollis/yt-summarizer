@@ -24,10 +24,10 @@ interface CollapsibleContentProps {
 
 /**
  * Collapsible content wrapper with smooth height transitions
- * 
+ *
  * Automatically detects if content exceeds the collapsed height
  * and shows expand/collapse controls when needed.
- * 
+ *
  * @example
  * ```tsx
  * <CollapsibleContent collapsedHeight={150}>
@@ -78,8 +78,8 @@ export function CollapsibleContent({
       <div
         ref={contentRef}
         className="transition-[max-height] duration-300 ease-in-out overflow-hidden"
-        style={{ 
-          maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight 
+        style={{
+          maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight
         }}
       >
         {children}
@@ -87,7 +87,7 @@ export function CollapsibleContent({
 
       {/* Gradient overlay when collapsed */}
       {needsCollapse && !isExpanded && showGradient && (
-        <div 
+        <div
           className={`absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t ${gradientClass} pointer-events-none`}
         />
       )}

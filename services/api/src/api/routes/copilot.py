@@ -69,7 +69,7 @@ def get_copilot_service(session: AsyncSession = Depends(get_session)) -> Copilot
     description="""
     Send a natural language query to the copilot with optional scope filters.
     Returns an answer with citations and recommended videos.
-    
+
     **This is a read-only operation.** The copilot cannot:
     - Trigger ingestion or reprocessing
     - Modify any data
@@ -391,12 +391,12 @@ def get_synthesis_service(session: AsyncSession = Depends(get_session)) -> Synth
     summary="Synthesize Structured Output",
     description="""
     Synthesize a structured output (learning path or watch list) from library content.
-    
+
     - **learning_path**: Ordered sequence of videos for progressive learning
     - **watch_list**: Prioritized collection based on user interests
-    
+
     Returns synthesized output with rationale for each item and gap detection.
-    
+
     **This is a read-only operation.** The copilot cannot:
     - Trigger ingestion or reprocessing
     - Modify any data

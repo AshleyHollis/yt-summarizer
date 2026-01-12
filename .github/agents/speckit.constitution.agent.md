@@ -6,7 +6,7 @@ tools:
   - search
   - execute
 target: vscode
-handoffs: 
+handoffs:
   - label: Build Specification
     agent: speckit.specify
     prompt: Implement the feature specification based on the updated constitution. I want to build...

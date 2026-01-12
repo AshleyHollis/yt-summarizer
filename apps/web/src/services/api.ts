@@ -182,16 +182,16 @@ async function request<T>(
   const url = buildUrl(endpoint, params);
   let lastError: Error | null = null;
   let response: Response | null = null;
-  
+
   for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
     try {
       response = await fetch(url, requestOptions);
-      
+
       // If successful or not a retryable status, break out of retry loop
       if (response.ok || !RETRY_CONFIG.retryableStatusCodes.includes(response.status)) {
         break;
       }
-      
+
       // Retryable error - wait and try again
       if (attempt < RETRY_CONFIG.maxRetries) {
         const delayMs = Math.min(
@@ -204,7 +204,7 @@ async function request<T>(
     } catch (err) {
       // Network error - save it and retry
       lastError = err instanceof Error ? err : new Error(String(err));
-      
+
       if (attempt < RETRY_CONFIG.maxRetries) {
         const delayMs = Math.min(
           RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
@@ -215,14 +215,14 @@ async function request<T>(
       }
     }
   }
-  
+
   // If we never got a response, throw the last network error
   if (!response) {
     const error = lastError || new Error('Failed to connect to API');
-    
+
     // Check for certificate-related errors
-    if (error.message.includes('certificate') || 
-        error.message.includes('SSL') || 
+    if (error.message.includes('certificate') ||
+        error.message.includes('SSL') ||
         error.message.includes('ERR_CERT') ||
         error.message.includes('SEC_ERROR')) {
       throw new ApiClientError(
@@ -232,7 +232,7 @@ async function request<T>(
         undefined
       );
     }
-    
+
     throw error;
   }
 
@@ -520,7 +520,7 @@ export interface VideoProcessingHistory {
   video_title: string | null;
   video_duration_seconds: number | null;
   processing_status: string;
-  
+
   /** When the video was first submitted (ISO string) */
   submitted_at: string | null;
   /** When first job started (ISO string) */
@@ -543,17 +543,17 @@ export interface VideoProcessingHistory {
   total_elapsed_seconds: number | null;
   /** Total variance (positive = slower than expected) */
   total_variance_seconds: number | null;
-  
+
   /** History for each processing stage */
   stages: StageHistoryItem[];
-  
+
   /** Number of stages completed */
   stages_completed: number;
   /** Number of stages failed */
   stages_failed: number;
   /** Total retry attempts across all stages */
   total_retries: number;
-  
+
   /** Whether this video processed faster than average */
   faster_than_average: boolean | null;
   /** Processing speed percentile (1-100, higher = faster) */

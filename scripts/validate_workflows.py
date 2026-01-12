@@ -30,31 +30,31 @@ def validate_yaml_file(filepath):
 def main():
     """Main validation function."""
     workflows_dir = Path('.github/workflows')
-    
+
     if not workflows_dir.exists():
         print(f'ERROR: Directory {workflows_dir} not found')
         sys.exit(1)
-    
+
     # Find all YAML workflow files
     workflow_files = list(workflows_dir.glob('*.yml')) + list(workflows_dir.glob('*.yaml'))
-    
+
     if not workflow_files:
         print(f'WARNING: No workflow files found in {workflows_dir}')
         sys.exit(0)
-    
+
     print(f'Validating {len(workflow_files)} workflow file(s)...\n')
-    
+
     errors = []
     for filepath in sorted(workflow_files):
         print(f'Checking {filepath}...', end=' ')
         is_valid, error_msg = validate_yaml_file(filepath)
-        
+
         if is_valid:
             print('✓ OK')
         else:
             print('✗ FAILED')
             errors.append((filepath, error_msg))
-    
+
     # Print summary
     print(f'\n{"="*60}')
     if errors:

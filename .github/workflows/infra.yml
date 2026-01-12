@@ -114,26 +114,26 @@ jobs:
         with:
           script: |
             const planOutput = process.env.PLAN_OUTPUT || 'No plan output available';
-            const truncatedPlan = planOutput.length > 60000 
+            const truncatedPlan = planOutput.length > 60000
               ? planOutput.substring(0, 60000) + '\n\n... (truncated)'
               : planOutput;
-            
+
             const body = `### 🏗️ Terraform Plan - Production
-            
+
             #### Initialization: \`${{ steps.init.outcome }}\`
             #### Validation: \`${{ steps.validate.outcome }}\`
             #### Plan: \`${{ steps.plan.outcome }}\`
-            
+
             <details><summary>Show Plan Output</summary>
-            
+
             \`\`\`hcl
             ${truncatedPlan}
             \`\`\`
-            
+
             </details>
-            
+
             *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-            
+
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -171,4 +171,3 @@ jobs:
         with:
           terraform-changed: ${{ needs.check-changes.outputs.terraform_changed }}
           terraform-result: ${{ needs.terraform.result }}
-

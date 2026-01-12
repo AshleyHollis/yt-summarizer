@@ -4,7 +4,7 @@
 # TRIGGERS: PR opened/updated, push to main, manual dispatch
 #
 # EXECUTION FLOWS:
-# 
+#
 # MAIN BRANCH (push to main):
 #   → ALWAYS runs FULL validation (all tests, all checks, all builds)
 #   → Purpose: Ensure merged code is always in a validated state
@@ -56,15 +56,15 @@ jobs:
   # PHASE 1: CHANGE DETECTION
   # ===========================================================================
   # Analyzes diff to determine what changed, enabling smart job execution
-  # 
+  #
   # MAIN BRANCH: Always outputs ALL areas (forces full validation)
   # PR BRANCHES: Outputs only changed areas (smart skipping)
-  # 
+  #
   # Outputs:
   #   - changed_areas: Space-separated list (e.g., "services/api k8s")
   #   - has_code_changes: Boolean for security scanning
   #   - is_main_branch: Boolean to indicate main branch (full validation mode)
-  # 
+  #
   # Used by all subsequent jobs to decide if they should run
   # ===========================================================================
   detect-changes:
@@ -260,7 +260,7 @@ jobs:
   # ===========================================================================
   # Runs only when relevant code changes
   # Dependencies: lint AND security must pass (fail-fast)
-  # 
+  #
   # Test Execution Rules:
   # - test-shared: runs if services/shared changed
   # - test-api: runs if services/api OR services/shared changed
@@ -480,7 +480,7 @@ jobs:
   # ===========================================================================
   # WHEN: Only when code requiring images changes (services/, apps/web, docker/)
   # WHY: Avoid rebuilding images for k8s manifest or docs changes
-  # 
+  #
   # TWO-STAGE PROCESS:
   # 1. build-images-meta: Generate image tag (pr-123-abc123f)
   # 2. build-images: Build and push images with that tag
@@ -489,12 +489,12 @@ jobs:
   # - build-images-meta uses always() to run when lint/security/test jobs skip
   # - build-images MUST also use always() + check meta result == 'success'
   # - Without this, build-images skips even when meta succeeds
-  # 
+  #
   # FLOW 1 (ACR configured):
   #   Lint → Security → Tests pass → build-images-meta generates tag → build-images builds + pushes
   # FLOW 2 (No ACR):
   #   Lint → Security → Tests pass → build-images-validate builds without pushing (validation only)
-  # 
+  #
   # Image Tags:
   # - PRs: pr-<number>-<sha> (e.g., pr-42-abc123f)
   # - Main: sha-<sha> (e.g., sha-abc123f)
@@ -564,7 +564,7 @@ jobs:
     # - build-images-meta uses always() so it runs when some tests skip
     # - This job MUST use always() + check meta result, or it will skip
     # - GitHub Actions won't run jobs depending on always() jobs unless they also use always()
-    # 
+    #
     # IMAGE BUILDING:
     # - Main branch: Always build after meta succeeds
     # - PR branch: Build only if code/docker areas changed
@@ -748,7 +748,7 @@ jobs:
   #   1. Required jobs ran (based on changed_areas)
   #   2. All jobs that ran passed (result == 'success')
   #   3. Jobs that should skip did skip (result == 'skipped')
-  # 
+  #
   # Replicates job conditions to ensure pipeline executed correctly
   # Fails if expected jobs didn't run or ran when they shouldn't
   # ===========================================================================
@@ -820,4 +820,3 @@ jobs:
           build-images-result: ${{ needs.build-images.result }}
           build-images-validate-result: ${{ needs.build-images-validate.result }}
           acr-configured: ${{ vars.ACR_NAME != '' }}
-
