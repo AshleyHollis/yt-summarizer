@@ -1,11 +1,11 @@
 name: 'Post Terraform Plan'
-description: 'Posts Terraform plan to PR comments and generates pipeline summary'
+description: 'Posts Terraform plan to PR comments and generates pipeline summary with Terraform Cloud-like styling'
 inputs:
   plan-summary:
     description: 'JSON summary of plan changes (add, change, destroy, has_changes)'
     required: true
   formatted-plan:
-    description: 'Formatted terraform plan output'
+    description: 'Formatted terraform plan output (JSON)'
     required: true
   plan-outcome:
     description: 'Plan outcome (success/failure)'
@@ -38,366 +38,37 @@ runs:
         ${{ inputs.plan-outcome }}
         PLAN_OUTCOME_EOF
 
+    - name: Generate PR Comment
+      id: generate-comment
+      if: ${{ inputs.skip-pr-comment != 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        PLAN_SUMMARY_PATH: ${{ github.action_path }}/plan-summary.json
+        FORMATTED_PLAN_PATH: ${{ github.action_path }}/formatted-plan.json
+        PLAN_OUTCOME_PATH: ${{ github.action_path }}/plan-outcome.txt
+        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
+      run: |
+        cd ${{ github.action_path }}
+        node src/action-main.js pr-comment > pr-comment.md
+
     - name: Post to PR
       id: post-pr
       if: ${{ inputs.skip-pr-comment != 'true' && github.event_name == 'pull_request' }}
       uses: actions/github-script@v7
-      env:
-        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
       with:
         github-token: ${{ github.token }}
         retries: 3
         script: |
           const fs = require('fs');
-          const path = require('path');
 
-          // Read plan data from files instead of environment variables
-          const planSummaryPath = '${{ github.action_path }}/plan-summary.json';
-          const formattedPlanPath = '${{ github.action_path }}/formatted-plan.json';
-          const planOutcomePath = '${{ github.action_path }}/plan-outcome.txt';
+          // Read generated comment
+          const commentPath = '${{ github.action_path }}/pr-comment.md';
+          const commentBody = fs.readFileSync(commentPath, 'utf8');
 
-          let summary, planJson, planOutcome;
-
-          try {
-            const summaryContent = fs.readFileSync(planSummaryPath, 'utf8');
-            summary = JSON.parse(summaryContent);
-          } catch (error) {
-            core.warning(`Failed to read plan summary file: ${error.message}`);
-            summary = { add: 0, change: 0, destroy: 0, has_changes: false };
-          }
-
-          try {
-            const planContent = fs.readFileSync(formattedPlanPath, 'utf8');
-            planJson = planContent;
-          } catch (error) {
-            core.warning(`Failed to read formatted plan file: ${error.message}`);
-            planJson = '{}';
-          }
-
-          try {
-            planOutcome = fs.readFileSync(planOutcomePath, 'utf8').trim();
-          } catch (error) {
-            core.warning(`Failed to read plan outcome file: ${error.message}`);
-            planOutcome = process.env.PLAN_OUTCOME || 'unknown';
-          }
-
-          core.info(`Plan Outcome: ${planOutcome}`);
-          core.info(`Summary: Add=${summary.add}, Change=${summary.change}, Destroy=${summary.destroy}`);
-
-          const hasChanges = summary.has_changes;
-          const runNumber = context.runNumber;
-          const runId = context.runId;
-          const runUrl = `${context.payload.repository.html_url}/actions/runs/${runId}`;
-          const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
-
-          // Unique marker for finding this comment - MUST be at the start
+          // Unique marker for finding this comment
           const COMMENT_MARKER = '<!-- terraform-plan-comment -->';
 
-          // Parse JSON plan to extract resource changes
-          function parseJsonPlan(jsonString) {
-            try {
-              const plan = JSON.parse(jsonString);
-              const resources = [];
-
-              if (!plan.resource_changes) {
-                core.warning('No resource_changes in plan JSON');
-                return resources;
-              }
-
-              for (const change of plan.resource_changes) {
-                if (!change.change || !change.change.actions || change.change.actions.includes('no-op')) {
-                  continue;
-                }
-
-                const actions = change.change.actions;
-                let action = 'read';
-                if (actions.includes('create')) action = 'create';
-                else if (actions.includes('delete') && actions.includes('create')) action = 'replace';
-                else if (actions.includes('update')) action = 'update';
-                else if (actions.includes('delete')) action = 'destroy';
-
-                const address = change.address;
-                const resourceType = change.type;
-                const resourceName = change.name;
-
-                // Build formatted details from before/after
-                const details = formatResourceChange(change, action);
-
-                resources.push({ address, action, type: resourceType, name: resourceName, details });
-              }
-
-              return resources;
-            } catch (error) {
-              core.error(`Failed to parse JSON plan: ${error.message}`);
-              return [];
-            }
-          }
-
-          // Format a value for display (Terraform-style)
-          function formatValue(value, unknown) {
-            if (unknown === true) return '(known after apply)';
-            if (value === null) return 'null';
-            if (value === undefined) return 'null';
-            if (typeof value === 'string') return `"${value}"`;
-            if (typeof value === 'boolean') return value.toString();
-            if (typeof value === 'number') return value.toString();
-            if (Array.isArray(value)) {
-              if (value.length === 0) return '[]';
-              return JSON.stringify(value);
-            }
-            if (typeof value === 'object') {
-              const keys = Object.keys(value);
-              if (keys.length === 0) return '{}';
-              return JSON.stringify(value);
-            }
-            return JSON.stringify(value);
-          }
-
-          // Recursively find all changes between before and after
-          function findChanges(before, after, afterUnknown, indent = '    ') {
-            const lines = [];
-            before = before || {};
-            after = after || {};
-            afterUnknown = afterUnknown || {};
-
-            const allKeys = new Set([
-              ...Object.keys(before),
-              ...Object.keys(after)
-            ]);
-
-            for (const key of Array.from(allKeys).sort()) {
-              const beforeVal = before[key];
-              const afterVal = after[key];
-              const isUnknown = afterUnknown[key];
-
-              const beforeExists = key in before;
-              const afterExists = key in after;
-
-              // Skip if values are identical
-              if (beforeExists && afterExists && JSON.stringify(beforeVal) === JSON.stringify(afterVal)) {
-                continue;
-              }
-
-              // Handle nested objects/blocks
-              if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
-                  typeof beforeVal === 'object' && beforeVal !== null && !Array.isArray(beforeVal)) {
-                const nestedLines = findChanges(beforeVal, afterVal, isUnknown || {}, indent + '    ');
-                if (nestedLines.length > 0) {
-                  lines.push(`${indent}~ ${key} {`);
-                  nestedLines.forEach(l => lines.push(l));
-                  lines.push(`${indent}  }`);
-                }
-                continue;
-              }
-
-              // Handle arrays (blocks in Terraform)
-              if (Array.isArray(afterVal) || Array.isArray(beforeVal)) {
-                const beforeArr = Array.isArray(beforeVal) ? beforeVal : [];
-                const afterArr = Array.isArray(afterVal) ? afterVal : [];
-
-                // Check if arrays of objects (blocks)
-                if ((beforeArr.length > 0 && typeof beforeArr[0] === 'object') ||
-                    (afterArr.length > 0 && typeof afterArr[0] === 'object')) {
-                  // Compare each element
-                  const maxLen = Math.max(beforeArr.length, afterArr.length);
-                  for (let i = 0; i < maxLen; i++) {
-                    const bItem = beforeArr[i];
-                    const aItem = afterArr[i];
-                    const unknownItem = Array.isArray(isUnknown) ? isUnknown[i] : isUnknown;
-
-                    if (bItem && aItem) {
-                      const nestedLines = findChanges(bItem, aItem, unknownItem || {}, indent + '    ');
-                      if (nestedLines.length > 0) {
-                        lines.push(`${indent}~ ${key} {`);
-                        nestedLines.forEach(l => lines.push(l));
-                        lines.push(`${indent}  }`);
-                      }
-                    } else if (aItem && !bItem) {
-                      lines.push(`${indent}+ ${key} {`);
-                      const nestedLines = findChanges({}, aItem, unknownItem || {}, indent + '    ');
-                      nestedLines.forEach(l => lines.push(l));
-                      lines.push(`${indent}  }`);
-                    } else if (bItem && !aItem) {
-                      lines.push(`${indent}- ${key} {`);
-                      lines.push(`${indent}    # (block removed)`);
-                      lines.push(`${indent}  }`);
-                    }
-                  }
-                } else {
-                  // Simple array comparison
-                  if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
-                    lines.push(`${indent}~ ${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
-                  }
-                }
-                continue;
-              }
-
-              // Value added
-              if (!beforeExists && afterExists) {
-                lines.push(`${indent}+ ${key} = ${formatValue(afterVal, isUnknown)}`);
-                continue;
-              }
-
-              // Value removed
-              if (beforeExists && !afterExists) {
-                lines.push(`${indent}- ${key} = ${formatValue(beforeVal, false)}`);
-                continue;
-              }
-
-              // Value changed (including null transitions)
-              if (beforeExists && afterExists) {
-                const beforeFormatted = formatValue(beforeVal, false);
-                const afterFormatted = formatValue(afterVal, isUnknown);
-                lines.push(`${indent}~ ${key} = ${beforeFormatted} -> ${afterFormatted}`);
-              }
-            }
-
-            return lines;
-          }
-
-          // Format resource change details
-          function formatResourceChange(change, action) {
-            const lines = [];
-            const before = change.change.before || {};
-            const after = change.change.after || {};
-            const afterUnknown = change.change.after_unknown || {};
-
-            const symbol = action === 'create' ? '+' : action === 'update' ? '~' : action === 'replace' ? '-/+' : '-';
-            lines.push(`${symbol} resource "${change.type}" "${change.name}" {`);
-
-            if (action === 'create') {
-              // For creates, show all new attributes
-              const changeLines = findChanges({}, after, afterUnknown, '    ');
-              changeLines.forEach(l => lines.push(l));
-            } else if (action === 'update') {
-              // For updates, show only changed attributes
-              const changeLines = findChanges(before, after, afterUnknown, '    ');
-              changeLines.forEach(l => lines.push(l));
-            } else if (action === 'destroy') {
-              // For destroy, show what's being removed
-              const changeLines = findChanges(before, {}, {}, '    ');
-              changeLines.forEach(l => lines.push(l));
-            } else if (action === 'replace') {
-              // For replace, show before values being removed and after values being added
-              lines.push('    # forces replacement');
-              const changeLines = findChanges(before, after, afterUnknown, '    ');
-              changeLines.forEach(l => lines.push(l));
-            }
-
-            lines.push('  }');
-            return lines.join('\n');
-          }
-
-          const resources = parseJsonPlan(planJson);
-          core.info(`Parsed ${resources.length} resources from JSON plan`);
-
-          const creates = resources.filter(r => r.action === 'create');
-          const updates = resources.filter(r => r.action === 'update');
-          const replaces = resources.filter(r => r.action === 'replace');
-          const destroys = resources.filter(r => r.action === 'destroy');
-
-          // Build resource item with emoji indicators
-          function buildResourceItem(resource) {
-            const indicators = {
-              create: '🟢 `+`',
-              update: '🟡 `~`',
-              replace: '🟣 `-/+`',
-              destroy: '🔴 `-`'
-            };
-            const indicator = indicators[resource.action] || '⚪ `?`';
-            const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
-
-            return `<details>\n<summary>${indicator} <code>${resource.address}</code></summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
-          }
-
-          // Build comment body
-          const sections = [];
-
-          // Hidden marker for comment detection
-          sections.push(COMMENT_MARKER);
-          sections.push('');
-
-          // Header - "Terraform Plan" with status icon
-          const statusIcon = planOutcome === 'success' ? '✅' : '❌';
-          sections.push(`## ${statusIcon} Terraform Plan`);
-          sections.push('');
-
-          // Run info line with pipe separators and View Workflow link
-          sections.push(`Run [#${runNumber}](${runUrl}) | ${timestamp} | @${context.actor} | [View Workflow](${runUrl})`);
-          sections.push('');
-
-          // Resource summary with colored emoji indicators inline
-          if (hasChanges) {
-            const parts = [];
-            if (summary.add > 0) parts.push(`🟢 ${summary.add} to add`);
-            if (summary.change > 0) parts.push(`🟡 ${summary.change} to change`);
-            if (summary.destroy > 0) parts.push(`🔴 ${summary.destroy} to destroy`);
-            sections.push(`**Plan:** ${parts.join(' · ')}`);
-            sections.push('');
-          }
-
-          // Resource sections as collapsible groups
-          if (creates.length > 0) {
-            sections.push('<details>');
-            sections.push(`<summary><strong>🟢 Create (${creates.length})</strong></summary>`);
-            sections.push('');
-            creates.forEach(r => sections.push(buildResourceItem(r)));
-            sections.push('');
-            sections.push('</details>');
-            sections.push('');
-          }
-
-          if (replaces.length > 0) {
-            sections.push('<details>');
-            sections.push(`<summary><strong>🟣 Replace (${replaces.length})</strong></summary>`);
-            sections.push('');
-            replaces.forEach(r => sections.push(buildResourceItem(r)));
-            sections.push('');
-            sections.push('</details>');
-            sections.push('');
-          }
-
-          if (updates.length > 0) {
-            sections.push('<details>');
-            sections.push(`<summary><strong>🟡 Update (${updates.length})</strong></summary>`);
-            sections.push('');
-            updates.forEach(r => sections.push(buildResourceItem(r)));
-            sections.push('');
-            sections.push('</details>');
-            sections.push('');
-          }
-
-          if (destroys.length > 0) {
-            sections.push('<details>');
-            sections.push(`<summary><strong>🔴 Destroy (${destroys.length})</strong></summary>`);
-            sections.push('');
-            destroys.forEach(r => sections.push(buildResourceItem(r)));
-            sections.push('');
-            sections.push('</details>');
-            sections.push('');
-          }
-
-          if (!hasChanges) {
-            sections.push('');
-            sections.push('✨ **No changes.** Your infrastructure matches the configuration.');
-            sections.push('');
-          }
-
-          // Fallback: show raw plan if no resources parsed but has changes
-          if (resources.length === 0 && hasChanges) {
-            sections.push('<details>');
-            sections.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
-            sections.push('');
-            sections.push('```json');
-            sections.push(planJson.length > 60000 ? planJson.substring(0, 60000) + '\n...(truncated)' : planJson);
-            sections.push('```');
-            sections.push('</details>');
-            sections.push('');
-          }
-
-          const commentBody = sections.join('\n');
-
-          core.info('Fetching comments...');
+          core.info('Fetching existing comments...');
           const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner,
             repo: context.repo.repo,
@@ -405,7 +76,7 @@ runs:
             per_page: 100
           });
 
-          // Find comment by unique marker (most reliable method)
+          // Find comment by unique marker
           const botComment = comments.find(c => c.body && c.body.includes(COMMENT_MARKER));
           core.info(`Found ${comments.length} comments, ${botComment ? 'updating existing #' + botComment.id : 'creating new'}`);
 
@@ -441,336 +112,30 @@ runs:
 
           core.setOutput('comment-id', commentId);
 
+    - name: Generate Pipeline Summary
+      id: generate-summary
+      shell: bash
+      env:
+        PLAN_SUMMARY_PATH: ${{ github.action_path }}/plan-summary.json
+        FORMATTED_PLAN_PATH: ${{ github.action_path }}/formatted-plan.json
+        PLAN_OUTCOME_PATH: ${{ github.action_path }}/plan-outcome.txt
+        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
+      run: |
+        cd ${{ github.action_path }}
+        node src/action-main.js pipeline-summary > pipeline-summary.md
+
     - name: Update pipeline summary
       uses: actions/github-script@v7
-      env:
-        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
       with:
         script: |
           const fs = require('fs');
-          const path = require('path');
 
-          // Read plan data from files instead of environment variables
-          const planSummaryPath = '${{ github.action_path }}/plan-summary.json';
-          const formattedPlanPath = '${{ github.action_path }}/formatted-plan.json';
-          const planOutcomePath = '${{ github.action_path }}/plan-outcome.txt';
-
-          let summary, planJson, planOutcome;
-
-          try {
-            const summaryContent = fs.readFileSync(planSummaryPath, 'utf8');
-            summary = JSON.parse(summaryContent);
-          } catch (error) {
-            core.warning(`Failed to read plan summary file: ${error.message}`);
-            summary = { add: 0, change: 0, destroy: 0, has_changes: false };
-          }
-
-          try {
-            const planContent = fs.readFileSync(formattedPlanPath, 'utf8');
-            planJson = planContent;
-          } catch (error) {
-            core.warning(`Failed to read formatted plan file: ${error.message}`);
-            planJson = '{}';
-          }
-
-          try {
-            planOutcome = fs.readFileSync(planOutcomePath, 'utf8').trim();
-          } catch (error) {
-            core.warning(`Failed to read plan outcome file: ${error.message}`);
-            planOutcome = process.env.PLAN_OUTCOME || 'unknown';
-          }
-
-          const hasChanges = summary.has_changes;
-          const runNumber = context.runNumber;
-          const runId = context.runId;
-          const runUrl = `${context.payload.repository.html_url}/actions/runs/${runId}`;
-          const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
-
-          // Reuse same JSON parsing logic as PR comment
-          function parseJsonPlan(jsonString) {
-            try {
-              const plan = JSON.parse(jsonString);
-              const resources = [];
-
-              if (!plan.resource_changes) return resources;
-
-              for (const change of plan.resource_changes) {
-                if (!change.change || !change.change.actions || change.change.actions.includes('no-op')) {
-                  continue;
-                }
-
-                const actions = change.change.actions;
-                let action = 'read';
-                if (actions.includes('create')) action = 'create';
-                else if (actions.includes('delete') && actions.includes('create')) action = 'replace';
-                else if (actions.includes('update')) action = 'update';
-                else if (actions.includes('delete')) action = 'destroy';
-
-                const address = change.address;
-                const resourceType = change.type;
-                const resourceName = change.name;
-                const details = formatResourceChange(change, action);
-
-                resources.push({ address, action, type: resourceType, name: resourceName, details });
-              }
-
-              return resources;
-            } catch (error) {
-              return [];
-            }
-          }
-
-          // Format a value for display (Terraform-style)
-          function formatValue(value, unknown) {
-            if (unknown === true) return '(known after apply)';
-            if (value === null) return 'null';
-            if (value === undefined) return 'null';
-            if (typeof value === 'string') return `"${value}"`;
-            if (typeof value === 'boolean') return value.toString();
-            if (typeof value === 'number') return value.toString();
-            if (Array.isArray(value)) {
-              if (value.length === 0) return '[]';
-              return JSON.stringify(value);
-            }
-            if (typeof value === 'object') {
-              const keys = Object.keys(value);
-              if (keys.length === 0) return '{}';
-              return JSON.stringify(value);
-            }
-            return JSON.stringify(value);
-          }
-
-          // Recursively find all changes between before and after
-          function findChanges(before, after, afterUnknown, indent = '    ') {
-            const lines = [];
-            before = before || {};
-            after = after || {};
-            afterUnknown = afterUnknown || {};
-
-            const allKeys = new Set([
-              ...Object.keys(before),
-              ...Object.keys(after)
-            ]);
-
-            for (const key of Array.from(allKeys).sort()) {
-              const beforeVal = before[key];
-              const afterVal = after[key];
-              const isUnknown = afterUnknown[key];
-
-              const beforeExists = key in before;
-              const afterExists = key in after;
-
-              // Skip if values are identical
-              if (beforeExists && afterExists && JSON.stringify(beforeVal) === JSON.stringify(afterVal)) {
-                continue;
-              }
-
-              // Handle nested objects/blocks
-              if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
-                  typeof beforeVal === 'object' && beforeVal !== null && !Array.isArray(beforeVal)) {
-                const nestedLines = findChanges(beforeVal, afterVal, isUnknown || {}, indent + '    ');
-                if (nestedLines.length > 0) {
-                  lines.push(`${indent}~ ${key} {`);
-                  nestedLines.forEach(l => lines.push(l));
-                  lines.push(`${indent}  }`);
-                }
-                continue;
-              }
-
-              // Handle arrays (blocks in Terraform)
-              if (Array.isArray(afterVal) || Array.isArray(beforeVal)) {
-                const beforeArr = Array.isArray(beforeVal) ? beforeVal : [];
-                const afterArr = Array.isArray(afterVal) ? afterVal : [];
-
-                // Check if arrays of objects (blocks)
-                if ((beforeArr.length > 0 && typeof beforeArr[0] === 'object') ||
-                    (afterArr.length > 0 && typeof afterArr[0] === 'object')) {
-                  // Compare each element
-                  const maxLen = Math.max(beforeArr.length, afterArr.length);
-                  for (let i = 0; i < maxLen; i++) {
-                    const bItem = beforeArr[i];
-                    const aItem = afterArr[i];
-                    const unknownItem = Array.isArray(isUnknown) ? isUnknown[i] : isUnknown;
-
-                    if (bItem && aItem) {
-                      const nestedLines = findChanges(bItem, aItem, unknownItem || {}, indent + '    ');
-                      if (nestedLines.length > 0) {
-                        lines.push(`${indent}~ ${key} {`);
-                        nestedLines.forEach(l => lines.push(l));
-                        lines.push(`${indent}  }`);
-                      }
-                    } else if (aItem && !bItem) {
-                      lines.push(`${indent}+ ${key} {`);
-                      const nestedLines = findChanges({}, aItem, unknownItem || {}, indent + '    ');
-                      nestedLines.forEach(l => lines.push(l));
-                      lines.push(`${indent}  }`);
-                    } else if (bItem && !aItem) {
-                      lines.push(`${indent}- ${key} {`);
-                      lines.push(`${indent}    # (block removed)`);
-                      lines.push(`${indent}  }`);
-                    }
-                  }
-                } else {
-                  // Simple array comparison
-                  if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
-                    lines.push(`${indent}~ ${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
-                  }
-                }
-                continue;
-              }
-
-              // Value added
-              if (!beforeExists && afterExists) {
-                lines.push(`${indent}+ ${key} = ${formatValue(afterVal, isUnknown)}`);
-                continue;
-              }
-
-              // Value removed
-              if (beforeExists && !afterExists) {
-                lines.push(`${indent}- ${key} = ${formatValue(beforeVal, false)}`);
-                continue;
-              }
-
-              // Value changed (including null transitions)
-              if (beforeExists && afterExists) {
-                const beforeFormatted = formatValue(beforeVal, false);
-                const afterFormatted = formatValue(afterVal, isUnknown);
-                lines.push(`${indent}~ ${key} = ${beforeFormatted} -> ${afterFormatted}`);
-              }
-            }
-
-            return lines;
-          }
-
-          function formatResourceChange(change, action) {
-            const lines = [];
-            const before = change.change.before || {};
-            const after = change.change.after || {};
-            const afterUnknown = change.change.after_unknown || {};
-
-            const symbol = action === 'create' ? '+' : action === 'update' ? '~' : action === 'replace' ? '-/+' : '-';
-            lines.push(`${symbol} resource "${change.type}" "${change.name}" {`);
-
-            if (action === 'create') {
-              const changeLines = findChanges({}, after, afterUnknown, '    ');
-              changeLines.forEach(l => lines.push(l));
-            } else if (action === 'update') {
-              const changeLines = findChanges(before, after, afterUnknown, '    ');
-              changeLines.forEach(l => lines.push(l));
-            } else if (action === 'destroy') {
-              const changeLines = findChanges(before, {}, {}, '    ');
-              changeLines.forEach(l => lines.push(l));
-            } else if (action === 'replace') {
-              lines.push('    # forces replacement');
-              const changeLines = findChanges(before, after, afterUnknown, '    ');
-              changeLines.forEach(l => lines.push(l));
-            }
-
-            lines.push('  }');
-            return lines.join('\n');
-          }
-
-          const resources = parseJsonPlan(planJson);
-          const creates = resources.filter(r => r.action === 'create');
-          const updates = resources.filter(r => r.action === 'update');
-          const replaces = resources.filter(r => r.action === 'replace');
-          const destroys = resources.filter(r => r.action === 'destroy');
-
-          function buildResourceItem(resource) {
-            const indicators = {
-              create: '🟢 `+`',
-              update: '🟡 `~`',
-              replace: '🟣 `-/+`',
-              destroy: '🔴 `-`'
-            };
-            const indicator = indicators[resource.action] || '⚪ `?`';
-            const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
-
-            return `<details>\n<summary>${indicator} <code>${resource.address}</code></summary>\n\n\`\`\`terraform\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
-          }
-
-          const lines = [];
-
-          // Header - "Terraform Plan" with status icon
-          const statusIcon = planOutcome === 'success' ? '✅' : '❌';
-          lines.push(`## ${statusIcon} Terraform Plan`);
-          lines.push('');
-
-          // Run info with pipe separators and View Workflow link
-          lines.push(`Run [#${runNumber}](${runUrl}) | ${timestamp} | @${context.actor} | [View Workflow](${runUrl})`);
-          lines.push('');
-
-          // Resource summary with colored emoji indicators inline
-          if (hasChanges) {
-            const parts = [];
-            if (summary.add > 0) parts.push(`🟢 ${summary.add} to add`);
-            if (summary.change > 0) parts.push(`🟡 ${summary.change} to change`);
-            if (summary.destroy > 0) parts.push(`🔴 ${summary.destroy} to destroy`);
-            lines.push(`**Plan:** ${parts.join(' · ')}`);
-            lines.push('');
-          }
-
-          // Resource sections as collapsible groups
-          if (creates.length > 0) {
-            lines.push('<details>');
-            lines.push(`<summary><strong>🟢 Create (${creates.length})</strong></summary>`);
-            lines.push('');
-            creates.forEach(r => lines.push(buildResourceItem(r)));
-            lines.push('');
-            lines.push('</details>');
-            lines.push('');
-          }
-
-          if (replaces.length > 0) {
-            lines.push('<details>');
-            lines.push(`<summary><strong>🟣 Replace (${replaces.length})</strong></summary>`);
-            lines.push('');
-            replaces.forEach(r => lines.push(buildResourceItem(r)));
-            lines.push('');
-            lines.push('</details>');
-            lines.push('');
-          }
-
-          if (updates.length > 0) {
-            lines.push('<details>');
-            lines.push(`<summary><strong>🟡 Update (${updates.length})</strong></summary>`);
-            lines.push('');
-            updates.forEach(r => lines.push(buildResourceItem(r)));
-            lines.push('');
-            lines.push('</details>');
-            lines.push('');
-          }
-
-          if (destroys.length > 0) {
-            lines.push('<details>');
-            lines.push(`<summary><strong>🔴 Destroy (${destroys.length})</strong></summary>`);
-            lines.push('');
-            destroys.forEach(r => lines.push(buildResourceItem(r)));
-            lines.push('');
-            lines.push('</details>');
-            lines.push('');
-          }
-
-          if (!hasChanges) {
-            lines.push('');
-            lines.push('✨ **No changes.** Your infrastructure matches the configuration.');
-            lines.push('');
-          }
-
-          // Fallback
-          if (resources.length === 0 && hasChanges) {
-            lines.push('<details>');
-            lines.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
-            lines.push('');
-            lines.push('```json');
-            lines.push(planJson.length > 60000 ? planJson.substring(0, 60000) + '\n...(truncated)' : planJson);
-            lines.push('```');
-            lines.push('</details>');
-            lines.push('');
-          }
+          // Read generated summary
+          const summaryPath = '${{ github.action_path }}/pipeline-summary.md';
+          const summaryContent = fs.readFileSync(summaryPath, 'utf8');
 
           await core.summary
-            .addRaw(lines.join('\n'))
+            .addRaw(summaryContent)
             .write();
 
     - name: Store outputs
