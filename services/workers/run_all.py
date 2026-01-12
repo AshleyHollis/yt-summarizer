@@ -4,9 +4,10 @@ import asyncio
 import signal
 import sys
 
+from shared.logging.config import configure_logging, get_logger
+
 from embed.worker import EmbedWorker
 from relationships.worker import RelationshipsWorker
-from shared.logging.config import configure_logging, get_logger
 from summarize.worker import SummarizeWorker
 
 # Import all workers
