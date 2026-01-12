@@ -138,19 +138,13 @@ runs:
         POD_NAME="acr-pull-test-$(date +%s)"
         PULL_SUCCESS=false
         
-        # Create a simple pod that just tries to pull the image
-        cat <<EOF | kubectl apply -n "$TEST_NAMESPACE" -f - &>/dev/null
-apiVersion: v1
-kind: Pod
-metadata:
-  name: ${POD_NAME}
-spec:
-  restartPolicy: Never
-  containers:
-    - name: test
-      image: ${FULL_IMAGE}
-      command: ["sh", "-c", "echo 'Image pulled successfully' && exit 0"]
-EOF
+        # Create a simple pod that just tries to pull the image (using kubectl run instead of YAML)
+        kubectl run ${POD_NAME} \
+          --image=${FULL_IMAGE} \
+          --restart=Never \
+          --namespace="$TEST_NAMESPACE" \
+          --command -- sh -c "echo 'Image pulled successfully' && exit 0" \
+          &>/dev/null
         
         # Wait up to 60 seconds for pod to start or fail
         echo "  ⏳ Waiting for pod status (max 60s)..."
