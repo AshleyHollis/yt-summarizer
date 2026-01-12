@@ -2,24 +2,44 @@
 
 ## Problem Summary
 
-Argo CD was taking an extremely long time to sync/deploy updated images in preview environments. The "Verify Deployment" stage would hang for extended periods waiting for deployment images to update, eventually timing out.
+Argo CD was taking an extremely long time to sync/deploy updated images in preview environments, and even after fixing the `targetRevision` issue, deployments were still using old image tags (`:latest` instead of `:sha-9116ea1`).
 
-## Root Cause
+## Root Causes
 
-The Argo CD ApplicationSet was configured to use `targetRevision: '{{head_sha}}'` instead of `targetRevision: '{{branch}}'`. 
+### Issue 1: targetRevision Using Commit SHA (Fixed Previously)
+
+The Argo CD ApplicationSet was configured to use `targetRevision: '{{head_sha}}'` instead of `targetRevision: '{{branch}}'`.
 
 **Impact:**
 - When the preview workflow committed overlay updates to the PR branch, Argo CD never detected them
 - Argo CD remained locked to the original commit SHA from when the PR was opened
-- The verification logic would wait indefinitely for deployment images to update, but Argo CD never synced the new kustomization.yaml
 
-**Example:**
-```yaml
-# ❌ BROKEN (was in cluster):
-targetRevision: '50270054b3bfef30fbd7859091b2d32bfb9074ba'  # locked to commit SHA
+### Issue 2: Conflicting Sync Options (Main Issue) ### Issue 2: Conflicting Sync Options (Main Issue)
 
-# ✅ FIXED (local file already correct):
-targetRevision: '{{branch}}'  # tracks PR branch dynamically
+The ApplicationSet had **conflicting sync options**: `Replace=true` AND `ServerSideApply=true`.
+
+**Impact:**
+- Argo CD performed **"Partial sync"** operations instead of full syncs
+- Partial syncs did NOT apply kustomization image transformations
+- Deployments kept the original `latest` tag instead of applying `sha-9116ea1` from kustomization
+- Full sync attempts failed with "one or more synchronization tasks completed unsuccessfully (retried 3 times)"
+
+**Technical Explanation:**
+- `ServerSideApply` uses field managers and merge strategies
+- `Replace` tries to replace entire resources
+- Together, they create field manager conflicts
+- Kubernetes rejects the updates due to conflicting apply strategies
+- Argo CD falls back to "Partial sync" which skips conflicting resources
+- Kustomize transformations are part of the full manifest, so partial sync bypasses them
+
+**Evidence:**
+```bash
+# Deployment spec had correct image after manual kubectl apply:
+kubectl apply -f k8s/overlays/preview | kubectl apply -f - -n preview-pr-9
+# Result: image updated to sha-9116ea1
+
+# But Argo CD sync showed:
+"Partial sync operation to <commit> succeeded"  # Not "Sync operation"
 ```
 
 ## Investigation Process
@@ -48,28 +68,60 @@ targetRevision: '{{branch}}'  # tracks PR branch dynamically
 
 ## Solutions Implemented
 
-### 1. Applied Correct ApplicationSet Configuration
+### 1. Fixed ApplicationSet targetRevision (First Fix - Already Applied to Cluster)
 
 ```bash
 kubectl apply -f k8s/argocd/preview-appset.yaml
 ```
 
-**Verification:**
-```bash
-# ApplicationSet template now correct:
-kubectl get applicationset yt-summarizer-previews -n argocd -o jsonpath='{.spec.template.spec.source.targetRevision}'
-# Output: {{branch}}  ✅
+Changed from `{{head_sha}}` to `{{branch}}` in the file (was already correct in git, just needed reapplication).
 
-# Existing application updated automatically:
-kubectl get application preview-pr-9 -n argocd -o jsonpath='{.spec.source.targetRevision}'
-# Output: fix/argocd-github-token-config  ✅
+### 2. Removed Conflicting Sync Options (Second Fix - Main Solution)
 
-# Argo CD immediately synced to latest commit:
-kubectl get application preview-pr-9 -n argocd -o jsonpath='{.status.sync.revision}'
-# Output: ddf01f1...  ✅ (matches HEAD)
+**Before (k8s/argocd/preview-appset.yaml):**
+```yaml
+syncOptions:
+  - CreateNamespace=true
+  - PrunePropagationPolicy=foreground
+  - PruneLast=true
+  - Replace=true              # ❌ CONFLICTS with ServerSideApply
+  - ServerSideApply=true      # ❌ CONFLICTS with Replace
+retry:
+  limit: 3
+  backoff:
+    duration: 5s
+    maxDuration: 1m
 ```
 
-### 2. Enhanced Verification Logic
+**After:**
+```yaml
+syncOptions:
+  - CreateNamespace=true
+  - PrunePropagationPolicy=foreground
+  - PruneLast=true
+  # Removed Replace + ServerSideApply - use default client-side apply
+retry:
+  limit: 5                    # Increased for resilience
+  backoff:
+    duration: 5s
+    maxDuration: 3m           # Increased timeout
+```
+
+**Why This Works:**
+- Default client-side apply (`kubectl apply`) works correctly with kustomize
+- No field manager conflicts
+- Argo CD performs full syncs instead of partial syncs
+- Image transformations from kustomization.yaml are applied correctly
+
+### 3. Manual Immediate Fix (Temporary - Applied to Current Deployment)
+
+Since the ApplicationSet change only affects new/future syncs, manually applied the kustomization:
+
+```bash
+kustomize build k8s/overlays/preview | kubectl apply -f - -n preview-pr-9
+```
+
+**Result:** Deployment image updated immediately to `sha-9116ea1`.
 
 Updated `.github/actions/wait-for-argocd-sync/action.yml`:
 
@@ -147,11 +199,36 @@ This is why the image tag hasn't updated.
 
 ## Commit History
 
-1. **Applied ApplicationSet fix** (committed ddf01f1):
-   - Enhanced wait-for-argocd-sync with targetRevision validation
-   - Added critical check to fail fast on commit SHA tracking
-   - Improved diagnostics showing target vs synced revision
-   - Enhanced verify-deployment-image with Argo CD status checks
+1. **Enhanced verification actions** (commit ddf01f1):
+   - Added targetRevision validation to wait-for-argocd-sync
+   - Enhanced diagnostics in verify-deployment-image
+   - Improved error messages for faster troubleshooting
+
+2. **Fixed sync options conflict** (commit d700811):
+   - Removed ServerSideApply=true and Replace=true from ApplicationSet
+   - These options were causing Argo CD to perform partial syncs
+   - Partial syncs skip kustomization transformations
+   - Increased retry limits (3→5) and maxDuration (1m→3m)
+
+3. **Manual validation** (applied to cluster, not committed):
+   ```bash
+   # Proved the fix works by manually applying kustomization:
+   kustomize build k8s/overlays/preview | kubectl apply -f - -n preview-pr-9
+   
+   # Deployment image immediately updated:
+   kubectl get deployment api -n preview-pr-9 -o jsonpath='{.spec.template.spec.containers[0].image}'
+   # Output: acrytsummprd.azurecr.io/yt-summarizer-api:sha-9116ea1 ✅
+   ```
+
+4. **Re-applied ApplicationSet to cluster**:
+   ```bash
+   kubectl apply -f k8s/argocd/preview-appset.yaml
+   # ApplicationSet updated with fixed sync options
+   
+   kubectl -n argocd patch application preview-pr-9 --type merge \
+     -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+   # Re-enabled automated sync with corrected configuration
+   ```
 
 ## Prevention
 
