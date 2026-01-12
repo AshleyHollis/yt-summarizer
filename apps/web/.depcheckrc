@@ -1,0 +1,14 @@
+{
+  "ignores": [
+    "@types/*",
+    "eslint-*",
+    "prettier",
+    "typescript",
+    "vitest",
+    "playwright"
+  ],
+  "specials": [
+    "bin",
+    "webpack"
+  ]
+}

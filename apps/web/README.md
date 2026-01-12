@@ -20,6 +20,19 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Dependency Notes
+
+### Packages that appear "unused" but are actually required
+
+Some dependencies may be flagged as unused by static analysis tools like `depcheck`, but they are actually used in configuration files or at build time:
+
+- **@copilotkit/runtime** - Referenced in `next.config.ts` for bundle optimization (`optimizePackageImports`)
+- **@tailwindcss/postcss** - PostCSS plugin used in `postcss.config.mjs` 
+- **@tailwindcss/typography** - Provides `prose-*` utility classes used throughout the app
+- **tailwindcss** - Core CSS framework loaded via `@import "tailwindcss"` in `src/app/globals.css`
+
+These are all legitimately required dependencies. Removing them will break the build or runtime functionality.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
@@ -34,3 +47,4 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+

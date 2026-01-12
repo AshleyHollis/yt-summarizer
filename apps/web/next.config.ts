@@ -22,10 +22,12 @@ const nextConfig: NextConfig = {
     preloadEntriesOnStart: false,
     // Optimize barrel imports for heavy libraries (reduces module resolution significantly)
     // CopilotKit and icon libraries have many exports
+    // Note: These packages must be listed in dependencies even if not directly imported,
+    // as Next.js needs them for the optimizePackageImports feature
     optimizePackageImports: [
       '@copilotkit/react-core',
       '@copilotkit/react-ui',
-      '@copilotkit/runtime',
+      '@copilotkit/runtime', // Required here even though not directly imported
       'react-markdown',
     ],
   },

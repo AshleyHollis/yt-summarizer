@@ -41,7 +41,8 @@ runs:
         echo "════════════════════════════════════════════════════════════════"
         echo ""
         
-        if depcheck --ignores="@types/*,eslint-*,prettier,typescript,vitest,playwright"; then
+        # Run depcheck (uses .depcheckrc config if present)
+        if depcheck; then
           echo ""
           echo "✅ No dependency issues detected"
         else
@@ -50,9 +51,19 @@ runs:
           echo "⚠️  DEPENDENCY ISSUES DETECTED"
           echo "════════════════════════════════════════════════════════════════"
           echo ""
+          echo "📋 Known false positives (these are actually used):"
+          echo "   • @copilotkit/runtime - Used in next.config.ts optimizePackageImports"
+          echo "   • @tailwindcss/postcss - PostCSS plugin in postcss.config.mjs"
+          echo "   • @tailwindcss/typography - Provides prose-* utility classes"
+          echo "   • tailwindcss - Core CSS framework"
+          echo ""
+          echo "   ⚠️  If you see packages OTHER than those listed above,"
+          echo "       they may be genuinely unused and should be investigated."
+          echo ""
           echo "📋 Action Required:"
-          echo "   Review missing/unused packages above"
-          echo "   Update package.json accordingly"
+          echo "   1. Review the packages listed above"
+          echo "   2. If it's a known false positive, document it"
+          echo "   3. If it's genuinely unused, remove it from package.json"
           echo ""
           echo "════════════════════════════════════════════════════════════════"
           exit 1
