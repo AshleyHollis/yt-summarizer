@@ -48,6 +48,48 @@ runs:
         echo "  Timeout: ${TIMEOUT}s"
         echo ""
         
+        # CRITICAL PRE-CHECK: Verify overlay actually contains the expected image tag
+        # This catches cases where Argo CD synced successfully but to a STALE overlay
+        APP_NAME=$(echo ${NAMESPACE} | sed 's/preview-/preview-pr-/')
+        echo "::group::📋 Pre-check: Verify Argo CD has correct image tag in manifest"
+        if kubectl get applications.argoproj.io ${APP_NAME} -n argocd &>/dev/null; then
+          # Get the kustomization.yaml from Argo CD's cached manifest
+          MANIFEST=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.summary.images}' 2>/dev/null || echo "")
+          
+          if [[ "$MANIFEST" == *"${EXPECTED_TAG}"* ]]; then
+            echo "✅ Argo CD manifest contains expected tag: ${EXPECTED_TAG}"
+          else
+            echo "::error::❌ CRITICAL: Argo CD manifest does NOT contain expected tag!"
+            echo "  Expected tag: ${EXPECTED_TAG}"
+            echo "  Current images in manifest: ${MANIFEST}"
+            echo ""
+            echo "  This indicates Argo CD synced a STALE overlay version."
+            echo "  Possible causes:"
+            echo "  1. Argo CD cache is stale (polling didn't detect overlay update)"
+            echo "  2. GitHub authentication issue preventing overlay fetch"
+            echo "  3. Overlay update wasn't pushed to PR branch successfully"
+            echo ""
+            echo "  Triggering hard refresh to force re-fetch..."
+            kubectl patch application ${APP_NAME} -n argocd -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' --type=merge 2>/dev/null || true
+            
+            # Give Argo CD 30s to refresh
+            echo "  Waiting 30s for Argo CD to refresh..."
+            sleep 30
+            
+            # Re-check
+            MANIFEST=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.summary.images}' 2>/dev/null || echo "")
+            if [[ "$MANIFEST" == *"${EXPECTED_TAG}"* ]]; then
+              echo "✅ Manifest updated after refresh"
+            else
+              echo "::error::❌ Manifest still stale after refresh - failing fast"
+              kubectl describe application ${APP_NAME} -n argocd
+              exit 1
+            fi
+          fi
+        fi
+        echo "::endgroup::"
+        echo ""
+        
         # Helper function: Check Argo CD Application Health
         check_argocd_health() {
           local app_name=$1

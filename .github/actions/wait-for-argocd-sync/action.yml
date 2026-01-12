@@ -101,10 +101,30 @@ runs:
           if $NAMESPACE_CREATED && ! $ARGOCD_SYNCED; then
             CURRENT_SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
             CURRENT_SYNCED_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.revision}' 2>/dev/null || echo "")
+            CURRENT_TARGET_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "")
             
             if [ "$CURRENT_SYNC_STATUS" = "Synced" ]; then
               echo "✅ Argo CD sync complete"
               echo "  Synced to revision: ${CURRENT_SYNCED_REV:0:8}..."
+              echo "  Target branch: ${CURRENT_TARGET_REV}"
+              
+              # CRITICAL: Verify we're not using a stale cached version
+              # If target is a branch name, we can't validate exact commit match,
+              # but we can check that the sync is recent (within last 60s)
+              if [[ ! "${CURRENT_TARGET_REV}" =~ ^[0-9a-f]{40}$ ]]; then
+                LAST_SYNC=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.finishedAt}' 2>/dev/null || echo "")
+                if [ -n "$LAST_SYNC" ]; then
+                  SYNC_AGE=$(($(date +%s) - $(date -d "$LAST_SYNC" +%s 2>/dev/null || echo "0")))
+                  if [ $SYNC_AGE -gt 60 ]; then
+                    echo "  ⚠️ Warning: Last sync was ${SYNC_AGE}s ago - may be stale"
+                    echo "  Triggering hard refresh..."
+                    kubectl patch application ${APP_NAME} -n argocd -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' --type=merge 2>/dev/null || true
+                    # Don't exit yet, give it one more cycle
+                    continue
+                  fi
+                fi
+              fi
+              
               ARGOCD_SYNCED=true
               exit 0
             fi
