@@ -138,7 +138,7 @@ runs:
           const sections = [];
           sections.push(`## ${statusEmoji} ${statusText}`);
           sections.push('');
-          
+
           if (hasChanges) {
             sections.push(`**Resources:** ${summaryBadges.join(' · ')}`);
           } else {

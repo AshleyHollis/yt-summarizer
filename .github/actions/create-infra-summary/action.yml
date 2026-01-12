@@ -15,7 +15,7 @@ runs:
       run: |
         echo "## 🏗️ Infrastructure Deployment Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         if [ "${{ inputs.terraform-changed }}" != "true" ]; then
           echo "⏭️ **Skipped** - No terraform changes in this commit" >> $GITHUB_STEP_SUMMARY
         else
