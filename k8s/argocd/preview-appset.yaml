@@ -20,6 +20,10 @@ spec:
         github:
           owner: AshleyHollis
           repo: yt-summarizer
+          # GitHub token for API access (create secret: kubectl create secret generic github-token -n argocd --from-literal=token=<YOUR_GITHUB_PAT>)
+          tokenRef:
+            secretName: github-token
+            key: token
           # Optional: filter by labels
           # labels:
           #   - preview
