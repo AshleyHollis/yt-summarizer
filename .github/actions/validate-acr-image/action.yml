@@ -86,7 +86,15 @@ runs:
           fi
         else
           # Extract digest from manifest
-          DIGEST=$(echo "$MANIFEST" | jq -r '.digest // empty' 2>/dev/null || echo "")
+          # Use set +e temporarily to prevent pipefail from stopping on jq errors
+          set +e
+          DIGEST=$(echo "$MANIFEST" | jq -r '.digest // ""' 2>/dev/null)
+          set -e
+          
+          # Fallback if jq fails or returns null
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+            DIGEST=""
+          fi
           
           echo "exists=true" >> $GITHUB_OUTPUT
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
