@@ -133,6 +133,128 @@ runs:
             }
           }
 
+          // Format a value for display (Terraform-style)
+          function formatValue(value, unknown) {
+            if (unknown === true) return '(known after apply)';
+            if (value === null) return 'null';
+            if (value === undefined) return 'null';
+            if (typeof value === 'string') return `"${value}"`;
+            if (typeof value === 'boolean') return value.toString();
+            if (typeof value === 'number') return value.toString();
+            if (Array.isArray(value)) {
+              if (value.length === 0) return '[]';
+              return JSON.stringify(value);
+            }
+            if (typeof value === 'object') {
+              const keys = Object.keys(value);
+              if (keys.length === 0) return '{}';
+              return JSON.stringify(value);
+            }
+            return JSON.stringify(value);
+          }
+
+          // Recursively find all changes between before and after
+          function findChanges(before, after, afterUnknown, indent = '    ') {
+            const lines = [];
+            before = before || {};
+            after = after || {};
+            afterUnknown = afterUnknown || {};
+
+            const allKeys = new Set([
+              ...Object.keys(before),
+              ...Object.keys(after)
+            ]);
+
+            for (const key of Array.from(allKeys).sort()) {
+              const beforeVal = before[key];
+              const afterVal = after[key];
+              const isUnknown = afterUnknown[key];
+
+              const beforeExists = key in before;
+              const afterExists = key in after;
+
+              // Skip if values are identical
+              if (beforeExists && afterExists && JSON.stringify(beforeVal) === JSON.stringify(afterVal)) {
+                continue;
+              }
+
+              // Handle nested objects/blocks
+              if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
+                  typeof beforeVal === 'object' && beforeVal !== null && !Array.isArray(beforeVal)) {
+                const nestedLines = findChanges(beforeVal, afterVal, isUnknown || {}, indent + '    ');
+                if (nestedLines.length > 0) {
+                  lines.push(`${indent}~ ${key} {`);
+                  nestedLines.forEach(l => lines.push(l));
+                  lines.push(`${indent}  }`);
+                }
+                continue;
+              }
+
+              // Handle arrays (blocks in Terraform)
+              if (Array.isArray(afterVal) || Array.isArray(beforeVal)) {
+                const beforeArr = Array.isArray(beforeVal) ? beforeVal : [];
+                const afterArr = Array.isArray(afterVal) ? afterVal : [];
+
+                // Check if arrays of objects (blocks)
+                if ((beforeArr.length > 0 && typeof beforeArr[0] === 'object') ||
+                    (afterArr.length > 0 && typeof afterArr[0] === 'object')) {
+                  // Compare each element
+                  const maxLen = Math.max(beforeArr.length, afterArr.length);
+                  for (let i = 0; i < maxLen; i++) {
+                    const bItem = beforeArr[i];
+                    const aItem = afterArr[i];
+                    const unknownItem = Array.isArray(isUnknown) ? isUnknown[i] : isUnknown;
+
+                    if (bItem && aItem) {
+                      const nestedLines = findChanges(bItem, aItem, unknownItem || {}, indent + '    ');
+                      if (nestedLines.length > 0) {
+                        lines.push(`${indent}~ ${key} {`);
+                        nestedLines.forEach(l => lines.push(l));
+                        lines.push(`${indent}  }`);
+                      }
+                    } else if (aItem && !bItem) {
+                      lines.push(`${indent}+ ${key} {`);
+                      const nestedLines = findChanges({}, aItem, unknownItem || {}, indent + '    ');
+                      nestedLines.forEach(l => lines.push(l));
+                      lines.push(`${indent}  }`);
+                    } else if (bItem && !aItem) {
+                      lines.push(`${indent}- ${key} {`);
+                      lines.push(`${indent}    # (block removed)`);
+                      lines.push(`${indent}  }`);
+                    }
+                  }
+                } else {
+                  // Simple array comparison
+                  if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
+                    lines.push(`${indent}~ ${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
+                  }
+                }
+                continue;
+              }
+
+              // Value added
+              if (!beforeExists && afterExists) {
+                lines.push(`${indent}+ ${key} = ${formatValue(afterVal, isUnknown)}`);
+                continue;
+              }
+
+              // Value removed
+              if (beforeExists && !afterExists) {
+                lines.push(`${indent}- ${key} = ${formatValue(beforeVal, false)}`);
+                continue;
+              }
+
+              // Value changed (including null transitions)
+              if (beforeExists && afterExists) {
+                const beforeFormatted = formatValue(beforeVal, false);
+                const afterFormatted = formatValue(afterVal, isUnknown);
+                lines.push(`${indent}~ ${key} = ${beforeFormatted} -> ${afterFormatted}`);
+              }
+            }
+
+            return lines;
+          }
+
           // Format resource change details
           function formatResourceChange(change, action) {
             const lines = [];
@@ -143,73 +265,27 @@ runs:
             const symbol = action === 'create' ? '+' : action === 'update' ? '~' : action === 'replace' ? '-/+' : '-';
             lines.push(`${symbol} resource "${change.type}" "${change.name}" {`);
 
-            // For creates, show all new attributes
             if (action === 'create') {
-              for (const [key, value] of Object.entries(after)) {
-                if (value === null || value === undefined) continue;
-                if (afterUnknown[key] === true) {
-                  lines.push(`    + ${key} = (known after apply)`);
-                } else {
-                  const formatted = typeof value === 'object' ? JSON.stringify(value) : `"${value}"`;
-                  lines.push(`    + ${key} = ${formatted}`);
-                }
-              }
-            }
-            // For updates, show changed attributes
-            else if (action === 'update') {
-              for (const [key, afterValue] of Object.entries(after)) {
-                const beforeValue = before[key];
-                if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
-                  if (typeof afterValue === 'object' && afterValue !== null) {
-                    lines.push(`  ~ ${key} {`);
-                    // Show nested changes
-                    const nestedChanges = findNestedChanges(beforeValue || {}, afterValue, afterUnknown[key] || {});
-                    nestedChanges.forEach(line => lines.push(`      ${line}`));
-                    lines.push(`    }`);
-                  } else {
-                    const formattedBefore = beforeValue !== null && beforeValue !== undefined ? JSON.stringify(beforeValue) : 'null';
-                    const formattedAfter = afterUnknown[key] === true ? '(known after apply)' : JSON.stringify(afterValue);
-                    lines.push(`    ~ ${key} = ${formattedBefore} -> ${formattedAfter}`);
-                  }
-                }
-              }
-              // Check for attributes in before but not in after (removed)
-              for (const key in before) {
-                if (!(key in after)) {
-                  lines.push(`    - ${key} = ${JSON.stringify(before[key])}`);
-                }
-              }
-            }
-            // For destroy, show what's being removed
-            else if (action === 'destroy') {
-              for (const [key, value] of Object.entries(before)) {
-                if (value === null || value === undefined) continue;
-                const formatted = typeof value === 'object' ? JSON.stringify(value) : `"${value}"`;
-                lines.push(`    - ${key} = ${formatted}`);
-              }
+              // For creates, show all new attributes
+              const changeLines = findChanges({}, after, afterUnknown, '    ');
+              changeLines.forEach(l => lines.push(l));
+            } else if (action === 'update') {
+              // For updates, show only changed attributes
+              const changeLines = findChanges(before, after, afterUnknown, '    ');
+              changeLines.forEach(l => lines.push(l));
+            } else if (action === 'destroy') {
+              // For destroy, show what's being removed
+              const changeLines = findChanges(before, {}, {}, '    ');
+              changeLines.forEach(l => lines.push(l));
+            } else if (action === 'replace') {
+              // For replace, show before values being removed and after values being added
+              lines.push('    # forces replacement');
+              const changeLines = findChanges(before, after, afterUnknown, '    ');
+              changeLines.forEach(l => lines.push(l));
             }
 
-            lines.push(`  }`);
+            lines.push('  }');
             return lines.join('\n');
-          }
-
-          // Find nested changes in objects
-          function findNestedChanges(before, after, afterUnknown) {
-            const changes = [];
-            const allKeys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
-
-            for (const key of allKeys) {
-              const beforeVal = before?.[key];
-              const afterVal = after?.[key];
-
-              if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
-                const formattedBefore = beforeVal !== null && beforeVal !== undefined ? JSON.stringify(beforeVal) : 'null';
-                const formattedAfter = afterUnknown?.[key] === true ? '(known after apply)' : JSON.stringify(afterVal);
-                changes.push(`~ ${key} = ${formattedBefore} -> ${formattedAfter}`);
-              }
-            }
-
-            return changes;
           }
 
           const resources = parseJsonPlan(planJson);
@@ -444,6 +520,128 @@ runs:
             }
           }
 
+          // Format a value for display (Terraform-style)
+          function formatValue(value, unknown) {
+            if (unknown === true) return '(known after apply)';
+            if (value === null) return 'null';
+            if (value === undefined) return 'null';
+            if (typeof value === 'string') return `"${value}"`;
+            if (typeof value === 'boolean') return value.toString();
+            if (typeof value === 'number') return value.toString();
+            if (Array.isArray(value)) {
+              if (value.length === 0) return '[]';
+              return JSON.stringify(value);
+            }
+            if (typeof value === 'object') {
+              const keys = Object.keys(value);
+              if (keys.length === 0) return '{}';
+              return JSON.stringify(value);
+            }
+            return JSON.stringify(value);
+          }
+
+          // Recursively find all changes between before and after
+          function findChanges(before, after, afterUnknown, indent = '    ') {
+            const lines = [];
+            before = before || {};
+            after = after || {};
+            afterUnknown = afterUnknown || {};
+
+            const allKeys = new Set([
+              ...Object.keys(before),
+              ...Object.keys(after)
+            ]);
+
+            for (const key of Array.from(allKeys).sort()) {
+              const beforeVal = before[key];
+              const afterVal = after[key];
+              const isUnknown = afterUnknown[key];
+
+              const beforeExists = key in before;
+              const afterExists = key in after;
+
+              // Skip if values are identical
+              if (beforeExists && afterExists && JSON.stringify(beforeVal) === JSON.stringify(afterVal)) {
+                continue;
+              }
+
+              // Handle nested objects/blocks
+              if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
+                  typeof beforeVal === 'object' && beforeVal !== null && !Array.isArray(beforeVal)) {
+                const nestedLines = findChanges(beforeVal, afterVal, isUnknown || {}, indent + '    ');
+                if (nestedLines.length > 0) {
+                  lines.push(`${indent}~ ${key} {`);
+                  nestedLines.forEach(l => lines.push(l));
+                  lines.push(`${indent}  }`);
+                }
+                continue;
+              }
+
+              // Handle arrays (blocks in Terraform)
+              if (Array.isArray(afterVal) || Array.isArray(beforeVal)) {
+                const beforeArr = Array.isArray(beforeVal) ? beforeVal : [];
+                const afterArr = Array.isArray(afterVal) ? afterVal : [];
+
+                // Check if arrays of objects (blocks)
+                if ((beforeArr.length > 0 && typeof beforeArr[0] === 'object') ||
+                    (afterArr.length > 0 && typeof afterArr[0] === 'object')) {
+                  // Compare each element
+                  const maxLen = Math.max(beforeArr.length, afterArr.length);
+                  for (let i = 0; i < maxLen; i++) {
+                    const bItem = beforeArr[i];
+                    const aItem = afterArr[i];
+                    const unknownItem = Array.isArray(isUnknown) ? isUnknown[i] : isUnknown;
+
+                    if (bItem && aItem) {
+                      const nestedLines = findChanges(bItem, aItem, unknownItem || {}, indent + '    ');
+                      if (nestedLines.length > 0) {
+                        lines.push(`${indent}~ ${key} {`);
+                        nestedLines.forEach(l => lines.push(l));
+                        lines.push(`${indent}  }`);
+                      }
+                    } else if (aItem && !bItem) {
+                      lines.push(`${indent}+ ${key} {`);
+                      const nestedLines = findChanges({}, aItem, unknownItem || {}, indent + '    ');
+                      nestedLines.forEach(l => lines.push(l));
+                      lines.push(`${indent}  }`);
+                    } else if (bItem && !aItem) {
+                      lines.push(`${indent}- ${key} {`);
+                      lines.push(`${indent}    # (block removed)`);
+                      lines.push(`${indent}  }`);
+                    }
+                  }
+                } else {
+                  // Simple array comparison
+                  if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
+                    lines.push(`${indent}~ ${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
+                  }
+                }
+                continue;
+              }
+
+              // Value added
+              if (!beforeExists && afterExists) {
+                lines.push(`${indent}+ ${key} = ${formatValue(afterVal, isUnknown)}`);
+                continue;
+              }
+
+              // Value removed
+              if (beforeExists && !afterExists) {
+                lines.push(`${indent}- ${key} = ${formatValue(beforeVal, false)}`);
+                continue;
+              }
+
+              // Value changed (including null transitions)
+              if (beforeExists && afterExists) {
+                const beforeFormatted = formatValue(beforeVal, false);
+                const afterFormatted = formatValue(afterVal, isUnknown);
+                lines.push(`${indent}~ ${key} = ${beforeFormatted} -> ${afterFormatted}`);
+              }
+            }
+
+            return lines;
+          }
+
           function formatResourceChange(change, action) {
             const lines = [];
             const before = change.change.before || {};
@@ -454,52 +652,22 @@ runs:
             lines.push(`${symbol} resource "${change.type}" "${change.name}" {`);
 
             if (action === 'create') {
-              for (const [key, value] of Object.entries(after)) {
-                if (value === null || value === undefined) continue;
-                if (afterUnknown[key] === true) {
-                  lines.push(`    + ${key} = (known after apply)`);
-                } else {
-                  const formatted = typeof value === 'object' ? JSON.stringify(value) : `"${value}"`;
-                  lines.push(`    + ${key} = ${formatted}`);
-                }
-              }
-            }
-            else if (action === 'update') {
-              for (const [key, afterValue] of Object.entries(after)) {
-                const beforeValue = before[key];
-                if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
-                  if (typeof afterValue === 'object' && afterValue !== null) {
-                    lines.push(`  ~ ${key} {`);
-                    const nestedChanges = findNestedChanges(beforeValue || {}, afterValue, afterUnknown[key] || {});
-                    nestedChanges.forEach(line => lines.push(`      ${line}`));
-                    lines.push(`    }`);
-                  } else {
-                    const formattedBefore = beforeValue !== null && beforeValue !== undefined ? JSON.stringify(beforeValue) : 'null';
-                    const formattedAfter = afterUnknown[key] === true ? '(known after apply)' : JSON.stringify(afterValue);
-                    lines.push(`    ~ ${key} = ${formattedBefore} -> ${formattedAfter}`);
-                  }
-                }
-              }
+              const changeLines = findChanges({}, after, afterUnknown, '    ');
+              changeLines.forEach(l => lines.push(l));
+            } else if (action === 'update') {
+              const changeLines = findChanges(before, after, afterUnknown, '    ');
+              changeLines.forEach(l => lines.push(l));
+            } else if (action === 'destroy') {
+              const changeLines = findChanges(before, {}, {}, '    ');
+              changeLines.forEach(l => lines.push(l));
+            } else if (action === 'replace') {
+              lines.push('    # forces replacement');
+              const changeLines = findChanges(before, after, afterUnknown, '    ');
+              changeLines.forEach(l => lines.push(l));
             }
 
-            lines.push(`  }`);
+            lines.push('  }');
             return lines.join('\n');
-          }
-
-          function findNestedChanges(before, after, afterUnknown) {
-            const changes = [];
-            const allKeys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
-
-            for (const key of allKeys) {
-              const beforeVal = before?.[key];
-              const afterVal = after?.[key];
-              if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
-                const formattedBefore = beforeVal !== null && beforeVal !== undefined ? JSON.stringify(beforeVal) : 'null';
-                const formattedAfter = afterUnknown?.[key] === true ? '(known after apply)' : JSON.stringify(afterVal);
-                changes.push(`~ ${key} = ${formattedBefore} -> ${formattedAfter}`);
-              }
-            }
-            return changes;
           }
 
           const resources = parseJsonPlan(planJson);
