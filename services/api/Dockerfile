@@ -38,8 +38,8 @@ RUN uv venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Install shared package and API dependencies
-RUN cd /app/shared && uv pip install --system -e .
-RUN uv pip install --system -e .
+RUN cd /app/shared && uv pip install --system --prerelease=allow -e .
+RUN uv pip install --system --prerelease=allow -e .
 
 # ================================
 # Stage 2: Production image
