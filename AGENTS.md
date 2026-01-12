@@ -85,6 +85,8 @@ Below is a concise list of repository-level tools and agent-facing utilities you
 
 - **Developer helper tools** — the repo references auxiliary tools such as `dotnet-outdated` (suggested for apphost upgrades). Install as needed, e.g. `dotnet tool install --global dotnet-outdated-tool`.
 
+- **GitHub CLI (`gh`)** — available in the environment and recommended for repository automation and agent tasks (creating PRs, viewing runs, posting comments). AI agents and automation may safely invoke `gh` to interact with GitHub resources from this workspace.
+
 > **Note:** This is a concise reference — for usage examples and caveats see the sections above (Aspire guidance, Playwright notes) and the specific scripts/actions referenced.
 
 ## Test Enforcement
