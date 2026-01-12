@@ -4,6 +4,7 @@
  * Generate Preview
  *
  * CLI tool to generate HTML preview from Terraform plan JSON.
+ * Now generates GitHub-accurate preview that matches exactly what GitHub renders.
  *
  * Usage:
  *   node generate-preview.js <plan.json> [output.html]
@@ -13,7 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parseJsonPlan, calculateSummary } = require('./terraform-plan-parser');
-const { generateHtml } = require('./html-generator');
+const { generateGitHubPreviewFromPlan } = require('./github-preview-generator');
 const { generatePrComment } = require('./markdown-generator');
 
 function main() {
@@ -23,13 +24,16 @@ function main() {
     console.log(`
 Terraform Plan Preview Generator
 
+Generates a preview that renders EXACTLY like GitHub PR comments.
+Uses GitHub's actual Primer CSS and marked.js GFM renderer.
+
 Usage:
   node generate-preview.js <plan.json> [output.html]
   node generate-preview.js --fixture <name>
 
 Options:
   --fixture <name>   Use a test fixture (realistic, no-changes, create-only)
-  --markdown         Also generate markdown output
+  --markdown         Also generate raw markdown output
   --help, -h         Show this help message
 
 Examples:
@@ -78,38 +82,33 @@ Examples:
   console.log(`  - ${summary.change} to change`);
   console.log(`  - ${summary.destroy} to destroy`);
 
-  // Generate HTML
-  const html = generateHtml({
+  const planOptions = {
     resources,
     summary,
     planOutcome: 'success',
     runNumber: 42,
     runUrl: 'https://github.com/AshleyHollis/yt-summarizer/actions/runs/12345',
     actor: 'developer',
-    timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC'
-  });
+    planJson
+  };
+
+  // Generate GitHub-accurate HTML preview
+  const html = generateGitHubPreviewFromPlan(planOptions);
 
   fs.writeFileSync(outputPath, html, 'utf-8');
-  console.log(`\nHTML preview generated: ${outputPath}`);
+  console.log(`\n✅ GitHub-accurate preview generated: ${outputPath}`);
+  console.log('   This preview uses GitHub Primer CSS and renders markdown exactly like GitHub.');
 
   // Generate markdown if requested
   if (generateMarkdown) {
     const markdownPath = outputPath.replace(/\.html$/, '.md');
-    const markdown = generatePrComment({
-      resources,
-      summary,
-      planOutcome: 'success',
-      runNumber: 42,
-      runUrl: 'https://github.com/AshleyHollis/yt-summarizer/actions/runs/12345',
-      actor: 'developer',
-      planJson
-    });
+    const markdown = generatePrComment(planOptions);
 
     fs.writeFileSync(markdownPath, markdown, 'utf-8');
-    console.log(`Markdown output generated: ${markdownPath}`);
+    console.log(`\n📝 Raw markdown output: ${markdownPath}`);
   }
 
-  console.log('\nOpen the HTML file in a browser to preview the Terraform plan visualization.');
+  console.log('\nOpen the HTML file in a browser to see exactly what GitHub will render.');
 }
 
 main();

@@ -112,20 +112,21 @@ describe('buildResourceItem', () => {
     assert.ok(markdown.includes('```'));
   });
 
-  test('uses correct indicator for each action type', () => {
+  test('includes resource address for each action type', () => {
     const actions = ['create', 'update', 'replace', 'destroy'];
 
     actions.forEach(action => {
-      const resource = { address: 'test', action, details: 'test' };
+      const resource = { address: 'test.resource', action, details: 'test' };
       const markdown = buildResourceItem(resource);
-      assert.ok(markdown.includes(ACTION_INDICATORS[action]));
+      // Resource item now just shows the address without the action indicator
+      assert.ok(markdown.includes('<code>test.resource</code>'));
     });
   });
 });
 
 describe('buildResourceSection', () => {
   test('returns empty array for empty resources', () => {
-    const lines = buildResourceSection('Create', '🟢', []);
+    const lines = buildResourceSection('Create', '🟢', 'create', []);
     assert.strictEqual(lines.length, 0);
   });
 
@@ -135,7 +136,7 @@ describe('buildResourceSection', () => {
       { address: 'b', action: 'create', details: 'test' }
     ];
 
-    const lines = buildResourceSection('Create', '🟢', resources);
+    const lines = buildResourceSection('Create', '🟢', 'create', resources);
     const markdown = lines.join('\n');
 
     assert.ok(markdown.includes('🟢 Create (2)'));
@@ -177,30 +178,34 @@ describe('generatePrComment', () => {
       actor: 'testuser'
     });
 
-    assert.ok(markdown.includes('Run [#42]'));
+    // New format: **Run:** [#42](url) | **Date:** ... | **By:** @actor
+    assert.ok(markdown.includes('**Run:** [#42]'));
     assert.ok(markdown.includes('@testuser'));
-    assert.ok(markdown.includes('View Workflow'));
+    assert.ok(markdown.includes('**By:**'));
   });
 
-  test('includes summary line for changes', () => {
+  test('includes summary table for changes', () => {
     const planJson = loadFixture('realistic');
     const resources = parseJsonPlan(planJson);
     const summary = calculateSummary(resources);
 
     const markdown = generatePrComment({ resources, summary });
 
-    assert.ok(markdown.includes('**Plan:**'));
+    // New format: Summary table with headers
+    assert.ok(markdown.includes('### 📋 Resource Summary'));
+    assert.ok(markdown.includes('| Action | Count |'));
     assert.ok(markdown.includes('🟢'));
-    assert.ok(markdown.includes('to add'));
   });
 
-  test('shows no changes message when no changes', () => {
+  test('shows no changes message with GitHub alert when no changes', () => {
     const resources = [];
     const summary = { add: 0, change: 0, destroy: 0, has_changes: false };
 
     const markdown = generatePrComment({ resources, summary });
 
-    assert.ok(markdown.includes('✨ **No changes.**'));
+    // New format: GitHub alert for no changes
+    assert.ok(markdown.includes('> [!SUCCESS]'));
+    assert.ok(markdown.includes('No changes'));
   });
 
   test('includes all resource sections', () => {
@@ -250,7 +255,7 @@ describe('generatePipelineSummary', () => {
 
     // Pipeline summary should have all the same content except the marker
     assert.ok(pipelineSummary.includes('## ✅ Terraform Plan'));
-    assert.ok(pipelineSummary.includes('**Plan:**'));
+    assert.ok(pipelineSummary.includes('### 📋 Resource Summary'));
   });
 });
 

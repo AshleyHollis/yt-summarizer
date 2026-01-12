@@ -20,7 +20,7 @@ const ACTION_INDICATORS = {
 };
 
 /**
- * Build resource item with emoji indicators
+ * Build resource item with emoji indicators and task list styling
  * @param {Object} resource - Resource object
  * @returns {string} Markdown for resource item
  */
@@ -33,7 +33,7 @@ function buildResourceItem(resource) {
     .join('\n');
 
   return `<details>
-<summary>${indicator} <code>${resource.address}</code></summary>
+<summary><code>${resource.address}</code></summary>
 
 \`\`\`terraform
 ${cleanDetails || '(no details)'}
@@ -43,22 +43,22 @@ ${cleanDetails || '(no details)'}
 }
 
 /**
- * Build section for a group of resources
+ * Build section for a group of resources with enhanced formatting
  * @param {string} title - Section title
  * @param {string} emoji - Emoji for section header
+ * @param {string} icon - Icon for task list items
  * @param {Array} resources - Resources in this group
  * @returns {string[]} Markdown lines
  */
-function buildResourceSection(title, emoji, resources) {
+function buildResourceSection(title, emoji, icon, resources) {
   if (resources.length === 0) return [];
 
   const lines = [];
-  lines.push('<details>');
-  lines.push(`<summary><strong>${emoji} ${title} (${resources.length})</strong></summary>`);
+  lines.push('---');
+  lines.push('');
+  lines.push(`### ${emoji} ${title} (${resources.length})`);
   lines.push('');
   resources.forEach(r => lines.push(buildResourceItem(r)));
-  lines.push('');
-  lines.push('</details>');
   lines.push('');
   return lines;
 }
@@ -101,34 +101,49 @@ function generatePrComment(options) {
   sections.push(`## ${statusIcon} Terraform Plan`);
   sections.push('');
 
-  // Run info line with pipe separators and View Workflow link
-  sections.push(`Run [#${runNumber}](${runUrl}) | ${timestamp} | @${actor} | [View Workflow](${runUrl})`);
+  // GitHub Info banner
+  sections.push(`**Run:** [#${runNumber}](${runUrl}) | **Date:** ${timestamp} | **By:** @${actor}`);
   sections.push('');
 
-  // Resource summary with colored emoji indicators inline
+  // GitHub Alert for action (note/success/warning)
+  if (planOutcome === 'success' && !hasChanges) {
+    sections.push('> [!SUCCESS]');
+    sections.push('> ✨ No changes. Your infrastructure matches the configuration.');
+    sections.push('');
+  } else if (planOutcome === 'success' && hasChanges) {
+    sections.push('> [!NOTE]');
+    sections.push('> 📊 Infrastructure changes detected. Review the changes below.');
+    sections.push('');
+  } else {
+    sections.push('> [!ERROR]');
+    sections.push('> ❌ Terraform plan failed. Check the logs for details.');
+    sections.push('');
+  }
+
+  // Resource summary as a clean table
   if (hasChanges) {
-    const parts = [];
-    if (summary.add > 0) parts.push(`🟢 ${summary.add} to add`);
-    if (summary.change > 0) parts.push(`🟡 ${summary.change} to change`);
-    if (summary.destroy > 0) parts.push(`🔴 ${summary.destroy} to destroy`);
-    sections.push(`**Plan:** ${parts.join(' · ')}`);
+    sections.push('### 📋 Resource Summary');
+    sections.push('');
+    const tableRow = (emoji, action, count) => count > 0 ? `| ${emoji} ${action} | **${count}** |` : '';
+    sections.push('| Action | Count |');
+    sections.push('|---------|-------|');
+    sections.push(tableRow('🟢', 'Create', summary.add));
+    sections.push(tableRow('🟣', 'Replace', summary.add + summary.destroy));
+    sections.push(tableRow('🟡', 'Update', summary.change));
+    sections.push(tableRow('🔴', 'Destroy', summary.destroy));
     sections.push('');
   }
 
-  // Resource sections as collapsible groups
-  sections.push(...buildResourceSection('Create', '🟢', creates));
-  sections.push(...buildResourceSection('Replace', '🟣', replaces));
-  sections.push(...buildResourceSection('Update', '🟡', updates));
-  sections.push(...buildResourceSection('Destroy', '🔴', destroys));
-
-  if (!hasChanges) {
-    sections.push('');
-    sections.push('✨ **No changes.** Your infrastructure matches the configuration.');
-    sections.push('');
-  }
+  // Resource sections with horizontal separators
+  sections.push(...buildResourceSection('Create', '🟢', 'create', creates));
+  sections.push(...buildResourceSection('Replace', '🟣', 'replace', replaces));
+  sections.push(...buildResourceSection('Update', '🟡', 'update', updates));
+  sections.push(...buildResourceSection('Destroy', '🔴', 'destroy', destroys));
 
   // Fallback: show raw plan if no resources parsed but has changes
   if (resources.length === 0 && hasChanges) {
+    sections.push('---');
+    sections.push('');
     sections.push('<details>');
     sections.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
     sections.push('');
