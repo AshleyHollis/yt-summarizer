@@ -1,0 +1,25 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.5.7",
+  "resource_changes": [
+    {
+      "address": "aws_instance.example",
+      "type": "aws_instance",
+      "name": "example",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["no-op"],
+        "before": {
+          "ami": "ami-12345678",
+          "instance_type": "t2.micro"
+        },
+        "after": {
+          "ami": "ami-12345678",
+          "instance_type": "t2.micro"
+        },
+        "after_unknown": {}
+      }
+    }
+  ],
+  "output_changes": {}
+}

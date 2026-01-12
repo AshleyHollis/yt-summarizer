@@ -17,9 +17,10 @@ locals {
   name_prefix = "ytsumm-prd"
 
   common_tags = {
-    Environment = local.environment
-    Project     = "yt-summarizer"
-    ManagedBy   = "terraform"
+    Environment       = local.environment
+    Project           = "yt-summarizer"
+    ManagedBy         = "terraform"
+    TestPipelineDate   = "2026-01-13"
   }
 }
 

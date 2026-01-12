@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraform Plan - Run #42</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background-color: #f8f9fa;
+        color: #1f2937;
+        line-height: 1.5;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      /* Header with Terraform branding */
+      .header {
+        background: linear-gradient(135deg, #5c4ee5 0%, #4040b2 100%);
+        color: white;
+        padding: 24px 32px;
+        border-radius: 12px 12px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .header-logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .header-logo svg {
+        filter: brightness(0) invert(1);
+      }
+
+      .header-title {
+        font-size: 24px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .header-subtitle {
+        font-size: 14px;
+        opacity: 0.8;
+        margin-top: 4px;
+      }
+
+      .status-badge {
+        margin-left: auto;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .status-badge.success {
+        background: rgba(46, 176, 57, 0.2);
+        color: #7cff8d;
+      }
+
+      .status-badge.failure {
+        background: rgba(198, 43, 43, 0.2);
+        color: #ff8d8d;
+      }
+
+      /* Main content */
+      .content {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-top: none;
+        border-radius: 0 0 12px 12px;
+        padding: 24px 32px;
+      }
+
+      /* Run info bar */
+      .run-info {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 16px;
+        background: #f3f4f6;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        font-size: 14px;
+        color: #6b7280;
+        flex-wrap: wrap;
+      }
+
+      .run-info a {
+        color: #5c4ee5;
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .run-info a:hover {
+        text-decoration: underline;
+      }
+
+      .run-info-divider {
+        width: 1px;
+        height: 16px;
+        background: #d1d5db;
+      }
+
+      /* Summary stats */
+      .summary {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+
+      .summary-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 15px;
+      }
+
+      .summary-item.add {
+        background: #e5f5e7;
+        color: #2eb039;
+      }
+
+      .summary-item.change {
+        background: #fef9e5;
+        color: #d4a017;
+      }
+
+      .summary-item.destroy {
+        background: #fce8e8;
+        color: #c62b2b;
+      }
+
+      .summary-count {
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      /* Resource sections */
+      .section {
+        margin-bottom: 16px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 20px;
+        background: #f3f4f6;
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s;
+      }
+
+      .section-header:hover {
+        background: #e5e7eb;
+      }
+
+      .section-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+      }
+
+      .section-title {
+        font-weight: 600;
+        font-size: 15px;
+        flex: 1;
+      }
+
+      .section-count {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .section-chevron {
+        color: #6b7280;
+        transition: transform 0.2s;
+      }
+
+      .section.open .section-chevron {
+        transform: rotate(90deg);
+      }
+
+      .section-content {
+        display: none;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .section.open .section-content {
+        display: block;
+      }
+
+      /* Resource items */
+      .resource {
+        border-bottom: 1px solid #f3f4f6;
+      }
+
+      .resource:last-child {
+        border-bottom: none;
+      }
+
+      .resource-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .resource-header:hover {
+        background: #fafafa;
+      }
+
+      .resource-symbol {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 14px;
+        font-weight: 700;
+        width: 32px;
+        text-align: center;
+      }
+
+      .resource-address {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 13px;
+        color: #374151;
+        flex: 1;
+        word-break: break-all;
+      }
+
+      .resource-chevron {
+        color: #6b7280;
+        transition: transform 0.2s;
+      }
+
+      .resource.open .resource-chevron {
+        transform: rotate(90deg);
+      }
+
+      .resource-details {
+        display: none;
+        padding: 0 20px 16px 64px;
+      }
+
+      .resource.open .resource-details {
+        display: block;
+      }
+
+      /* Code block for resource details */
+      pre {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 16px;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      /* Syntax highlighting in code blocks */
+      .hl-add { color: #73c990; }
+      .hl-remove { color: #e06c75; }
+      .hl-change { color: #e5c07b; }
+      .hl-replace { color: #c678dd; }
+      .hl-comment { color: #7f848e; font-style: italic; }
+      .hl-string { color: #98c379; }
+      .hl-keyword { color: #61afef; }
+      .hl-value { color: #d19a66; }
+
+      /* No changes message */
+      .no-changes {
+        text-align: center;
+        padding: 48px;
+        color: #6b7280;
+      }
+
+      .no-changes-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+
+      .no-changes-text {
+        font-size: 16px;
+        font-weight: 500;
+        color: #2eb039;
+      }
+
+      /* Footer */
+      .footer {
+        text-align: center;
+        padding: 16px;
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      .footer a {
+        color: #5c4ee5;
+        text-decoration: none;
+      }
+
+      .footer a:hover {
+        text-decoration: underline;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        body {
+          padding: 10px;
+        }
+
+        .header {
+          flex-direction: column;
+          align-items: flex-start;
+          padding: 16px 20px;
+        }
+
+        .status-badge {
+          margin-left: 0;
+          margin-top: 12px;
+        }
+
+        .summary {
+          flex-direction: column;
+        }
+
+        .run-info {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        .run-info-divider {
+          display: none;
+        }
+      }
+    </style>
+
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-logo">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+    <g fill="#5c4ee5">
+      <path d="M22.4 0v20.2L40 30.4V10.2L22.4 0z"/>
+      <path d="M42.2 21.3v20.2l17.6-10.2V11.1L42.2 21.3z"/>
+      <path d="M4.2 11.1v20.2L22 41.5V21.3L4.2 11.1z"/>
+      <path d="M22.4 43.7V64l17.6-10.2V33.6l-17.6 10.1z"/>
+    </g>
+  </svg>
+        <div>
+          <div class="header-title">Terraform Plan</div>
+          <div class="header-subtitle">Infrastructure as Code</div>
+        </div>
+      </div>
+      <span class="status-badge success">✓ Plan Succeeded</span>
+    </header>
+
+    <main class="content">
+      <div class="run-info">
+        <a href="https://github.com/AshleyHollis/yt-summarizer/actions/runs/12345">Run #42</a>
+        <div class="run-info-divider"></div>
+        <span>2026-01-13 10:30:00 UTC</span>
+        <div class="run-info-divider"></div>
+        <span>by @developer</span>
+        <div class="run-info-divider"></div>
+        <a href="https://github.com/AshleyHollis/yt-summarizer/actions/runs/12345">View Workflow →</a>
+      </div>
+
+
+      <div class="summary">
+        <div class="summary-item add"><span class="summary-count">7</span> to add</div>
+        <div class="summary-item change"><span class="summary-count">12</span> to change</div>
+        <div class="summary-item destroy"><span class="summary-count">1</span> to destroy</div>
+      </div>
+
+
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background: #e5f5e7; color: #2eb039">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </div>
+        <span class="section-title">Resources to Add</span>
+        <span class="section-count" style="background: #e5f5e7; color: #2eb039">7</span>
+        <svg class="section-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="section-content">
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #2eb039">+</span>
+        <span class="resource-address">module.github_oidc.azuread_application.github_actions</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-add">+ resource "azuread_application" "github_actions" {</span>
+<span class="hl-add">+ description = "Service principal for GitHub Actions OIDC authentication"</span>
+<span class="hl-add">+ display_name = "GitHub Actions OIDC"</span>
+<span class="hl-add">+ sign_in_audience = "AzureADMyOrg"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #2eb039">+</span>
+        <span class="resource-address">module.github_oidc.azuread_application_federated_identity_credential.main</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-add">+ resource "azuread_application_federated_identity_credential" "main" {</span>
+<span class="hl-change">~ audiences = null -&gt; ["api://AzureADTokenExchange"]</span>
+<span class="hl-add">+ description = "Federated credential for main branch"</span>
+<span class="hl-add">+ display_name = "github-oidc-main"</span>
+<span class="hl-add">+ issuer = "https://token.actions.githubusercontent.com"</span>
+<span class="hl-add">+ subject = "repo:AshleyHollis/yt-summarizer:ref:refs/heads/main"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #2eb039">+</span>
+        <span class="resource-address">module.github_oidc.azuread_application_federated_identity_credential.production</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-add">+ resource "azuread_application_federated_identity_credential" "production" {</span>
+<span class="hl-change">~ audiences = null -&gt; ["api://AzureADTokenExchange"]</span>
+<span class="hl-add">+ description = "Federated credential for production environment"</span>
+<span class="hl-add">+ display_name = "github-oidc-production"</span>
+<span class="hl-add">+ issuer = "https://token.actions.githubusercontent.com"</span>
+<span class="hl-add">+ subject = "repo:AshleyHollis/yt-summarizer:environment:production"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #2eb039">+</span>
+        <span class="resource-address">module.github_oidc.azuread_application_federated_identity_credential.pull_request</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-add">+ resource "azuread_application_federated_identity_credential" "pull_request" {</span>
+<span class="hl-change">~ audiences = null -&gt; ["api://AzureADTokenExchange"]</span>
+<span class="hl-add">+ description = "Federated credential for pull requests"</span>
+<span class="hl-add">+ display_name = "github-oidc-pull-request"</span>
+<span class="hl-add">+ issuer = "https://token.actions.githubusercontent.com"</span>
+<span class="hl-add">+ subject = "repo:AshleyHollis/yt-summarizer:pull_request"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #2eb039">+</span>
+        <span class="resource-address">module.github_oidc.azuread_service_principal.github_actions</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-add">+ resource "azuread_service_principal" "github_actions" {</span>
+<span class="hl-add">+ description = "Service principal for GitHub Actions"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #2eb039">+</span>
+        <span class="resource-address">module.github_oidc.azurerm_role_assignment.acr_push[0]</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-add">+ resource "azurerm_role_assignment" "acr_push" {</span>
+<span class="hl-add">+ role_definition_name = "AcrPush"</span>
+<span class="hl-add">+ scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg/providers/Microsoft.ContainerRegistry/registries/ytsummarizerregistry"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #2eb039">+</span>
+        <span class="resource-address">module.github_oidc.azurerm_role_assignment.contributor[0]</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-add">+ resource "azurerm_role_assignment" "contributor" {</span>
+<span class="hl-add">+ role_definition_name = "Contributor"</span>
+<span class="hl-add">+ scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg"</span>
+  }</pre>
+      </div>
+    </div>
+
+      </div>
+    </div>
+
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background: #e8f1fc; color: #5c4ee5">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        </div>
+        <span class="section-title">Resources to Replace</span>
+        <span class="section-count" style="background: #e8f1fc; color: #5c4ee5">1</span>
+        <svg class="section-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="section-content">
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #5c4ee5">-/+</span>
+        <span class="resource-address">module.cdn.azurerm_cdn_profile.profile</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-replace">-/+ resource "azurerm_cdn_profile" "profile" {</span>
+<span class="hl-comment"># forces replacement</span>
+<span class="hl-change">~ sku = "Standard_Verizon" -&gt; "Standard_Microsoft"</span>
+  }</pre>
+      </div>
+    </div>
+
+      </div>
+    </div>
+
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background: #fef9e5; color: #d4a017">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <span class="section-title">Resources to Update</span>
+        <span class="section-count" style="background: #fef9e5; color: #d4a017">11</span>
+        <svg class="section-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="section-content">
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.acr.azurerm_container_registry.acr</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_container_registry" "acr" {</span>
+<span class="hl-change">~ sku = "Basic" -&gt; "Standard"</span>
+<span class="hl-change">~ tags {</span>
+<span class="hl-add">    + managed-by = "terraform"</span>
+  }
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.aks.azurerm_kubernetes_cluster.aks</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_kubernetes_cluster" "aks" {</span>
+<span class="hl-change">~ default_node_pool {</span>
+<span class="hl-change">    ~ node_count = 2 -&gt; 3</span>
+  }
+<span class="hl-change">~ kubernetes_version = "1.28.5" -&gt; "1.29.0"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.key_vault.azurerm_key_vault_secret.secrets["sql-connection-string"]</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_key_vault_secret" "secrets" {</span>
+<span class="hl-change">~ content_type = "text/plain" -&gt; "application/x-connection-string"</span>
+<span class="hl-change">~ expiration_date = null -&gt; "2025-12-31T23:59:59Z"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.sql.azurerm_mssql_database.database</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_mssql_database" "database" {</span>
+<span class="hl-change">~ max_size_gb = 2 -&gt; 10</span>
+<span class="hl-change">~ sku_name = "Basic" -&gt; "S0"</span>
+<span class="hl-change">~ storage_account_type = "Local" -&gt; "Geo"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.sql.azurerm_mssql_server.server</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_mssql_server" "server" {</span>
+<span class="hl-change">~ minimum_tls_version = "1.0" -&gt; "1.2"</span>
+<span class="hl-change">~ public_network_access_enabled = true -&gt; false</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.storage.azurerm_storage_account.storage</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_storage_account" "storage" {</span>
+<span class="hl-change">~ account_replication_type = "LRS" -&gt; "GRS"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.storage.azurerm_storage_container.containers["embeddings"]</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_storage_container" "containers" {</span>
+<span class="hl-change">~ container_access_type = "private" -&gt; "blob"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.storage.azurerm_storage_container.containers["summaries"]</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_storage_container" "containers" {</span>
+<span class="hl-change">~ container_access_type = "private" -&gt; "blob"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.storage.azurerm_storage_container.containers["transcripts"]</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_storage_container" "containers" {</span>
+<span class="hl-change">~ container_access_type = "private" -&gt; "blob"</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.storage.azurerm_storage_queue.queues["embed-queue"]</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_storage_queue" "queues" {</span>
+<span class="hl-add">+ metadata = {"purpose":"embedding-jobs"}</span>
+  }</pre>
+      </div>
+    </div>
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #d4a017">~</span>
+        <span class="resource-address">module.swa.azurerm_static_web_app.swa</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-change">~ resource "azurerm_static_web_app" "swa" {</span>
+<span class="hl-change">~ sku_size = "Free" -&gt; "Standard"</span>
+<span class="hl-change">~ sku_tier = "Free" -&gt; "Standard"</span>
+  }</pre>
+      </div>
+    </div>
+
+      </div>
+    </div>
+
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background: #fce8e8; color: #c62b2b">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </div>
+        <span class="section-title">Resources to Destroy</span>
+        <span class="section-count" style="background: #fce8e8; color: #c62b2b">1</span>
+        <svg class="section-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="section-content">
+
+    <div class="resource">
+      <div class="resource-header">
+        <span class="resource-symbol" style="color: #c62b2b">-</span>
+        <span class="resource-address">module.key_vault.azurerm_role_assignment.secrets_officer[0]</span>
+        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="resource-details">
+        <pre><span class="hl-remove">- resource "azurerm_role_assignment" "secrets_officer" {</span>
+<span class="hl-remove">- id = "/subscriptions/12345678-1234-1234-1234-123456789abc/providers/Microsoft.Authorization/roleAssignments/abcdef12-3456-7890-abcd-ef1234567890"</span>
+<span class="hl-remove">- principal_id = "old-principal-id"</span>
+<span class="hl-remove">- role_definition_name = "Key Vault Secrets Officer"</span>
+<span class="hl-remove">- scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg/providers/Microsoft.KeyVault/vaults/ytsummarizerkv"</span>
+  }</pre>
+      </div>
+    </div>
+
+      </div>
+    </div>
+
+
+    </main>
+
+    <footer class="footer">
+      <p>Generated by <a href="https://github.com/hashicorp/terraform">Terraform</a> Plan Visualizer</p>
+    </footer>
+  </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Toggle sections
+        document.querySelectorAll('.section-header').forEach(function(header) {
+          header.addEventListener('click', function() {
+            this.parentElement.classList.toggle('open');
+          });
+        });
+
+        // Toggle resources
+        document.querySelectorAll('.resource-header').forEach(function(header) {
+          header.addEventListener('click', function() {
+            this.parentElement.classList.toggle('open');
+          });
+        });
+
+        // Open first section and first resource by default
+        var firstSection = document.querySelector('.section');
+        if (firstSection) {
+          firstSection.classList.add('open');
+          var firstResource = firstSection.querySelector('.resource');
+          if (firstResource) {
+            firstResource.classList.add('open');
+          }
+        }
+      });
+    </script>
+
+</body>
+</html>

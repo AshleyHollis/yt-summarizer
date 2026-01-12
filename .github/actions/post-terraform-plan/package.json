@@ -1,0 +1,27 @@
+{
+  "name": "post-terraform-plan",
+  "version": "1.0.0",
+  "description": "GitHub Action to post Terraform plan to PR comments with beautiful formatting",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node tests/parser.test.js && node tests/markdown.test.js",
+    "test:parser": "node tests/parser.test.js",
+    "test:markdown": "node tests/markdown.test.js",
+    "test:ui": "npx playwright test tests/ui.spec.js",
+    "test:all": "npm run test && npm run test:ui",
+    "preview": "node src/generate-preview.js --fixture realistic",
+    "preview:all": "node src/generate-preview.js --fixture realistic && node src/generate-preview.js --fixture no-changes && node src/generate-preview.js --fixture create-only",
+    "open-preview": "node src/generate-preview.js --fixture realistic && start preview/realistic-preview.html"
+  },
+  "keywords": [
+    "terraform",
+    "github-actions",
+    "pr-comment",
+    "infrastructure"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}
