@@ -164,7 +164,7 @@ jobs:
             </details>
 
             ---
-            <sub>Pushed by: @\${{ github.actor }} • Plan: ` + '`' + planOutcome + '`' + ` • [View Run](https://github.com/\${{ github.repository }}/actions/runs/\${{ github.run_id }})</sub>`;
+            <sub>Pushed by: @${context.actor} • Plan: ${planOutcome} • [View Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})</sub>;
 
             // Find and update existing comment or create new one
             const { data: comments } = await github.rest.issues.listComments({
