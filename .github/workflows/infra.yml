@@ -144,7 +144,7 @@ jobs:
             // Build formatted summary (Terraform Cloud style)
             let changesSummary = '';
             let summaryIcon = '✨';
-            
+
             if (!hasChanges) {
               summaryIcon = '✅';
               changesSummary = `${summaryIcon} No changes. Infrastructure matches the plan.`;
