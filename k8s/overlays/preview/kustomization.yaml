@@ -1,8 +1,8 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #9
-# Image Tag: sha-9116ea1
-# Commit: aadd96da0b095195bbc11ae486f600ce6e2cf507
-# Updated: 2026-01-12T03:51:50Z
+# Image Tag: sha-07bbad4
+# Commit: 1a535f61e41425cdf4149037bffd72d59a3157ee
+# Updated: 2026-01-12T04:59:45Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -29,8 +29,8 @@ images:
   - 
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: sha-9116ea1
+    newTag: sha-07bbad4
   - 
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: sha-9116ea1
+    newTag: sha-07bbad4
