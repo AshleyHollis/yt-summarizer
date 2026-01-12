@@ -119,7 +119,7 @@ runs:
           function buildResourceSection(resource) {
             const actionColors = {
               create: '#22c55e',
-              update: '#f59e0b', 
+              update: '#f59e0b',
               replace: '#a855f7',
               destroy: '#ef4444'
             };
@@ -132,7 +132,7 @@ runs:
             const color = actionColors[resource.action] || '#6b7280';
             const symbol = actionSymbols[resource.action] || 'read';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
-            
+
             return `<details>\n<summary>` +
               `<strong style="color:${color};">${symbol}</strong> ` +
               `<code>${resource.address}</code>` +
@@ -181,7 +181,7 @@ runs:
               sections.push(`| <span style="color:#ef4444;">**- Destroy**</span> | **${summary.destroy}** |`);
             }
             sections.push('');
-            
+
             // Navigation hint
             sections.push('> 💡 **Tip:** Click on sections below to expand/collapse resource details');
             sections.push('');
@@ -206,7 +206,7 @@ runs:
             sections.push('</details>');
             sections.push('');
           }
-          
+
           if (replaces.length > 0) {
             sections.push(`### <span style="color:#a855f7;">♻️ Resources to Replace</span> <sup>${replaces.length}</sup>`);
             sections.push('');
@@ -217,7 +217,7 @@ runs:
             sections.push('</details>');
             sections.push('');
           }
-          
+
           if (updates.length > 0) {
             sections.push(`### <span style="color:#f59e0b;">🔄 Resources to Update</span> <sup>${updates.length}</sup>`);
             sections.push('');
@@ -228,7 +228,7 @@ runs:
             sections.push('</details>');
             sections.push('');
           }
-          
+
           if (destroys.length > 0) {
             sections.push(`### <span style="color:#ef4444;">🗑️ Resources to Destroy</span> <sup>${destroys.length}</sup>`);
             sections.push('');
@@ -382,7 +382,7 @@ runs:
             const color = actionColors[resource.action] || '#6b7280';
             const symbol = actionSymbols[resource.action] || 'read';
             const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
-            
+
             return `<details>\n<summary>` +
               `<strong style="color:${color};">${symbol}</strong> ` +
               `<code>${resource.address}</code>` +
@@ -426,7 +426,7 @@ runs:
               lines.push(`| <span style="color:#ef4444;">**- Destroy**</span> | **${summary.destroy}** |`);
             }
             lines.push('');
-            
+
             lines.push('> 💡 **Tip:** Click on sections below to expand/collapse resource details');
             lines.push('');
           } else {
