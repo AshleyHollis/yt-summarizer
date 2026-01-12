@@ -72,7 +72,7 @@ runs:
 
             for (let i = 0; i < lines.length; i++) {
               const line = lines[i];
-              
+
               // Match resource header: # resource.address will be created/updated/etc
               const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
               if (resourceMatch) {
@@ -80,14 +80,14 @@ runs:
                 if (currentResource && currentDetails.length > 0) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                 }
-                
+
                 const actionText = resourceMatch[3];
                 let action = 'read';
                 if (actionText === 'created') action = 'create';
                 else if (actionText === 'updated in-place') action = 'update';
                 else if (actionText === 'replaced') action = 'replace';
                 else if (actionText === 'destroyed') action = 'destroy';
-                
+
                 currentResource = { address: resourceMatch[1], action };
                 currentDetails = [];
                 continue;
@@ -108,12 +108,12 @@ runs:
                 currentDetails.push(line);
               }
             }
-            
+
             // Save the last resource if exists
             if (currentResource && currentDetails.length > 0) {
               resources.push({ ...currentResource, details: currentDetails.join('\n') });
             }
-            
+
             return resources;
           }
 
@@ -296,7 +296,7 @@ runs:
 
             for (let i = 0; i < lines.length; i++) {
               const line = lines[i];
-              
+
               // Match resource header: # resource.address will be created/updated/etc
               const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
               if (resourceMatch) {
@@ -304,14 +304,14 @@ runs:
                 if (currentResource && currentDetails.length > 0) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                 }
-                
+
                 const actionText = resourceMatch[3];
                 let action = 'read';
                 if (actionText === 'created') action = 'create';
                 else if (actionText === 'updated in-place') action = 'update';
                 else if (actionText === 'replaced') action = 'replace';
                 else if (actionText === 'destroyed') action = 'destroy';
-                
+
                 currentResource = { address: resourceMatch[1], action };
                 currentDetails = [];
                 continue;
@@ -332,12 +332,12 @@ runs:
                 currentDetails.push(line);
               }
             }
-            
+
             // Save the last resource if exists
             if (currentResource && currentDetails.length > 0) {
               resources.push({ ...currentResource, details: currentDetails.join('\n') });
             }
-            
+
             return resources;
           }
 
