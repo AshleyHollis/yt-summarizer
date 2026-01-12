@@ -152,19 +152,19 @@ jobs:
 
             const body = `## Terraform Plan ${statusEmoji}
 
-### 📊 Plan Summary
-${changesSummary}
+            ### 📊 Plan Summary
+            ${changesSummary}
 
-<details>
-<summary><strong>📋 View Full Plan</strong></summary>
+            <details>
+            <summary><strong>📋 View Full Plan</strong></summary>
 
-#### Plan Output
-` + '```terraform\n' + truncatedPlan + '\n```' + `
+            #### Plan Output
+            ` + '```terraform\n' + truncatedPlan + '\n```' + `
 
-</details>
+            </details>
 
----
-<sub>Pushed by: @\${{ github.actor }} • Plan: ` + '`' + planOutcome + '`' + ` • [View Run](https://github.com/\${{ github.repository }}/actions/runs/\${{ github.run_id }})</sub>`;
+            ---
+            <sub>Pushed by: @\${{ github.actor }} • Plan: ` + '`' + planOutcome + '`' + ` • [View Run](https://github.com/\${{ github.repository }}/actions/runs/\${{ github.run_id }})</sub>`;
 
             // Find and update existing comment or create new one
             const { data: comments } = await github.rest.issues.listComments({
