@@ -129,8 +129,92 @@ runs:
             
             # Check if application is even running a sync operation
             OPERATION_RUNNING=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
+            OPERATION_MSG=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.message}' 2>/dev/null || echo "")
+            
             if [ "$OPERATION_RUNNING" = "Running" ]; then
               echo "  ⏳ Sync operation in progress..."
+              
+              # CRITICAL: Check if stuck waiting for hook job
+              if [[ "$OPERATION_MSG" == *"waiting for completion of hook"* ]]; then
+                echo "  ⚠️ Waiting for sync hook to complete: ${OPERATION_MSG}"
+                
+                # Extract hook job name from message (e.g., "waiting for completion of hook batch/Job/db-migration")
+                HOOK_JOB=$(echo "$OPERATION_MSG" | grep -oP '(?<=hook batch/Job/)[^ ]+' || echo "")
+                if [ -n "$HOOK_JOB" ]; then
+                  echo "  🔍 Checking hook job status: ${HOOK_JOB}"
+                  
+                  # Check job status in the namespace
+                  if kubectl get job ${HOOK_JOB} -n ${NAMESPACE} &>/dev/null; then
+                    JOB_SUCCEEDED=$(kubectl get job ${HOOK_JOB} -n ${NAMESPACE} -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
+                    JOB_FAILED=$(kubectl get job ${HOOK_JOB} -n ${NAMESPACE} -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+                    JOB_ACTIVE=$(kubectl get job ${HOOK_JOB} -n ${NAMESPACE} -o jsonpath='{.status.active}' 2>/dev/null || echo "0")
+                    
+                    echo "    Job Status: Succeeded=${JOB_SUCCEEDED}, Failed=${JOB_FAILED}, Active=${JOB_ACTIVE}"
+                    
+                    # FAIL FAST: If job has failed pods, get pod logs immediately
+                    if [ "$JOB_FAILED" -gt 0 ] || [ "$JOB_ACTIVE" -eq 0 -a "$JOB_SUCCEEDED" -eq 0 ]; then
+                      echo "::error::❌ Hook job ${HOOK_JOB} has failed or is not progressing!"
+                      
+                      # Get pod logs to understand the failure
+                      echo ""
+                      echo "::group::🔴 Hook Job Pod Logs"
+                      POD_NAME=$(kubectl get pods -n ${NAMESPACE} -l job-name=${HOOK_JOB} --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+                      if [ -n "$POD_NAME" ]; then
+                        echo "Pod: ${POD_NAME}"
+                        kubectl describe pod ${POD_NAME} -n ${NAMESPACE} 2>/dev/null || echo "Cannot describe pod"
+                        echo ""
+                        echo "--- Container Logs ---"
+                        kubectl logs ${POD_NAME} -n ${NAMESPACE} --all-containers=true 2>/dev/null || echo "Cannot get logs"
+                      else
+                        echo "Cannot find pod for job ${HOOK_JOB}"
+                      fi
+                      echo "::endgroup::"
+                      
+                      # Get job details
+                      echo ""
+                      echo "::group::🔴 Hook Job Details"
+                      kubectl describe job ${HOOK_JOB} -n ${NAMESPACE} 2>/dev/null || echo "Cannot describe job"
+                      echo "::endgroup::"
+                      
+                      exit 1
+                    fi
+                    
+                    # Show pod status for active jobs
+                    if [ "$JOB_ACTIVE" -gt 0 ]; then
+                      POD_NAME=$(kubectl get pods -n ${NAMESPACE} -l job-name=${HOOK_JOB} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                      if [ -n "$POD_NAME" ]; then
+                        POD_PHASE=$(kubectl get pod ${POD_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                        POD_REASON=$(kubectl get pod ${POD_NAME} -n ${NAMESPACE} -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null || echo "")
+                        echo "    Active Pod: ${POD_NAME} (Phase: ${POD_PHASE})"
+                        if [ -n "$POD_REASON" ]; then
+                          echo "    Container State: ${POD_REASON}"
+                          
+                          # FAIL FAST: Detect common fatal errors
+                          case "$POD_REASON" in
+                            ImagePullBackOff|ErrImagePull)
+                              echo "::error::❌ Hook job pod cannot pull image!"
+                              kubectl describe pod ${POD_NAME} -n ${NAMESPACE} 2>/dev/null | grep -A 10 "Events:" || true
+                              exit 1
+                              ;;
+                            CrashLoopBackOff)
+                              echo "::error::❌ Hook job pod is crash looping!"
+                              kubectl logs ${POD_NAME} -n ${NAMESPACE} --previous 2>/dev/null || kubectl logs ${POD_NAME} -n ${NAMESPACE} 2>/dev/null || echo "Cannot get logs"
+                              exit 1
+                              ;;
+                            CreateContainerConfigError)
+                              echo "::error::❌ Hook job pod has container config error!"
+                              kubectl describe pod ${POD_NAME} -n ${NAMESPACE} 2>/dev/null | grep -A 10 "Events:" || true
+                              exit 1
+                              ;;
+                          esac
+                        fi
+                      fi
+                    fi
+                  else
+                    echo "  ⚠️ Hook job ${HOOK_JOB} not found in namespace ${NAMESPACE}"
+                  fi
+                fi
+              fi
             elif [ "$OPERATION_RUNNING" = "Succeeded" ]; then
               echo "  ✅ Last sync operation succeeded"
             elif [ "$OPERATION_RUNNING" = "None" ] && [ "$SYNC_STATUS" != "Synced" ]; then
