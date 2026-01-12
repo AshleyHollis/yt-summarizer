@@ -99,7 +99,7 @@ describe('buildResourceItem', () => {
     assert.ok(markdown.includes('<code>module.vpc.aws_subnet.private</code>'));
   });
 
-  test('includes terraform code block', () => {
+  test('includes hcl code block', () => {
     const resource = {
       address: 'test',
       action: 'create',
@@ -108,25 +108,25 @@ describe('buildResourceItem', () => {
 
     const markdown = buildResourceItem(resource);
 
-    assert.ok(markdown.includes('```terraform'));
+    assert.ok(markdown.includes('```hcl'));
     assert.ok(markdown.includes('```'));
   });
 
-  test('includes resource address for each action type', () => {
+  test('includes emoji for each action type', () => {
     const actions = ['create', 'update', 'replace', 'destroy'];
+    const emojis = { create: '🟢', update: '🟡', replace: '🟣', destroy: '🔴' };
 
     actions.forEach(action => {
       const resource = { address: 'test.resource', action, details: 'test' };
       const markdown = buildResourceItem(resource);
-      // Resource item now just shows the address without the action indicator
-      assert.ok(markdown.includes('<code>test.resource</code>'));
+      assert.ok(markdown.includes(emojis[action]), `Missing emoji for ${action}`);
     });
   });
 });
 
 describe('buildResourceSection', () => {
   test('returns empty array for empty resources', () => {
-    const lines = buildResourceSection('Create', '🟢', 'create', []);
+    const lines = buildResourceSection('Create', 'create', []);
     assert.strictEqual(lines.length, 0);
   });
 
@@ -136,10 +136,11 @@ describe('buildResourceSection', () => {
       { address: 'b', action: 'create', details: 'test' }
     ];
 
-    const lines = buildResourceSection('Create', '🟢', 'create', resources);
+    const lines = buildResourceSection('Resources to Create', 'create', resources);
     const markdown = lines.join('\n');
 
-    assert.ok(markdown.includes('🟢 Create (2)'));
+    assert.ok(markdown.includes('Resources to Create'));
+    assert.ok(markdown.includes('2'));
     assert.ok(markdown.includes('<details>'));
   });
 });
@@ -162,8 +163,9 @@ describe('generatePrComment', () => {
     const successMd = generatePrComment({ resources, summary, planOutcome: 'success' });
     const failureMd = generatePrComment({ resources, summary, planOutcome: 'failure' });
 
-    assert.ok(successMd.includes('## ✅ Terraform Plan'));
-    assert.ok(failureMd.includes('## ❌ Terraform Plan'));
+    // New format: h1 header
+    assert.ok(successMd.includes('# ✅ Terraform Plan'));
+    assert.ok(failureMd.includes('# ❌ Terraform Plan'));
   });
 
   test('includes run info line', () => {
@@ -178,33 +180,40 @@ describe('generatePrComment', () => {
       actor: 'testuser'
     });
 
-    // New format: **Run:** [#42](url) | **Date:** ... | **By:** @actor
-    assert.ok(markdown.includes('**Run:** [#42]'));
+    // New format: blockquote with run info
+    assert.ok(markdown.includes('Run [#42]'));
     assert.ok(markdown.includes('@testuser'));
-    assert.ok(markdown.includes('**By:**'));
   });
 
-  test('includes summary table for changes', () => {
+  test('includes badges for changes', () => {
     const planJson = loadFixture('realistic');
     const resources = parseJsonPlan(planJson);
     const summary = calculateSummary(resources);
 
     const markdown = generatePrComment({ resources, summary });
 
-    // New format: Summary table with headers
-    assert.ok(markdown.includes('### 📋 Resource Summary'));
-    assert.ok(markdown.includes('| Action | Count |'));
-    assert.ok(markdown.includes('🟢'));
+    // New format: shields.io badges
+    assert.ok(markdown.includes('img.shields.io/badge'));
   });
 
-  test('shows no changes message with GitHub alert when no changes', () => {
+  test('includes diff block for summary', () => {
+    const planJson = loadFixture('realistic');
+    const resources = parseJsonPlan(planJson);
+    const summary = calculateSummary(resources);
+
+    const markdown = generatePrComment({ resources, summary });
+
+    // New format: diff code block
+    assert.ok(markdown.includes('```diff'));
+    assert.ok(markdown.includes('+ ') || markdown.includes('to add'));
+  });
+
+  test('shows no changes message when no changes', () => {
     const resources = [];
     const summary = { add: 0, change: 0, destroy: 0, has_changes: false };
 
     const markdown = generatePrComment({ resources, summary });
 
-    // New format: GitHub alert for no changes
-    assert.ok(markdown.includes('> [!SUCCESS]'));
     assert.ok(markdown.includes('No changes'));
   });
 
@@ -215,10 +224,11 @@ describe('generatePrComment', () => {
 
     const markdown = generatePrComment({ resources, summary });
 
-    assert.ok(markdown.includes('🟢 Create'));
-    assert.ok(markdown.includes('🟡 Update'));
-    assert.ok(markdown.includes('🔴 Destroy'));
-    assert.ok(markdown.includes('🟣 Replace'));
+    // New format: section headers with icons
+    assert.ok(markdown.includes('Resources to Create'));
+    assert.ok(markdown.includes('Resources to Update'));
+    assert.ok(markdown.includes('Resources to Destroy'));
+    assert.ok(markdown.includes('Resources to Replace'));
   });
 
   test('includes all resource addresses', () => {
@@ -254,8 +264,8 @@ describe('generatePipelineSummary', () => {
     const pipelineSummary = generatePipelineSummary({ resources, summary });
 
     // Pipeline summary should have all the same content except the marker
-    assert.ok(pipelineSummary.includes('## ✅ Terraform Plan'));
-    assert.ok(pipelineSummary.includes('### 📋 Resource Summary'));
+    assert.ok(pipelineSummary.includes('# ✅ Terraform Plan'));
+    assert.ok(pipelineSummary.includes('```diff'));
   });
 });
 

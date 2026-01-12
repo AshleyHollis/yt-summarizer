@@ -2,6 +2,7 @@
  * Markdown Generator for Terraform Plan
  *
  * Generates GitHub-flavored markdown for Terraform plan output.
+ * Optimized for visual appeal within GitHub's markdown constraints.
  */
 
 const { groupResourcesByAction } = require('./terraform-plan-parser');
@@ -20,23 +21,41 @@ const ACTION_INDICATORS = {
 };
 
 /**
- * Build resource item with emoji indicators and task list styling
+ * Action styling for sections
+ */
+const ACTION_STYLES = {
+  create: { emoji: '🟢', icon: '➕', badge: '2eb039', label: 'CREATE' },
+  update: { emoji: '🟡', icon: '✏️', badge: 'd4a017', label: 'UPDATE' },
+  replace: { emoji: '🟣', icon: '🔄', badge: '5c4ee5', label: 'REPLACE' },
+  destroy: { emoji: '🔴', icon: '🗑️', badge: 'c62b2b', label: 'DESTROY' }
+};
+
+/**
+ * Generate a badge image URL
+ */
+function badge(label, value, color) {
+  return `![${label}](https://img.shields.io/badge/${encodeURIComponent(label)}-${value}-${color}?style=flat-square)`;
+}
+
+/**
+ * Build resource item with clean formatting
  * @param {Object} resource - Resource object
  * @returns {string} Markdown for resource item
  */
 function buildResourceItem(resource) {
-  const indicator = ACTION_INDICATORS[resource.action] || '⚪ `?`';
+  const style = ACTION_STYLES[resource.action] || ACTION_STYLES.update;
   const cleanDetails = resource.details
     .split('\n')
     .filter(l => l.trim())
     .map(l => l.replace(/^\s{4}/, ''))
     .join('\n');
 
-  return `<details>
-<summary><code>${resource.address}</code></summary>
+  return `
+<details>
+<summary>${style.emoji} <code>${resource.address}</code></summary>
 
-\`\`\`terraform
-${cleanDetails || '(no details)'}
+\`\`\`hcl
+${cleanDetails || '# (no changes detected)'}
 \`\`\`
 
 </details>`;
@@ -45,20 +64,22 @@ ${cleanDetails || '(no details)'}
 /**
  * Build section for a group of resources with enhanced formatting
  * @param {string} title - Section title
- * @param {string} emoji - Emoji for section header
- * @param {string} icon - Icon for task list items
+ * @param {string} action - Action type (create, update, replace, destroy)
  * @param {Array} resources - Resources in this group
  * @returns {string[]} Markdown lines
  */
-function buildResourceSection(title, emoji, icon, resources) {
+function buildResourceSection(title, action, resources) {
   if (resources.length === 0) return [];
 
+  const style = ACTION_STYLES[action] || ACTION_STYLES.update;
   const lines = [];
-  lines.push('---');
+
   lines.push('');
-  lines.push(`### ${emoji} ${title} (${resources.length})`);
+  lines.push(`### ${style.icon} ${title} · ${resources.length}`);
   lines.push('');
+
   resources.forEach(r => lines.push(buildResourceItem(r)));
+
   lines.push('');
   return lines;
 }
@@ -96,56 +117,65 @@ function generatePrComment(options) {
   sections.push(COMMENT_MARKER);
   sections.push('');
 
-  // Header - "Terraform Plan" with status icon
+  // Header with Terraform branding
   const statusIcon = planOutcome === 'success' ? '✅' : '❌';
-  sections.push(`## ${statusIcon} Terraform Plan`);
+  sections.push(`# ${statusIcon} Terraform Plan`);
   sections.push('');
 
-  // GitHub Info banner
-  sections.push(`**Run:** [#${runNumber}](${runUrl}) | **Date:** ${timestamp} | **By:** @${actor}`);
+  // Run info as a subtle line
+  sections.push(`> 📋 **Run [#${runNumber}](${runUrl})** · ${timestamp} · @${actor}`);
   sections.push('');
 
-  // GitHub Alert for action (note/success/warning)
-  if (planOutcome === 'success' && !hasChanges) {
-    sections.push('> [!SUCCESS]');
-    sections.push('> ✨ No changes. Your infrastructure matches the configuration.');
-    sections.push('');
-  } else if (planOutcome === 'success' && hasChanges) {
-    sections.push('> [!NOTE]');
-    sections.push('> 📊 Infrastructure changes detected. Review the changes below.');
-    sections.push('');
-  } else {
-    sections.push('> [!ERROR]');
-    sections.push('> ❌ Terraform plan failed. Check the logs for details.');
-    sections.push('');
-  }
-
-  // Resource summary as a clean table
+  // Summary badges for visual impact
   if (hasChanges) {
-    sections.push('### 📋 Resource Summary');
+    const badges = [];
+    if (summary.add > 0) badges.push(badge('add', summary.add, '2eb039'));
+    if (summary.change > 0) badges.push(badge('change', summary.change, 'd4a017'));
+    if (summary.destroy > 0) badges.push(badge('destroy', summary.destroy, 'c62b2b'));
+
+    sections.push(badges.join(' '));
     sections.push('');
-    const tableRow = (emoji, action, count) => count > 0 ? `| ${emoji} ${action} | **${count}** |` : '';
-    sections.push('| Action | Count |');
-    sections.push('|---------|-------|');
-    sections.push(tableRow('🟢', 'Create', summary.add));
-    sections.push(tableRow('🟣', 'Replace', summary.add + summary.destroy));
-    sections.push(tableRow('🟡', 'Update', summary.change));
-    sections.push(tableRow('🔴', 'Destroy', summary.destroy));
+
+    // Visual summary bar
+    const total = summary.add + summary.change + summary.destroy;
+    sections.push('```diff');
+    if (summary.add > 0) sections.push(`+ ${summary.add} to add`);
+    if (summary.change > 0) sections.push(`! ${summary.change} to change`);
+    if (summary.destroy > 0) sections.push(`- ${summary.destroy} to destroy`);
+    sections.push('```');
     sections.push('');
   }
 
-  // Resource sections with horizontal separators
-  sections.push(...buildResourceSection('Create', '🟢', 'create', creates));
-  sections.push(...buildResourceSection('Replace', '🟣', 'replace', replaces));
-  sections.push(...buildResourceSection('Update', '🟡', 'update', updates));
-  sections.push(...buildResourceSection('Destroy', '🔴', 'destroy', destroys));
+  // No changes - success message
+  if (!hasChanges) {
+    sections.push('```');
+    sections.push('✨ No changes. Your infrastructure matches the configuration.');
+    sections.push('```');
+    sections.push('');
+  }
+
+  // Resource sections
+  if (creates.length > 0) {
+    sections.push(...buildResourceSection('Resources to Create', 'create', creates));
+  }
+
+  if (replaces.length > 0) {
+    sections.push(...buildResourceSection('Resources to Replace', 'replace', replaces));
+  }
+
+  if (updates.length > 0) {
+    sections.push(...buildResourceSection('Resources to Update', 'update', updates));
+  }
+
+  if (destroys.length > 0) {
+    sections.push(...buildResourceSection('Resources to Destroy', 'destroy', destroys));
+  }
 
   // Fallback: show raw plan if no resources parsed but has changes
   if (resources.length === 0 && hasChanges) {
-    sections.push('---');
     sections.push('');
     sections.push('<details>');
-    sections.push('<summary><strong>📋 Raw Plan Output</strong></summary>');
+    sections.push('<summary>📋 <strong>Raw Plan Output</strong></summary>');
     sections.push('');
     sections.push('```json');
     sections.push(planJson.length > 60000 ? planJson.substring(0, 60000) + '\n...(truncated)' : planJson);
@@ -153,6 +183,11 @@ function generatePrComment(options) {
     sections.push('</details>');
     sections.push('');
   }
+
+  // Footer
+  sections.push('---');
+  sections.push(`<sub>🔗 [View full workflow run](${runUrl})</sub>`);
+  sections.push('');
 
   return sections.join('\n');
 }
