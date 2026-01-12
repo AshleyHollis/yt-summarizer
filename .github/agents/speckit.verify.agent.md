@@ -1,6 +1,12 @@
-﻿```chatagent
----
+﻿---
 description: Run complete test verification to ensure implementation works correctly - ALL AUTOMATED
+tools:
+  - read
+  - search
+  - execute
+  - aspire/*
+  - playwright/*
+target: vscode
 ---
 
 ## User Input

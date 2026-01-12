@@ -1,4 +1,6 @@
-# Copilot instructions
+# Copilot Instructions
+
+> **Note**: This file provides Aspire-specific guidance for AI coding agents. For comprehensive repository-wide instructions including available tools, scripts, and workflows, see [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
 This repository is set up to use Aspire. Aspire is an orchestrator for the entire application and will take care of configuring dependencies, building, and running the application. The resources that make up the application are defined in `apphost.cs` including application code and external dependencies.
 

@@ -1,5 +1,15 @@
 ---
 description: Execute the implementation plan by processing and executing all tasks defined in tasks.md
+tools:
+  - read
+  - edit
+  - search
+  - execute
+  - github/*
+  - playwright/*
+  - aspire/*
+  - pylance/*
+target: vscode
 ---
 
 ## User Input

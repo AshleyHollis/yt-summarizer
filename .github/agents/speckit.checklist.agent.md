@@ -1,5 +1,11 @@
 ---
 description: Generate a custom checklist for the current feature based on user requirements.
+tools:
+  - read
+  - edit
+  - search
+  - execute
+target: vscode
 ---
 
 ## Checklist Purpose: "Unit Tests for English"
