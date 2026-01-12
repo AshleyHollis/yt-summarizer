@@ -150,21 +150,26 @@ jobs:
               ? formattedPlan.substring(0, maxLength) + '\n\n... (output truncated)'
               : formattedPlan;
 
-            const body = `## Terraform Plan ${statusEmoji}
-
-            ### 📊 Plan Summary
-            ${changesSummary}
-
-            <details>
-            <summary><strong>📋 View Full Plan</strong></summary>
-
-            #### Plan Output
-            ` + '```terraform\n' + truncatedPlan + '\n```' + `
-
-            </details>
-
-            ---
-            <sub>Pushed by: @${context.actor} • Plan: ${planOutcome} • [View Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})</sub>;
+            const lines = [
+              `## Terraform Plan ${statusEmoji}`,
+              '',
+              '### 📊 Plan Summary',
+              `${changesSummary}`,
+              '',
+              '<details>',
+              '<summary><strong>📋 View Full Plan</strong></summary>',
+              '',
+              '#### Plan Output',
+              '```terraform',
+              truncatedPlan,
+              '```',
+              '',
+              '</details>',
+              '',
+              '---',
+              `<sub>Pushed by: @${context.actor} • Plan: ${planOutcome} • [View Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})</sub>`
+            ];
+            const body = lines.join('\n');
 
             // Find and update existing comment or create new one
             const { data: comments } = await github.rest.issues.listComments({
