@@ -127,82 +127,149 @@ jobs:
           retries: 3
           script: |
             const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
-            const formattedPlan = process.env.FORMATTED_PLAN || 'No plan output available';
+            const rawPlan = process.env.FORMATTED_PLAN || 'No plan output available';
             const planOutcome = process.env.PLAN_OUTCOME;
 
             core.info(`🔍 Plan Outcome: ${planOutcome}`);
             core.info(`📊 Summary: Add=${summary.add}, Change=${summary.change}, Destroy=${summary.destroy}`);
-            core.info(`🔗 Issue Number: ${context.issue.number}`);
-            core.info(`🏷️ Run ID: ${context.runId}`);
 
-            // Determine status and styling
             const statusEmoji = planOutcome === 'success' ? '✅' : '❌';
-            const statusColor = planOutcome === 'success' ? 'success' : 'danger';
-            const statusLabel = planOutcome === 'success' ? 'Success' : 'Failed';
+            const statusText = planOutcome === 'success' ? 'Plan finished' : 'Plan failed';
             const hasChanges = summary.has_changes;
 
-            // Build formatted summary (Terraform Cloud style)
-            let changesSummary = '';
-            let summaryIcon = '✨';
+            // Parse resources from terraform plan output
+            function parseResources(planOutput) {
+              const resources = [];
+              const lines = planOutput.split('\n');
+              let currentResource = null;
+              let currentDetails = [];
+              let inResource = false;
 
-            if (!hasChanges) {
-              summaryIcon = '✅';
-              changesSummary = `${summaryIcon} No changes. Infrastructure matches the plan.`;
+              for (const line of lines) {
+                // Match "# resource.name will be created/updated/destroyed"
+                const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
+                if (resourceMatch) {
+                  if (currentResource) {
+                    resources.push({ ...currentResource, details: currentDetails.join('\n') });
+                  }
+                  const actionText = resourceMatch[3];
+                  let action = 'read';
+                  if (actionText === 'created') action = 'create';
+                  else if (actionText === 'updated in-place') action = 'update';
+                  else if (actionText === 'replaced') action = 'replace';
+                  else if (actionText === 'destroyed') action = 'destroy';
+                  currentResource = { address: resourceMatch[1], action };
+                  currentDetails = [];
+                  inResource = true;
+                  continue;
+                }
+
+                if (inResource && line.trim()) {
+                  if (line.match(/^Plan:|^Changes to Outputs:|^Warning:|^─+$/)) {
+                    inResource = false;
+                    if (currentResource) {
+                      resources.push({ ...currentResource, details: currentDetails.join('\n') });
+                      currentResource = null;
+                      currentDetails = [];
+                    }
+                  } else {
+                    currentDetails.push(line);
+                  }
+                }
+              }
+              if (currentResource) {
+                resources.push({ ...currentResource, details: currentDetails.join('\n') });
+              }
+              return resources;
+            }
+
+            const resources = parseResources(rawPlan);
+            core.info(`📦 Parsed ${resources.length} resources from plan`);
+
+            const creates = resources.filter(r => r.action === 'create');
+            const updates = resources.filter(r => r.action === 'update');
+            const replaces = resources.filter(r => r.action === 'replace');
+            const destroys = resources.filter(r => r.action === 'destroy');
+
+            function getActionIcon(action) {
+              const icons = { create: '➕', update: '🔄', replace: '♻️', destroy: '🗑️' };
+              return icons[action] || '📖';
+            }
+
+            function getActionBadge(action) {
+              const badges = { create: '`+ create`', update: '`~ update`', replace: '`-/+ replace`', destroy: '`- destroy`' };
+              return badges[action] || '`read`';
+            }
+
+            function buildResourceSection(resource) {
+              const icon = getActionIcon(resource.action);
+              const badge = getActionBadge(resource.action);
+              const cleanDetails = resource.details.split('\n').filter(l => l.trim()).map(l => l.replace(/^\s{4}/, '')).join('\n');
+              return `<details>\n<summary>${icon} <code>${resource.address}</code> ${badge}</summary>\n\n\`\`\`hcl\n${cleanDetails || '(no details)'}\n\`\`\`\n\n</details>`;
+            }
+
+            // Build summary badges like Terraform Cloud
+            const summaryBadges = [];
+            if (summary.add > 0) summaryBadges.push(`🟢 **${summary.add}** to add`);
+            if (summary.change > 0) summaryBadges.push(`🟡 **${summary.change}** to change`);
+            if (summary.destroy > 0) summaryBadges.push(`🔴 **${summary.destroy}** to destroy`);
+
+            const sections = [];
+            sections.push(`## ${statusEmoji} ${statusText}`);
+            sections.push('');
+            
+            if (hasChanges) {
+              sections.push(`**Resources:** ${summaryBadges.join(' · ')}`);
             } else {
-              const parts = [];
-              const counts = [];
-              if (summary.add > 0) { parts.push(`+${summary.add}`); counts.push('new'); }
-              if (summary.change > 0) { parts.push(`~${summary.change}`); counts.push('changed'); }
-              if (summary.destroy > 0) { parts.push(`-${summary.destroy}`); counts.push('destroyed'); }
-              changesSummary = `${parts.join(', ')} resource(s) ${counts.join(', ')}`;
+              sections.push('✅ **No changes.** Infrastructure matches configuration.');
+            }
+            sections.push('');
+            sections.push('---');
+            sections.push('');
+
+            // Group by action type with expandable sections
+            if (creates.length > 0) {
+              sections.push(`### ➕ Resources to Create (${creates.length})`);
+              sections.push('');
+              creates.forEach(r => sections.push(buildResourceSection(r)));
+              sections.push('');
+            }
+            if (replaces.length > 0) {
+              sections.push(`### ♻️ Resources to Replace (${replaces.length})`);
+              sections.push('');
+              replaces.forEach(r => sections.push(buildResourceSection(r)));
+              sections.push('');
+            }
+            if (updates.length > 0) {
+              sections.push(`### 🔄 Resources to Update (${updates.length})`);
+              sections.push('');
+              updates.forEach(r => sections.push(buildResourceSection(r)));
+              sections.push('');
+            }
+            if (destroys.length > 0) {
+              sections.push(`### 🗑️ Resources to Destroy (${destroys.length})`);
+              sections.push('');
+              destroys.forEach(r => sections.push(buildResourceSection(r)));
+              sections.push('');
             }
 
-            // Format output with proper indentation and truncation
-            const maxLength = 60000;
-            const needsTruncation = formattedPlan.length > maxLength;
-            const truncatedPlan = needsTruncation
-              ? formattedPlan.substring(0, maxLength) + '\n\n...\n*(Plan output truncated for brevity)*'
-              : formattedPlan;
-
-            // Parse key changes for summary
-            const keyChanges = [];
-            if (formattedPlan.includes('module.github_oidc.azuread_application')) {
-              keyChanges.push('🆕 GitHub OIDC Application');
-            }
-            if (formattedPlan.includes('azurerm_kubernetes_cluster.aks must be replaced')) {
-              keyChanges.push('♻️ AKS Cluster Replacement');
-            }
-            if (formattedPlan.includes('azurerm_federated_identity_credential')) {
-              keyChanges.push('🔑 Federated Identity Credential');
+            // Fallback: show raw plan if no resources parsed
+            if (resources.length === 0 && hasChanges) {
+              sections.push('<details>');
+              sections.push('<summary><b>📋 View Raw Plan Output</b></summary>');
+              sections.push('');
+              sections.push('```hcl');
+              sections.push(rawPlan.length > 60000 ? rawPlan.substring(0, 60000) + '\n...(truncated)' : rawPlan);
+              sections.push('```');
+              sections.push('</details>');
+              sections.push('');
             }
 
-            // Build formatted comment body
-            const commentBody = [
-              `## Terraform Plan ${statusEmoji}`,
-              '',
-              `<details><summary><b>📊 Plan Summary</b></summary>`,
-              '',
-              `**Status:** <span style="color:${statusColor === 'success' ? 'green' : 'red'}">● ${statusLabel}</span>`,
-              '',
-              `**Changes:** ${changesSummary}`,
-              '',
-              '</details>',
-              '',
-              keyChanges.length > 0 ? `### 🔑 Key Changes\n${keyChanges.map(c => `- ${c}`).join('\n')}\n` : '',
-              `<details><summary><b>📋 View Full Plan</b></summary>`,
-              '',
-              '```hcl',
-              truncatedPlan,
-              '```',
-              '',
-              needsTruncation ? `_Plan output truncated at ${maxLength.toLocaleString()} characters_` : '',
-              '</details>',
-              '',
-              '---',
-              `<sub>💬 Posted by @${context.actor} at ${new Date().toISOString()} • [View Run](${context.payload.repository.html_url}/actions/runs/${context.runId})</sub>`
-            ].join('\n');
+            sections.push('---');
+            sections.push(`<sub>📅 ${new Date().toISOString()} · Triggered by @${context.actor} · [View Run](${context.payload.repository.html_url}/actions/runs/${context.runId})</sub>`);
 
-            // Find and update existing comment
+            const commentBody = sections.join('\n');
+
             core.info('📝 Fetching comments...');
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -211,44 +278,32 @@ jobs:
               per_page: 100
             });
 
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('Terraform Plan')
-            );
+            const botComment = comments.find(c => c.user.type === 'Bot' && (c.body.includes('Plan finished') || c.body.includes('Plan failed') || c.body.includes('Terraform Plan')));
+            core.info(`🔍 Found ${comments.length} comments, ${botComment ? 'updating existing' : 'creating new'}`);
 
-            core.info(`🔍 Found ${comments.length} comments, ${botComment ? 'existing Terraform comment found' : 'creating new comment'}`);
-
-            // Update or create comment with retry logic
             try {
               if (botComment) {
                 core.info(`📝 Updating comment ${botComment.id}...`);
-                const updateResult = await github.rest.issues.updateComment({
+                await github.rest.issues.updateComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   comment_id: botComment.id,
                   body: commentBody
                 });
-                core.info(`✅ Comment updated successfully`);
-                core.setOutput('comment_id', botComment.id);
-                core.setOutput('action', 'updated');
+                core.info(`✅ Comment updated`);
               } else {
-                core.info(`📝 Creating new comment...`);
-                const createResult = await github.rest.issues.createComment({
+                core.info(`📝 Creating comment...`);
+                const result = await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
                   body: commentBody
                 });
-                core.info(`✅ Comment created successfully`);
-                core.setOutput('comment_id', createResult.data.id);
-                core.setOutput('action', 'created');
+                core.info(`✅ Comment created: ${result.data.id}`);
               }
               core.notice(`🎉 Terraform plan posted to PR #${context.issue.number}`);
             } catch (error) {
-              core.error(`❌ Failed to post comment: ${error.message}`);
-              if (error.status) {
-                core.setFailed(`GitHub API returned status ${error.status}`);
-              }
+              core.error(`❌ Failed: ${error.message}`);
               core.setFailed(error.stack);
               throw error;
             }
