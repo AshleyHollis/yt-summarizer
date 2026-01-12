@@ -149,7 +149,6 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
       # Azure-managed networking
       kubelet_identity,
-      network_profile[0].load_balancer_profile[0].effective_outbound_ips,
       network_profile[0].load_balancer_profile[0].managed_outbound_ip_count,
       network_profile[0].load_balancer_profile[0].idle_timeout_in_minutes,
       network_profile[0].load_balancer_profile[0].managed_outbound_ipv6_count,
