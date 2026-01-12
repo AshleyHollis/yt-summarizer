@@ -122,6 +122,7 @@ kubectl create secret generic github-repo \
 kubectl label secret github-repo -n argocd argocd.argoproj.io/secret-type=repository
 ```
 
+<<<<<<< HEAD
 ### Option 3: GitHub App (Recommended for ApplicationSet PR Generator)
 
 **⚠️ RECOMMENDED**: GitHub Apps provide better security, don't expire, and have higher rate limits than PATs.
@@ -223,6 +224,7 @@ EOF
 - Set calendar reminder 2 weeks before PAT expires
 - Rotate token by updating Key Vault secret
 - Consider GitHub App instead for zero-maintenance
+
 
 
 
