@@ -73,7 +73,8 @@ spec:
           # Optional: filter by labels
           # labels:
           #   - preview
-        requeueAfterSeconds: 60
+        # Poll every 30s to quickly detect PR branch updates (overlay commits)
+        requeueAfterSeconds: 30
 
   # Template for each discovered PR
   template:
@@ -97,8 +98,11 @@ spec:
 
       source:
         repoURL: https://github.com/AshleyHollis/yt-summarizer.git
-        # Use the PR's head SHA for the preview
-        targetRevision: '{{head_sha}}'
+        # IMPORTANT: Use branch name (not head_sha) so Argo CD picks up overlay commits
+        # The preview workflow commits updated kustomization.yaml to the PR branch.
+        # Using {{head_sha}} would lock to the original commit and miss those updates.
+        # Using {{branch}} ensures Argo CD always reads the latest PR branch state.
+        targetRevision: '{{branch}}'
         # Preview overlay lives in the PR branch
         path: k8s/overlays/preview
 
