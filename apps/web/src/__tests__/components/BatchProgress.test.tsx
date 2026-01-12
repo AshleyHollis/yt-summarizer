@@ -1,6 +1,6 @@
 /**
  * Tests for BatchProgress component
- * 
+ *
  * These tests verify the BatchProgress component behavior by mocking
  * the batch API. Since EventSource is not available in JSDOM, the
  * component falls back to polling mode using batchApi.getById.

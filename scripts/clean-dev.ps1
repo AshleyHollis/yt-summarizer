@@ -1,27 +1,27 @@
 <#
 .SYNOPSIS
     Cleans up all development containers and data for a fresh start.
-    
+
 .DESCRIPTION
     Stops and removes all Aspire-managed containers (SQL, Azurite storage),
     optionally removes Docker volumes for a completely fresh state.
     Use this when you have orphaned containers or want to start completely fresh.
-    
+
 .PARAMETER All
     Also removes Docker volumes (blob data, queue data). Without this flag,
     only containers are removed and volume data is preserved.
-    
+
 .PARAMETER Force
     Skip confirmation prompts.
-    
+
 .EXAMPLE
     .\clean-dev.ps1
     # Removes containers only, preserves volume data
-    
+
 .EXAMPLE
     .\clean-dev.ps1 -All
     # Removes containers AND all volume data (complete fresh start)
-    
+
 .EXAMPLE
     .\clean-dev.ps1 -All -Force
     # Complete cleanup without confirmation
@@ -101,12 +101,12 @@ if ($storageContainers) {
 if ($All) {
     Write-Host ""
     Write-Host "[REMOVE] Removing Docker volumes..." -ForegroundColor Yellow
-    
+
     # Find and remove Aspire-related volumes
-    $volumes = docker volume ls --format "{{.Name}}" | Where-Object { 
-        $_ -match "sql|storage|azurite|ytsummarizer" 
+    $volumes = docker volume ls --format "{{.Name}}" | Where-Object {
+        $_ -match "sql|storage|azurite|ytsummarizer"
     }
-    
+
     if ($volumes) {
         $volumes | ForEach-Object {
             Write-Host "  Removing volume $_..." -ForegroundColor Gray

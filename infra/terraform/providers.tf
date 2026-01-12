@@ -41,7 +41,7 @@ provider "azurerm" {
       prevent_deletion_if_contains_resources = false
     }
   }
-  
+
   # Uses Azure CLI or OIDC authentication
   # In GitHub Actions, uses federated credentials
   use_oidc = var.use_oidc

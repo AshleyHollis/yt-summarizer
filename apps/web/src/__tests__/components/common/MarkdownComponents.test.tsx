@@ -77,11 +77,11 @@ describe('CollapsibleContent', () => {
         <p>Test content</p>
       </CollapsibleContent>
     );
-    
+
     const button = screen.getByText('Show more');
     fireEvent.click(button);
     expect(screen.getByText('Show less')).toBeInTheDocument();
-    
+
     fireEvent.click(screen.getByText('Show less'));
     expect(screen.getByText('Show more')).toBeInTheDocument();
   });
@@ -97,7 +97,7 @@ describe('CollapsibleContent', () => {
 
   it('uses custom expand/collapse labels', () => {
     render(
-      <CollapsibleContent 
+      <CollapsibleContent
         collapsedHeight={100}
         expandLabel="Read more"
         collapseLabel="Read less"
@@ -106,7 +106,7 @@ describe('CollapsibleContent', () => {
       </CollapsibleContent>
     );
     expect(screen.getByText('Read more')).toBeInTheDocument();
-    
+
     fireEvent.click(screen.getByText('Read more'));
     expect(screen.getByText('Read less')).toBeInTheDocument();
   });

@@ -39,7 +39,7 @@ $errors = @()
 foreach ($file in $yamlFiles) {
     $relativePath = $file.FullName.Replace("$PWD\", "")
     Write-Host "Checking: $relativePath" -ForegroundColor Gray
-    
+
     try {
         # Use Python to validate YAML syntax
         $pythonScript = @"
@@ -61,9 +61,9 @@ except Exception as e:
     print(f'Error: {str(e)}')
     sys.exit(1)
 "@
-        
+
         $output = python -c $pythonScript 2>&1
-        
+
         if ($LASTEXITCODE -ne 0) {
             $errors += [PSCustomObject]@{
                 File = $relativePath
@@ -91,12 +91,12 @@ if ($errors.Count -eq 0) {
 } else {
     Write-Host "❌ Found $($errors.Count) YAML file(s) with errors:" -ForegroundColor Red
     Write-Host ""
-    
+
     foreach ($error in $errors) {
         Write-Host "File: $($error.File)" -ForegroundColor Yellow
         Write-Host "Error: $($error.Error)" -ForegroundColor Red
         Write-Host ""
     }
-    
+
     exit 1
 }

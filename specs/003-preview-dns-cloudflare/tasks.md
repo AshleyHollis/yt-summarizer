@@ -218,7 +218,7 @@
 ## Dependencies
 
 ```
-Phase 1 (Setup) 
+Phase 1 (Setup)
     └──► Phase 2 (Foundational)
               └──► Phase 3 (US3: Certificates) ──► Phase 4 (US1: Preview Create)
                                                           │

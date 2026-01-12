@@ -188,7 +188,7 @@ test.describe('Channel Ingestion Flow', () => {
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
       await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
-      
+
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
       await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
 
@@ -202,7 +202,7 @@ test.describe('Channel Ingestion Flow', () => {
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
       await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
-      
+
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
       await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
 
@@ -215,7 +215,7 @@ test.describe('Channel Ingestion Flow', () => {
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
       await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
-      
+
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
       await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
 
@@ -229,36 +229,36 @@ test.describe('Channel Ingestion Flow', () => {
     test('View Ready Videos link uses correct status=completed URL', async ({ page }) => {
       // This test verifies the fix for the bug where the link used status=ready (invalid)
       // instead of status=completed (valid)
-      
+
       // Fetch and ingest videos
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      
+
       // Wait for videos to load
       await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
-      
+
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
       await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 15000 });
 
       // Wait for batch to potentially complete or have some succeeded items
       // The "View Ready Videos" link only appears when succeeded_count > 0
-      
+
       // Wait a bit for potential processing
       await page.waitForTimeout(5000);
-      
+
       // Check if View Ready link exists (it may not if no videos succeeded yet)
       const viewReadyLink = page.getByRole('link', { name: /View.*Ready Video/i });
-      
+
       if (await viewReadyLink.isVisible()) {
         // CRITICAL: Verify the link uses status=completed, NOT status=ready
         const href = await viewReadyLink.getAttribute('href');
         expect(href).toBe('/library?status=completed');
         expect(href).not.toContain('status=ready');
-        
+
         // Click the link and verify navigation works
         await viewReadyLink.click();
         await expect(page).toHaveURL('/library?status=completed');
-        
+
         // Verify library page loads with the filter applied
         await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
         const statusDropdown = page.getByLabel(/Status/i);
@@ -284,7 +284,7 @@ test.describe('Channel Ingestion Flow', () => {
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
       await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
 
-      // Check if any video shows "already ingested" 
+      // Check if any video shows "already ingested"
       // (This will be true if videos were previously ingested)
       const alreadyIngestedCount = await page.getByText(/Already ingested/i).count();
       // Just verify the page loaded correctly - the indicator may or may not be present

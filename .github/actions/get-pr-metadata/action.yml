@@ -54,7 +54,7 @@ runs:
       shell: bash
       run: |
         EVENT_NAME="${{ inputs.event-name }}"
-        
+
         if [ "$EVENT_NAME" = "pull_request" ]; then
           echo "pr_number=${{ inputs.pr-number-context }}" >> $GITHUB_OUTPUT
           echo "pr_head_ref=${{ inputs.pr-head-ref-context }}" >> $GITHUB_OUTPUT

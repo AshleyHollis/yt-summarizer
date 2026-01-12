@@ -1,7 +1,7 @@
 /**
  * Tests for Video Detail Page Reprocess Button functionality
- * 
- * Tests T180: Add "Reprocess" button to video detail page for videos 
+ *
+ * Tests T180: Add "Reprocess" button to video detail page for videos
  * with failed/empty transcripts
  */
 
@@ -162,7 +162,7 @@ describe('Video Detail Page - Reprocess Button', () => {
       vi.mocked(libraryApi.getVideoDetail).mockResolvedValue(
         createMockVideoDetail({ processing_status: 'failed', summary: null })
       );
-      
+
       // Delay the reprocess response to test loading state
       vi.mocked(videoApi.reprocess).mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve({ video_id: 'test-video-id' }), 500))
@@ -188,7 +188,7 @@ describe('Video Detail Page - Reprocess Button', () => {
       vi.mocked(libraryApi.getVideoDetail).mockResolvedValue(
         createMockVideoDetail({ processing_status: 'failed', summary: null })
       );
-      
+
       vi.mocked(videoApi.reprocess).mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve({ video_id: 'test-video-id' }), 500))
       );

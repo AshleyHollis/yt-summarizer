@@ -36,4 +36,3 @@ patches:
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
   - path: patches/migration-job-patch.yaml
-

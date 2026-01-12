@@ -21,14 +21,14 @@ test.describe('Core User Flows @smoke', () => {
   test.describe('Navigation', () => {
     test('home page redirects to add page @smoke', async ({ page }) => {
       await page.goto('/');
-      
+
       // Should redirect to /add
       await expect(page).toHaveURL('/add');
     });
 
     test('add page has correct title @smoke', async ({ page }) => {
       await page.goto('/add');
-      
+
       // Check page title
       await expect(page).toHaveTitle(/YouTube Summarizer/);
     });
@@ -43,7 +43,7 @@ test.describe('Core User Flows @smoke', () => {
       // Check header/navigation exists
       const nav = page.locator('nav');
       await expect(nav).toBeVisible();
-      
+
       // Check app title link is visible
       await expect(page.getByRole('link', { name: 'YT Summarizer' })).toBeVisible();
     });
@@ -58,7 +58,7 @@ test.describe('Core User Flows @smoke', () => {
       // Check for URL input
       const input = page.getByLabel(/YouTube URL/i);
       await expect(input).toBeVisible();
-      
+
       // Check placeholder text
       await expect(input).toHaveAttribute('placeholder', /YouTube URL/);
     });
@@ -90,13 +90,13 @@ test.describe('Core User Flows @smoke', () => {
     test('submit button becomes enabled when valid YouTube URL is entered', async ({ page }) => {
       const input = page.getByLabel(/YouTube URL/i);
       const enterButton = page.getByRole('button', { name: /Enter URL/i });
-      
+
       // Initially shows "Enter URL" button that is disabled
       await expect(enterButton).toBeDisabled();
-      
+
       // Enter a valid YouTube URL
       await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-      
+
       // Button should change to "Process Video" and be enabled
       const processButton = page.getByRole('button', { name: /Process Video/i });
       await expect(processButton).toBeEnabled();
@@ -104,10 +104,10 @@ test.describe('Core User Flows @smoke', () => {
 
     test('submit button stays disabled for non-YouTube URLs', async ({ page }) => {
       const input = page.getByLabel(/YouTube URL/i);
-      
+
       // Enter a non-YouTube URL
       await input.fill('https://example.com/watch?v=abc123');
-      
+
       // Button should stay disabled since it's not a valid YouTube URL
       const submitButton = page.getByRole('button', { name: /Enter URL/i });
       await expect(submitButton).toBeDisabled();
@@ -115,10 +115,10 @@ test.describe('Core User Flows @smoke', () => {
 
     test('submit button stays disabled for non-YouTube domain', async ({ page }) => {
       const input = page.getByLabel(/YouTube URL/i);
-      
+
       // Enter valid URL but not YouTube
       await input.fill('https://vimeo.com/12345');
-      
+
       // Button should stay disabled
       const submitButton = page.getByRole('button', { name: /Enter URL/i });
       await expect(submitButton).toBeDisabled();
@@ -132,30 +132,30 @@ test.describe('Core User Flows @smoke', () => {
 
     test('accepts standard YouTube watch URL', async ({ page }) => {
       const input = page.getByLabel(/YouTube URL/i);
-      
+
       // Enter valid YouTube URL
       await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-      
+
       // Input should have the value
       await expect(input).toHaveValue('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
     });
 
     test('accepts YouTube short URL format', async ({ page }) => {
       const input = page.getByLabel(/YouTube URL/i);
-      
+
       // Enter youtu.be short URL
       await input.fill('https://youtu.be/dQw4w9WgXcQ');
-      
+
       // Should be accepted
       await expect(input).toHaveValue('https://youtu.be/dQw4w9WgXcQ');
     });
 
     test('accepts YouTube embed URL format', async ({ page }) => {
       const input = page.getByLabel(/YouTube URL/i);
-      
+
       // Enter embed URL
       await input.fill('https://www.youtube.com/embed/dQw4w9WgXcQ');
-      
+
       // Should be accepted
       await expect(input).toHaveValue('https://www.youtube.com/embed/dQw4w9WgXcQ');
     });
@@ -169,35 +169,35 @@ test.describe('Video Submission (Requires Backend)', () => {
 
   test('submits video and shows loading state', async ({ page }) => {
     await page.goto('/add');
-    
+
     const input = page.getByLabel(/YouTube URL/i);
     await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-    
+
     // Wait for button to change to "Process Video"
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
-    
+
     // Should show loading indicator or redirect to video page
     // The form should either show "Submitting..." button, redirect, or an error alert
     const submittingButton = page.getByRole('button', { name: /Submitting|Processing/i });
     const errorAlertWithText = page.locator('role=alert').filter({ hasText: /error|failed/i });
     const videoPage = page.locator('[class*="video" i]');
-    
+
     // Wait for either submitting state, an error message, or navigation
     await expect(submittingButton.or(errorAlertWithText).or(videoPage)).toBeVisible({ timeout: 10000 });
   });
 
   test('submits video and redirects to video detail page', async ({ page }) => {
     await page.goto('/add');
-    
+
     const input = page.getByLabel(/YouTube URL/i);
     await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-    
+
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
-    
+
     // Should redirect to video detail page
     await page.waitForURL(/\/videos\/[a-zA-Z0-9-]+/, { timeout: 15000 });
     await expect(page).toHaveURL(/\/videos\/[a-zA-Z0-9-]+/);
@@ -205,22 +205,22 @@ test.describe('Video Submission (Requires Backend)', () => {
 
   test('video detail page shows processing status', async ({ page }) => {
     await page.goto('/add');
-    
+
     const input = page.getByLabel(/YouTube URL/i);
     await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-    
+
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
-    
+
     // Wait for redirect to video detail page
     await page.waitForURL(/\/videos\/[a-zA-Z0-9-]+/, { timeout: 15000 });
-    
+
     // Should show video detail page elements
     // The page shows either processing progress or video content
     const pageContent = page.locator('main');
     await expect(pageContent).toBeVisible();
-    
+
     // Should have navigation back - look for the actual link text
     const homeLink = page.getByRole('link', { name: /YT Summarizer/i });
     await expect(homeLink).toBeVisible();
@@ -235,19 +235,19 @@ test.describe('Error Handling (Requires Backend)', () => {
     // Testing network error scenarios with route blocking is unreliable as
     // the page may still be loading or the form may handle errors differently
     // depending on timing. Consider manual testing or a more robust approach.
-    
+
     await page.goto('/add');
-    
+
     const input = page.getByLabel(/YouTube URL/i);
     await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-    
+
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await expect(submitButton).toBeEnabled({ timeout: 5000 });
-    
+
     await page.route('**/api/**', (route) => route.abort());
-    
+
     await submitButton.click();
-    
+
     const errorOrReady = page.getByText(/error|failed|unable|try again|could not/i)
       .or(submitButton);
     await expect(errorOrReady).toBeVisible({ timeout: 10000 });
@@ -256,7 +256,7 @@ test.describe('Error Handling (Requires Backend)', () => {
   test('handles non-existent video ID gracefully', async ({ page }) => {
     // Navigate directly to a non-existent video
     await page.goto('/videos/non-existent-video-id-12345');
-    
+
     // Should show error or not found message
     const errorMessage = page.getByText(/not found|error|failed|unable/i);
     await expect(errorMessage).toBeVisible({ timeout: 10000 });
@@ -266,10 +266,10 @@ test.describe('Error Handling (Requires Backend)', () => {
 test.describe('Accessibility', () => {
   test('submit form is keyboard accessible', async ({ page }) => {
     await page.goto('/add');
-    
+
     // Tab to the input
     await page.keyboard.press('Tab');
-    
+
     // Should focus on the URL input or a focusable element
     const activeElement = await page.evaluate(() => document.activeElement?.tagName);
     expect(['INPUT', 'BUTTON', 'A']).toContain(activeElement);
@@ -277,7 +277,7 @@ test.describe('Accessibility', () => {
 
   test('form input has accessible label', async ({ page }) => {
     await page.goto('/add');
-    
+
     // The input should be associated with a label
     const input = page.getByRole('textbox', { name: /url/i });
     await expect(input).toBeVisible();
@@ -285,19 +285,19 @@ test.describe('Accessibility', () => {
 
   test('form shows disabled button for invalid URLs', async ({ page }) => {
     await page.goto('/add');
-    
+
     const input = page.getByLabel(/YouTube URL/i);
-    
+
     // Enter a non-YouTube URL
     await input.fill('https://example.com/watch?v=abc123');
-    
+
     // Button should be disabled for invalid URLs - it says "Enter URL" when disabled
     const disabledButton = page.getByRole('button', { name: /Enter URL/i });
     await expect(disabledButton).toBeDisabled();
-    
+
     // Now enter a valid YouTube URL
     await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-    
+
     // Button should become enabled and change to "Process Video"
     const enabledButton = page.getByRole('button', { name: /Process Video/i });
     await expect(enabledButton).toBeEnabled();

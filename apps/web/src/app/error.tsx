@@ -61,7 +61,7 @@ export default function Error({ error, reset }: ErrorProps) {
 
     // Check for specific HTTP status codes in error message
     const errorMessage = error.message.toLowerCase();
-    
+
     if (errorMessage.includes('503') || errorMessage.includes('service unavailable')) {
       return {
         title: 'Database is waking up',
@@ -121,11 +121,11 @@ export default function Error({ error, reset }: ErrorProps) {
     <div className="min-h-[50vh] flex items-center justify-center p-8">
       <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
         <div className="flex justify-center mb-4">{icon}</div>
-        
+
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
           {title}
         </h1>
-        
+
         <p className="text-gray-600 dark:text-gray-400 mb-6">
           {message}
         </p>
@@ -160,7 +160,7 @@ export default function Error({ error, reset }: ErrorProps) {
 function WifiOffIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
         d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" />
     </svg>
   );
@@ -169,7 +169,7 @@ function WifiOffIcon({ className }: { className?: string }) {
 function DatabaseIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
         d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
     </svg>
   );
@@ -178,7 +178,7 @@ function DatabaseIcon({ className }: { className?: string }) {
 function ServerIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
         d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
     </svg>
   );
@@ -187,7 +187,7 @@ function ServerIcon({ className }: { className?: string }) {
 function ExclamationIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
     </svg>
   );

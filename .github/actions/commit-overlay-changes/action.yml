@@ -23,7 +23,7 @@ runs:
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        
+
         # Sanity: ensure generated overlay contains a non-empty newTag
         if grep -q "newTag: \"\"" k8s/overlays/preview/kustomization.yaml; then
           echo "::error::Generated overlay has empty newTag - aborting commit"
@@ -34,17 +34,17 @@ runs:
         fi
 
         git add k8s/overlays/preview/
-        
+
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
           git commit -m "chore(preview): update image tags for PR #${{ inputs.pr-number }}
-          
+
           Image tag: ${{ inputs.image-tag }}
           Commit: ${{ inputs.commit-sha }}
-          
+
           [skip ci]"
-          
+
           git push origin ${{ inputs.pr-branch }}
           echo "✅ Pushed overlay changes to ${{ inputs.pr-branch }}"
         fi

@@ -15,7 +15,7 @@
 
 .EXAMPLE
     .\setup-argocd-github-app.ps1
-    
+
 .NOTES
     Requires: gh CLI, kubectl with AKS context configured
 #>

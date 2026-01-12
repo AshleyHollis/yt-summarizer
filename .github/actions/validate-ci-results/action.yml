@@ -73,16 +73,16 @@ runs:
         #   contains(changed_areas, 'services/new')
         # Then add a case in should_run_job() for "test-new-service"
         # =====================================================================
-        
+
         IS_MAIN="${{ inputs.is-main-branch }}"
-        
+
         # Helper to check if job should have run based on changed areas
         should_run_job() {
           # Main branch: ALL jobs must run
           if [[ "$IS_MAIN" == "true" ]]; then
             return 0
           fi
-          
+
           # PR branch: Check if areas changed
           local areas="${{ inputs.changed-areas }}"
           case "$1" in
@@ -117,12 +117,12 @@ runs:
               ;;
           esac
         }
-        
+
         # Helper to check if job passed or was appropriately skipped
         check_job() {
           local name=$1
           local result=$2
-          
+
           if should_run_job "$name"; then
             if [ "$result" != "success" ]; then
               echo "❌ $name failed (result: $result)"
@@ -142,27 +142,27 @@ runs:
           fi
           return 0
         }
-        
+
         EXIT_CODE=0
-        
+
         if [[ "$IS_MAIN" == "true" ]]; then
           echo "🔍 Checking CI results (MAIN BRANCH - full validation required)..."
         else
           echo "🔍 Checking CI results (PR branch - smart skipping enabled)..."
         fi
         echo ""
-        
+
         # Check test jobs
         check_job "test-shared" "${{ inputs.test-shared-result }}" || EXIT_CODE=1
         check_job "test-api" "${{ inputs.test-api-result }}" || EXIT_CODE=1
         check_job "test-workers" "${{ inputs.test-workers-result }}" || EXIT_CODE=1
         check_job "test-frontend" "${{ inputs.test-frontend-result }}" || EXIT_CODE=1
-        
+
         # Check validation jobs
         check_job "validate-terraform" "${{ inputs.validate-terraform-result }}" || EXIT_CODE=1
         check_job "validate-kustomize" "${{ inputs.validate-kustomize-result }}" || EXIT_CODE=1
         check_job "kubernetes-validate" "${{ inputs.kubernetes-validate-result }}" || EXIT_CODE=1
-        
+
         # Check secret scanning
         if [[ "$IS_MAIN" == "true" ]] || [[ "${{ inputs.secret-scanning-should-run }}" == "true" ]]; then
           if [ "${{ inputs.secret-scanning-result }}" != "success" ]; then
@@ -174,12 +174,12 @@ runs:
         else
           echo "⏭️  secret-scanning skipped (no code changes)"
         fi
-        
+
         # Check build jobs - one must succeed if builds are required
         if should_run_job "build-images"; then
           BUILD_PUSH="${{ inputs.build-images-result }}"
           BUILD_VALIDATE="${{ inputs.build-images-validate-result }}"
-          
+
           if [ "$BUILD_PUSH" = "success" ] || [ "$BUILD_PUSH" = "skipped" -a "$BUILD_VALIDATE" = "success" ]; then
             echo "✅ Build validation passed"
           else
@@ -189,12 +189,12 @@ runs:
         else
           echo "⏭️  Build jobs skipped (no changes requiring image builds)"
         fi
-        
+
         echo ""
         if [ $EXIT_CODE -eq 0 ]; then
           echo "🎉 All CI checks passed!"
         else
           echo "💥 One or more CI checks failed"
         fi
-        
+
         exit $EXIT_CODE

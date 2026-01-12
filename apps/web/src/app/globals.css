@@ -640,20 +640,20 @@ button[aria-label="Web Inspector"],
 /* ==================== Hide Duplicate Text Content ==================== */
 /**
  * CRITICAL: Prevents duplicate answer text in CopilotKit messages.
- * 
+ *
  * PROBLEM: CopilotKit renders BOTH:
  *   1. The custom tool UI (via useRenderToolCall) - our rich video cards, answers, etc.
  *   2. A plain markdown text (copilotKitMarkdown) with the raw answer
- * 
+ *
  * This causes the same answer to appear twice in the chat - once nicely formatted
  * in our custom component, and once as plain text below it.
- * 
+ *
  * SOLUTION: Hide copilotKitMarkdown for all assistant messages EXCEPT the first one
  * (which is the greeting message that doesn't have a tool render).
- * 
+ *
  * WHY :first-child exception: The initial greeting ("Hello! I'm your AI assistant...")
  * is a regular text message without any tool call, so it needs the markdown to show.
- * 
+ *
  * @see apps/web/src/hooks/useBackendToolRenderers.tsx - registers tool renderers
  * @see apps/web/src/components/copilot/CopilotMessage.tsx - our rich answer UI
  */
@@ -674,14 +674,14 @@ button[aria-label="Web Inspector"],
 /* ==================== Hide Duplicate Loading Indicators ==================== */
 /**
  * CRITICAL: Prevents duplicate loading indicators in CopilotKit.
- * 
+ *
  * PROBLEM: CopilotKit shows its own "typing" dots (copilotKitActivityDot) while
  * our custom tool render shows a "Searching videos..." spinner. This causes
  * two loading indicators to appear simultaneously.
- * 
+ *
  * SOLUTION: Hide CopilotKit's default loading indicators entirely.
  * Our tool render handles the loading state with a custom spinner.
- * 
+ *
  * @see apps/web/src/hooks/useBackendToolRenderers.tsx - custom loading spinner (ToolLoadingState)
  */
 .copilotKitTypingIndicator,

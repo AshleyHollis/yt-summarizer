@@ -6,13 +6,13 @@ repos:
         name: Check YAML syntax
         args: ['--unsafe']  # Allows custom tags in GitHub Actions
         exclude: ^k8s/.*\.yaml$  # K8s uses templates/overlays that may not validate standalone
-      
+
       - id: check-json
         name: Check JSON syntax
-      
+
       - id: end-of-file-fixer
         name: Ensure files end with newline
-      
+
       - id: trailing-whitespace
         name: Remove trailing whitespace
         args: ['--markdown-linebreak-ext=md']

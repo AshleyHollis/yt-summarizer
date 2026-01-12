@@ -52,7 +52,7 @@ runs:
         ADD=$(grep -oP 'Plan: \K\d+(?= to add)' plan_output.txt || echo "0")
         CHANGE=$(grep -oP '\d+(?= to change)' plan_output.txt || echo "0")
         DESTROY=$(grep -oP '\d+(?= to destroy)' plan_output.txt || echo "0")
-        
+
         # Create JSON summary
         SUMMARY=$(cat <<EOF
         {
@@ -63,11 +63,11 @@ runs:
         }
         EOF
         )
-        
+
         echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
         echo "$SUMMARY" >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"
-        
+
         # Extract resource changes (lines with +, ~, -, or #)
         FORMATTED=""
         while IFS= read -r line; do
@@ -75,12 +75,12 @@ runs:
             FORMATTED+="$line"$'\n'
           fi
         done < plan_output.txt
-        
+
         # If no formatted content, use full output
         if [ -z "$FORMATTED" ]; then
           FORMATTED=$(cat plan_output.txt)
         fi
-        
+
         echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
         echo "$FORMATTED" >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"

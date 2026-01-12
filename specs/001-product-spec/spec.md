@@ -332,7 +332,7 @@ The copilot provides three toggleable knowledge sources in the UI header:
 - **Search scope selector**: "All Videos" | "This Channel" | "This Video"
   - Contextually shows all options when viewing a video
   - Shows only "All Videos" when on library pages
-  
+
 - **Knowledge source toggles** (Include:):
   - **Your Videos**: Search transcripts & summaries from the video library (RAG retrieval). Enabled by default.
   - **AI Knowledge**: Include AI's general trained knowledge in answers. Enabled by default.

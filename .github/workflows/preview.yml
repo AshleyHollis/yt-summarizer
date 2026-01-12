@@ -67,7 +67,7 @@ jobs:
   #   - needs_image_build: true if services/apps/docker changed (requires CI images)
   #   - needs_deployment: true if any deployment required (code or k8s changes)
   #   - pr_number, pr_head_ref, pr_head_sha: PR metadata for downstream jobs
-  # 
+  #
   # DECISION TREE:
   #   Code changes (services/apps/docker) → needs_image_build=true, needs_deployment=true
   #   K8s only changes → needs_image_build=false, needs_deployment=true
@@ -117,13 +117,13 @@ jobs:
   # ===========================================================================
   # ONLY runs when needs_deployment=true
   # Waits for CI workflow to complete and retrieves image tag
-  # 
+  #
   # FLOW:
   #   1. Find CI workflow run for same commit SHA
   #   2. Wait up to 30min for completion
   #   3. Extract image tag from CI artifacts (pr-<number>-<sha>)
   #   4. Fail if CI fails (no fallback)
-  # 
+  #
   # CRITICAL: This enforces that CI must succeed before preview deploys
   # ===========================================================================
   wait-for-ci:
@@ -172,7 +172,7 @@ jobs:
   #   2. Find most recent commit that changed code (services/apps/docker)
   #   3. Use that commit's image tag: pr-<number>-<sha>
   #   4. If no commits in PR built images, fallback to production tag (read prod kustomization.yaml)
-  # 
+  #
   # This ensures K8s changes are tested with the PR's own code, not random
   # production code. Fully deterministic as it's tied to git history.
   # ===========================================================================
@@ -198,28 +198,28 @@ jobs:
         run: |
           PR_NUMBER="${{ needs.detect-changes.outputs.pr_number }}"
           BASE_BRANCH="${{ github.event.pull_request.base.ref || 'main' }}"
-          
+
           echo "🔍 Searching PR #$PR_NUMBER history for most recent code change..."
-          
+
           # Get list of commits in this PR (from base branch to HEAD)
           git fetch origin "$BASE_BRANCH"
           COMMITS=$(git rev-list "origin/$BASE_BRANCH"..HEAD)
-          
+
           FOUND_IMAGE_TAG=""
           FOUND_COMMIT=""
-          
+
           # Walk commits from newest to oldest
           for commit in $COMMITS; do
             SHORT_SHA=$(git rev-parse --short=7 "$commit")
-            
+
             # Check if this commit changed code areas that trigger image builds
             # Skip merge commits by checking parent count
             PARENT_COUNT=$(git rev-list --parents -n 1 "$commit" | awk '{print NF-1}')
-            
+
             if [ "$PARENT_COUNT" -le 1 ]; then
               # Regular commit, not a merge
               CHANGED_FILES=$(git diff-tree --no-commit-tree --name-only -r "$commit" 2>/dev/null || true)
-              
+
               if echo "$CHANGED_FILES" | grep -qE '^(services/api|services/workers|services/shared|apps/web|docker)/'; then
                 FOUND_COMMIT="$commit"
                 FOUND_IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
@@ -229,31 +229,31 @@ jobs:
               fi
             fi
           done
-          
+
           # If no code changes found in PR, fallback to production tag
           if [ -z "$FOUND_IMAGE_TAG" ]; then
             echo "⚠️  No code changes found in PR history"
             echo "📦 Falling back to production image tag from main branch"
-            
+
             # Read production kustomization.yaml for deterministic SHA-based tag
             git fetch origin main
             PROD_TAG=$(git show origin/main:k8s/overlays/prod/kustomization.yaml | grep -oP 'newTag: \K.*' | head -1)
-            
+
             if [ -z "$PROD_TAG" ]; then
               echo "::error::Could not find production image tag in kustomization.yaml"
               exit 1
             fi
-            
+
             if [ "$PROD_TAG" = "latest" ]; then
               echo "::error::Production kustomization is using 'latest' tag - not deterministic!"
               echo "::error::Production deployment must use SHA-based tags (e.g., sha-abc123f)"
               exit 1
             fi
-            
+
             echo "✅ Using production tag: $PROD_TAG"
             FOUND_IMAGE_TAG="$PROD_TAG"
           fi
-          
+
           echo "image_tag=$FOUND_IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "🎯 Final image tag for K8s-only preview: $FOUND_IMAGE_TAG"
 
@@ -277,12 +277,12 @@ jobs:
   # ===========================================================================
   # ONLY runs when both detect-changes and wait-for-ci succeed
   # Enforces MAX_PREVIEWS limit to prevent resource exhaustion
-  # 
+  #
   # FLOW:
   #   1. Count currently deployed previews
   #   2. If count < MAX_PREVIEWS → can_deploy=true
   #   3. If count >= MAX_PREVIEWS → can_deploy=false, post queue message
-  # 
+  #
   # Downstream jobs check can_deploy=true before running
   # ===========================================================================
   check-concurrency:
@@ -316,7 +316,7 @@ jobs:
         with:
           script: |
             const reason = `Maximum concurrent previews (${{ env.MAX_PREVIEWS }}) reached. Your preview will deploy when a slot becomes available.\n\nClose another PR or wait for an existing preview to be cleaned up.`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -329,10 +329,10 @@ jobs:
   # ===========================================================================
   # ONLY runs when can_deploy=true
   # Generates preview URLs using Gateway API pattern
-  # 
+  #
   # URL PATTERN: pr-<number>.yt-summarizer.apps.ashleyhollis.com
   # Example: pr-42.yt-summarizer.apps.ashleyhollis.com
-  # 
+  #
   # Outputs:
   #   - preview_url: Full URL for API (https://pr-42.yt-summarizer...)
   #   - preview_host: Just hostname (pr-42.yt-summarizer...)
@@ -363,7 +363,7 @@ jobs:
   # PHASE 5: UPDATE KUBERNETES OVERLAY
   # ===========================================================================
   # ONLY runs when can_deploy=true and get-ingress succeeds
-  # 
+  #
   # CRITICAL FLOW:
   #   1. Checkout PR branch (not main)
   #   2. Update k8s/overlays/preview/kustomization.yaml with:
@@ -373,7 +373,7 @@ jobs:
   #   3. Validate kustomize build + kubectl dry-run
   #   4. Commit and push to PR branch
   #   5. Argo CD auto-detects commit and syncs to cluster
-  # 
+  #
   # WHY COMMIT TO PR BRANCH:
   #   - Argo CD watches PR branches for preview overlays
   #   - GitOps: Cluster state matches git (no out-of-band changes)
@@ -459,14 +459,14 @@ jobs:
   # PHASE 6: VERIFY DEPLOYMENT
   # ===========================================================================
   # ONLY runs when update-overlay succeeds
-  # 
+  #
   # VERIFICATION STEPS:
   #   1. Wait for Argo CD to sync (detects overlay commit)
   #   2. Verify API deployment has correct image tag
   #   3. Verify worker deployments have correct image tag
   #   4. Run health checks against preview URL
   #   5. Verify TLS certificate is valid
-  # 
+  #
   # FAILURE SCENARIOS:
   #   - Argo CD sync timeout → likely image pull failure
   #   - Wrong image tag → overlay update didn't propagate
@@ -538,13 +538,13 @@ jobs:
   # ===========================================================================
   # ONLY runs when can_deploy=true and get-ingress succeeds
   # Runs in parallel with verify-deployment (no dependency)
-  # 
+  #
   # FLOW:
   #   1. Build Next.js app with preview API URL
   #   2. Cleanup stale SWA environments (old closed PRs)
   #   3. Deploy to Azure Static Web Apps
   #   4. SWA creates ephemeral preview environment
-  # 
+  #
   # SWA CLEANUP:
   #   - Runs before deploy to free up slots
   #   - Deletes environments for closed/merged PRs
@@ -672,14 +672,14 @@ jobs:
   # PHASE 9: E2E TESTS (OPTIONAL)
   # ===========================================================================
   # ONLY runs when post-preview-comment succeeds AND preview_url is set
-  # 
+  #
   # FLOW:
   #   1. Wait for Argo CD sync (double-check deployment ready)
   #   2. Wait for API health check (ensure startup complete)
   #   3. Run Playwright E2E tests against preview environment
   #   4. Upload test report artifact
   #   5. Post results to PR
-  # 
+  #
   # TEST ENVIRONMENT:
   #   - Frontend: SWA preview URL
   #   - Backend: Gateway API preview URL
@@ -757,17 +757,17 @@ jobs:
   # PHASE 10: FINAL STATUS CHECK
   # ===========================================================================
   # always() ensures this runs regardless of job results
-  # 
+  #
   # VALIDATES:
   #   1. If deployment needed, did all steps succeed?
   #   2. If no deployment needed, did workflow skip appropriately?
   #   3. Are all URLs configured correctly?
-  # 
+  #
   # FAIL CONDITIONS:
   #   - needs_deployment=true but verify-deployment failed
   #   - needs_deployment=true but deploy-frontend failed
   #   - preview_url missing when deployment succeeded
-  # 
+  #
   # This is the required status check for PR merging
   # ===========================================================================
   preview-status-check:

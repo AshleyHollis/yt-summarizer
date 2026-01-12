@@ -127,11 +127,11 @@ jobs:
             const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
             const formattedPlan = process.env.FORMATTED_PLAN || 'No plan output available';
             const planOutcome = process.env.PLAN_OUTCOME;
-            
+
             // Determine status emoji and color
             const statusEmoji = planOutcome === 'success' ? '✅' : '❌';
             const hasChanges = summary.has_changes;
-            
+
             // Build summary section like Terraform Cloud
             let changesSummary = '';
             if (!hasChanges) {
@@ -143,13 +143,13 @@ jobs:
               if (summary.destroy > 0) parts.push(`**${summary.destroy}** to destroy`);
               changesSummary = parts.join(', ');
             }
-            
+
             // Truncate plan if too long
             const maxLength = 60000;
-            const truncatedPlan = formattedPlan.length > maxLength 
+            const truncatedPlan = formattedPlan.length > maxLength
               ? formattedPlan.substring(0, maxLength) + '\n\n... (output truncated)'
               : formattedPlan;
-            
+
             const body = `## Terraform Plan ${statusEmoji}
 
 ### 📊 Plan Summary
@@ -165,19 +165,19 @@ ${changesSummary}
 
 ---
 <sub>Pushed by: @\${{ github.actor }} • Plan: ` + '`' + planOutcome + '`' + ` • [View Run](https://github.com/\${{ github.repository }}/actions/runs/\${{ github.run_id }})</sub>`;
-            
+
             // Find and update existing comment or create new one
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
               comment.body.includes('Terraform Plan')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -224,4 +224,3 @@ ${changesSummary}
         with:
           terraform-changed: ${{ needs.check-changes.outputs.terraform_changed }}
           terraform-result: ${{ needs.terraform.result }}
-

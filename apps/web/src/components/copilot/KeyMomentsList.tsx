@@ -27,10 +27,10 @@ interface KeyMomentsListProps {
  */
 export function KeyMomentsList({ moments, className = "" }: KeyMomentsListProps) {
   // Filter out moments with empty/invalid timestamps or descriptions
-  const validMoments = moments.filter(m => 
-    m.timestamp && 
+  const validMoments = moments.filter(m =>
+    m.timestamp &&
     m.timestamp !== "0:00" &&
-    m.description && 
+    m.description &&
     m.description.length > 5 &&
     !GARBAGE_TEXT_PREFIXES.some(prefix => m.description.startsWith(prefix))
   );

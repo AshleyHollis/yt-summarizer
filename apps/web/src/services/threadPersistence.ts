@@ -1,9 +1,9 @@
 /**
  * Thread Persistence Service
- * 
+ *
  * Centralized, deterministic service for managing chat thread persistence.
  * Uses idempotent operations and proper state machines to avoid race conditions.
- * 
+ *
  * Design principles:
  * 1. Single source of truth - all thread state flows through this service
  * 2. Idempotent operations - safe to call multiple times
@@ -87,14 +87,14 @@ type CreationState = "idle" | "creating" | "created";
 class ThreadCreationTracker {
   private state: CreationState = "idle";
   private pendingPromise: Promise<ChatThread | null> | null = null;
-  
+
   /**
    * Check if we can start a new creation
    */
   canCreate(): boolean {
     return this.state === "idle";
   }
-  
+
   /**
    * Start creation and return the promise to wait on
    */
@@ -103,7 +103,7 @@ class ThreadCreationTracker {
       // Already creating - return the existing promise
       return this.pendingPromise || Promise.resolve(null);
     }
-    
+
     this.state = "creating";
     this.pendingPromise = createFn().then(result => {
       this.state = result ? "created" : "idle";
@@ -112,10 +112,10 @@ class ThreadCreationTracker {
       this.state = "idle";
       throw err;
     });
-    
+
     return this.pendingPromise;
   }
-  
+
   /**
    * Reset to allow new creations (call when starting a fresh chat)
    */
@@ -134,12 +134,12 @@ export const threadCreationTracker = new ThreadCreationTracker();
 
 /**
  * Transform CopilotKit Message objects to ThreadMessage format for persistence.
- * 
+ *
  * CopilotKit internal messages use these roles:
  * - "user": User text message
  * - "assistant": Can be either text OR a tool invocation (ID starts with "call_")
  * - "tool": Tool result message
- * 
+ *
  * Our ThreadMessage format follows OpenAI's format:
  * - user/assistant/system messages have role and content
  * - assistant messages can have toolCalls array
@@ -147,11 +147,11 @@ export const threadCreationTracker = new ThreadCreationTracker();
  */
 export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessage[] {
   const result: ThreadMessage[] = [];
-  
+
   // Track tool call IDs we've seen in "assistant" messages that are actually tool invocations
   let lastToolCallId: string | null = null;
   let lastToolCallAssistantIdx: number = -1;
-  
+
   for (const msg of copilotMessages) {
     const m = msg as Record<string, unknown>;
     const role = m.role as string;
@@ -159,7 +159,7 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
     const content = m.content as string | undefined;
     const name = m.name as string | undefined;
     const args = m.arguments as Record<string, unknown> | string | undefined;
-    
+
     if (role === "user" || role === "system") {
       // User/system messages
       result.push({
@@ -170,7 +170,7 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
     } else if (role === "assistant") {
       // Check if this is a tool invocation (ID starts with "call_") or a regular assistant message
       const isToolInvocation = id.startsWith("call_") || name !== undefined;
-      
+
       if (isToolInvocation) {
         // This is a tool invocation - add it as toolCalls on an assistant message
         const toolCall = {
@@ -181,10 +181,10 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
             arguments: typeof args === "string" ? args : (args ? JSON.stringify(args) : "{}"),
           },
         };
-        
+
         // Find or create an assistant message to attach this to
         const lastAssistantIdx = result.findLastIndex(msg => msg.role === "assistant");
-        
+
         if (lastAssistantIdx >= 0 && !result[lastAssistantIdx].toolCalls?.length) {
           // Attach to existing assistant message that doesn't already have tool calls
           result[lastAssistantIdx].toolCalls = [toolCall];
@@ -212,11 +212,11 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
     } else if (role === "tool") {
       // Tool result message - link to the last tool call we saw
       // CopilotKit may provide toolCallId or actionExecutionId, or we infer it
-      const toolCallId = (m.toolCallId as string) || 
-                         (m.actionExecutionId as string) || 
+      const toolCallId = (m.toolCallId as string) ||
+                         (m.actionExecutionId as string) ||
                          lastToolCallId ||
                          "";
-      
+
       result.push({
         id,
         role: "tool",
@@ -225,7 +225,7 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
       });
     }
   }
-  
+
   return result;
 }
 
@@ -299,7 +299,7 @@ export async function fetchThread(threadId: string): Promise<{ thread: ChatThrea
  * Idempotent if called through threadCreationTracker
  */
 export async function createThread(
-  messages: ThreadMessage[], 
+  messages: ThreadMessage[],
   title: string,
   scope?: QueryScope | null,
   aiSettings?: AISettings | null,
@@ -309,11 +309,11 @@ export async function createThread(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages, title, scope, aiSettings }),
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to create thread: ${response.status}`);
   }
-  
+
   const data = await response.json();
   return {
     id: data.thread_id,
@@ -379,47 +379,47 @@ export async function deleteThread(threadId: string): Promise<boolean> {
 
 /**
  * Prepare messages for display by reconstructing toolCalls where needed.
- * 
+ *
  * CRITICAL FOR RICH UI: This function enables persisted threads to show the same
  * rich UI (video cards, formatted answers, sources) that they showed during the
  * original conversation.
- * 
+ *
  * ## Why This Is Needed
- * 
+ *
  * CopilotKit's `useRenderToolCall` hook matches tool calls by their `function.name`.
  * When a thread is loaded from the server, assistant messages may have:
  *   - Empty content (the LLM doesn't return text when using a tool)
  *   - No `toolCalls` array (the server didn't persist it correctly)
- * 
+ *
  * Without `toolCalls`, CopilotKit has nothing to render and shows a blank message.
- * 
+ *
  * ## How It Works
- * 
+ *
  * 1. Build a map of tool result messages (role: "tool") by their `toolCallId`
  * 2. Parse each tool result's content as JSON to analyze its structure
  * 3. For each assistant message without `toolCalls`:
  *    - Find any following tool result messages that belong to it
  *    - Infer the tool name from the result's JSON structure
  *    - Reconstruct the `toolCalls` array
- * 
+ *
  * ## Tool Name Matching
- * 
+ *
  * The inferred tool name MUST match exactly what's registered in useRenderToolCall.
  * Our tools use snake_case: "query_library", "search_videos", etc.
- * 
+ *
  * @example
  * // Server returns these messages:
  * [
  *   { role: "assistant", content: "" },  // No toolCalls!
  *   { role: "tool", toolCallId: "call_123", content: '{"answer":"...","videoCards":[]}' }
  * ]
- * 
+ *
  * // This function transforms them to:
  * [
  *   { role: "assistant", content: "", toolCalls: [{ id: "call_123", function: { name: "query_library" } }] },
  *   { role: "tool", toolCallId: "call_123", content: '{"answer":"...","videoCards":[]}' }
  * ]
- * 
+ *
  * @see useBackendToolRenderers.tsx - where useRenderToolCall registers the renderers
  * @see globals.css - CSS that hides duplicate text content
  */
@@ -439,12 +439,12 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
       toolResults.set(msg.toolCallId, { message: msg, parsedContent });
     }
   }
-  
+
   // Track tool calls per assistant message
   // An assistant message "owns" all tool messages that come after it until the next assistant
   const assistantToolCalls = new Map<number, string[]>();
   let currentAssistantIdx = -1;
-  
+
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
     if (msg.role === "assistant") {
@@ -454,13 +454,13 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
       assistantToolCalls.get(currentAssistantIdx)?.push(msg.toolCallId);
     }
   }
-  
+
   /**
    * Infer tool name from the JSON structure of the tool result.
-   * 
+   *
    * CRITICAL: The returned name MUST match the tool name registered in useRenderToolCall.
    * Use snake_case (e.g., "query_library") NOT camelCase (e.g., "queryLibrary").
-   * 
+   *
    * Detection logic is based on unique fields in each tool's response:
    * - query_library: has both "answer" AND "videoCards"
    * - search_videos: has "videos" but NOT "answer"
@@ -472,7 +472,7 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
   const inferToolName = (parsedContent: unknown): string => {
     if (!parsedContent || typeof parsedContent !== 'object') return "query_library";
     const obj = parsedContent as Record<string, unknown>;
-    
+
     // query_library returns: answer, videoCards, evidence, followups
     if ('answer' in obj && 'videoCards' in obj) return "query_library";
     // search_videos returns: videos
@@ -485,22 +485,22 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
     if ('coverage' in obj) return "get_library_coverage";
     // get_topics_for_channel returns: topics
     if ('topics' in obj) return "get_topics_for_channel";
-    
+
     return "query_library"; // Default fallback
   };
-  
+
   // Transform messages
   return messages.map((msg, idx) => {
     // Keep non-assistant messages as-is
     if (msg.role !== "assistant") return msg;
-    
+
     // If assistant already has toolCalls, keep it
     if (msg.toolCalls && msg.toolCalls.length > 0) return msg;
-    
+
     // Check if this assistant has associated tool calls
     const toolCallIds = assistantToolCalls.get(idx) || [];
     if (toolCallIds.length === 0) return msg;
-    
+
     // Check if all tool calls have results
     const hasAllResults = toolCallIds.every(id => toolResults.has(id));
     if (!hasAllResults) {
@@ -511,12 +511,12 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
         content: "⚠️ The previous response was interrupted. Please try sending your message again.",
       };
     }
-    
+
     // Reconstruct toolCalls from results
     const reconstructedToolCalls = toolCallIds.map(id => {
       const result = toolResults.get(id);
       const toolName = result?.parsedContent ? inferToolName(result.parsedContent) : "query_library";
-      
+
       return {
         id,
         type: "function" as const,
@@ -526,7 +526,7 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
         },
       };
     });
-    
+
     return { ...msg, toolCalls: reconstructedToolCalls };
   });
 }
@@ -537,20 +537,20 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
 export function generateTitle(content: string): string {
   const maxLength = 50;
   const cleaned = content.trim().replace(/\s+/g, ' ');
-  
+
   if (!cleaned) return "New Chat";
-  
+
   const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-  
+
   if (capitalized.length <= maxLength) return capitalized;
-  
+
   const truncated = capitalized.substring(0, maxLength);
   const lastSpace = truncated.lastIndexOf(' ');
-  
+
   if (lastSpace > 20) {
     return truncated.substring(0, lastSpace) + "…";
   }
-  
+
   return truncated.substring(0, maxLength - 1) + "…";
 }
 
@@ -563,7 +563,7 @@ export function generateTitle(content: string): string {
  * This allows idempotent saves - we only save when content actually changes.
  */
 export function computeMessageHash(messages: ThreadMessage[]): string {
-  return messages.map(m => 
+  return messages.map(m =>
     `${m.id}:${m.role}:${typeof m.content === 'string' ? m.content.length : 0}:${m.toolCallId || ''}`
   ).join('|');
 }

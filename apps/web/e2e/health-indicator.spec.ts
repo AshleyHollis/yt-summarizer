@@ -2,11 +2,11 @@ import { test, expect } from '@playwright/test';
 
 /**
  * E2E Tests for WarmingUpIndicator (FR-020)
- * 
+ *
  * Tests the health status banner behavior:
  * - Shows warning banner when service is degraded/unhealthy
  * - Hides banner when service is healthy
- * 
+ *
  * Note: The banner visibility depends on real-time health check results.
  * These tests verify the component behaves correctly in either state.
  */
@@ -16,16 +16,16 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
     test('banner should eventually hide when API becomes healthy', async ({ page }) => {
       // Navigate to library page
       await page.goto('/library');
-      
+
       // Wait for the page to fully load
       await page.waitForLoadState('networkidle');
-      
+
       // Give the health check time to complete (it polls periodically)
       // The health check polls every 5 seconds and updates state
       await page.waitForTimeout(6000);
-      
+
       const warmingIndicator = page.getByTestId('warming-up-indicator');
-      
+
       // Check if the banner eventually becomes hidden as API stabilizes
       // We use a longer timeout since health checks are async
       try {
@@ -43,7 +43,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
           type: 'info',
           description: `Banner visible with message: ${bannerText}`
         });
-        
+
         // Verify at least the banner has correct structure
         await expect(warmingIndicator).toHaveAttribute('role', 'status');
       }
@@ -52,10 +52,10 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
     test('page content loads regardless of health status', async ({ page }) => {
       // Navigate to library page
       await page.goto('/library');
-      
+
       // Wait for page to load
       await page.waitForLoadState('networkidle');
-      
+
       // Verify core content is visible (page should work even with banner)
       // The library page should show video count or navigation
       await expect(
@@ -69,15 +69,15 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
       await page.goto('/library');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
-      
+
       const warmingIndicator = page.getByTestId('warming-up-indicator');
       const bannerVisible = await warmingIndicator.isVisible().catch(() => false);
-      
+
       if (bannerVisible) {
         // Verify accessibility attributes
         await expect(warmingIndicator).toHaveRole('status');
         await expect(warmingIndicator).toHaveAttribute('aria-live', 'polite');
-        
+
         // Verify it contains a message
         const text = await warmingIndicator.textContent();
         expect(text).toBeTruthy();
@@ -92,17 +92,17 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
       await page.goto('/library');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
-      
+
       const warmingIndicator = page.getByTestId('warming-up-indicator');
       const bannerVisible = await warmingIndicator.isVisible().catch(() => false);
-      
+
       if (bannerVisible) {
         // Verify styling classes are applied
         const classList = await warmingIndicator.getAttribute('class');
-        
+
         // Should have either yellow (degraded) or red (unhealthy) styling
         expect(classList).toMatch(/bg-(yellow|red)/);
-        
+
         // Should have appropriate text color
         expect(classList).toMatch(/text-(yellow|red)/);
       } else {
@@ -120,18 +120,18 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
       await page.goto('/library');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
-      
+
       const warmingIndicator = page.getByTestId('warming-up-indicator');
       const bannerVisible = await warmingIndicator.isVisible().catch(() => false);
-      
+
       if (bannerVisible) {
         const bannerText = await warmingIndicator.textContent();
-        
+
         // Should contain one of the expected messages
         expect(bannerText).toMatch(
           /warming up|service unavailable|database.*starting|restore.*connectivity/i
         );
-        
+
         // Should be informative (not empty or too short)
         expect(bannerText!.length).toBeGreaterThan(10);
       } else {

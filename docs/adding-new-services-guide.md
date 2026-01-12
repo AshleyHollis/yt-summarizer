@@ -29,13 +29,13 @@ test-notifications:
     contains(needs.detect-changes.outputs.changed_areas, 'services/shared')
   steps:
     - uses: actions/checkout@v4
-    
+
     - name: Setup Python with uv
       uses: ./.github/actions/setup-python-uv
       with:
         python-version: '3.11'
         service-package: services/notifications
-        
+
     - name: Run tests
       run: pytest services/notifications/tests -v
 ```
@@ -100,7 +100,7 @@ build-notifications:
     contains(needs.detect-changes.outputs.changed_areas, 'docker')
   steps:
     - uses: actions/checkout@v4
-    
+
     - name: Login to ACR
       uses: ./.github/actions/azure-acr-login
       with:
@@ -108,7 +108,7 @@ build-notifications:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         acr-name: ${{ vars.ACR_NAME }}
-        
+
     - name: Build and push
       uses: ./.github/actions/docker-build-push
       with:

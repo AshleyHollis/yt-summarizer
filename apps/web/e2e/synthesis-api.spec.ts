@@ -45,7 +45,7 @@ test.describe('US6: Synthesis API Integration', () => {
 
       // Verify response structure
       expect(data.synthesisType).toBe('learning_path');
-      
+
       // Should either have learning path OR insufficient content
       if (data.insufficientContent) {
         // If insufficient, should have message
@@ -81,10 +81,10 @@ test.describe('US6: Synthesis API Integration', () => {
 
       if (!data.insufficientContent && data.learningPath?.items?.length > 0) {
         const firstItem = data.learningPath.items[0];
-        
+
         // Evidence should be an array with segment citations
         expect(Array.isArray(firstItem.evidence)).toBeTruthy();
-        
+
         if (firstItem.evidence.length > 0) {
           const evidence = firstItem.evidence[0];
           expect(evidence.videoId).toBeDefined();
@@ -186,7 +186,7 @@ test.describe('US6: Synthesis API Integration', () => {
 
       // Verify the response has the expected structure regardless of content sufficiency
       expect(data.synthesisType).toBe('learning_path');
-      
+
       // Either insufficient content (ideal) or learning path (acceptable but less relevant)
       if (data.insufficientContent) {
         expect(data.insufficientMessage).toBeTruthy();
@@ -270,7 +270,7 @@ test.describe('US6: Synthesis API Integration', () => {
      * These tests verify that the LLM correctly orders videos from beginner → advanced.
      * They use Corey Schafer's Python OOP tutorial series from global-setup.ts which has
      * a known correct pedagogical order (numbered 1-6, each building on previous concepts).
-     * 
+     *
      * IMPORTANT: This tests the core spec requirement US6 AC#4:
      * "Given a curated video series with a known correct pedagogical order,
      *  When user asks for a 'learning path', Then the returned order matches
@@ -297,10 +297,10 @@ test.describe('US6: Synthesis API Integration', () => {
       }
 
       expect(data.learningPath).toBeTruthy();
-      
+
       // Expect at least 1 video in the learning path
       expect(data.learningPath.items.length).toBeGreaterThanOrEqual(1);
-      
+
       // If we have fewer than 2 videos, skip ordering verification but pass the test
       if (data.learningPath.items.length < 2) {
         console.log(`Only ${data.learningPath.items.length} video(s) returned - ordering test skipped`);
@@ -314,16 +314,16 @@ test.describe('US6: Synthesis API Integration', () => {
 
       // Get the expected order from our test fixture (Python OOP series)
       const expectedOrder = ORDERED_TEST_VIDEOS.pythonOOP.expectedOrder;
-      
+
       // Find which of our ordered test videos appear in the results
-      const foundVideos = expectedOrder.filter(expected => 
+      const foundVideos = expectedOrder.filter(expected =>
         returnedVideoIds.some((returned: string) => returned.includes(expected.id) || expected.id.includes(returned))
       );
 
       // If we found at least 2 of our ordered videos, verify their relative order
       if (foundVideos.length >= 2) {
         const returnedPositions = foundVideos.map(video => {
-          const idx = returnedVideoIds.findIndex((id: string) => 
+          const idx = returnedVideoIds.findIndex((id: string) =>
             id.includes(video.id) || video.id.includes(id)
           );
           return { id: video.id, level: video.level, position: idx, expectedPos: expectedOrder.findIndex(e => e.id === video.id) };
@@ -337,11 +337,11 @@ test.describe('US6: Synthesis API Integration', () => {
         for (let i = 0; i < returnedPositions.length - 1; i++) {
           const currentLevel = levelOrder.indexOf(returnedPositions[i].level);
           const nextLevel = levelOrder.indexOf(returnedPositions[i + 1].level);
-          
+
           // Current should be at same or lower level than next
           expect(currentLevel).toBeLessThanOrEqual(nextLevel);
         }
-        
+
         console.log(`Verified ${foundVideos.length} videos in correct pedagogical order`);
       }
     });
@@ -366,12 +366,12 @@ test.describe('US6: Synthesis API Integration', () => {
       }
 
       expect(data.learningPath).toBeTruthy();
-      
+
       if (data.learningPath.items.length >= 2) {
         const returnedVideoIds = data.learningPath.items.map(
           (item: { videoId: string }) => item.videoId
         );
-        
+
         // Map returned videos to their tutorial numbers (from video titles)
         const tutorialNumbers = ORDERED_TEST_VIDEOS.pythonOOP.expectedOrder
           .filter(v => returnedVideoIds.some((id: string) => id.includes(v.id)))
@@ -413,7 +413,7 @@ test.describe('US6: Synthesis API Integration', () => {
         // The 58-second kettlebell short (aSYap2yhW8s) should not appear in learning paths
         // because shorts lack sufficient content for pedagogical ordering
         const shortVideoId = 'aSYap2yhW8s';
-        
+
         const hasShort = data.learningPath.items.some(
           (item: { videoId: string }) => item.videoId.includes(shortVideoId)
         );
@@ -447,7 +447,7 @@ test.describe('US6: Synthesis API Integration', () => {
         for (const item of data.learningPath.items) {
           expect(item.rationale).toBeDefined();
           expect(item.rationale.length).toBeGreaterThan(10);
-          
+
           // Rationale should explain difficulty level or progression context
           // We just verify it exists and is meaningful, not its exact content
         }
@@ -459,12 +459,12 @@ test.describe('US6: Synthesis API Integration', () => {
     /**
      * These tests verify that the LLM can infer correct pedagogical order from CONTENT ANALYSIS
      * rather than explicit indicators like "Tutorial 1, 2, 3" or "Beginner/Advanced" labels.
-     * 
+     *
      * This is a harder test than explicit ordering because:
      * 1. Video titles have NO explicit difficulty markers
      * 2. Videos are from multiple creators (no channel-based hints)
      * 3. LLM must understand the content/topic to determine prerequisites
-     * 
+     *
      * Example: "What is a callback?" should come before "JavaScript Async Await" because
      * understanding callbacks is a prerequisite for understanding async/await.
      */

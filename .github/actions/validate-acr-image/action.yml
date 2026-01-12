@@ -42,22 +42,22 @@ runs:
         REPOSITORY="${{ inputs.repository }}"
         TAG="${{ inputs.tag }}"
         FAIL_IF_MISSING="${{ inputs.fail-if-missing }}"
-        
+
         echo "🔍 Validating image exists in ACR..."
         echo "  Registry: ${REGISTRY}.azurecr.io"
         echo "  Repository: ${REPOSITORY}"
         echo "  Tag: ${TAG}"
-        
+
         # Try to get manifest for the specific tag
         # This requires authentication, which should be set up by Azure Login action
         MANIFEST=$(az acr repository show --name "$REGISTRY" --image "${REPOSITORY}:${TAG}" --output json 2>&1 || echo "")
-        
+
         if [ -z "$MANIFEST" ] || [[ "$MANIFEST" == *"not found"* ]] || [[ "$MANIFEST" == *"ResourceNotFound"* ]]; then
           echo "exists=false" >> $GITHUB_OUTPUT
           echo "digest=" >> $GITHUB_OUTPUT
-          
+
           echo "::warning::❌ Image NOT found: ${REGISTRY}.azurecr.io/${REPOSITORY}:${TAG}"
-          
+
           if [ "$FAIL_IF_MISSING" = "true" ]; then
             echo ""
             echo "::error::Required image does not exist in ACR!"
@@ -83,12 +83,12 @@ runs:
             echo "     - Check that the service principal has AcrPush permissions"
             echo "::endgroup::"
             echo ""
-            
+
             # List available tags for this repository to help debugging
             echo "::group::📦 Available Tags in ${REPOSITORY}"
             az acr repository show-tags --name "$REGISTRY" --repository "$REPOSITORY" --orderby time_desc --output table --top 20 2>/dev/null || echo "Could not list tags (permission issue or repository doesn't exist)"
             echo "::endgroup::"
-            
+
             exit 1
           fi
         else
@@ -97,20 +97,20 @@ runs:
           set +e
           DIGEST=$(echo "$MANIFEST" | jq -r '.digest // ""' 2>/dev/null)
           set -e
-          
+
           # Fallback if jq fails or returns null
           if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
             DIGEST=""
           fi
-          
+
           echo "exists=true" >> $GITHUB_OUTPUT
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
-          
+
           echo "✅ Image exists in ACR"
           if [ -n "$DIGEST" ]; then
             echo "   Digest: ${DIGEST}"
           fi
-        fi    
+        fi
     - name: Test Kubernetes image pull capability
       id: k8s-pull-test
       shell: bash
@@ -120,7 +120,7 @@ runs:
         REPOSITORY="${{ inputs.repository }}"
         TAG="${{ inputs.tag }}"
         FULL_IMAGE="${REGISTRY}.azurecr.io/${REPOSITORY}:${TAG}"
-        
+
         echo ""
         echo "🧪 Testing Kubernetes image pull capability..."
         echo "   This verifies that K8s pods can actually pull the image (not just Azure CLI)"
@@ -157,7 +157,7 @@ runs:
         echo "  ⏳ Waiting for pod status (max 60s)..."
         for i in {1..60}; do
           POD_STATUS=$(kubectl get pod ${POD_NAME} -n "$TEST_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-          
+
           if [ "$POD_STATUS" = "Running" ] || [ "$POD_STATUS" = "Succeeded" ]; then
             PULL_SUCCESS=true
             echo "  ✅ Image pull SUCCESSFUL - Pod status: $POD_STATUS"
@@ -166,14 +166,14 @@ runs:
             echo "  ❌ Image pull FAILED - Pod status: $POD_STATUS"
             break
           fi
-          
+
           # Check container status for more detail
           CONTAINER_STATE=$(kubectl get pod ${POD_NAME} -n "$TEST_NAMESPACE" -o jsonpath='{.status.containerStatuses[0].state}' 2>/dev/null || echo "")
           if [[ "$CONTAINER_STATE" == *"ErrImagePull"* ]] || [[ "$CONTAINER_STATE" == *"ImagePullBackOff"* ]]; then
             echo "  ❌ Image pull FAILED - Container state: ErrImagePull/ImagePullBackOff"
             break
           fi
-          
+
           sleep 1
         done
 
@@ -184,12 +184,12 @@ runs:
           kubectl describe pod ${POD_NAME} -n "$TEST_NAMESPACE" 2>/dev/null | grep -A 20 "Events:" || echo "Could not retrieve events"
           echo "  ::endgroup::"
           echo ""
-          
+
           echo "  ::group::🔍 Container Status Details"
           kubectl get pod ${POD_NAME} -n "$TEST_NAMESPACE" -o jsonpath='{.status.containerStatuses[0]}' 2>/dev/null | jq '.' || echo "Could not retrieve container status"
           echo "  ::endgroup::"
           echo ""
-          
+
           echo "::error::❌ CRITICAL: Image exists in ACR but Kubernetes CANNOT pull it!"
           echo "::error:: "
           echo "::error::  This indicates an ACR authentication/permissions issue:"
@@ -204,16 +204,16 @@ runs:
         else
           echo "  ✅ VERIFICATION PASSED: Kubernetes can successfully pull this image"
         fi
-        
+
         # Cleanup
         kubectl delete pod ${POD_NAME} -n "$TEST_NAMESPACE" --ignore-not-found=true &>/dev/null || true
         if [ "$CLEANUP_NEEDED" = "true" ]; then
           kubectl delete namespace "$TEST_NAMESPACE" --ignore-not-found=true &>/dev/null || true
         fi
-        
+
         # Output result
         echo "pull_success=${PULL_SUCCESS}" >> $GITHUB_OUTPUT
-        
+
         # Exit with error if pull test failed
         if [ "$PULL_SUCCESS" = "false" ]; then
           exit 1

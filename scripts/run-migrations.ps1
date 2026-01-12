@@ -73,7 +73,7 @@ try {
     # Run migrations with timeout
     Write-Host ""
     Write-Host "Running migrations..." -ForegroundColor Green
-    
+
     $job = Start-Job -ScriptBlock {
         param($dir)
         Set-Location $dir
@@ -81,7 +81,7 @@ try {
     } -ArgumentList $sharedDir
 
     $completed = Wait-Job $job -Timeout $Timeout
-    
+
     if (-not $completed) {
         Stop-Job $job
         Remove-Job $job

@@ -15,9 +15,9 @@
  */
 
 import { useVideoContext, useScope, useAISettings } from "@/app/providers";
-import { 
-  FolderOpenIcon, 
-  FilmIcon, 
+import {
+  FolderOpenIcon,
+  FilmIcon,
   UsersIcon,
   LightBulbIcon,
   GlobeAltIcon,
@@ -96,23 +96,23 @@ export function ScopeIndicator() {
 
   // Knowledge source toggles with better descriptions
   const knowledgeSources = [
-    { 
-      key: "useVideoContext" as const, 
-      label: "Your Videos", 
+    {
+      key: "useVideoContext" as const,
+      label: "Your Videos",
       icon: BookOpenIcon,
       description: "Search transcripts & summaries from your library",
       shortDesc: "Library content"
     },
-    { 
-      key: "useLLMKnowledge" as const, 
-      label: "AI Knowledge", 
+    {
+      key: "useLLMKnowledge" as const,
+      label: "AI Knowledge",
       icon: LightBulbIcon,
       description: "Include AI's general knowledge in answers",
       shortDesc: "General knowledge"
     },
-    { 
-      key: "useWebSearch" as const, 
-      label: "Web Search", 
+    {
+      key: "useWebSearch" as const,
+      label: "Web Search",
       icon: GlobeAltIcon,
       description: "Search the web for current information",
       shortDesc: "Live web results"

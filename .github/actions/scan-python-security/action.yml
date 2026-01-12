@@ -36,17 +36,17 @@ runs:
         echo "🔒 Python Security Scan (bandit)"
         echo "════════════════════════════════════════════════════════════════"
         echo ""
-        
+
         # Auto-detect source directory
         if [ -d "src" ]; then
           SCAN_DIR="src"
         else
           SCAN_DIR="."
         fi
-        
+
         echo "📁 Scanning directory: $SCAN_DIR"
         echo ""
-        
+
         # Exclude test directories and skip common test-related warnings
         # B101: assert_used (expected in tests)
         # B110: try_except_pass (acceptable for telemetry/optional features)

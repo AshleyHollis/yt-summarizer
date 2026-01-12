@@ -2,25 +2,25 @@ import { test, expect, Page } from "@playwright/test";
 
 /**
  * E2E tests for Chat Response Quality
- * 
+ *
  * Tests verify that the copilot responds correctly based on:
  * - The videos in the library (seeded via global-setup.ts)
  * - The configured LLM (DeepSeek-V3.2)
- * 
+ *
  * Test videos (all with YouTube auto-captions for cost efficiency):
  * - The Perfect Push Up (Calisthenicmovement) - IODxDxX7oi4 - 3:37 ✓ has captions
  * - You CAN do pushups! (Hybrid Calisthenics) - 0GsVJsS6474 - 3:09 ✓ has captions
  * - The Perfect Push-Up (short) - c-lBErfxszs - 0:31 ✓ has captions
  * - The BEST Kettlebell Swing Tutorial - aSYap2yhW8s - 0:58 ✓ has captions
  * - How To Do Kettlebell Swings | Proper Form - hp3qVqIHNOI - 4:37 ✓ has captions
- * 
+ *
  * Videos are clustered by topic for relationship testing:
  * - Push-up cluster: IODxDxX7oi4 + 0GsVJsS6474 + c-lBErfxszs (should relate)
  * - Kettlebell cluster: aSYap2yhW8s + hp3qVqIHNOI (should relate)
- * 
+ *
  * IMPORTANT: Videos without YouTube auto-captions require Whisper transcription
  * which is expensive. Verify captions with: yt-dlp --list-subs "URL"
- * 
+ *
  * These tests use multiple assertions per test for efficiency.
  */
 
@@ -80,15 +80,15 @@ test.describe("Chat Response Quality", () => {
     // 3. Response should mention key push-up concepts (form cues from the videos)
     const pageContent = await page.content();
     const lowerContent = pageContent.toLowerCase();
-    
+
     // Should mention at least some of these push-up form cues
     const formCues = ["plank", "elbow", "shoulder", "chest", "straight", "body", "core", "arms"];
     const foundCues = formCues.filter(cue => lowerContent.includes(cue));
     expect(foundCues.length).toBeGreaterThan(2);
 
     // 4. Should cite the push-up videos (check for video titles)
-    const hasPushUpVideo = 
-      lowerContent.includes("perfect push up") || 
+    const hasPushUpVideo =
+      lowerContent.includes("perfect push up") ||
       lowerContent.includes("the push-up") ||
       lowerContent.includes("push up");
     expect(hasPushUpVideo).toBe(true);
@@ -109,10 +109,10 @@ test.describe("Chat Response Quality", () => {
     // 2. Should reference the kettlebell video
     const pageContent = await page.content();
     const lowerContent = pageContent.toLowerCase();
-    
+
     // Should mention kettlebell-related content
-    const hasKettlebellContent = 
-      lowerContent.includes("kettlebell") || 
+    const hasKettlebellContent =
+      lowerContent.includes("kettlebell") ||
       lowerContent.includes("pavel") ||
       lowerContent.includes("swing") ||
       lowerContent.includes("cassiusk");
@@ -134,8 +134,8 @@ test.describe("Chat Response Quality", () => {
     // 2. Should reference Mark Wildman or heavy clubs content
     const pageContent = await page.content();
     const lowerContent = pageContent.toLowerCase();
-    
-    const hasHeavyClubsContent = 
+
+    const hasHeavyClubsContent =
       lowerContent.includes("heavy club") ||
       lowerContent.includes("mark wildman") ||
       lowerContent.includes("beginner") ||
@@ -157,20 +157,20 @@ test.describe("Chat Response Quality", () => {
     const videoLinks = page.locator('a[href*="/videos/"], a[href*="/library/"]');
     const citations = page.locator('superscript');
     const sourcesSection = page.getByText('Sources');
-    
+
     // At least one of these should be present
     const hasVideoLinks = await videoLinks.count() > 0;
     const hasCitations = await citations.count() > 0;
     const hasSources = await sourcesSection.count() > 0;
-    
+
     expect(hasVideoLinks || hasCitations || hasSources).toBe(true);
 
     // Check page has content from exercise-related topics
     const pageContent = await page.content();
     const lowerContent = pageContent.toLowerCase();
-    
+
     // Should mention exercise-related content
-    const hasExerciseContent = 
+    const hasExerciseContent =
       lowerContent.includes("exercise") ||
       lowerContent.includes("push") ||
       lowerContent.includes("kettlebell") ||
@@ -188,10 +188,10 @@ test.describe("Chat Response Quality", () => {
 
     // 2. Response should be a coherent answer, not just transcript dump
     const pageContent = await page.content();
-    
+
     // Should have structured content - check for lists or paragraphs in HTML
-    const hasStructuredContent = 
-      pageContent.includes("<li") || 
+    const hasStructuredContent =
+      pageContent.includes("<li") ||
       pageContent.includes("<ul") ||
       pageContent.includes("<ol") ||
       pageContent.includes("<p") ||
@@ -204,7 +204,7 @@ test.describe("Chat Response Quality", () => {
 
   test("irrelevant query shows Limited Information indicator", async ({ page }) => {
     await submitQuery(page, "How do I bake a chocolate cake?");
-    
+
     // Wait for the "Limited Information" response
     await page.waitForSelector('text="Limited Information"', { timeout: 30000 });
 
@@ -230,14 +230,14 @@ test.describe("Chat Response Quality", () => {
 
     // Find a video link - could be in /videos/ or /library/ paths
     const videoLink = page.locator('a[href*="/videos/"], a[href*="/library/"]').first();
-    
+
     // If no links found, skip this test (citations may be text-only)
     const linkCount = await videoLink.count();
     if (linkCount === 0) {
       console.log("No video links found in copilot response - citations may be text-only");
       return;
     }
-    
+
     await expect(videoLink).toBeVisible();
 
     // Get the href before clicking
@@ -258,12 +258,12 @@ test.describe("Chat Response Quality", () => {
 
     // Video detail page should load with video info
     await page.waitForLoadState("networkidle");
-    
+
     // Should show video content - look for headings or article content
     const hasHeading = await page.locator("h1, h2, h3").first().isVisible().catch(() => false);
     const hasArticle = await page.locator("article").count() > 0;
     const hasVideoPlayer = await page.locator("video, iframe, [class*='player']").count() > 0;
-    
+
     expect(hasHeading || hasArticle || hasVideoPlayer).toBe(true);
   });
 });
@@ -282,7 +282,7 @@ test.describe("Chat Edge Cases", () => {
 
     // Try to submit empty query - send button should be disabled
     const sendButton = page.getByRole("button", { name: /send/i });
-    
+
     // With empty input, send should be disabled
     await expect(sendButton).toBeDisabled();
 
@@ -290,7 +290,7 @@ test.describe("Chat Edge Cases", () => {
     await input.fill("   ");
     // Send should still be disabled or the query should be trimmed
     const isDisabled = await sendButton.isDisabled();
-    
+
     // Either button is disabled OR if we can submit, it handles gracefully
     if (!isDisabled) {
       await input.press("Enter");
@@ -302,12 +302,12 @@ test.describe("Chat Edge Cases", () => {
 
   test("handles special characters in query", async ({ page }) => {
     await submitQuery(page, "What about push-ups? (with good form) & proper technique!");
-    
+
     // Should still work and not crash
     await waitForResponse(page);
-    
+
     // Should get a response (either video cards or "limited information")
-    const hasResponse = 
+    const hasResponse =
       await page.locator('a[href*="/videos/"]').count() > 0 ||
       await page.locator('text="Limited Information"').count() > 0;
     expect(hasResponse).toBe(true);
@@ -319,7 +319,7 @@ test.describe("Chat Edge Cases", () => {
       "what muscles are worked, how many reps and sets I should do, " +
       "and any tips for people who have wrist problems. " +
       "Also interested in variations like diamond push-ups, wide push-ups, and decline push-ups.";
-    
+
     await submitQuery(page, longQuery);
     await waitForResponse(page);
 
@@ -337,7 +337,7 @@ test.describe("Chat Edge Cases", () => {
     // Second query - different topic
     await submitQuery(page, "What about kettlebells?");
     await waitForResponse(page);
-    
+
     // Should show new results
     const pageContent = await page.content();
     expect(pageContent.toLowerCase()).toContain("kettlebell");

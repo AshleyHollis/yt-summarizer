@@ -138,43 +138,43 @@ Both patterns use the same progress state schema for consistency:
 interface WorkflowProgress {
   /** Unique workflow ID */
   workflowId: string;
-  
+
   /** Current step number (1-based) */
   step: number;
-  
+
   /** Total number of steps */
   totalSteps: number;
-  
+
   /** Completion percentage (0-100) */
   percent: number;
-  
+
   /** Human-readable message for current step */
   message: string;
-  
+
   /** Workflow status */
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-  
+
   /** Optional: Current step details */
   currentStep?: {
     name: string;
     description: string;
     startedAt: string; // ISO timestamp
   };
-  
+
   /** Optional: List of completed steps */
   completedSteps?: Array<{
     name: string;
     completedAt: string;
     durationMs: number;
   }>;
-  
+
   /** Optional: Error information if failed */
   error?: {
     code: string;
     message: string;
     retryable: boolean;
   };
-  
+
   /** Optional: Workflow result (on completion) */
   result?: unknown;
 }

@@ -231,7 +231,7 @@ class MyStageWorker(BaseWorker):
             queue_name="my-input-queue",
             service_name="my-stage-worker"
         )
-    
+
     async def process_message(self, message, correlation_id: str) -> WorkerResult:
         # Processing logic - telemetry is automatic
         # Span events like message_received, processing_started are added by BaseWorker

@@ -9,7 +9,7 @@ This refactoring applied SOLID and Clean Code principles by extracting inline ba
 
 #### `.github/actions/get-pr-metadata/action.yml`
 **Purpose**: Extract PR metadata from pull_request or workflow_dispatch events
-**Inputs**: 
+**Inputs**:
 - Event context data (event name, PR number, refs, SHAs)
 **Outputs**:
 - `pr_number`, `pr_head_ref`, `pr_head_sha`, `base_sha`
@@ -20,7 +20,7 @@ This refactoring applied SOLID and Clean Code principles by extracting inline ba
 
 #### `.github/actions/get-production-image-tag/action.yml`
 **Purpose**: Extract current image tag from production Kustomize overlay
-**Inputs**: 
+**Inputs**:
 - `overlay-path` (defaults to `k8s/overlays/prod/kustomization.yaml`)
 **Outputs**:
 - `image_tag`
@@ -52,7 +52,7 @@ This refactoring applied SOLID and Clean Code principles by extracting inline ba
   id: set-pr
   run: |
     # 15 lines of inline bash script
-    
+
 - name: Set base SHA for comparison
   id: base-sha
   run: |

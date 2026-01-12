@@ -1,11 +1,11 @@
 /**
  * Tests for Thread Persistence Service
- * 
+ *
  * These tests ensure the rich UI loading functionality works correctly:
  * 1. prepareMessagesForDisplay reconstructs toolCalls for persisted messages
  * 2. Tool names are correctly inferred from result structure
  * 3. CopilotKit can render the right component when loading saved threads
- * 
+ *
  * @see threadPersistence.ts for implementation details
  */
 
@@ -23,11 +23,11 @@ describe('prepareMessagesForDisplay', () => {
   describe('tool name inference', () => {
     /**
      * CRITICAL TEST: Ensures persisted threads show rich UI after page refresh.
-     * 
+     *
      * When a thread is loaded from the server, the assistant message may have
      * empty content and no toolCalls array. We need to reconstruct the toolCalls
      * from the following tool result message, with the CORRECT tool name.
-     * 
+     *
      * The tool name MUST match what's registered in useRenderToolCall:
      * - "query_library" (snake_case) - NOT "queryLibrary" (camelCase)
      */
@@ -49,13 +49,13 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      
+
       // Find the assistant message
       const assistantMsg = result.find(m => m.role === 'assistant');
       expect(assistantMsg).toBeDefined();
       expect(assistantMsg?.toolCalls).toBeDefined();
       expect(assistantMsg?.toolCalls).toHaveLength(1);
-      
+
       // CRITICAL: Tool name must be "query_library" (snake_case)
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('query_library');
     });
@@ -76,7 +76,7 @@ describe('prepareMessagesForDisplay', () => {
 
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('search_videos');
     });
 
@@ -96,7 +96,7 @@ describe('prepareMessagesForDisplay', () => {
 
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('search_segments');
     });
 
@@ -116,7 +116,7 @@ describe('prepareMessagesForDisplay', () => {
 
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('get_video_summary');
     });
 
@@ -136,7 +136,7 @@ describe('prepareMessagesForDisplay', () => {
 
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('get_library_coverage');
     });
 
@@ -156,7 +156,7 @@ describe('prepareMessagesForDisplay', () => {
 
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('get_topics_for_channel');
     });
 
@@ -176,7 +176,7 @@ describe('prepareMessagesForDisplay', () => {
 
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('query_library');
     });
   });
@@ -205,7 +205,7 @@ describe('prepareMessagesForDisplay', () => {
 
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       // Should keep the original tool name
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('custom_tool');
     });
@@ -221,10 +221,10 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      
+
       const assistant1 = result.find(m => m.id === 'assistant-1');
       const assistant2 = result.find(m => m.id === 'assistant-2');
-      
+
       expect(assistant1?.toolCalls?.[0].id).toBe('call_1');
       expect(assistant2?.toolCalls?.[0].id).toBe('call_2');
     });
@@ -241,7 +241,7 @@ describe('prepareMessagesForDisplay', () => {
       // but this test documents the expected behavior for missing results
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       // Should still reconstruct toolCalls since toolCallId exists
       expect(assistantMsg?.toolCalls).toBeDefined();
     });
@@ -260,7 +260,7 @@ describe('prepareMessagesForDisplay', () => {
 
       const result = prepareMessagesForDisplay(messages);
       const assistantMsg = result.find(m => m.role === 'assistant');
-      
+
       // Should default to query_library when can't parse JSON
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('query_library');
     });
@@ -273,7 +273,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      
+
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(messages[0]);
     });
@@ -284,7 +284,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      
+
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(messages[0]);
     });
@@ -295,7 +295,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      
+
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(messages[0]);
     });
@@ -306,7 +306,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      
+
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(messages[0]);
     });
@@ -320,7 +320,7 @@ describe('copilotToThreadMessages', () => {
     ];
 
     const result = copilotToThreadMessages(copilotMessages);
-    
+
     expect(result).toHaveLength(1);
     expect(result[0].role).toBe('user');
     expect(result[0].content).toBe('Hello');
@@ -332,7 +332,7 @@ describe('copilotToThreadMessages', () => {
     ];
 
     const result = copilotToThreadMessages(copilotMessages);
-    
+
     expect(result).toHaveLength(1);
     expect(result[0].role).toBe('assistant');
     expect(result[0].content).toBe('How can I help?');
@@ -349,7 +349,7 @@ describe('copilotToThreadMessages', () => {
     ];
 
     const result = copilotToThreadMessages(copilotMessages);
-    
+
     // Should create assistant message with toolCalls
     const assistantMsg = result.find(m => m.role === 'assistant');
     expect(assistantMsg?.toolCalls).toBeDefined();
@@ -374,7 +374,7 @@ describe('copilotToThreadMessages', () => {
     ];
 
     const result = copilotToThreadMessages(copilotMessages);
-    
+
     const toolMsg = result.find(m => m.role === 'tool');
     expect(toolMsg?.toolCallId).toBe('call_abc123');
   });
@@ -388,7 +388,7 @@ describe('generateTitle', () => {
   it('should truncate long titles at word boundary', () => {
     const longText = 'This is a very long question about something that goes on and on and on';
     const result = generateTitle(longText);
-    
+
     expect(result.length).toBeLessThanOrEqual(51); // 50 + ellipsis
     expect(result).toContain('…');
   });
@@ -408,7 +408,7 @@ describe('computeMessageHash', () => {
 
     const hash1 = computeMessageHash(messages);
     const hash2 = computeMessageHash(messages);
-    
+
     expect(hash1).toBe(hash2);
   });
 
@@ -422,7 +422,7 @@ describe('computeMessageHash', () => {
 
     const hash1 = computeMessageHash(messages1);
     const hash2 = computeMessageHash(messages2);
-    
+
     expect(hash1).not.toBe(hash2);
   });
 });
@@ -466,14 +466,14 @@ describe('messagesChanged', () => {
 /**
  * These tests document the expected behavior when switching threads.
  * They ensure that loaded threads display correctly with rich UI.
- * 
+ *
  * THREAD SWITCHING FLOW:
  * 1. User clicks thread in dropdown
  * 2. selectThread() updates activeThreadId
  * 3. fetchThread() loads messages from server
  * 4. prepareMessagesForDisplay() reconstructs toolCalls
  * 5. CopilotKit re-renders with rich UI
- * 
+ *
  * CRITICAL: Step 4 is essential - without it, rich UI won't render.
  */
 describe('Thread switching scenarios', () => {
@@ -518,11 +518,11 @@ describe('Thread switching scenarios', () => {
 
       // Verify structure
       expect(displayMessages).toHaveLength(3);
-      
+
       // User message unchanged
       expect(displayMessages[0].role).toBe('user');
       expect(displayMessages[0].content).toBe('What videos do you have about investing?');
-      
+
       // Assistant message now has toolCalls reconstructed
       const assistant = displayMessages[1];
       expect(assistant.role).toBe('assistant');
@@ -530,7 +530,7 @@ describe('Thread switching scenarios', () => {
       expect(assistant.toolCalls).toHaveLength(1);
       expect(assistant.toolCalls![0].id).toBe('call_invest123');
       expect(assistant.toolCalls![0].function.name).toBe('query_library');
-      
+
       // Tool result unchanged
       expect(displayMessages[2].role).toBe('tool');
       expect(displayMessages[2].toolCallId).toBe('call_invest123');
@@ -566,7 +566,7 @@ describe('Thread switching scenarios', () => {
       expect(assistant1?.toolCalls?.[0].id).toBe('call_1');
       expect(assistant2?.toolCalls?.[0].id).toBe('call_2');
       expect(assistant3?.toolCalls?.[0].id).toBe('call_3');
-      
+
       // All should be query_library
       expect(assistant1?.toolCalls?.[0].function.name).toBe('query_library');
       expect(assistant2?.toolCalls?.[0].function.name).toBe('query_library');
@@ -597,7 +597,7 @@ describe('Thread switching scenarios', () => {
       const greeting = displayMessages.find(m => m.id === 'greeting');
       expect(greeting?.content).toBe('Hello! I can help you search your video library.');
       expect(greeting?.toolCalls).toBeUndefined();
-      
+
       // But the second assistant message should have toolCalls
       const assistant1 = displayMessages.find(m => m.id === 'assistant-1');
       expect(assistant1?.toolCalls).toBeDefined();

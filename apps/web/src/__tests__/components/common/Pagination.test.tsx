@@ -76,7 +76,7 @@ describe('Pagination', () => {
       const prevButtons = screen.getAllByRole('button').filter(
         (btn) => btn.textContent?.includes('Previous') || btn.querySelector('[data-testid="chevron-left"]')
       );
-      
+
       // At least one previous button should be disabled
       const disabledPrevButton = prevButtons.find(btn => btn.hasAttribute('disabled'));
       expect(disabledPrevButton).toBeTruthy();
@@ -88,7 +88,7 @@ describe('Pagination', () => {
       const prevButtons = screen.getAllByRole('button').filter(
         (btn) => btn.textContent?.includes('Previous') || btn.querySelector('[data-testid="chevron-left"]')
       );
-      
+
       // At least one previous button should be enabled
       const enabledPrevButton = prevButtons.find(btn => !btn.hasAttribute('disabled'));
       expect(enabledPrevButton).toBeTruthy();
@@ -100,7 +100,7 @@ describe('Pagination', () => {
       const nextButtons = screen.getAllByRole('button').filter(
         (btn) => btn.textContent?.includes('Next') || btn.querySelector('[data-testid="chevron-right"]')
       );
-      
+
       // At least one next button should be disabled
       const disabledNextButton = nextButtons.find(btn => btn.hasAttribute('disabled'));
       expect(disabledNextButton).toBeTruthy();
@@ -112,7 +112,7 @@ describe('Pagination', () => {
       const nextButtons = screen.getAllByRole('button').filter(
         (btn) => btn.textContent?.includes('Next') || btn.querySelector('[data-testid="chevron-right"]')
       );
-      
+
       // At least one next button should be enabled
       const enabledNextButton = nextButtons.find(btn => !btn.hasAttribute('disabled'));
       expect(enabledNextButton).toBeTruthy();
@@ -129,7 +129,7 @@ describe('Pagination', () => {
         (btn) => btn.textContent?.includes('Next') || btn.querySelector('[data-testid="chevron-right"]')
       );
       const enabledNextButton = nextButtons.find(btn => !btn.hasAttribute('disabled'));
-      
+
       if (enabledNextButton) {
         fireEvent.click(enabledNextButton);
         expect(onPageChange).toHaveBeenCalledWith(2);
@@ -145,7 +145,7 @@ describe('Pagination', () => {
         (btn) => btn.textContent?.includes('Previous') || btn.querySelector('[data-testid="chevron-left"]')
       );
       const enabledPrevButton = prevButtons.find(btn => !btn.hasAttribute('disabled'));
-      
+
       if (enabledPrevButton) {
         fireEvent.click(enabledPrevButton);
         expect(onPageChange).toHaveBeenCalledWith(4);
@@ -159,7 +159,7 @@ describe('Pagination', () => {
       // Click on page 3
       const page3Button = screen.getByRole('button', { name: '3' });
       fireEvent.click(page3Button);
-      
+
       expect(onPageChange).toHaveBeenCalledWith(3);
     });
   });

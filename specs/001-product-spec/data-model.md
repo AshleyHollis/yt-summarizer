@@ -348,7 +348,7 @@ ORDER BY Distance ASC;
 
 ```sql
 -- Get related videos with evidence
-SELECT 
+SELECT
     r.RelationshipType,
     r.Confidence,
     r.Rationale,
@@ -369,7 +369,7 @@ ORDER BY r.Confidence DESC;
 
 ```sql
 -- Facet counts for current scope
-SELECT 
+SELECT
     f.Name AS Topic,
     f.FacetType,
     COUNT(DISTINCT vf.VideoId) AS VideoCount
@@ -389,7 +389,7 @@ ORDER BY VideoCount DESC;
 
 ```sql
 -- Jobs for a video with timing
-SELECT 
+SELECT
     j.JobId,
     j.JobType,
     j.Status,

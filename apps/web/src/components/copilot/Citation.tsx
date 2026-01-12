@@ -59,11 +59,11 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
   const maxScore = 0.6;
   const minDisplay = 70;
   const maxDisplay = 100;
-  
+
   const clampedScore = Math.max(minScore, Math.min(confidence, maxScore));
   const rescaledScore = minDisplay + ((clampedScore - minScore) / (maxScore - minScore)) * (maxDisplay - minDisplay);
   const percentage = Math.round(rescaledScore);
-  
+
   // Color based on display percentage
   const getColorClass = (): string => {
     if (percentage >= 90) return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';

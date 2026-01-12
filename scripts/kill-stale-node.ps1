@@ -16,7 +16,7 @@ $orphanedProcesses = $nextProcesses | Where-Object {
 
 if ($orphanedProcesses) {
     Write-Host "Found $($orphanedProcesses.Count) orphaned Next.js process(es)..."
-    $orphanedProcesses | ForEach-Object { 
+    $orphanedProcesses | ForEach-Object {
         $mem = [math]::Round((Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).WorkingSet64 / 1MB)
         Write-Host "  PID $($_.ProcessId) ($($mem)MB) - killing..."
         Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue

@@ -15,7 +15,7 @@
 .EXAMPLE
     # First, get AKS credentials
     az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
-    
+
     # Then run this script
     ./scripts/bootstrap-argocd.ps1
 #>

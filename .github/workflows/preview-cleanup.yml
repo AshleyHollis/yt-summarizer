@@ -41,13 +41,13 @@ jobs:
           else
             echo "⚠️  SWA cleanup completed with warnings (environment may not have existed)"
           fi
-          
+
           cat >> $GITHUB_STEP_SUMMARY << 'EOF'
           ## 🗑️ Azure Static Web Apps Cleanup
-          
+
           **Status:** ${{ steps.swa-cleanup.outcome == 'success' && '✅ Success' || '⚠️  Completed with warnings' }}
           **PR Number:** #${{ github.event.pull_request.number }}
-          
+
           The staging environment for this PR has been processed for deletion.
           EOF
 
@@ -58,10 +58,10 @@ jobs:
             const merged = ${{ github.event.pull_request.merged }};
             const prNumber = ${{ github.event.pull_request.number }};
             const status = merged ? 'merged ✅' : 'closed ❌';
-            const actionNote = merged 
+            const actionNote = merged
               ? 'Code has been merged to main and will be deployed to production.'
               : 'PR was closed without merging.';
-            
+
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -115,4 +115,3 @@ jobs:
         with:
           acr-name: ${{ vars.ACR_NAME || 'acrytsummprd' }}
           pr-number: ${{ github.event.pull_request.number }}
-

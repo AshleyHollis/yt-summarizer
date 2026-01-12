@@ -14,11 +14,11 @@ interface UncertaintyMessageProps {
 
 /**
  * UncertaintyMessage Component
- * 
+ *
  * Displays a message when the AI has limited information to answer.
  * Optionally shows a "Search Entire Library" button when the search
  * was scoped to a specific video or subset.
- * 
+ *
  * This helps users understand WHY they're not getting results and
  * gives them an actionable way to broaden their search.
  */
@@ -41,7 +41,7 @@ export function UncertaintyMessage({
           <p className="text-sm text-[var(--copilot-kit-secondary-contrast-color)] leading-relaxed mt-1">
             {message}
           </p>
-          
+
           {/* Scope suggestion when results are limited */}
           {showBroadenOption && onBroadenScope && (
             <div className="mt-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">

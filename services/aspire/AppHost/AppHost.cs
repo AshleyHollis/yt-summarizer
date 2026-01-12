@@ -53,9 +53,9 @@ var web = builder.AddNpmApp("web", "../../../apps/web", "dev")
 // Using AddExecutable to avoid pip install conflicts - venvs are pre-created
 // Workers use gRPC protocol for OTLP (default) with SSL certs from SSL_CERT_DIR
 var transcribeWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/transcribe"));
-var transcribeWorker = builder.AddExecutable("transcribe-worker", 
+var transcribeWorker = builder.AddExecutable("transcribe-worker",
         Path.Combine(transcribeWorkerPath, ".venv/Scripts/python.exe"),
-        transcribeWorkerPath, 
+        transcribeWorkerPath,
         "__main__.py")
     .WithReference(blobs)
     .WithReference(queues)

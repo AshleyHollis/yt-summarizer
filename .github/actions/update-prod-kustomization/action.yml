@@ -20,12 +20,12 @@ runs:
       working-directory: ${{ inputs.kustomization-path }}
       run: |
         IMAGE_TAG="${{ inputs.image-tag }}"
-        
+
         python ../../../scripts/ci/update_prod_kustomization.py \
           --template ../../../${{ inputs.template-path }} \
           --output kustomization.yaml \
           --image-tag "${IMAGE_TAG}"
-        
+
         echo "✅ Updated production kustomization with tag: ${IMAGE_TAG}"
         echo ""
         echo "--- kustomization.yaml ---"

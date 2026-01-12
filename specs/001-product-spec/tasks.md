@@ -451,7 +451,7 @@
 
 - [X] T186 [P] Add OpenTelemetry SDK to workers in services/workers/pyproject.toml
   - Install same packages as API plus opentelemetry-instrumentation-azure-sdk (for queue/blob)
-  
+
 - [X] T186a Create shared OpenTelemetry configuration in services/shared/shared/telemetry/config.py
   - configure_telemetry(service_name: str) function reusable by API and workers
   - Auto-detect Aspire OTLP endpoint from environment
@@ -679,7 +679,7 @@ Phase 2 (Foundational) ──────┬────────────
 
 **Phase 2 (Foundational)**: T020, T021, T022, T023, T024, T25 can run in parallel after migrations
 
-**Phase 3 (US1)**: 
+**Phase 3 (US1)**:
 - T035, T040 (models) can run in parallel
 - T049, T050, T053, T054 (components) can run in parallel
 

@@ -231,7 +231,7 @@ ORDER BY j.updated_at DESC;
 
 ```sql
 -- Average processing time per stage (last 24 hours)
-SELECT 
+SELECT
   job_type,
   AVG(DATEDIFF(second, started_at, completed_at)) as avg_seconds,
   MAX(DATEDIFF(second, started_at, completed_at)) as max_seconds

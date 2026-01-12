@@ -6,7 +6,7 @@
 .DESCRIPTION
     Analyzes git diff to determine which parts of the codebase changed.
     Outputs JSON indicating which pipeline stages should run.
-    
+
 .PARAMETER BaseSha
     Base commit SHA to compare against (defaults to HEAD~1)
 
@@ -21,7 +21,7 @@
 
 .EXAMPLE
     ./detect-changes.ps1 -BaseSha main -HeadSha HEAD
-    
+
 .EXAMPLE
     ./detect-changes.ps1 -PrNumber 123 -OutputFormat json
 #>
@@ -74,10 +74,10 @@ function Get-ChangedFiles {
         [string]$Head,
         [int]$PR
     )
-    
+
     if ($PR -gt 0) {
         Write-Host "Fetching changed files from PR #$PR via GitHub API..."
-        
+
         $repo = $env:GITHUB_REPOSITORY
         if (-not $repo) {
             # Try to get from git remote
@@ -88,15 +88,15 @@ function Get-ChangedFiles {
                 throw "Could not determine repository. Set GITHUB_REPOSITORY environment variable."
             }
         }
-        
+
         $token = $env:GITHUB_TOKEN ?? $env:GH_TOKEN
         $headers = @{}
         if ($token) {
             $headers["Authorization"] = "Bearer $token"
         }
-        
+
         $apiUrl = "https://api.github.com/repos/$repo/pulls/$PR/files?per_page=100"
-        
+
         try {
             $response = Invoke-RestMethod -Uri $apiUrl -Headers $headers -Method Get
             return $response | ForEach-Object { $_.filename }
@@ -106,16 +106,16 @@ function Get-ChangedFiles {
             # Fall through to git diff
         }
     }
-    
+
     # Use git diff
     Write-Host "Analyzing changes between $Base and $Head..."
     $files = git diff --name-only "$Base" "$Head" 2>$null
-    
+
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "git diff failed, using git show for HEAD"
         $files = git show --name-only --pretty=format: HEAD
     }
-    
+
     return $files | Where-Object { $_ }
 }
 
@@ -124,25 +124,25 @@ function Test-PathMatch {
         [string]$Path,
         [string[]]$Patterns
     )
-    
+
     foreach ($pattern in $Patterns) {
         $isNegative = $pattern.StartsWith("!")
         $cleanPattern = if ($isNegative) { $pattern.Substring(1) } else { $pattern }
-        
+
         # Convert glob pattern to regex
         $regex = $cleanPattern `
             -replace '\*\*/', '.*' `
             -replace '/\*\*', '/.*' `
             -replace '\*', '[^/]*' `
             -replace '\.', '\.'
-        
+
         $regex = "^$regex$"
-        
+
         if ($Path -match $regex) {
             return -not $isNegative
         }
     }
-    
+
     return $false
 }
 
@@ -154,7 +154,7 @@ if (-not $changedFiles) {
 } else {
     Write-Host "Changed files:"
     $changedFiles | ForEach-Object { Write-Host "  $_" }
-    
+
     # Check each file against patterns
     foreach ($file in $changedFiles) {
         # Check code components
@@ -174,7 +174,7 @@ if (-not $changedFiles) {
             $changes.frontend = $true
             $changes.code_changes = $true
         }
-        
+
         # Check infrastructure
         if (Test-PathMatch $file $patterns.kubernetes) {
             $changes.kubernetes = $true
@@ -188,7 +188,7 @@ if (-not $changedFiles) {
             $changes.docker = $true
             $changes.code_changes = $true
         }
-        
+
         # Check docs and CI
         if (Test-PathMatch $file $patterns.docs) {
             $changes.docs = $true
@@ -198,7 +198,7 @@ if (-not $changedFiles) {
             $changes.code_changes = $true
         }
     }
-    
+
     # Determine if only tests changed
     $testFiles = $changedFiles | Where-Object {
         (Test-PathMatch $_ $patterns.api_tests) -or
@@ -206,7 +206,7 @@ if (-not $changedFiles) {
         (Test-PathMatch $_ $patterns.shared_tests) -or
         (Test-PathMatch $_ $patterns.frontend_tests)
     }
-    
+
     $changes.tests_only = ($testFiles.Count -eq $changedFiles.Count) -and ($changedFiles.Count -gt 0)
 }
 
@@ -245,7 +245,7 @@ switch ($OutputFormat) {
         }
         $output | ConvertTo-Json -Depth 3
     }
-    
+
     "github-actions" {
         Write-Host "Setting GitHub Actions outputs..."
         foreach ($key in $changes.Keys) {
@@ -257,20 +257,20 @@ switch ($OutputFormat) {
         foreach ($key in $summary.Keys) {
             Write-Output "$key=$($summary[$key].ToString().ToLower())" >> $env:GITHUB_OUTPUT
         }
-        
+
         Write-Host ""
         Write-Host "Changes detected:"
         $changes.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object {
             Write-Host "  ✓ $($_.Key)"
         }
-        
+
         Write-Host ""
         Write-Host "Pipeline stages to run:"
         $stages.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object {
             Write-Host "  ✓ $($_.Key)"
         }
     }
-    
+
     "text" {
         Write-Host ""
         Write-Host "=== Change Detection Results ==="
@@ -280,14 +280,14 @@ switch ($OutputFormat) {
             $status = if ($_.Value) { "✓" } else { "○" }
             Write-Host "  $status $($_.Key)"
         }
-        
+
         Write-Host ""
         Write-Host "Pipeline Stages:"
         $stages.GetEnumerator() | Sort-Object Key | ForEach-Object {
             $status = if ($_.Value) { "RUN" } else { "SKIP" }
             Write-Host "  [$status] $($_.Key)"
         }
-        
+
         Write-Host ""
         Write-Host "Summary:"
         Write-Host "  Code changes: $($summary.has_code_changes)"

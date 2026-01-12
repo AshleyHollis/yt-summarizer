@@ -1,11 +1,11 @@
 /**
  * Reusable styling utilities for CopilotKit components.
- * 
+ *
  * This file centralizes all copilot styling patterns to:
  * 1. Avoid conflicts with CopilotKit's internal styles
  * 2. Ensure consistency across all copilot components
  * 3. Make styling changes easy to maintain
- * 
+ *
  * All styles use CopilotKit CSS variables for theme compatibility.
  */
 

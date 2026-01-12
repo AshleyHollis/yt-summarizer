@@ -58,7 +58,7 @@ span_link = create_span_link_from_message(message)
 with tracer.start_as_current_span("process", links=[span_link] if span_link else []) as span:
     # Add events to mark key milestones
     add_span_event(span, "message_received", {"queue": "my-queue"})
-    
+
     try:
         result = process(message)
         add_span_event(span, "processing_completed", {"status": "success"})

@@ -15,7 +15,7 @@ terraform {
 locals {
   environment = "prod"
   name_prefix = "ytsumm-prd"
-  
+
   common_tags = {
     Environment = local.environment
     Project     = "yt-summarizer"
@@ -212,7 +212,7 @@ module "github_oidc" {
 # =============================================================================
 # CLUSTER COMPONENTS - Managed by Argo CD (not Terraform)
 # =============================================================================
-# 
+#
 # The following components are NOT managed by Terraform:
 # - Nginx Ingress Controller → k8s/argocd/infra-apps.yaml
 # - External Secrets Operator → k8s/argocd/infra-apps.yaml
@@ -315,7 +315,7 @@ output "github_oidc_federated_credentials" {
 # Output for post-deploy instructions
 output "post_deploy_instructions" {
   value = <<-EOT
-    
+
     ╔═══════════════════════════════════════════════════════════════════════════╗
     ║ NEXT STEPS: Bootstrap Argo CD and Cluster Components                      ║
     ╠═══════════════════════════════════════════════════════════════════════════╣
