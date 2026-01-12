@@ -8,11 +8,11 @@ terraform {
   required_providers {
     azuread = {
       source  = "hashicorp/azuread"
-      version = "~> 2.47"
+      version = ">= 2.47"
     }
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.85"
+      version = ">= 3.85"
     }
   }
 }
@@ -32,7 +32,8 @@ resource "azuread_application" "github_actions" {
   display_name = var.application_name
   owners       = [data.azurerm_client_config.current.object_id]
 
-  tags = var.tags
+  # Convert map tags to set of strings for Azure AD
+  tags = [for k, v in var.tags : "${k}:${v}"]
 }
 
 # -----------------------------------------------------------------------------
@@ -43,7 +44,7 @@ resource "azuread_service_principal" "github_actions" {
   client_id = azuread_application.github_actions.client_id
   owners    = [data.azurerm_client_config.current.object_id]
 
-  tags = var.tags
+  # Note: tags are inherited from the application
 }
 
 # -----------------------------------------------------------------------------
