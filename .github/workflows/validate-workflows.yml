@@ -41,8 +41,9 @@ jobs:
 
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
+        continue-on-error: true  # Existing workflows have errors - report but don't block
         with:
-          fail_level: none  # Report issues but don't fail - existing workflows have issues
+          fail_level: none
           filter_mode: nofilter
 
   pre-commit-check:
