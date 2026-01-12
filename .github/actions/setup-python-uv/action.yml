@@ -50,14 +50,14 @@ runs:
     - name: Install shared package
       if: inputs.shared-package == 'true'
       shell: bash
-      run: uv pip install --system -e "services/shared[dev]"
+      run: uv pip install --system --prerelease=allow -e "services/shared[dev]"
 
     - name: Install service package
       if: inputs.service-package != ''
       shell: bash
-      run: uv pip install --system -e "${{ inputs.service-package }}[dev]"
+      run: uv pip install --system --prerelease=allow -e "${{ inputs.service-package }}[dev]"
 
     - name: Install pytest-xdist
       if: inputs.install-pytest-xdist == 'true'
       shell: bash
-      run: uv pip install --system pytest-xdist
+      run: uv pip install --system --prerelease=allow pytest-xdist
