@@ -56,38 +56,11 @@ IMPORTANT! Consider avoiding persistent containers early during development to a
 IMPORTANT! The aspire workload is obsolete. You should never attempt to install or use the Aspire workload.
 
 ## Official documentation
-IMPORTANT! Always prefer official documentation when available. The following sites contain the official documentation for Aspire and related components
+IMPORTANT! Always prefer official documentation when available. The following sites contain the official documentation for Aspire and related components:
 
 1. https://aspire.dev
 2. https://learn.microsoft.com/dotnet/aspire
 3. https://nuget.org (for specific integration package details)
-
-## Available tools
-Below is a concise list of repository-level tools and agent-facing utilities you can use when working in this repo.
-
-- **Aspire** (primary orchestrator) — run with `aspire run`. Useful commands / MCP tools include:
-  - `aspire run`, `aspire update`
-  - `list resources`, `execute resource command`
-  - `list integrations`, `get integration docs`
-  - `list structured logs`, `list console logs`, `list traces`, `list trace structured logs`
-  - `select apphost`, `list apphosts`
-  - AppHost is defined in `apphost.cs` (see `services/aspire/AppHost`). The repo includes a wrapper `tools/aspire.cmd` which launches Aspire detached and writes logs to `aspire.log` in the workspace root.
-
-- **Playwright / E2E** — frontend E2E tests live in `apps/web` and are run via `playwright test` (npm script `test:e2e`). Playwright reports are stored at `apps/web/playwright-report/`. There is also a Playwright MCP server configured for functional investigations.
-
-- **Repository scripts** (see `scripts/`) — high-level helpers such as `scripts/run-tests.ps1` (runs all test suites and is required to be executed before marking features complete), `run-migrations.ps1`, `start-workers.ps1`, `smoke-test.ps1`, etc.
-
-- **GitHub Actions & custom actions** — there are many reusable actions under `.github/actions/` (examples: `run-playwright-tests`, `run-pytest`, `run-ruff-check`, `docker-build-push`). Check that folder for action implementations and usage patterns.
-
-- **CI / Docker & Terraform** — `docker-compose.ci.yml` and workflows in `.github/workflows/` are used by CI for building images and running tests. Terraform manifests live in `infra/terraform/` (providers, modules, environments). Common CI-related actions include `terraform-plan`, `validate-argocd-paths`, `verify-azure-credentials`, `record-test-duration`, and others under `.github/actions/`.
-
-- **Kubernetes & Argo CD** — Kubernetes manifests and base overlays live under `k8s/`, `base/`, and `overlays/`. The preview deploy flow (see `.github/workflows/preview.yml`) updates a Kustomize overlay with PR-specific image tags, commits the overlay, and relies on Argo CD to pick up and apply changes.
-  - K8s tooling available in actions: `setup-kustomize`, `kustomize-validate`, `get-aks-ingress-ip`, `wait-for-argocd-sync`, and `azure/aks-set-context` (used to set AKS context in workflows).
-  - Helm is used in Terraform provider configuration for managing Argo CD and other charts (see `infra/terraform/providers.tf`).
-
-- **Developer helper tools** — the repo references auxiliary tools such as `dotnet-outdated` (suggested for apphost upgrades). Install as needed, e.g. `dotnet tool install --global dotnet-outdated-tool`.
-
-> **Note:** This is a concise reference — for usage examples and caveats see the sections above (Aspire guidance, Playwright notes) and the specific scripts/actions referenced.
 
 ## Test Enforcement
 
