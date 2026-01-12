@@ -124,64 +124,91 @@ jobs:
           PLAN_OUTCOME: ${{ steps.plan.outcome }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          retries: 3
           script: |
             const summary = JSON.parse(process.env.PLAN_SUMMARY || '{"add":0,"change":0,"destroy":0,"has_changes":false}');
             const formattedPlan = process.env.FORMATTED_PLAN || 'No plan output available';
             const planOutcome = process.env.PLAN_OUTCOME;
 
-            console.log('Posting Terraform plan to PR...');
-            console.log('Issue number:', context.issue.number);
-            console.log('Plan outcome:', planOutcome);
-            console.log('Plan summary:', JSON.stringify(summary, null, 2));
+            core.info(`🔍 Plan Outcome: ${planOutcome}`);
+            core.info(`📊 Summary: Add=${summary.add}, Change=${summary.change}, Destroy=${summary.destroy}`);
+            core.info(`🔗 Issue Number: ${context.issue.number}`);
+            core.info(`🏷️ Run ID: ${context.runId}`);
 
-            // Determine status emoji and color
+            // Determine status and styling
             const statusEmoji = planOutcome === 'success' ? '✅' : '❌';
+            const statusColor = planOutcome === 'success' ? 'success' : 'danger';
+            const statusLabel = planOutcome === 'success' ? 'Success' : 'Failed';
             const hasChanges = summary.has_changes;
 
-            // Build summary section like Terraform Cloud
+            // Build formatted summary (Terraform Cloud style)
             let changesSummary = '';
+            let summaryIcon = '✨';
+            
             if (!hasChanges) {
-              changesSummary = '**No changes.** Infrastructure matches the configuration.';
+              summaryIcon = '✅';
+              changesSummary = `${summaryIcon} No changes. Infrastructure matches the plan.`;
             } else {
               const parts = [];
-              if (summary.add > 0) parts.push(`**${summary.add}** to add`);
-              if (summary.change > 0) parts.push(`**${summary.change}** to change`);
-              if (summary.destroy > 0) parts.push(`**${summary.destroy}** to destroy`);
-              changesSummary = parts.join(', ');
+              const counts = [];
+              if (summary.add > 0) { parts.push(`+${summary.add}`); counts.push('new'); }
+              if (summary.change > 0) { parts.push(`~${summary.change}`); counts.push('changed'); }
+              if (summary.destroy > 0) { parts.push(`-${summary.destroy}`); counts.push('destroyed'); }
+              changesSummary = `${parts.join(', ')} resource(s) ${counts.join(', ')}`;
             }
 
-            // Truncate plan if too long
+            // Format output with proper indentation and truncation
             const maxLength = 60000;
-            const truncatedPlan = formattedPlan.length > maxLength
-              ? formattedPlan.substring(0, maxLength) + '\n\n... (output truncated)'
+            const needsTruncation = formattedPlan.length > maxLength;
+            const truncatedPlan = needsTruncation
+              ? formattedPlan.substring(0, maxLength) + '\n\n...\n*(Plan output truncated for brevity)*'
               : formattedPlan;
 
-            const lines = [
+            // Parse key changes for summary
+            const keyChanges = [];
+            if (formattedPlan.includes('module.github_oidc.azuread_application')) {
+              keyChanges.push('🆕 GitHub OIDC Application');
+            }
+            if (formattedPlan.includes('azurerm_kubernetes_cluster.aks must be replaced')) {
+              keyChanges.push('♻️ AKS Cluster Replacement');
+            }
+            if (formattedPlan.includes('azurerm_federated_identity_credential')) {
+              keyChanges.push('🔑 Federated Identity Credential');
+            }
+
+            // Build formatted comment body
+            const commentBody = [
               `## Terraform Plan ${statusEmoji}`,
               '',
-              '### 📊 Plan Summary',
-              `${changesSummary}`,
+              `<details><summary><b>📊 Plan Summary</b></summary>`,
               '',
-              '<details>',
-              '<summary><strong>📋 View Full Plan</strong></summary>',
+              `**Status:** <span style="color:${statusColor === 'success' ? 'green' : 'red'}">● ${statusLabel}</span>`,
               '',
-              '#### Plan Output',
-              '```terraform',
-              truncatedPlan,
-              '```',
+              `**Changes:** ${changesSummary}`,
               '',
               '</details>',
               '',
+              keyChanges.length > 0 ? `### 🔑 Key Changes\n${keyChanges.map(c => `- ${c}`).join('\n')}\n` : '',
+              `<details><summary><b>📋 View Full Plan</b></summary>`,
+              '',
+              '```hcl',
+              truncatedPlan,
+              '```',
+              '',
+              needsTruncation ? `_Plan output truncated at ${maxLength.toLocaleString()} characters_` : '',
+              '</details>',
+              '',
               '---',
-              `<sub>Pushed by: @${context.actor} • Plan: ${planOutcome} • [View Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})</sub>`
-            ];
-            const body = lines.join('\n');
+              `<sub>💬 Posted by @${context.actor} at ${new Date().toISOString()} • [View Run](${context.payload.repository.html_url}/actions/runs/${context.runId})</sub>`
+            ].join('\n');
 
-            // Find and update existing comment or create new one
+            // Find and update existing comment
+            core.info('📝 Fetching comments...');
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
+              per_page: 100
             });
 
             const botComment = comments.find(comment =>
@@ -189,33 +216,40 @@ jobs:
               comment.body.includes('Terraform Plan')
             );
 
-            console.log('Found existing Terraform comment:', !!botComment);
-            console.log('Total comments:', comments.length);
+            core.info(`🔍 Found ${comments.length} comments, ${botComment ? 'existing Terraform comment found' : 'creating new comment'}`);
 
+            // Update or create comment with retry logic
             try {
               if (botComment) {
-                console.log('Updating existing comment:', botComment.id);
-                await github.rest.issues.updateComment({
+                core.info(`📝 Updating comment ${botComment.id}...`);
+                const updateResult = await github.rest.issues.updateComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   comment_id: botComment.id,
-                  body: body
+                  body: commentBody
                 });
-                console.log('Updated comment successfully');
+                core.info(`✅ Comment updated successfully`);
+                core.setOutput('comment_id', botComment.id);
+                core.setOutput('action', 'updated');
               } else {
-                console.log('Creating new comment');
-                await github.rest.issues.createComment({
+                core.info(`📝 Creating new comment...`);
+                const createResult = await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
-                  body: body
+                  body: commentBody
                 });
-                console.log('Created comment successfully');
+                core.info(`✅ Comment created successfully`);
+                core.setOutput('comment_id', createResult.data.id);
+                core.setOutput('action', 'created');
               }
+              core.notice(`🎉 Terraform plan posted to PR #${context.issue.number}`);
             } catch (error) {
-              console.error('Error posting comment:', error);
-              console.error('Error message:', error.message);
-              console.error('Error status:', error.status);
+              core.error(`❌ Failed to post comment: ${error.message}`);
+              if (error.status) {
+                core.setFailed(`GitHub API returned status ${error.status}`);
+              }
+              core.setFailed(error.stack);
               throw error;
             }
 
