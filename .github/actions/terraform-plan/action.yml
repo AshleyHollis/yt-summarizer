@@ -50,12 +50,12 @@ runs:
       run: |
         # Get structured JSON output from terraform
         terraform show -json tfplan > plan.json
-        
+
         # Parse plan summary from JSON
         ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"]))) | length' plan.json)
         CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | contains(["update"]))) | length' plan.json)
         DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | contains(["delete"]))) | length' plan.json)
-        
+
         # Create JSON summary
         SUMMARY=$(cat <<EOF
         {
