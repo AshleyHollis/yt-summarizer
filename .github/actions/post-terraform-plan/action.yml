@@ -71,13 +71,14 @@ runs:
             let currentDetails = [];
             let inResource = false;
             let braceDepth = 0;
+            let seenResourceBlock = false;
 
             for (const line of lines) {
               // Match resource header: # resource.address will be created/updated/etc
               const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
               if (resourceMatch) {
-                // Save previous resource if exists
-                if (currentResource) {
+                // Save previous resource if exists AND braces are balanced
+                if (currentResource && braceDepth === 0 && seenResourceBlock) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                 }
                 const actionText = resourceMatch[3];
@@ -90,46 +91,49 @@ runs:
                 currentDetails = [];
                 inResource = true;
                 braceDepth = 0;
+                seenResourceBlock = false;
                 continue;
               }
 
               if (inResource) {
-                // Track brace depth to know when resource block ends
+                // Check for section boundaries that end resource capture
+                if (line.match(/^Plan:|^Changes to Outputs:|^Warning:/)) {
+                  if (currentResource && seenResourceBlock) {
+                    resources.push({ ...currentResource, details: currentDetails.join('\n') });
+                    currentResource = null;
+                    currentDetails = [];
+                  }
+                  inResource = false;
+                  continue;
+                }
+
+                // Capture the line first
+                if (line.trim()) {
+                  currentDetails.push(line);
+                  
+                  // Track if we've seen the resource block start
+                  if (line.match(/^\s*[~+\-]\s*resource\s+"/)) {
+                    seenResourceBlock = true;
+                  }
+                }
+
+                // Track brace depth AFTER capturing
                 const openBraces = (line.match(/{/g) || []).length;
                 const closeBraces = (line.match(/}/g) || []).length;
                 braceDepth += openBraces - closeBraces;
 
-                // Check for section boundaries that end resource capture
-                if (line.match(/^Plan:|^Changes to Outputs:|^Warning:|^\s*#\s+\S+.*will be/)) {
-                  // Don't end on another resource header - that's handled above
-                  if (!line.match(/^\s*#\s+\S+.*will be/)) {
-                    inResource = false;
-                    if (currentResource) {
-                      resources.push({ ...currentResource, details: currentDetails.join('\n') });
-                      currentResource = null;
-                      currentDetails = [];
-                    }
-                    continue;
-                  }
-                }
-
-                // Capture the line (including resource block lines)
-                // Skip truly empty lines but keep lines with content
-                if (line.trim() || currentDetails.length > 0) {
-                  currentDetails.push(line);
-                }
-
-                // If we've closed all braces and have content, resource is complete
-                if (braceDepth === 0 && currentDetails.length > 0 && line.match(/^\s*}\s*$/)) {
+                // If we've closed all braces and seen the resource block, resource is complete
+                if (braceDepth === 0 && seenResourceBlock && line.match(/^\s*}\s*$/)) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                   currentResource = null;
                   currentDetails = [];
                   inResource = false;
+                  seenResourceBlock = false;
                 }
               }
             }
             // Don't forget the last resource
-            if (currentResource) {
+            if (currentResource && seenResourceBlock) {
               resources.push({ ...currentResource, details: currentDetails.join('\n') });
             }
             return resources;
@@ -313,13 +317,14 @@ runs:
             let currentDetails = [];
             let inResource = false;
             let braceDepth = 0;
+            let seenResourceBlock = false;
 
             for (const line of lines) {
               // Match resource header: # resource.address will be created/updated/etc
               const resourceMatch = line.match(/^\s*#\s+(.+?)\s+(will be|must be)\s+(created|updated in-place|replaced|destroyed)/);
               if (resourceMatch) {
-                // Save previous resource if exists
-                if (currentResource) {
+                // Save previous resource if exists AND braces are balanced
+                if (currentResource && braceDepth === 0 && seenResourceBlock) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                 }
                 const actionText = resourceMatch[3];
@@ -332,46 +337,49 @@ runs:
                 currentDetails = [];
                 inResource = true;
                 braceDepth = 0;
+                seenResourceBlock = false;
                 continue;
               }
 
               if (inResource) {
-                // Track brace depth to know when resource block ends
+                // Check for section boundaries that end resource capture
+                if (line.match(/^Plan:|^Changes to Outputs:|^Warning:/)) {
+                  if (currentResource && seenResourceBlock) {
+                    resources.push({ ...currentResource, details: currentDetails.join('\n') });
+                    currentResource = null;
+                    currentDetails = [];
+                  }
+                  inResource = false;
+                  continue;
+                }
+
+                // Capture the line first
+                if (line.trim()) {
+                  currentDetails.push(line);
+                  
+                  // Track if we've seen the resource block start
+                  if (line.match(/^\s*[~+\-]\s*resource\s+"/)) {
+                    seenResourceBlock = true;
+                  }
+                }
+
+                // Track brace depth AFTER capturing
                 const openBraces = (line.match(/{/g) || []).length;
                 const closeBraces = (line.match(/}/g) || []).length;
                 braceDepth += openBraces - closeBraces;
 
-                // Check for section boundaries that end resource capture
-                if (line.match(/^Plan:|^Changes to Outputs:|^Warning:|^\s*#\s+\S+.*will be/)) {
-                  // Don't end on another resource header - that's handled above
-                  if (!line.match(/^\s*#\s+\S+.*will be/)) {
-                    inResource = false;
-                    if (currentResource) {
-                      resources.push({ ...currentResource, details: currentDetails.join('\n') });
-                      currentResource = null;
-                      currentDetails = [];
-                    }
-                    continue;
-                  }
-                }
-
-                // Capture the line (including resource block lines)
-                // Skip truly empty lines but keep lines with content
-                if (line.trim() || currentDetails.length > 0) {
-                  currentDetails.push(line);
-                }
-
-                // If we've closed all braces and have content, resource is complete
-                if (braceDepth === 0 && currentDetails.length > 0 && line.match(/^\s*}\s*$/)) {
+                // If we've closed all braces and seen the resource block, resource is complete
+                if (braceDepth === 0 && seenResourceBlock && line.match(/^\s*}\s*$/)) {
                   resources.push({ ...currentResource, details: currentDetails.join('\n') });
                   currentResource = null;
                   currentDetails = [];
                   inResource = false;
+                  seenResourceBlock = false;
                 }
               }
             }
             // Don't forget the last resource
-            if (currentResource) {
+            if (currentResource && seenResourceBlock) {
               resources.push({ ...currentResource, details: currentDetails.join('\n') });
             }
             return resources;
