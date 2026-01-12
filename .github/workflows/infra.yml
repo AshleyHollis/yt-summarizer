@@ -159,14 +159,12 @@ ${changesSummary}
 <summary><strong>📋 View Full Plan</strong></summary>
 
 #### Plan Output
-\`\`\`terraform
-${truncatedPlan}
-\`\`\`
+` + '```terraform\n' + truncatedPlan + '\n```' + `
 
 </details>
 
 ---
-<sub>Pushed by: @${{ github.actor }} • Plan: \`${planOutcome}\` • [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})</sub>`;
+<sub>Pushed by: @\${{ github.actor }} • Plan: ` + '`' + planOutcome + '`' + ` • [View Run](https://github.com/\${{ github.repository }}/actions/runs/\${{ github.run_id }})</sub>`;
             
             // Find and update existing comment or create new one
             const { data: comments } = await github.rest.issues.listComments({
