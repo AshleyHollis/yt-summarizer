@@ -119,7 +119,8 @@ describe('findChanges', () => {
     const lines = findChanges(before, after, {}, '');
 
     assert.strictEqual(lines.length, 1);
-    assert.ok(lines[0].includes('~'));
+    // Modified values use '!' marker for update actions
+    assert.ok(lines[0].includes('!'), 'Changed value should use ! marker');
     assert.ok(lines[0].includes('"old"'));
     assert.ok(lines[0].includes('"new"'));
   });
@@ -127,7 +128,7 @@ describe('findChanges', () => {
   test('skips identical values', () => {
     const before = { name: 'same', count: 5 };
     const after = { name: 'same', count: 5 };
-    const lines = findChanges(before, after, {}, '');
+    const lines = findChanges(before, after, {}, '', '  ');
 
     assert.strictEqual(lines.length, 0);
   });
@@ -142,6 +143,19 @@ describe('findChanges', () => {
     assert.ok(lines[0].includes('(known after apply)'));
   });
 
+  test('skips markers when forceMarker is "  " (for create/destroy)', () => {
+    const before = {};
+    const after = { name: 'test', count: 5, enabled: true };
+    const lines = findChanges(before, after, {}, '', '  ');
+
+    assert.strictEqual(lines.length, 3);
+    lines.forEach(line => {
+      assert.ok(!line.startsWith('+'), `Create should not have + marker: ${line}`);
+      assert.ok(!line.startsWith('-'), `Create should not have - marker: ${line}`);
+      assert.ok(!line.startsWith('!'), `Create should not have ! marker: ${line}`);
+    });
+  });
+
   test('forces + marker for all lines when forceMarker is +', () => {
     const before = {};
     const after = { name: 'test', count: 5, enabled: true };
@@ -150,7 +164,7 @@ describe('findChanges', () => {
     assert.strictEqual(lines.length, 3);
     lines.forEach(line => {
       assert.ok(line.startsWith('+'), `Line should start with +: ${line}`);
-      assert.ok(!line.includes('->'), `Create should not show before->after: ${line}`);
+      assert.ok(!line.includes('->'), `Should not show before->after: ${line}`);
     });
   });
 
@@ -162,6 +176,21 @@ describe('findChanges', () => {
     assert.strictEqual(lines.length, 2);
     lines.forEach(line => {
       assert.ok(line.startsWith('-'), `Line should start with -: ${line}`);
+    });
+  });
+
+  test('handles nested blocks with no markers ("  " forceMarker)', () => {
+    const before = {};
+    const after = { tags: { env: 'prod', team: 'infra' } };
+    const lines = findChanges(before, after, {}, '', '  ');
+
+    assert.ok(lines.length >= 1, 'Should have lines for nested block');
+    // All lines should NOT use markers
+    lines.forEach(line => {
+      if (line.trim() !== '}') {
+        assert.ok(!line.startsWith('+') && !line.startsWith('-') && !line.startsWith('!'),
+          `Line should NOT have diff markers: ${line}`);
+      }
     });
   });
 
@@ -181,7 +210,7 @@ describe('findChanges', () => {
 });
 
 describe('formatResourceChange', () => {
-  test('create action uses + for all content lines', () => {
+  test('create action uses no markers for content lines', () => {
     const change = {
       type: 'aws_instance',
       name: 'web',
@@ -195,16 +224,22 @@ describe('formatResourceChange', () => {
     const result = formatResourceChange(change, 'create');
     const lines = result.split('\n');
 
-    // First line should be the resource header with +
-    assert.ok(lines[0].startsWith('+'), 'Resource header should start with +');
+    // Resource header should have no marker
+    assert.ok(lines[0].startsWith('resource'), 'Resource header should start with "resource"');
+    assert.ok(!lines[0].startsWith('+'), 'Create header should NOT have + marker');
 
-    // Content lines should all use + (except closing brace)
+    // Content lines should NOT use markers (just indentation)
     lines.slice(1, -1).forEach(line => {
-      assert.ok(line.startsWith('+'), `Create content line should start with +: ${line}`);
+      // Lines should either be attribute lines with 4-space indentation or closing brace
+      const isAttributeLine = line.trim().startsWith('    ') || line.includes('=');
+      if (isAttributeLine) {
+        assert.ok(!line.startsWith('+') && !line.startsWith('-'),
+          `Create content line should NOT have markers: ${line}`);
+      }
     });
   });
 
-  test('destroy action uses - for all content lines', () => {
+  test('destroy action uses no markers for content lines', () => {
     const change = {
       type: 'aws_instance',
       name: 'web',
@@ -218,16 +253,22 @@ describe('formatResourceChange', () => {
     const result = formatResourceChange(change, 'destroy');
     const lines = result.split('\n');
 
-    // First line should be the resource header with -
-    assert.ok(lines[0].startsWith('-'), 'Resource header should start with -');
+    // Resource header should have no marker
+    assert.ok(lines[0].startsWith('resource'), 'Resource header should start with "resource"');
+    assert.ok(!lines[0].startsWith('-'), 'Destroy header should NOT have - marker');
 
-    // Content lines should all use - (except closing brace)
+    // Content lines should NOT use markers (just indentation)
     lines.slice(1, -1).forEach(line => {
-      assert.ok(line.startsWith('-'), `Destroy content line should start with -: ${line}`);
+      // Lines should either be attribute lines with 4-space indentation or closing brace
+      const isAttributeLine = line.trim().startsWith('    ') || line.includes('=');
+      if (isAttributeLine) {
+        assert.ok(!line.startsWith('+') && !line.startsWith('-'),
+          `Destroy content line should NOT have markers: ${line}`);
+      }
     });
   });
 
-  test('update action uses ~ for changed values', () => {
+  test('update action uses ! for changed values', () => {
     const change = {
       type: 'aws_instance',
       name: 'web',
@@ -241,10 +282,12 @@ describe('formatResourceChange', () => {
     const result = formatResourceChange(change, 'update');
     const lines = result.split('\n');
 
-    // Header should use ~
-    assert.ok(lines[0].startsWith('~'), 'Update header should start with ~');
+    // Header should have no marker (action is shown in collapsible section)
+    assert.ok(lines[0].startsWith('resource'), 'Resource header should start with "resource"');
+    assert.ok(!lines[0].startsWith('!'), 'Update header should NOT have ! marker');
 
-    // Should show before -> after for changed value
+    // Should show before -> after for changed value with ! marker
+    assert.ok(result.includes('! '), 'Update should use ! marker for changed values');
     assert.ok(result.includes('->'), 'Update should show before -> after');
   });
 
@@ -266,7 +309,7 @@ describe('formatResourceChange', () => {
     assert.ok(result.includes('new_tag'), 'Should include the new attribute');
   });
 
-  test('replace action uses ! for header', () => {
+  test('replace action includes force replacement comment', () => {
     const change = {
       type: 'aws_instance',
       name: 'web',
@@ -280,10 +323,53 @@ describe('formatResourceChange', () => {
     const result = formatResourceChange(change, 'replace');
     const lines = result.split('\n');
 
-    // Header should use !
-    assert.ok(lines[0].startsWith('!'), 'Replace header should start with !');
+    // Header should have no marker
+    assert.ok(lines[0].startsWith('resource'), 'Resource header should start with "resource"');
+    assert.ok(!lines[0].startsWith('!'), 'Replace header should NOT have ! marker');
+
     // Should include forces replacement comment
     assert.ok(result.includes('# forces replacement'), 'Replace should include replacement comment');
+  });
+
+  test('replace action uses !! for attribute changes', () => {
+    const change = {
+      type: 'aws_instance',
+      name: 'web',
+      change: {
+        before: { ami: 'ami-old', instance_type: 't2.micro' },
+        after: { ami: 'ami-new', instance_type: 't2.micro' },
+        after_unknown: {}
+      }
+    };
+
+    const result = formatResourceChange(change, 'replace');
+
+    // Replace actions use !! for changed attributes only, header has no marker
+    assert.ok(result.includes('!! '), 'Replace should use !! for changed attributes');
+    assert.ok(!result.includes('! resource'), 'Replace header should NOT have ! marker');
+  });
+
+  test('update with multiple change types uses differentiated markers', () => {
+    const change = {
+      type: 'aws_instance',
+      name: 'web',
+      change: {
+        before: { instance_type: 't2.micro', old_tag: 'old' },
+        after: { instance_type: 't2.small', new_tag: 'new' },
+        after_unknown: {}
+      }
+    };
+
+    const result = formatResourceChange(change, 'update');
+
+    // Should have + for new_tag
+    assert.ok(result.includes('+ ') && result.includes('new_tag'), 'Update should use + for added attributes');
+
+    // Should have - for old_tag
+    assert.ok(result.includes('- ') && result.includes('old_tag'), 'Update should use - for removed attributes');
+
+    // Should have ! for changed instance_type
+    assert.ok(result.includes('! ') && result.includes('instance_type'), 'Update should use ! for modified attributes');
   });
 });
 

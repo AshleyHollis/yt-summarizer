@@ -33,14 +33,25 @@ function formatValue(value, unknown) {
 /**
  * Recursively find all changes between before and after states
  * Format optimized for GitHub diff syntax highlighting (markers at column 0)
+ *
+ * Markers used:
+ *   '+' - Added lines (green, only for updates)
+ *   '-' - Removed lines (red, only for updates)
+ *   '!' - Modified lines (yellow/orange, only for updates)
+ *   '!!' - Force replacement lines (bright red, only for replaces)
+ *
+ * Note: Create and destroy actions use NO markers since the entire resource
+ * block is already visually indicated in a collapsible section.
+ *
  * @param {Object} before - Before state
  * @param {Object} after - After state
  * @param {Object} afterUnknown - Unknown values in after state
  * @param {string} prefix - Indentation prefix (spaces only, no markers)
- * @param {string} forceMarker - Force all lines to use this marker (for create/destroy actions)
+ * @param {string} forceMarker - Force all lines to use this marker (null for create/destroy to skip markers)
+ * @param {boolean} isReplace - Whether this change is part of a force replacement action (affects non-forced markers)
  * @returns {string[]} Array of formatted change lines
  */
-function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = null) {
+function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = null, isReplace = false) {
   const lines = [];
   before = before || {};
   after = after || {};
@@ -59,32 +70,57 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
     const beforeExists = key in before;
     const afterExists = key in after;
 
-    // Skip if values are identical (and not forcing a marker)
-    if (!forceMarker && beforeExists && afterExists && JSON.stringify(beforeVal) === JSON.stringify(afterVal)) {
+    // Skip if values are identical AND we're not forcing explicit markers
+    // Explicit markers: '+', '-', etc. (excluding implicit '  ' for create/destroy)
+    if (beforeExists && afterExists && JSON.stringify(beforeVal) === JSON.stringify(afterVal) &&
+        (forceMarker === '  ' || forceMarker === undefined || forceMarker === null)) {
       continue;
     }
 
     // Determine marker: use forced marker or compute based on change type
-    const marker = forceMarker || (
-      !beforeExists && afterExists ? '+' :
-      beforeExists && !afterExists ? '-' : '~'
-    );
+    // For create/destroy: forceMarker='  ' (two spaces) to skip markers
+    // For updates/replaces: forceMarker=undefined to compute markers dynamically
+    let marker;
 
-    // Handle nested objects/blocks
-    if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
-        (typeof beforeVal === 'object' || beforeVal === undefined || beforeVal === null) &&
-        (!beforeVal || !Array.isArray(beforeVal))) {
-      const nestedBefore = (typeof beforeVal === 'object' && beforeVal !== null) ? beforeVal : {};
-      const nestedLines = findChanges(nestedBefore, afterVal, isUnknown || {}, prefix + '    ', forceMarker);
-      if (nestedLines.length > 0 || forceMarker) {
-        lines.push(`${marker} ${prefix}${key} {`);
-        nestedLines.forEach(l => lines.push(l));
-        lines.push(`  ${prefix}}`);
+    if (forceMarker === '  ' || forceMarker === '') {
+      // Create/destroy mode - use no markers
+      marker = '  ';
+    } else if (forceMarker === '+' || forceMarker === '-') {
+      // Explicit forced marker
+      marker = forceMarker;
+    } else {
+      // Update/replace mode - compute markers dynamically
+      if (isReplace) {
+        marker = '!!'; // Force replacement - bright red
+      } else if (!beforeExists && afterExists) {
+        marker = '+'; // Added
+      } else if (beforeExists && !afterExists) {
+        marker = '-'; // Removed
+      } else {
+        marker = '!'; // Modified
       }
-      continue;
     }
 
-    // Handle arrays (blocks in Terraform)
+    // For arrays/objects, use marker instead of '  ' when in mode that uses markers
+    const shouldUseMarkerForBlocks = !forceMarker || (forceMarker !== '  ' && forceMarker !== '');
+
+  // Handle nested objects/blocks
+  if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
+      (typeof beforeVal === 'object' || beforeVal === undefined || beforeVal === null) &&
+      (!beforeVal || !Array.isArray(beforeVal))) {
+    const nestedBefore = (typeof beforeVal === 'object' && beforeVal !== null) ? beforeVal : {};
+    const nestedLines = findChanges(nestedBefore, afterVal, isUnknown || {}, prefix + '    ', forceMarker, isReplace);
+
+    // Only add block header if there are nested changes or if we're forcing a marker (non-null)
+    if (nestedLines.length > 0 || shouldUseMarkerForBlocks) {
+      // Use computed marker (or '  ' for no marker)
+      const blockMarker = shouldUseMarkerForBlocks ? marker : '  ';
+      lines.push(`${blockMarker} ${prefix}${key} {`);
+      nestedLines.forEach(l => lines.push(l));
+      lines.push(`  ${prefix}}`);
+    }
+    continue;
+  }
     if (Array.isArray(afterVal) || Array.isArray(beforeVal)) {
       const beforeArr = Array.isArray(beforeVal) ? beforeVal : [];
       const afterArr = Array.isArray(afterVal) ? afterVal : [];
@@ -100,43 +136,46 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
           const unknownItem = Array.isArray(isUnknown) ? isUnknown[i] : isUnknown;
 
           if (bItem && aItem) {
-            const nestedLines = findChanges(bItem, aItem, unknownItem || {}, prefix + '    ', forceMarker);
+            const nestedLines = findChanges(bItem, aItem, unknownItem || {}, prefix + '    ', forceMarker, isReplace);
             if (nestedLines.length > 0) {
-              lines.push(`${forceMarker || '~'} ${prefix}${key} {`);
+              const arrayMarker = shouldUseMarkerForBlocks ? (isReplace ? '!!' : '!') : marker;
+              lines.push(`${arrayMarker} ${prefix}${key} {`);
               nestedLines.forEach(l => lines.push(l));
               lines.push(`  ${prefix}}`);
             }
           } else if (aItem && !bItem) {
-            const itemMarker = forceMarker || '+';
+            const itemMarker = marker;
             lines.push(`${itemMarker} ${prefix}${key} {`);
-            const nestedLines = findChanges({}, aItem, unknownItem || {}, prefix + '    ', forceMarker || '+');
+            const itemForceMarker = shouldUseMarkerForBlocks ? undefined : '  ';
+            const nestedLines = findChanges({}, aItem, unknownItem || {}, prefix + '    ', itemForceMarker, false);
             nestedLines.forEach(l => lines.push(l));
             lines.push(`  ${prefix}}`);
           } else if (bItem && !aItem) {
-            const itemMarker = forceMarker || '-';
+            const itemMarker = marker;
             lines.push(`${itemMarker} ${prefix}${key} {`);
             lines.push(`${itemMarker} ${prefix}    # (block removed)`);
             lines.push(`  ${prefix}}`);
           }
         }
       } else {
-        // Simple array comparison - show the value appropriately
-        if (forceMarker) {
-          // For create/destroy, just show the value
-          const val = forceMarker === '-' ? beforeVal : afterVal;
-          lines.push(`${forceMarker} ${prefix}${key} = ${formatValue(val, forceMarker !== '-' && isUnknown)}`);
+        // Simple array comparison
+        if (shouldUseMarkerForBlocks || marker === '  ') {
+          // For create/destroy, just show the value without marker
+          const val = beforeExists ? beforeVal : afterVal;
+          lines.push(`${marker} ${prefix}${key} = ${formatValue(val, isUnknown)}`);
         } else if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
-          lines.push(`~ ${prefix}${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
+          const arrayMarker = isReplace ? '!!' : '!';
+          lines.push(`${arrayMarker} ${prefix}${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
         }
       }
       continue;
     }
 
     // Simple value handling
-    if (forceMarker) {
-      // For forced marker (create/destroy), just show the value without before->after
-      const val = forceMarker === '-' ? beforeVal : afterVal;
-      lines.push(`${forceMarker} ${prefix}${key} = ${formatValue(val, forceMarker !== '-' && isUnknown)}`);
+    if (marker === '  ') {
+      // No marker case (create/destroy) - show the value without before->after
+      const val = beforeExists ? beforeVal : afterVal;
+      lines.push(`  ${prefix}${key} = ${formatValue(val, isUnknown)}`);
     } else if (!beforeExists && afterExists) {
       // Value added
       lines.push(`+ ${prefix}${key} = ${formatValue(afterVal, isUnknown)}`);
@@ -147,7 +186,8 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
       // Value changed
       const beforeFormatted = formatValue(beforeVal, false);
       const afterFormatted = formatValue(afterVal, isUnknown);
-      lines.push(`~ ${prefix}${key} = ${beforeFormatted} -> ${afterFormatted}`);
+      const changeMarker = isReplace ? '!!' : '!';
+      lines.push(`${changeMarker} ${prefix}${key} = ${beforeFormatted} -> ${afterFormatted}`);
     }
   }
 
@@ -166,29 +206,33 @@ function formatResourceChange(change, action) {
   const after = change.change.after || {};
   const afterUnknown = change.change.after_unknown || {};
 
-  // Use diff-compatible prefixes at column 0
-  const symbol = action === 'create' ? '+' : action === 'update' ? '~' : action === 'replace' ? '!' : '-';
+  // Use plain resource header without marker - action is already shown in collapsible summary
+  const isReplaceAction = action === 'replace';
 
-  // Resource header with marker at column 0 for diff highlighting
-  lines.push(`${symbol} resource "${change.type}" "${change.name}" {`);
+  // Resource header (no marker, since action is indicated in section header)
+  lines.push(`resource "${change.type}" "${change.name}" {`);
 
-  if (action === 'replace') {
-    lines.push(`! # forces replacement`);
+  if (isReplaceAction) {
+    lines.push(`    # forces replacement`);
   }
 
-  // Get attribute changes with proper indentation (marker at column 0)
-  // For create/destroy, force all lines to use the same marker
+    // Get attribute changes with proper indentation (marker at column 0)
+  // For create/destroy: NO markers (resource block already indicates action) - use '  '
+  // For replace: use '!!' markers to highlight critical nature
+  // For update: use differentiated markers (+, -, !)
   let changeLines;
   if (action === 'create') {
-    changeLines = findChanges({}, after, afterUnknown, '    ', '+');
+    // Create: no markers needed, entire block shows new resource
+    changeLines = findChanges({}, after, afterUnknown, '    ', '  ', false);
   } else if (action === 'destroy') {
-    changeLines = findChanges(before, {}, {}, '    ', '-');
-  } else if (action === 'replace') {
-    // Replace shows changes but could use ! for emphasis, or ~ for actual changes
-    changeLines = findChanges(before, after, afterUnknown, '    ', null);
+    // Destroy: no markers needed, entire block shows deleted resource
+    changeLines = findChanges(before, {}, {}, '    ', '  ', false);
+  } else if (isReplaceAction) {
+    // Replace shows changes with '!!' markers for force replacement attributes
+    changeLines = findChanges(before, after, afterUnknown, '    ', undefined, true);
   } else {
-    // update
-    changeLines = findChanges(before, after, afterUnknown, '    ', null);
+    // update uses '!' for modifications, '+' for adds, '-' for removes
+    changeLines = findChanges(before, after, afterUnknown, '    ', undefined, false);
   }
 
   changeLines.forEach(l => lines.push(l));
