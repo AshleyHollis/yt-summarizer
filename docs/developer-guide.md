@@ -8,9 +8,9 @@ Before starting, ensure you have the following installed:
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| **Node.js** | 18+ | Frontend development |
+| **Node.js** | 20+ | Frontend development |
 | **Python** | 3.11+ | API and workers |
-| **.NET SDK** | 8.0+ | Aspire orchestration |
+| **.NET SDK** | 9.0+ | Aspire orchestration |
 | **Docker Desktop** | Latest | Containers (SQL, Azurite) |
 | **Azure CLI** | Latest | Azure resource management |
 | **Git** | Latest | Version control |

@@ -2,7 +2,7 @@
 ===============================================================================
 SYNC IMPACT REPORT
 ===============================================================================
-Version: 1.0.2 (Architecture alignment: AKS + Argo CD GitOps)
+Version: 1.2.0 (Engineering quality principles: maintainability, testability, extensibility, modularity, onboarding)
 
 Core capabilities this constitution supports:
   - Cross-video and cross-channel queries
@@ -15,10 +15,31 @@ Principles:
   I.   Product & UX (cross-content queries, citations, graceful degradation)
   II.  AI/Copilot Boundaries (read-only, grounded, library-scoped)
   III. Data & Provenance (SQL as source of truth, relationships, traceability)
-  IV.  Reliability & Operations (async processing, observability, GitOps)
+  IV.  Reliability & Operations (automated service mgmt, async processing, observability, GitOps)
   V.   Security (no secrets, least-privilege)
-  VI.  Engineering Quality (simplicity, testing, migrations)
+  VI.  Engineering Quality (maintainability, testability, extensibility, modularity, testing NON-NEGOTIABLE, migrations)
   VII. Change Management (amendments, compliance, pre-merge checks)
+
+Changes in 1.2.0:
+  - **MAJOR CHANGE**: Added first-class engineering quality principles (VI.1 - VI.5 as NON-NEGOTIABLE)
+  - Added VI.1 Maintaintability: Module isolation, self-documenting code, single responsibility, error handling
+  - Added VI.2 Testability: Pure functions, dependency injection, testable interfaces, no hidden state
+  - Added VI.3 Extensibility: Plugin-like architecture, strategy pattern, configuration-driven, open-closed principle
+  - Added VI.4 Modularity: Clear module boundaries, internal vs public API, layered imports, single entry point
+  - Added VI.5 Onboarding: Module READMEs, usage examples, architecture diagrams, walkthrough comments
+  - Reordered VI to prioritze these quality principles before simplicity
+  - Expanded principles index to reflect new quality-focused governance structure
+
+Changes in 1.1.0:
+  - **MAJOR CHANGE**: Redefined VI.5 "Testing" to be NON-NEGOTIABLE with explicit requirements
+  - Added requirement for unit, integration, AND E2E tests (was "SHOULD", now "MUST")
+  - Added test-driven development requirement: tests MUST fail initially before implementation
+  - Added 100% pass rate requirement before ANY task can be marked complete
+  - Prohibited test skipping: `-SkipE2E` or partial test skipping not allowed for task completion
+  - Added IV.1 "Automated service management": Mandatory background process pattern across all agents
+  - Fixed numbering in Reliability & Operations section (was duplicate "2.")
+  - Added requirement: ALL agents MUST verify background processes before running tests
+  - Added to VII.2: ALL dependent agents MUST be checked and updated after amendments
 
 Changes in 1.0.2:
   - Aligned Architecture Constraints to AKS + Argo CD GitOps (single-node, cost-optimized)
@@ -122,12 +143,22 @@ Changes in 1.0.1:
 
 ### IV. Reliability & Operations
 
-1. **Async-first background processing**: All ingestion and processing MUST be asynchronous. Jobs MUST:
+1. **Automated service management**: ALL background services MUST use official background process pattern:
+   ```powershell
+   # Start Aspire in background (detached) - REQUIRED for non-blocking execution
+   Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "services\aspire\AppHost\AppHost.csproj" -WindowStyle Hidden
+   Start-Sleep -Seconds 30  # Wait for services to initialize
+   ```
+   - **⚠️ PROHIBITED**: Never use `aspire run` or `dotnet run` directly when follow-up commands are needed
+   - **Verification agents MUST** use existing background processes or start them via PowerShell Start-Process
+   - **Fixed ports**: API runs on `http://localhost:8000`, Web runs on `http://localhost:3000`
+
+2. **Async-first background processing**: All ingestion and processing MUST be asynchronous. Jobs MUST:
    - Implement retry with exponential backoff.
    - Dead-letter failed jobs after max retries with diagnostic context.
    - Expose clear job status (pending, running, succeeded, failed) via API.
 
-2. **Serverless wake-up resilience**: Azure SQL serverless auto-pause MUST NOT break UX. The API layer MUST:
+3. **Serverless wake-up resilience**: Azure SQL serverless auto-pause MUST NOT break UX. The API layer MUST:
    - Detect transient connection failures (DB waking up).
    - Retry with appropriate timeouts (up to 60s for cold start).
    - Return user-friendly "warming up" messaging rather than cryptic errors.
@@ -161,19 +192,54 @@ Changes in 1.0.1:
 
 ### VI. Engineering Quality
 
-1. **Simplicity first**: Optimize for maintainability and clarity. Add complexity (specialized vector indexes, caching layers) ONLY when measured need exists.
+1. **Maintainability (NON-NEGOTIABLE)**: Optimize for clarity and longevity of code changes.
+   - **Module isolation**: Changes to one module MUST NOT affect others (clear module boundaries).
+   - **Self-documenting code**: Names, functions, and classes MUST be self-explanatory; comments only explain WHY.
+   - **Single responsibility**: Each function/class MUST have ONE clear purpose.
+   - **DRY principle**: Remove duplication; extract to shared utilities when reuse >2x.
+   - **Error handling**: Every function MUST handle errors appropriately (fail fast or recover gracefully).
 
-2. **Bounded queries**: All queries MUST have sensible limits:
+2. **Testability (NON-NEGOTIABLE)**: Every function/component MUST be testable in isolation.
+   - **Pure functions**: Where possible, functions MUST have deterministic inputs/outputs (no hidden dependencies).
+   - **Dependency injection**: Service dependencies MUST be injectable to enable mocking in tests.
+   - **Testable interfaces**: All external dependencies MUST have interfaces that can be mocked.
+   - **No hidden state**: Functions MUST NOT rely on global or singleton state unless documented.
+   - **Facilities available**: Test fixtures and helpers MUST exist for complex setup scenarios.
+
+3. **Extensibility (NON-NEGOTIABLE)**: Easy to add new formatters, validators, or features.
+   - **Plugin-like architecture**: New formatters/validators MUST be addable without modifying core logic.
+   - **Strategy pattern**: Pluggable algorithms (e.g., different embedding strategies) via interface implementations.
+   - **Configuration-driven**: Feature toggles or behavior changes via config, NOT if/else blocks.
+   - **Open-closed principle**: Open for extension (new formatters) but closed for modification (core logic stable).
+   - **Extension points clearly documented**: Where and how to extend the system MUST be obvious.
+
+4. **Modularity (NON-NEGOTIABLE)**: Clear module boundaries make bugs easier to locate.
+   - **Package/module boundaries**: Each service or domain MUST have clear interface contracts.
+   - **Internal vs public API**: Internal implementation details MUST NOT leak to public interfaces.
+   - **Import dependency graph**: Modules MUST be arranged in layers (no circular dependencies).
+   - **Single entry point**: Each module MUST have ONE primary entry/export for consumers.
+   - **Cross-cutting concerns** (logging, metrics, auth) MUST be handled via middleware/pipes, not scattered.
+
+5. **Onboarding (CLARITY TARGET)**: New developers can understand module by module.
+   - **README per module**: Each major component/service MUST have a README explaining purpose and usage.
+   - **Clear examples**: Public interfaces MUST include usage examples in docstrings or README.
+   - **Architecture diagrams**: Complex interactions MUST be documented with diagrams.
+   - **Walkthrough comments**: Complex flows MUST have inline walkthrough comments for new devs.
+   - **Naming conventions**: Consistent naming across the codebase to learn pattern once and apply everywhere.
+
+6. **Simplicity first**: Optimize for maintainability and clarity. Add complexity (specialized vector indexes, caching layers) ONLY when measured need exists.
+
+7. **Bounded queries**: All queries MUST have sensible limits:
    - Top-K retrieval with configurable but capped limits.
    - Pagination for list endpoints.
    - Sensible defaults (e.g., 10 results per page, 50 max per request).
 
-3. **Cost-aware defaults**: Prefer serverless tiers with auto-pause, batched processing over real-time where latency tolerance exists, and cached results over recomputation.
+8. **Cost-aware defaults**: Prefer serverless tiers with auto-pause, batched processing over real-time where latency tolerance exists, and cached results over recomputation.
 
 4. **Development environment**:
    - **.NET Aspire is for local/dev orchestration only**. It MUST NOT be used for production deployments.
-   - **Production deployments** are performed via AKS + Argo CD GitOps (see IV.4).
-   - **.NET Aspire MUST run as a detached background process** when running tests or subsequent terminal commands. Launching Aspire as a blocking foreground process will cause it to exit when the next terminal command is entered.
+   - **Production deployments** are performed via AKS + Argo CD GitOps (see IV.1).
+   - **.NET Aspire MUST run as a detached background process**. Launching Aspire as a blocking foreground process will cause it to exit when next terminal command is entered.
    - **PowerShell pattern for background Aspire**:
      ```powershell
      # Start Aspire in background (detached) - REQUIRED for non-blocking execution
@@ -181,25 +247,29 @@ Changes in 1.0.1:
      Start-Sleep -Seconds 30  # Wait for services to initialize
      ```
    - **⚠️ NEVER use `aspire run` or `dotnet run` directly** when you need to execute follow-up commands in the same session—they block the terminal and will be killed when the next command runs.
-   - **Fixed ports**: API runs on `http://localhost:8000`, Web runs on `http://localhost:3000`. These are configured with `isProxied: false` in AppHost.cs.
+   - **Background process checks REQUIRED**: All agents MUST verify services are running via background processes and provide startup help ONLY if needed (using Start-Process pattern).
 
-5. **Testing**:
-   - **Unit tests**: MUST cover business logic and transformation functions.
-   - **Integration tests**: SHOULD cover database access and job processing.
+5. **Testing (NON-NEGOTIABLE)**:
+   - **Unit tests**: MUST cover business logic, transformation functions, data models, and service methods.
+   - **Integration tests**: MUST cover database access, message contracts, and cross-service communication.
+   - **E2E tests**: MUST cover all user story acceptance criteria and critical user journeys.
+   - **Test-driven development**: Tests MUST be written before implementation and fail initially.
+   - **100% pass rate required**: NO task may be marked complete until ALL automated tests pass.
+   - **No skipping allowed**: `-SkipE2E` or any partial test skipping is prohibited for task completion.
    - **Smoke tests**: SHOULD verify deployment succeeded and critical paths work.
 
 6. **Migration-driven schema changes**: Database schema changes MUST be defined as versioned migrations, source-controlled, and idempotent where possible.
 
 7. **Small, reviewable PRs**: Prefer incremental changes. Each PR SHOULD address a single concern and include relevant tests.
 
-8. **Dependency discipline**: Keep dependencies minimal and versions pinned.
+11. **Dependency discipline**: Keep dependencies minimal and versions pinned.
 
-9. **Documentation separation**:
+12. **Documentation separation**:
    - **Specs** describe WHAT and WHY (user-visible behavior).
    - **Plans** describe HOW (architecture, stack choices).
    - **Tasks** are concrete, ordered, and testable.
 
-**Rationale**: Clear standards help AI agents and future-you maintain the codebase. Measure before optimizing.
+**Rationale**: These engineering quality principles ensure the codebase is **maintainable**, **testable**, **extensible**, and **easy to understand**. Clear module boundaries and self-documenting code reduce debugging time. Testable interfaces and dependency injection enable comprehensive test coverage. Extensible architecture allows adding features without breaking existing code. Good onboarding reduces time for new developers to become productive. Measure before optimizing complexity.
 
 ---
 
@@ -233,6 +303,7 @@ Changes in 1.0.1:
      - **PATCH**: Clarifications, wording, typo fixes, non-semantic refinements.
    - Update Sync Impact Report.
    - Propagate changes to dependent templates.
+   - **ALL dependent agents MUST be checked and updated** to reflect new principles
 
 3. **Compliance verification**: All PRs/code reviews SHOULD verify alignment with constitutional principles. Violations MUST be justified or rejected.
 
@@ -240,4 +311,4 @@ Changes in 1.0.1:
 
 ---
 
-**Version**: 1.0.2 | **Ratified**: 2025-12-13 | **Last Amended**: 2026-01-09
+**Version**: 1.1.0 | **Ratified**: 2025-12-13 | **Last Amended**: 2026-01-13

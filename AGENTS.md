@@ -77,18 +77,16 @@ This script runs ALL test suites (Shared, Workers, API, Frontend, E2E) and outpu
 # Run ALL tests (default - includes E2E, requires Aspire)
 .\scripts\run-tests.ps1
 
-# Skip E2E for faster development iteration
-.\scripts\run-tests.ps1 -SkipE2E
-
 # Run specific component only
 .\scripts\run-tests.ps1 -Component api
 ```
 
-### Rules:
-1. **NEVER mark a task [X] if tests fail**
-2. **NEVER rationalize skipping E2E tests** - they catch integration issues that unit tests miss
-3. **If Aspire isn't running, the script will start it automatically**
-4. **Unit tests alone are NOT sufficient** - E2E tests are required for completion verification
+### Rules (Constitution VI.5 - NON-NEGOTIABLE):
+1. **NEVER mark a task [X] if ANY tests fail** (100% pass rate required)
+2. **E2E tests are MANDATORY** - they catch integration issues that unit tests miss
+3. **NEVER use -SkipE2E for task completion** - this is for development iteration only
+4. **If Aspire isn't running, use Start-Process per Constitution IV.1** (not `aspire run`)
+5. **Unit + Integration + E2E tests are ALL REQUIRED** per Constitution VI.5
 
 ### What the tests check:
 - Shared package tests (pytest)
