@@ -206,11 +206,25 @@ function formatResourceChange(change, action) {
   const after = change.change.after || {};
   const afterUnknown = change.change.after_unknown || {};
 
-  // Use plain resource header without marker - action is already shown in collapsible summary
   const isReplaceAction = action === 'replace';
 
-  // Resource header (no marker, since action is indicated in section header)
-  lines.push(`resource "${change.type}" "${change.name}" {`);
+  // Resource header with marker (like real Terraform output)
+  // Create: +
+  // Destroy: -
+  // Update: ~
+  // Replace: -/+ (Terraform shows both)
+  let resourceMarker;
+  if (action === 'create') {
+    resourceMarker = '+';
+  } else if (action === 'destroy') {
+    resourceMarker = '-';
+  } else if (isReplaceAction) {
+    resourceMarker = '-/+'; // Replace shows -/+
+  } else {
+    resourceMarker = '~';
+  }
+
+  lines.push(`${resourceMarker} resource "${change.type}" "${change.name}" {`);
 
   if (isReplaceAction) {
     lines.push(`    # forces replacement`);
@@ -236,7 +250,7 @@ function formatResourceChange(change, action) {
   }
 
   changeLines.forEach(l => lines.push(l));
-  lines.push(`  }`);
+  lines.push('}');
 
   return lines.join('\n');
 }

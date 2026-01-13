@@ -224,9 +224,8 @@ describe('formatResourceChange', () => {
     const result = formatResourceChange(change, 'create');
     const lines = result.split('\n');
 
-    // Resource header should have no marker
-    assert.ok(lines[0].startsWith('resource'), 'Resource header should start with "resource"');
-    assert.ok(!lines[0].startsWith('+'), 'Create header should NOT have + marker');
+    // Resource header should have + marker (like real Terraform output)
+    assert.ok(lines[0].startsWith('+ resource'), 'Create header should have + marker');
 
     // Content lines should NOT use markers (just indentation)
     lines.slice(1, -1).forEach(line => {
@@ -253,9 +252,8 @@ describe('formatResourceChange', () => {
     const result = formatResourceChange(change, 'destroy');
     const lines = result.split('\n');
 
-    // Resource header should have no marker
-    assert.ok(lines[0].startsWith('resource'), 'Resource header should start with "resource"');
-    assert.ok(!lines[0].startsWith('-'), 'Destroy header should NOT have - marker');
+    // Resource header should have - marker (like real Terraform output)
+    assert.ok(lines[0].startsWith('- resource'), 'Destroy header should have - marker');
 
     // Content lines should NOT use markers (just indentation)
     lines.slice(1, -1).forEach(line => {
@@ -282,9 +280,8 @@ describe('formatResourceChange', () => {
     const result = formatResourceChange(change, 'update');
     const lines = result.split('\n');
 
-    // Header should have no marker (action is shown in collapsible section)
-    assert.ok(lines[0].startsWith('resource'), 'Resource header should start with "resource"');
-    assert.ok(!lines[0].startsWith('!'), 'Update header should NOT have ! marker');
+    // Header should have ~ marker (like real Terraform output)
+    assert.ok(lines[0].startsWith('~ resource'), 'Update header should have ~ marker');
 
     // Should show before -> after for changed value with ! marker
     assert.ok(result.includes('! '), 'Update should use ! marker for changed values');
@@ -323,8 +320,8 @@ describe('formatResourceChange', () => {
     const result = formatResourceChange(change, 'replace');
     const lines = result.split('\n');
 
-    // Header should have no marker
-    assert.ok(lines[0].startsWith('resource'), 'Resource header should start with "resource"');
+    // Header should have -/+ marker (like real Terraform output)
+    assert.ok(lines[0].startsWith('-/+ resource'), 'Replace header should have -/+ marker');
     assert.ok(!lines[0].startsWith('!'), 'Replace header should NOT have ! marker');
 
     // Should include forces replacement comment
@@ -344,7 +341,7 @@ describe('formatResourceChange', () => {
 
     const result = formatResourceChange(change, 'replace');
 
-    // Replace actions use !! for changed attributes only, header has no marker
+    // Replace actions use !! for changed attributes, header has -/+ marker
     assert.ok(result.includes('!! '), 'Replace should use !! for changed attributes');
     assert.ok(!result.includes('! resource'), 'Replace header should NOT have ! marker');
   });
