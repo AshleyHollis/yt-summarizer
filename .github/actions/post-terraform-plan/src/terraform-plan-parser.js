@@ -6,6 +6,40 @@
  */
 
 /**
+ * Check if a value is meaningful (not null, empty, or default-like)
+ * @param {*} value - The value to check
+ * @returns {boolean} True if the value should be displayed
+ */
+function isMeaningfulValue(value) {
+  // Skip null values
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  // Skip empty arrays
+  if (Array.isArray(value) && value.length === 0) {
+    return false;
+  }
+
+  // Skip empty objects
+  if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+    return false;
+  }
+
+  // Skip false booleans that are likely defaults
+  if (typeof value === 'boolean' && value === false) {
+    return false;
+  }
+
+  // Skip empty strings (common default/placeholder)
+  if (typeof value === 'string' && value === '') {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Format a value for display (Terraform-style)
  * @param {*} value - The value to format
  * @param {boolean} unknown - Whether the value is unknown (known after apply)
@@ -70,11 +104,54 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
     const beforeExists = key in before;
     const afterExists = key in after;
 
+    // Skip meaningless values (null, empty arrays, false) when not changing
+    // For create: skip meaningless values in after
+    // For destroy: skip meaningless values in before
+    // For update: show if changing from meaningful to meaningless or vice versa
+    if (afterExists) {
+      if (!beforeExists) {
+        // Create: skip meaningless values
+        if (!isMeaningfulValue(afterVal)) {
+          continue;
+        }
+      } else {
+        // Update: skip if both are meaningless and identical
+        if (!isMeaningfulValue(beforeVal) && !isMeaningfulValue(afterVal) &&
+            JSON.stringify(beforeVal) === JSON.stringify(afterVal)) {
+          continue;
+        }
+      }
+    } else if (beforeExists && !afterExists) {
+      // Destroy: skip meaningless values
+      if (!isMeaningfulValue(beforeVal)) {
+        continue;
+      }
+    }
+
     // Skip if values are identical AND we're not forcing explicit markers
     // Explicit markers: '+', '-', etc. (excluding implicit '  ' for create/destroy)
     if (beforeExists && afterExists && JSON.stringify(beforeVal) === JSON.stringify(afterVal) &&
         (forceMarker === '  ' || forceMarker === undefined || forceMarker === null)) {
       continue;
+    }
+
+    // For destroy actions, only show key identifying attributes
+    // Skip computed/read-only attributes that aren't useful
+    if (forceMarker === '  ' && !afterExists) {
+      // These are computed/generated attributes, not useful for display
+      const computedIdPatterns = [
+        'id',
+        'subscription',
+        'tenant',
+        'principal_id',
+        'client_id',
+        'object_id',
+        'name',  // Already in resource header
+        'type',  // Already in resource header
+      ];
+      if (computedIdPatterns.some(pattern => key.includes(pattern))) {
+        continue;
+      }
     }
 
     // Determine marker: use forced marker or compute based on change type
