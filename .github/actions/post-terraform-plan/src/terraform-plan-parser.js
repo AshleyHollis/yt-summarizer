@@ -83,20 +83,21 @@ function formatMultilineArray(arr, prefix, key, marker = '  ') {
   const opening = `${marker} ${prefix}${key} = [`;
   const lines = [opening];
 
-  // Closing line: should align with attribute name in opening
-  // Opening: `       tags = [`  where prefix is '       '
-  // Closing: `       ]` with same prefix
-  const closingIndent = prefix;
+  // Closing line: must align with content portion of opening line
+  // Opening format: `${marker} ${prefix}${key} = [`
+  // Content starts after: marker + space (e.g., '  ' + ' ' = 3 chars for no-marker mode)
+  // Closing indent: marker + space + prefix (matching the content start)
+  const contentIndent = `${marker} ${prefix}`;
 
-  // Inner lines: add 4 spaces beyond prefix
-  const innerIndentation = prefix + '    ';
+  // Inner lines: add 4 spaces beyond content indentation
+  const innerIndentation = contentIndent + '    ';
   arr.forEach(item => {
     const formatted = formatValue(item, false);
     lines.push(`${innerIndentation}${formatted},`);
   });
 
-  // Closing line aligned with opening content
-  lines.push(`${closingIndent}]`);
+  // Closing line aligned with opening content (after marker + space)
+  lines.push(`${contentIndent}]`);
   return lines;
 }
 
