@@ -83,8 +83,13 @@ function shouldSkipComputedAttr(key, afterExists, forceMarker) {
 
 /**
  * Format a simple value change
- * @param {string} marker - Diff marker
- * @param {string} prefix - Indentation prefix
+ *
+ * Generates canonical output - indentation will be applied by post-processor
+ *
+ * Format: marker + key + = + value
+ *
+ * @param {string} marker - Diff marker (+, -, !, !!, '  ')
+ * @param {string} prefix - Indentation prefix (not used, kept for compat)
  * @param {string} key - Attribute key
  * @param {*} beforeVal - Before value
  * @param {*} afterVal - After value
@@ -102,7 +107,7 @@ function formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnk
       const arrayLines = formatMultilineArray(val, prefix, key, '  ');
       return arrayLines.join('\n').split('\n');
     }
-    return `  ${prefix}${key} = ${formatValue(val, isUnknown)}`;
+    return `${marker} ${key} = ${formatValue(val, isUnknown)}`;
   }
 
   // Value added
@@ -111,7 +116,7 @@ function formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnk
       const arrayLines = formatMultilineArray(afterVal, prefix, key, '+');
       return arrayLines.join('\n').split('\n');
     }
-    return `+ ${prefix}${key} = ${formatValue(afterVal, isUnknown)}`;
+    return `${marker} ${key} = ${formatValue(afterVal, isUnknown)}`;
   }
 
   // Value removed
@@ -120,17 +125,20 @@ function formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnk
       const arrayLines = formatMultilineArray(beforeVal, prefix, key, '-');
       return arrayLines.join('\n').split('\n');
     }
-    return `- ${prefix}${key} = ${formatValue(beforeVal, false)}`;
+    return `${marker} ${key} = ${formatValue(beforeVal, false)}`;
   }
 
   // Value changed
   const beforeFormatted = formatValue(beforeVal, false);
   const afterFormatted = formatValue(afterVal, isUnknown);
-  return `${changeMarker} ${prefix}${key} = ${beforeFormatted} -> ${afterFormatted}`;
+  return `${changeMarker} ${key} = ${beforeFormatted} -> ${afterFormatted}`;
 }
 
 /**
  * Format array of objects (blocks) changes
+ *
+ * Generates canonical output - indentation will be applied by post-processor
+ *
  * @param {Array} beforeArr - Before array
  * @param {Array} afterArr - After array
  * @param {Object} afterUnknown - Unknown values
@@ -153,23 +161,23 @@ function formatArrayOfObjects(beforeArr, afterArr, afterUnknown, prefix, forceMa
     if (bItem && aItem) {
       const nestedLines = findChanges(bItem, aItem, unknownItem || {}, prefix + '    ', forceMarker, isReplace);
       if (nestedLines.length > 0) {
-        const arrayMarker = useMarkers ? (isReplace ? '!!' : '!') : '  ';
-        lines.push(`${arrayMarker} ${prefix}${key} {`);
+        const useMarker = useMarkers ? (isReplace ? '!!' : '!') : '  ';
+        lines.push(`${useMarker} ${key} {`);
         nestedLines.forEach(l => lines.push(l));
-        lines.push(`  ${prefix}}`);
+        lines.push(`  }`);
       }
     } else if (aItem && !bItem) {
       const itemMarker = !forceMarker || (forceMarker !== '  ' && forceMarker !== '') ? '+' : '  ';
-      lines.push(`${itemMarker} ${prefix}${key} {`);
+      lines.push(`${itemMarker} ${key} {`);
       const itemForceMarker = useMarkers ? undefined : '  ';
       const nestedLines = findChanges({}, aItem, unknownItem || {}, prefix + '    ', itemForceMarker, false);
       nestedLines.forEach(l => lines.push(l));
-      lines.push(`  ${prefix}}`);
+      lines.push(`  }`);
     } else if (bItem && !aItem) {
       const itemMarker = !forceMarker || (forceMarker !== '  ' && forceMarker !== '') ? '-' : '  ';
-      lines.push(`${itemMarker} ${prefix}${key} {`);
-      lines.push(`${itemMarker} ${prefix}    # (block removed)`);
-      lines.push(`  ${prefix}}`);
+      lines.push(`${itemMarker} ${key} {`);
+      lines.push(`${itemMarker} # (block removed)`);
+      lines.push(`  }`);
     }
   }
 
@@ -178,6 +186,9 @@ function formatArrayOfObjects(beforeArr, afterArr, afterUnknown, prefix, forceMa
 
 /**
  * Format simple array changes
+ *
+ * Generates canonical output - indentation will be applied by post-processor
+ *
  * @param {Array} beforeArr - Before array
  * @param {Array} afterArr - After array
  * @param {Object} afterUnknown - Unknown values
@@ -197,20 +208,21 @@ function formatSimpleArray(beforeArr, afterArr, afterUnknown, prefix, forceMarke
   if (useMarkers || forceMarker === '  ') {
     // For create/destroy, show array with multi-line formatting
     const val = beforeExists ? beforeArr : afterArr;
+    const marker = forceMarker || '  ';
     if (val.length > 1) {
-      const arrayLines = formatMultilineArray(val, prefix, key, forceMarker || '  ');
+      const arrayLines = formatMultilineArray(val, prefix, key, marker);
       lines.push(...arrayLines);
     } else if (val.length === 1) {
-      lines.push(`${forceMarker || '  '} ${prefix}${key} = ${formatValue(val[0], isUnknown)}`);
+      lines.push(`${marker} ${key} = ${formatValue(val[0], isUnknown)}`);
     } else {
-      lines.push(`${forceMarker || '  '} ${prefix}${key} = []`);
+      lines.push(`${marker} ${key} = []`);
     }
   } else if (!areValuesEquivalent(beforeArr, afterArr)) {
     // Array comparison: show before -> after on the line
     const beforeFormatted = formatValue(beforeArr, false);
     const afterFormatted = formatValue(afterArr, isUnknown);
     const arrayMarker = isReplace ? '!!' : '!';
-    lines.push(`${arrayMarker} ${prefix}${key} = ${beforeFormatted} -> ${afterFormatted}`);
+    lines.push(`${arrayMarker} ${key} = ${beforeFormatted} -> ${afterFormatted}`);
   }
 
   return lines;
@@ -218,6 +230,9 @@ function formatSimpleArray(beforeArr, afterArr, afterUnknown, prefix, forceMarke
 
 /**
  * Format nested block/object changes
+ *
+ * Generates canonical output - indentation will be applied by post-processor
+ *
  * @param {*} beforeVal - Before value
  * @param {*} afterVal - After value
  * @param {Object} afterUnknown - Unknown values
@@ -241,9 +256,9 @@ function formatNestedBlock(beforeVal, afterVal, afterUnknown, prefix, forceMarke
       forceMarker,
       isReplace
     ) : '  ';
-    lines.push(`${blockMarker} ${prefix}${key} {`);
+    lines.push(`${blockMarker} ${key} {`);
     nestedLines.forEach(l => lines.push(l));
-    lines.push(`  ${prefix}}`);
+    lines.push(`  }`);
   }
 
   return lines;

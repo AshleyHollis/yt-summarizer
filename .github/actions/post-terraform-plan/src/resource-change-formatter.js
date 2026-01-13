@@ -2,10 +2,12 @@
  * Resource Change Formatter Module
  *
  * Formats individual resource changes into Terraform-style output.
+ * Uses post-processor to apply consistent indentation.
  */
 
 const { findChanges } = require('./change-detection');
 const { getResourceHeaderMarker } = require('./formatters/diff-marker');
+const { applyIndentation } = require('./post-process');
 
 /**
  * Determine the force marker for a given action type
@@ -35,7 +37,7 @@ function isReplaceAction(action) {
  * Format resource change details
  * @param {Object} change - Resource change object from Terraform plan
  * @param {string} action - Action type (create, update, destroy, replace)
- * @returns {string} Formatted diff output with markers at column 0 for syntax highlighting
+ * @returns {string} Formatted diff output with proper indentation
  */
 function formatResourceChange(change, action) {
   const lines = [];
@@ -54,12 +56,15 @@ function formatResourceChange(change, action) {
     lines.push(`    # forces replacement`);
   }
 
-  // Get attribute changes with proper indentation (marker at column 0)
+  // Get attribute changes with canonical format (no indentation logic)
   const changeLines = findChanges(before, after, afterUnknown, '    ', forceMarker, isReplace);
   changeLines.forEach(l => lines.push(l));
   lines.push('}');
 
-  return lines.join('\n');
+  // Apply post-processing for consistent 4-space indentation
+  const fixedLines = applyIndentation(lines);
+
+  return fixedLines.join('\n');
 }
 
 module.exports = {
