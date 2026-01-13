@@ -45,13 +45,14 @@ function isMeaningfulValue(value) {
  * @param {boolean} unknown - Whether the value is unknown (known after apply)
  * @returns {string} Formatted value string
  */
-function formatValue(value, unknown) {
-  if (unknown === true) return '(known after apply)';
+function formatValue(value, unknown = false) {
+  if (unknown) return '(known after apply)';
   if (value === null) return 'null';
   if (value === undefined) return 'null';
   if (typeof value === 'string') return `"${value}"`;
   if (typeof value === 'boolean') return value.toString();
   if (typeof value === 'number') return value.toString();
+
   if (Array.isArray(value)) {
     if (value.length === 0) return '[]';
     return JSON.stringify(value);
@@ -61,7 +62,33 @@ function formatValue(value, unknown) {
     if (keys.length === 0) return '{}';
     return JSON.stringify(value);
   }
+
   return JSON.stringify(value);
+}
+
+/**
+ * Format an array value with multi-line Terraform-style output
+ * @param {Array} arr - The array to format
+ * @param {string} attributeName - The attribute name (e.g., 'tags')
+ * @param {string} marker - The marker to use (+, -, !, etc.)
+ * @returns {Array<string>} Array of formatted lines
+ */
+function formatMultilineArray(arr, attributeName, marker = '  ') {
+  if (arr.length === 0) {
+    return [`  ${attributeName} = []`];
+  }
+
+  const lines = [`${marker} ${attributeName} = [`];
+
+  // Inner lines: 4 spaces indentation + formatted value + comma
+  arr.forEach(item => {
+    const formatted = formatValue(item, false);
+    lines.push(`    ${formatted},`);
+  });
+
+  // Closing line: 2 spaces (no marker) to align with opening line's content
+  lines.push('  ]');
+  return lines;
 }
 
 /**
@@ -235,32 +262,51 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
           }
         }
       } else {
-        // Simple array comparison
+        // Simple array comparison with multi-line formatting
         if (shouldUseMarkerForBlocks || marker === '  ') {
-          // For create/destroy, just show the value without marker
+          // For create/destroy, show array with multi-line formatting
           const val = beforeExists ? beforeVal : afterVal;
-          lines.push(`${marker} ${prefix}${key} = ${formatValue(val, isUnknown)}`);
+          const arrayLines = formatMultilineArray(val, key, marker);
+          lines.push(...arrayLines);
         } else if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
+          // Array comparison: show before -> after on the line
+          const beforeFormatted = formatValue(beforeVal, false);
+          const afterFormatted = formatValue(afterVal, isUnknown);
           const arrayMarker = isReplace ? '!!' : '!';
-          lines.push(`${arrayMarker} ${prefix}${key} = ${formatValue(beforeVal, false)} -> ${formatValue(afterVal, isUnknown)}`);
+          lines.push(`${arrayMarker} ${prefix}${key} = ${beforeFormatted} -> ${afterFormatted}`);
         }
       }
       continue;
     }
 
-    // Simple value handling
+    // Simple value handling with multi-line array formatting
     if (marker === '  ') {
-      // No marker case (create/destroy) - show the value without before->after
+      // No marker case (create/destroy) - show multi-line arrays or single-line values
       const val = beforeExists ? beforeVal : afterVal;
-      lines.push(`  ${prefix}${key} = ${formatValue(val, isUnknown)}`);
+      if (Array.isArray(val) && val.length > 1) {
+        const arrayLines = formatMultilineArray(val, key, '  ');
+        lines.push(...arrayLines);
+      } else {
+        lines.push(`  ${prefix}${key} = ${formatValue(val, isUnknown)}`);
+      }
     } else if (!beforeExists && afterExists) {
       // Value added
-      lines.push(`+ ${prefix}${key} = ${formatValue(afterVal, isUnknown)}`);
+      if (Array.isArray(afterVal) && afterVal.length > 1) {
+        const arrayLines = formatMultilineArray(afterVal, key, '+');
+        lines.push(...arrayLines);
+      } else {
+        lines.push(`+ ${prefix}${key} = ${formatValue(afterVal, isUnknown)}`);
+      }
     } else if (beforeExists && !afterExists) {
       // Value removed
-      lines.push(`- ${prefix}${key} = ${formatValue(beforeVal, false)}`);
+      if (Array.isArray(beforeVal) && beforeVal.length > 1) {
+        const arrayLines = formatMultilineArray(beforeVal, key, '-');
+        lines.push(...arrayLines);
+      } else {
+        lines.push(`- ${prefix}${key} = ${formatValue(beforeVal, false)}`);
+      }
     } else if (beforeExists && afterExists) {
-      // Value changed
+      // Value changed - arrays show inline, not multi-line for diff
       const beforeFormatted = formatValue(beforeVal, false);
       const afterFormatted = formatValue(afterVal, isUnknown);
       const changeMarker = isReplace ? '!!' : '!';
