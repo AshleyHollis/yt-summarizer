@@ -262,12 +262,19 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
           }
         }
       } else {
-        // Simple array comparison with multi-line formatting
+        // Simple array comparison
         if (shouldUseMarkerForBlocks || marker === '  ') {
           // For create/destroy, show array with multi-line formatting
           const val = beforeExists ? beforeVal : afterVal;
-          const arrayLines = formatMultilineArray(val, key, marker);
-          lines.push(...arrayLines);
+          if (Array.isArray(val) && val.length > 1) {
+            const arrayLines = formatMultilineArray(val, prefix + key, marker);
+            lines.push(...arrayLines);
+          } else if (val.length === 1) {
+            // Single element: inline format
+            lines.push(`${marker} ${prefix}${key} = ${formatValue(val, isUnknown)}`);
+          } else {
+            lines.push(`${marker} ${prefix}${key} = []`);
+          }
         } else if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
           // Array comparison: show before -> after on the line
           const beforeFormatted = formatValue(beforeVal, false);
