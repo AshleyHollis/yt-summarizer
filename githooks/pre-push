@@ -1,6 +1,5 @@
 #!/bin/bash
 # Pre-push hook for yt-summarizer
-# Copies to .git/hooks/pre-push on setup
 # ALWAYS runs pre-commit validation before allowing push
 # Blocks push if pre-commit checks would fail
 # Bypass with --no-verify (not recommended)
@@ -29,24 +28,19 @@ echo "Running pre-commit to ensure no issues before pushing..."
 echo "This prevents you from pushing code that will fail in CI."
 echo ""
 
-# Check if pre-commit wrapper exists
-if [ ! -f "tools/pre-commit.local" ]; then
-    echo "WARNING: tools/pre-commit.local not found"
+# Check if pre-commit command exists
+if ! command -v pre-commit &> /dev/null; then
+    echo "WARNING: pre-commit not found on PATH"
     echo "Pre-push validation skipped (will rely on CI)"
     exit 0
 fi
 
 # Run pre-commit local validation (no auto-fix)
-# Try PowerShell first, then fallback to checking file type
-if command -v pwsh &> /dev/null; then
-    pwsh -File "tools/pre-commit.local"
-    EXIT_CODE=$?
-elif command -v powershell &> /dev/null; then
-    powershell -ExecutionPolicy Bypass -File "tools/pre-commit.local"
-    EXIT_CODE=$?
+echo -e "${CYAN}Running pre-commit --all-files --verbose...${NC}"
+if pre-commit run --all-files --verbose; then
+    EXIT_CODE=0
 else
-    echo "ERROR: Neither pwsh nor powershell found in PATH"
-    exit 1
+    EXIT_CODE=$?
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then
@@ -57,7 +51,7 @@ if [ $EXIT_CODE -ne 0 ]; then
     echo ""
     echo -e "${RED}Your PUSH has been BLOCKED.${NC}"
     echo ""
-    echo "Issues found that must be fixed before pushing:"
+    echo "Issues found that must be fixed before pushing"
     echo ""
     echo -e "${YELLOW}How to fix:${NC}"
     echo "  1. Run 'pre-commit run --all-files --verbose' to auto-fix issues"

@@ -1,6 +1,5 @@
 #!/bin/bash
 # Pre-commit hook for yt-summarizer
-# Copies to .git/hooks/pre-commit on setup
 # ALWAYS runs pre-commit validation in both CI and local environments
 # Blocks commits if pre-commit checks fail
 # Use --no-verify to bypass (not recommended)
@@ -14,18 +13,11 @@ CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Go to repository root to find the pre-commit wrapper
+# Go to repository root
 cd "$(git rev-parse --show-toplevel)" || {
     echo -e "${RED}ERROR: Could not find repository root${NC}"
     exit 1
 }
-
-# Check if pre-commit wrapper exists
-if [ ! -f "tools/pre-commit.local" ]; then
-    echo -e "${RED}ERROR: tools/pre-commit.local not found${NC}"
-    echo "Expected to find pre-commit wrapper script at tools/pre-commit.local"
-    exit 1
-fi
 
 echo ""
 echo "========================================"
@@ -33,16 +25,19 @@ echo -e "${CYAN}RUNNING PRE-COMMIT VALIDATION${CYAN}"
 echo "========================================"
 echo ""
 
-# Run the pre-commit local wrapper (handles auto-fix)
-if command -v pwsh &> /dev/null; then
-    pwsh -File "tools/pre-commit.local"
-    EXIT_CODE=$?
-elif command -v powershell &> /dev/null; then
-    powershell -ExecutionPolicy Bypass -File "tools/pre-commit.local"
-    EXIT_CODE=$?
-else
-    echo -e "${RED}ERROR: Neither pwsh nor powershell found in PATH${NC}"
+# Check if pre-commit command exists
+if ! command -v pre-commit &> /dev/null; then
+    echo -e "${RED}ERROR: pre-commit not found on PATH${NC}"
+    echo "Install pre-commit: pip install pre-commit"
     exit 1
+fi
+
+# Run pre-commit with auto-fix
+echo -e "${CYAN}Running pre-commit --all-files --verbose...${NC}"
+if pre-commit run --all-files --verbose; then
+    EXIT_CODE=0
+else
+    EXIT_CODE=$?
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then
@@ -56,9 +51,9 @@ if [ $EXIT_CODE -ne 0 ]; then
     echo "The pre-commit checks found issues that must be fixed before committing."
     echo ""
     echo -e "${YELLOW}How to fix:${NC}"
-    echo "  1. Review the error messages above"
+    echo "  1. Review error messages above"
     echo "  2. Run 'pre-commit run --all-files --verbose' to auto-fix issues"
-    echo "  3. Review the fixes: git diff"
+    echo "  3. Review fixes with 'git diff'"
     echo "  4. Add the fixed files: git add ."
     echo "  5. Commit again: git commit ..."
     echo ""
