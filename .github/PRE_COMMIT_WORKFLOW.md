@@ -4,11 +4,17 @@
 
 The pre-commit workflow is now configured to **ALWAYS run** in both local and CI environments, ensuring code quality and blocking bad commits.
 
+**NEW: Pre-push Hook Added**
+- `.git/hooks/pre-push` validates code before allowing push to remote
+- Blocks push if pre-commit checks would fail
+- Prevents pushing code that will fail in CI
+- Can be bypassed with `git push --no-verify` (not recommended)
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Commit or Push Request                     │
+│                    LOCAL COMMIT                            │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
@@ -23,15 +29,8 @@ The pre-commit workflow is now configured to **ALWAYS run** in both local and CI
                          │
                          ▼
               ┌──────────────────────┐
-              │   pre-commit run      │  ← Runs all hooks
+              │   pre-commit run      │  ← Runs all hooks + AUTO-FIX
               └──────────┬───────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│           hooks defined in .pre-commit-config.yaml          │
-│  - Check YAML/JSON syntax  - Fix trailing whitespace         │
-│  - Run always-run-precommit (calls tools/pre-commit.local)   │
-└────────────────────────┬────────────────────────────────────┘
                          │
               ┌──────────┴──────────┐
               │                     │
@@ -41,14 +40,52 @@ The pre-commit workflow is now configured to **ALWAYS run** in both local and CI
       ┌───────────────┐    ┌─────────────────┐
       │  ALLOW COMMIT │    │  BLOCK COMMIT   │
       └───────────────┘    └─────────────────┘
-                               │
-                               ▼
-                      ┌──────────────────┐
-                      │ Show fix guide   │
-                      │ - Commit blocked │
-                      │ - How to fix     │
-                      │ - Or use --no-verify │
-                      └──────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    LOCAL PUSH                              │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+              ┌──────────────────────┐
+              │  .git/hooks/pre-push  │  ← NEW: Git hook (always runs)
+              └──────────┬───────────┘
+                         │
+                         ▼
+              ┌──────────────────────┐
+              │   pre-commit run      │  ← Runs all hooks, NO AUTO-FIX
+              └──────────┬───────────┘
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+         All pass?            Any fail?
+              │                     │
+              ▼                     ▼
+      ┌───────────────┐    ┌─────────────────┐
+      │  ALLOW PUSH   │    │  BLOCK PUSH     │
+      └───────────────┘    └─────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    REMOTE CI                              │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+              ┌──────────────────────┐
+              │   CI Pipeline         │  ← GitHub Actions
+              └──────────┬───────────┘
+                         │
+                         ▼
+              ┌──────────────────────┐
+              │   Lint + Test        │  ← No pre-commit checks
+              └──────────┬───────────┘
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+         All pass?            Any fail?
+              │                     │
+              ▼                     ▼
+      ┌───────────────┐    ┌─────────────────┐
+      │  ALLOW MERGE  │    │  BLOCK MERGE    │
+      └───────────────┘    └─────────────────┘
 ```
 
 ## Key Components
@@ -58,8 +95,19 @@ The pre-commit workflow is now configured to **ALWAYS run** in both local and CI
 - **Purpose**: Git pre-commit hook that ALWAYS runs
 - **Behavior**:
   - Executes `tools/pre-commit.local` wrapper
+  - Auto-fixes issues where possible
   - Non-zero exit code blocks the commit
   - Can be bypassed with `git commit --no-verify`
+
+### 2. `.git/hooks/pre-push` (Git Hook - NEW)
+- **Location**: `.git/hooks/pre-push`
+- **Purpose**: Git pre-push hook that ALWAYS runs
+- **Behavior**:
+  - Executes `tools/pre-commit.local` wrapper WITHOUT auto-fix
+  - Valid-only mode: Checks for issues, reports them
+  - Non-zero exit code blocks the push
+  - Can be bypassed with `git push --no-verify`
+- **Key Difference**: Runs validation BEFORE code reaches remote
 
 ### 2. `tools/pre-commit.local` (Wrapper Script)
 - **Location**: `tools/pre-commit.local`
@@ -79,9 +127,10 @@ The pre-commit workflow is now configured to **ALWAYS run** in both local and CI
 
 ## How It Works in Different Environments
 
-### Local Development
+### Local Development - Three-Stage Protection
 
 ```
+STAGE 1: COMMIT
 1. User runs: git commit
    ↓
 2. Git hook executes: .git/hooks/pre-commit
@@ -91,39 +140,43 @@ The pre-commit workflow is now configured to **ALWAYS run** in both local and CI
 4. Pre-commit applies auto-fixes (for fixable issues)
    ↓
 5. Checks complete:
-   - If all pass → Commit allowed
-   - If any fail → Commit blocked, show fix instructions
-```
+   - If all pass → Commit allowed ✅
+   - If any fail → Commit blocked, show fix instructions ❌
 
-**Key Points**:
-- ✅ Pre-commit runs **ALWAYS** (cannot be skipped)
-- ✅ Auto-fix runs locally to clean up issues
-- ✅ Commit blocked if issues remain after auto-fix
-- ✅ User can bypass with `git commit --no-verify`
-
-### CI Environment
-
-```
-1. CI triggers commit or push
+STAGE 2: PUSH
+1. User runs: git push
    ↓
-2. Pre-commit runs automatically (GitHub Actions, pre-commit.ci, etc.)
+2. Git hook executes: .git/hooks/pre-push
    ↓
-3. Configuration at top of .pre-commit-config.yaml:
-   ci:
-     autofix_prs: false  ← Auto-fix DISABLED in CI
+3. Wrapper runs: pre-commit run --all-files --verbose (VALIDATION ONLY)
    ↓
-4. Pre-commit checks run without auto-fix
+4. Pre-commit checks WITHOUT auto-fix
    ↓
 5. Checks complete:
-   - If all pass → CI continues
-   - If any fail → CI fails, report issues
+   - If all pass → Push allowed ✅
+   - If any fail → Push blocked, show fix instructions ❌
+
+STAGE 3: REMOTE CI
+1. Code reaches remote (if push succeeded)
+   ↓
+2. GitHub Actions CI triggers
+   ↓
+3. CI runs: lint → security → tests
+   ↓
+4. Checks complete:
+   - If all pass → Merge allowed ✅
+   - If any fail → Merge blocked ❌
 ```
 
 **Key Points**:
-- ✅ Pre-commit runs in CI
-- ✅ Auto-fix is DISABLED in CI (`autofix_prs: false`)
-- ✅ CI fails if pre-commit fails
-- ✅ No automatic PRs created for fixes (prevent conflict loops)
+- ✅ Pre-commit runs on **EVERY commit** (cannot be skipped)
+- ✅ Pre-commit runs on **EVERY push** (cannot be skipped)
+- ✅ Git hooks use environment detection for CI vs local
+- ✅ Auto-fix runs on commit, NOT on push
+- ✅ Commit blocked if issues remain after auto-fix
+- ✅ Push blocked if pre-commit checks would fail
+- ✅ Push can be bypassed with `git push --no-verify` (not recommended)
+- ✅ CI fails if pre-commit checks would not pass (via lint/tests)
 
 ## Validation Behaviors
 
@@ -306,7 +359,27 @@ git commit --no-verify -m "fix: emergency update"
 pip install pre-commit
 ```
 
-### Issue: "Commit blocked by pre-commit"
+### Issue: "Push blocked by pre-push"
+
+**Fix**:
+```bash
+# Pre-push found issues - must fix before pushing
+pre-commit run --all-files --verbose
+
+# Review the fixes
+git diff
+
+# Add the fixes
+git add .
+
+# Commit the fixes
+git commit -m "fix: apply pre-commit auto-fixes"
+
+# Push again
+git push origin my-branch
+```
+
+**Important**: Pre-push does NOT auto-fix - you must commit the fixes first.
 
 **Fix**:
 ```bash
@@ -332,12 +405,43 @@ git commit --no-verify -m "fix: emergency update"
 
 Warning: This bypasses ALL git hooks, including security checks.
 
+## Comparison: Pre-commit vs Pre-push
+
+| Aspect | Pre-commit Hook | Pre-push Hook |
+|--------|----------------|---------------|
+| **When it runs** | On every `git commit` | On every `git push` |
+| **Purpose** | Clean up code before committing | Catch issues before pushing |
+| **Auto-fix** | ✅ Yes (fixes issues) | ❌ No (validation only) |
+| **Blocks** | Commits (no commit created) | Pushes (push not sent) |
+| **Bypass command** | `git commit --no-verify` | `git push --no-verify` |
+| **Environment** | Always runs | Always runs |
+| **CI vs Local** | Same behavior in both | Same behavior in both |
+| **File location** | `.git/hooks/pre-commit` | `.git/hooks/pre-push` |
+
+### Why Both Hooks?
+
+1. **Pre-commit**: Fix issues immediately while you're working
+   - Auto-fix removes friction
+   - Clean history (no messy fixes later)
+   - Developer productivity
+
+2. **Pre-push**: Catch issues before they reach remote
+   - Last line of defense
+   - Block pushes to prevent CI failures
+   - Team code quality gate
+
+3. **Both together**: Multi-layer protection
+   - Fix early (pre-commit)
+   - Validate before sharing (pre-push)
+
 ## Summary
 
-✅ **Pre-commit ALWAYS runs** in both local and CI environments
-✅ **Auto-fix runs locally** to prevent commit/push conflicts
+✅ **Pre-commit ALWAYS runs** on every commit (blocks bad commits)
+✅ **Pre-push ALWAYS runs** on every push (blocks bad pushes)
+✅ **Auto-fix runs on commit** (not on push or CI)
 ✅ **Auto-fix DISABLED in CI** (`autofix_prs: false`) to prevent conflict loops
-✅ **Commits BLOCKED** if checks fail (must fix or use `--no-verify`)
+✅ **Multi-layer protection**: Commit blocked → Push blocked → CI blocked
+✅ **Bypass available**: `git commit --no-verify` or `git push --no-verify` (not recommended)
 ✅ **Clear error messages** guide users to fix issues
 
-This ensures code quality without the friction of commit/push conflicts between local and CI environments.
+This ensures code quality with three layers of protection, maintaining developer productivity while enforcing code standards.
