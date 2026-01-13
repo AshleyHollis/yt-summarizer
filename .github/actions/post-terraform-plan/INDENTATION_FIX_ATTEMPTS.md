@@ -51,7 +51,7 @@ The issue is in how markers (+, -, !, !!, '  ') are combined with indentation pr
 ## Attempt History
 
 ### Attempt 1: Initial Investigation (2026-01-13)
-- **Description**: Analyzed the codebase to understand the indentation logic
+- **Description**: Analyzed codebase to understand indentation logic
 - **Files Examined**:
   - `.github/actions/post-terraform-plan/src/formatters/array-formatter.js`
   - `.github/actions/post-terraform-plan/src/change-detection.js`
@@ -95,17 +95,10 @@ The issue is in how markers (+, -, !, !!, '  ') are combined with indentation pr
 2. **Post-Process** (final choice): Generate canonical output → Post-processor fixes indentation
 
 **Decision**: Post-process approach for better reliability and maintainability:
-- Separation of concerns: Logic generation vs presentation formatting
-- Easier to test: Post-processor can be tested independently
-- More maintainable: Indentation rules live in one place (`post-process.js`)
-- More reliable: Edge cases only need fixing in one module
-
-**Files Modified**:
-1. `src/formatters/array-formatter.js` - Simplified to generate canonical output
-2. `src/change-detection.js` - Simplified to generate canonical output
-3. `src/resource-change-formatter.js` - Wired in post-processor
-
-**Changes Made**:
+- **Separation of concerns**: Logic generation vs presentation formatting
+- **Easier to test**: Post-processor can be tested independently
+- **More maintainable**: Indentation rules live in one place (`post-process.js`)
+- **More reliable**: Edge cases only need fixing in one module
 - Formatters simplified to generate canonical output (no indentation logic)
 - Post-processor now handles all indentation via `applyIndentation()`
 - Resource-change-formatter calls post-processor before returning output
@@ -123,4 +116,3 @@ The issue is in how markers (+, -, !, !!, '  ') are combined with indentation pr
 2. **Test independently**: Post-processor can be tested with edge cases in isolation
 3. **Track attempts**: Keep a log to avoid repeating failed fixes
 4. **Architectural choice**: Post-process pattern more maintainable long-term than complex formatter logic
-
