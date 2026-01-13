@@ -1,5 +1,5 @@
 ci:
-  autofix_prs: true  # Automatically create PRs with fixes
+  autofix_prs: false  # Automatically create PRs with fixes (disabled)
   autofix_commit_msg: "style: pre-commit.ci auto fixes"
   autoupdate_schedule: weekly  # Update hooks weekly
   autoupdate_commit_msg: "chore: update pre-commit hooks"
