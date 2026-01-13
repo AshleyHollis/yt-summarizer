@@ -69,25 +69,34 @@ function formatValue(value, unknown = false) {
 /**
  * Format an array value with multi-line Terraform-style output
  * @param {Array} arr - The array to format
- * @param {string} attributeName - The attribute name (e.g., 'tags')
+ * @param {string} prefix - Prefix indentation (e.g., '    ')
+ * @param {string} key - Attribute name
  * @param {string} marker - The marker to use (+, -, !, etc.)
  * @returns {Array<string>} Array of formatted lines
  */
-function formatMultilineArray(arr, attributeName, marker = '  ') {
+function formatMultilineArray(arr, prefix, key, marker = '  ') {
   if (arr.length === 0) {
-    return [`  ${attributeName} = []`];
+    return [`${marker} ${prefix}${key} = []`];
   }
 
-  const lines = [`${marker} ${attributeName} = [`];
+  // Opening line: marker + space + prefix + key + ' = ['
+  const opening = `${marker} ${prefix}${key} = [`;
+  const lines = [opening];
 
-  // Inner lines: 4 spaces indentation + formatted value + comma
+  // Closing line: should align with attribute name in opening
+  // Opening: `       tags = [`  where prefix is '       '
+  // Closing: `       ]` with same prefix
+  const closingIndent = prefix;
+
+  // Inner lines: add 4 spaces beyond prefix
+  const innerIndentation = prefix + '    ';
   arr.forEach(item => {
     const formatted = formatValue(item, false);
-    lines.push(`    ${formatted},`);
+    lines.push(`${innerIndentation}${formatted},`);
   });
 
-  // Closing line: 2 spaces (no marker) to align with opening line's content
-  lines.push('  ]');
+  // Closing line aligned with opening content
+  lines.push(`${closingIndent}]`);
   return lines;
 }
 
@@ -267,7 +276,7 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
           // For create/destroy, show array with multi-line formatting
           const val = beforeExists ? beforeVal : afterVal;
           if (Array.isArray(val) && val.length > 1) {
-            const arrayLines = formatMultilineArray(val, prefix + key, marker);
+            const arrayLines = formatMultilineArray(val, prefix, key, marker);
             lines.push(...arrayLines);
           } else if (val.length === 1) {
             // Single element: inline format
@@ -291,7 +300,7 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
       // No marker case (create/destroy) - show multi-line arrays or single-line values
       const val = beforeExists ? beforeVal : afterVal;
       if (Array.isArray(val) && val.length > 1) {
-        const arrayLines = formatMultilineArray(val, key, '  ');
+        const arrayLines = formatMultilineArray(val, prefix, key, '  ');
         lines.push(...arrayLines);
       } else {
         lines.push(`  ${prefix}${key} = ${formatValue(val, isUnknown)}`);
@@ -299,7 +308,7 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
     } else if (!beforeExists && afterExists) {
       // Value added
       if (Array.isArray(afterVal) && afterVal.length > 1) {
-        const arrayLines = formatMultilineArray(afterVal, key, '+');
+        const arrayLines = formatMultilineArray(afterVal, prefix, key, '+');
         lines.push(...arrayLines);
       } else {
         lines.push(`+ ${prefix}${key} = ${formatValue(afterVal, isUnknown)}`);
@@ -307,7 +316,7 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
     } else if (beforeExists && !afterExists) {
       // Value removed
       if (Array.isArray(beforeVal) && beforeVal.length > 1) {
-        const arrayLines = formatMultilineArray(beforeVal, key, '-');
+        const arrayLines = formatMultilineArray(beforeVal, prefix, key, '-');
         lines.push(...arrayLines);
       } else {
         lines.push(`- ${prefix}${key} = ${formatValue(beforeVal, false)}`);
@@ -460,6 +469,7 @@ function groupResourcesByAction(resources) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     formatValue,
+    formatMultilineArray,
     findChanges,
     formatResourceChange,
     parseJsonPlan,
