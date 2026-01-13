@@ -4,9 +4,10 @@
   "description": "GitHub Action to post Terraform plan to PR comments with beautiful formatting",
   "main": "src/index.js",
   "scripts": {
-    "test": "node tests/parser.test.js && node tests/markdown.test.js",
-    "test:refactored": "npm run test:value-validator && npm run test:formatters && npm run test:change-detection && npm run test:resource-change-formatter && npm run test:plan-parser",
+    "test": "node tests/parser.test.js && node tests/markdown.test.js && node tests/post-process.test.js",
+    "test:refactored": "npm run test:value-validator && npm run test:formatters && npm run test:change-detection && npm run test:resource-change-formatter && npm run test:plan-parser && npm run test:post-process",
     "test:parser": "node tests/parser.test.js",
+    "test:post-process": "node tests/post-process.test.js",
     "test:markdown": "node tests/markdown.test.js",
     "test:value-validator": "node tests/value-validator.test.js",
     "test:formatters": "node tests/formatters/value-formatter.test.js && node tests/formatters/array-formatter.test.js && node tests/formatters/diff-marker.test.js",
