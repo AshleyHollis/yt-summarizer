@@ -1,0 +1,54 @@
+# Pre-commit validator that ALWAYS runs local pre-commit
+# Runs for all environments to ensure code quality before commits
+# Cannot be skipped via SKIP_PRE_COMMIT
+
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Red
+Write-Host "VALIDATING PRE-COMMIT" -ForegroundColor Red
+Write-Host "========================================" -ForegroundColor Red
+
+# Find and validate pre-commit executable
+$PreCommitName = "pre-commit"
+$PreCommit = Get-Command $PreCommitName -ErrorAction SilentlyContinue
+
+if (-not $PreCommit) {
+    Write-Error "ERROR: pre-commit not found on PATH" -ForegroundColor Red
+    Write-Host "Install pre-commit: pip install pre-commit" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "Pre-commit found at: $($PreCommit.Source)" -ForegroundColor Gray
+
+# Run local pre-commit with auto-fix
+Write-Host "Running pre-commit --all-files --verbose..." -ForegroundColor Cyan
+& pre-commit run --all-files --verbose
+$ExitCode = $LASTEXITCODE
+
+if ($ExitCode -ne 0) {
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Red
+    Write-Host "PRE-COMMIT VALIDATION FAILED" -ForegroundColor Red
+    Write-Host "========================================" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "The local pre-commit found issues that must be fixed." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Commits will be BLOCKED until issues are resolved." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "How to fix:" -ForegroundColor Yellow
+    Write-Host "  1. Run 'pre-commit run --all-files --verbose' to auto-fix issues" -ForegroundColor White
+    Write-Host "  2. Review the changes with 'git diff'" -ForegroundColor White
+    Write-Host "  3. Add the fixes: 'git add .'" -ForegroundColor White
+    Write-Host "  4. Commit again" -ForegroundColor White
+    Write-Host ""
+    Write-Host "To bypass ALL git hooks (not recommended):" -ForegroundColor Red
+    Write-Host "  Use: git commit --no-verify ..." -ForegroundColor Red
+    Write-Host ""
+    exit $ExitCode
+} else {
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "PRE-COMMIT VALIDATION PASSED" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host ""
+    exit 0
+}
