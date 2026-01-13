@@ -37,8 +37,17 @@ if [ ! -f "tools/pre-commit.local" ]; then
 fi
 
 # Run pre-commit local validation (no auto-fix)
-pwsh -File "tools/pre-commit.local"
-EXIT_CODE=$?
+# Try PowerShell first, then fallback to checking file type
+if command -v pwsh &> /dev/null; then
+    pwsh -File "tools/pre-commit.local"
+    EXIT_CODE=$?
+elif command -v powershell &> /dev/null; then
+    powershell -ExecutionPolicy Bypass -File "tools/pre-commit.local"
+    EXIT_CODE=$?
+else
+    echo "ERROR: Neither pwsh nor powershell found in PATH"
+    exit 1
+fi
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo ""

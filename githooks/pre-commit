@@ -34,17 +34,15 @@ echo "========================================"
 echo ""
 
 # Run the pre-commit local wrapper (handles auto-fix)
-if [ -x "tools/pre-commit.local" ]; then
-    # Execute directly if executable
-    ./tools/pre-commit.local
+if command -v pwsh &> /dev/null; then
+    pwsh -File "tools/pre-commit.local"
+    EXIT_CODE=$?
+elif command -v powershell &> /dev/null; then
+    powershell -ExecutionPolicy Bypass -File "tools/pre-commit.local"
     EXIT_CODE=$?
 else
-    # Run with pwsh if not executable
-    pwsh -File "tools/pre-commit.local" 2>&1 || {
-        echo -e "${RED}ERROR: Could not execute pre-commit wrapper${NC}"
-        exit 1
-    }
-    EXIT_CODE=$?
+    echo -e "${RED}ERROR: Neither pwsh nor powershell found in PATH${NC}"
+    exit 1
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then
