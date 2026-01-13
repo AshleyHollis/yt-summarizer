@@ -83,21 +83,21 @@ function formatMultilineArray(arr, prefix, key, marker = '  ') {
   const opening = `${marker} ${prefix}${key} = [`;
   const lines = [opening];
 
-  // Closing line: must align with content portion of opening line
-  // Opening format: `${marker} ${prefix}${key} = [`
-  // Content starts after: marker + space (e.g., '  ' + ' ' = 3 chars for no-marker mode)
-  // Closing indent: marker + space + prefix (matching the content start)
-  const contentIndent = `${marker} ${prefix}`;
-
-  // Inner lines: add 4 spaces beyond content indentation
-  const innerIndentation = contentIndent + '    ';
+  // Inner indentation: marker + space + prefix + 4 spaces for values
+  const markerPlusSpace = `${marker} `;
+  const innerIndentation = `${markerPlusSpace}${prefix}    `;
+  
   arr.forEach(item => {
     const formatted = formatValue(item, false);
     lines.push(`${innerIndentation}${formatted},`);
   });
 
-  // Closing line aligned with opening content (after marker + space)
-  lines.push(`${contentIndent}]`);
+  // Closing bracket aligns with content start point
+  // The opening has format: marker + space + prefix + key + ' = ['
+  // The bracket is after marker + space + prefix + key + ' = '
+  // So closing should align to: marker + space + prefix
+  const closingIndent = `${markerPlusSpace}${prefix}`;
+  lines.push(`${closingIndent}]`);
   return lines;
 }
 
