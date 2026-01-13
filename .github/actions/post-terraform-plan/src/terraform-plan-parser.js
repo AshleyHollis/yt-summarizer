@@ -68,6 +68,7 @@ function formatValue(value, unknown = false) {
 
 /**
  * Format an array value with multi-line Terraform-style output
+ * Declarative approach: define structure once, then template lines
  * @param {Array} arr - The array to format
  * @param {string} prefix - Prefix indentation (e.g., '    ')
  * @param {string} key - Attribute name
@@ -79,26 +80,18 @@ function formatMultilineArray(arr, prefix, key, marker = '  ') {
     return [`${marker} ${prefix}${key} = []`];
   }
 
-  // Opening line: marker + space + prefix + key + ' = ['
-  const opening = `${marker} ${prefix}${key} = [`;
-  const lines = [opening];
+  // Define indentation structure - all relative to content start
+  // Pattern: marker + space + prefix + [content]
+  const contentIndent = `${marker} ${prefix}`;
+  const valueIndent = `${contentIndent}    `;
+  const closingIndent = `${contentIndent}`;
 
-  // Inner indentation: marker + space + prefix + 4 spaces for values
-  const markerPlusSpace = `${marker} `;
-  const innerIndentation = `${markerPlusSpace}${prefix}    `;
-  
-  arr.forEach(item => {
-    const formatted = formatValue(item, false);
-    lines.push(`${innerIndentation}${formatted},`);
-  });
-
-  // Closing bracket aligns with content start point
-  // The opening has format: marker + space + prefix + key + ' = ['
-  // The bracket is after marker + space + prefix + key + ' = '
-  // So closing should align to: marker + space + prefix
-  const closingIndent = `${markerPlusSpace}${prefix}`;
-  lines.push(`${closingIndent}]`);
-  return lines;
+  // Build lines declaratively
+  return [
+    `${contentIndent}${key} = [`,
+    ...arr.map(item => `${valueIndent}${formatValue(item, false)},`),
+    `${closingIndent}]`
+  ];
 }
 
 /**
