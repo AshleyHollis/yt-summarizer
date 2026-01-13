@@ -5,10 +5,16 @@
   "main": "src/index.js",
   "scripts": {
     "test": "node tests/parser.test.js && node tests/markdown.test.js",
+    "test:refactored": "npm run test:value-validator && npm run test:formatters && npm run test:change-detection && npm run test:resource-change-formatter && npm run test:plan-parser",
     "test:parser": "node tests/parser.test.js",
     "test:markdown": "node tests/markdown.test.js",
+    "test:value-validator": "node tests/value-validator.test.js",
+    "test:formatters": "node tests/formatters/value-formatter.test.js && node tests/formatters/array-formatter.test.js && node tests/formatters/diff-marker.test.js",
+    "test:change-detection": "node tests/change-detection.test.js",
+    "test:resource-change-formatter": "node tests/resource-change-formatter.test.js",
+    "test:plan-parser": "node tests/plan-parser.test.js",
     "test:ui": "npx playwright test tests/ui.spec.js",
-    "test:all": "npm run test && npm run test:ui",
+    "test:all": "npm run test && npm run test:ui && npm run test:refactored",
     "preview": "node src/generate-preview.js --fixture realistic",
     "preview:all": "node src/generate-preview.js --fixture realistic && node src/generate-preview.js --fixture no-changes && node src/generate-preview.js --fixture create-only",
     "open-preview": "node src/generate-preview.js --fixture realistic && start preview/realistic-preview.html"
