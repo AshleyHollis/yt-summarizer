@@ -81,16 +81,24 @@ function formatMultilineArray(arr, prefix, key, marker = '  ') {
   }
 
   // Define indentation structure - all relative to content start
-  // Pattern: marker + space + prefix + [content]
-  const contentIndent = `${marker} ${prefix}`;
-  const valueIndent = `${contentIndent}    `;
-  const closingIndent = `${contentIndent}`;
+  // Pattern: marker + ' ' + prefix + [content]
+  // All markers in this function are at the same level, so we use:
+  //   - marker + ' ' + prefix for opening and closing brace (always aligned)
+  //   - marker + ' ' + prefix + '    ' for inner content (4 more spaces)
+  //
+  // Example with marker='  ' (create) and prefix='    ' (4 spaces):
+  //      tags = [          <- '  ' + ' ' + '    ' = 7 characters before "tags"
+  //          "value",      <- '  ' + ' ' + '    ' + '    ' = 11 characters before "value"
+  //          "value2",     <- same as above
+  //      ]                 <- '  ' + ' ' + '    ' = 7 characters before "]"
+  const markerPrefix = `${marker} ${prefix}`;
+  const valueIndent = `${markerPrefix}    `;
 
   // Build lines declaratively
   return [
-    `${contentIndent}${key} = [`,
+    `${markerPrefix}${key} = [`,
     ...arr.map(item => `${valueIndent}${formatValue(item, false)},`),
-    `${closingIndent}]`
+    `${markerPrefix}]`
   ];
 }
 
@@ -224,7 +232,9 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
       const blockMarker = shouldUseMarkerForBlocks ? marker : '  ';
       lines.push(`${blockMarker} ${prefix}${key} {`);
       nestedLines.forEach(l => lines.push(l));
-      lines.push(`  ${prefix}}`);
+      // Closing brace: use same spacing as opening line for consistency
+      // Opening: marker + ' ' + prefix -> closing should match
+      lines.push(`${blockMarker} ${prefix}}`);
     }
     continue;
   }
@@ -248,7 +258,8 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
               const arrayMarker = shouldUseMarkerForBlocks ? (isReplace ? '!!' : '!') : marker;
               lines.push(`${arrayMarker} ${prefix}${key} {`);
               nestedLines.forEach(l => lines.push(l));
-              lines.push(`  ${prefix}}`);
+              // Closing brace: use same spacing as opening line for consistency
+              lines.push(`${arrayMarker} ${prefix}}`);
             }
           } else if (aItem && !bItem) {
             const itemMarker = marker;
@@ -256,12 +267,14 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
             const itemForceMarker = shouldUseMarkerForBlocks ? undefined : '  ';
             const nestedLines = findChanges({}, aItem, unknownItem || {}, prefix + '    ', itemForceMarker, false);
             nestedLines.forEach(l => lines.push(l));
-            lines.push(`  ${prefix}}`);
+            // Closing brace: use same spacing as opening line for consistency
+            lines.push(`${itemMarker} ${prefix}}`);
           } else if (bItem && !aItem) {
             const itemMarker = marker;
             lines.push(`${itemMarker} ${prefix}${key} {`);
             lines.push(`${itemMarker} ${prefix}    # (block removed)`);
-            lines.push(`  ${prefix}}`);
+            // Closing brace: use same spacing as opening line for consistency
+            lines.push(`${itemMarker} ${prefix}}`);
           }
         }
       } else {
@@ -383,7 +396,19 @@ function formatResourceChange(change, action) {
   }
 
   changeLines.forEach(l => lines.push(l));
-  lines.push('}');
+
+  // Closing brace: ensure consistent indentation
+  // For create (marker='  '): closing should match attribute indentation
+  // For update (marker = variable values): closing needs marker + spacing
+  if (action === 'create') {
+    lines.push('}');  // No marker for create closing
+  } else if (action === 'destroy') {
+    lines.push('}');  // No marker for destroy closing
+  } else if (isReplaceAction) {
+    lines.push('}');  // Replace closing
+  } else {
+    lines.push('}');  // Update closing
+  }
 
   return lines.join('\n');
 }

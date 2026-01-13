@@ -5,796 +5,543 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Terraform Plan - Run #42</title>
 
-    <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+  <!-- GitHub Primer CSS - the actual styles GitHub uses -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown-light.min.css">
 
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        background-color: #f8f9fa;
-        color: #1f2937;
-        line-height: 1.5;
-        padding: 20px;
-      }
+  <!-- marked.js for GitHub Flavored Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
-      }
+  <style>
+    /* Match GitHub's PR comment container */
+    body {
+      background: #ffffff;
+      padding: 0;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    }
 
-      /* Header with Terraform branding */
-      .header {
-        background: linear-gradient(135deg, #5c4ee5 0%, #4040b2 100%);
-        color: white;
-        padding: 24px 32px;
-        border-radius: 12px 12px 0 0;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-      }
+    .github-container {
+      max-width: 1012px;
+      margin: 0 auto;
+      padding: 32px 16px;
+    }
 
-      .header-logo {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
+    /* Mode toggle */
+    .mode-toggle {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 100;
+    }
 
-      .header-logo svg {
-        filter: brightness(0) invert(1);
-      }
+    .mode-toggle button {
+      padding: 8px 16px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      color: #24292f;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
 
-      .header-title {
-        font-size: 24px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
+    .mode-toggle button:hover {
+      background: #eaeef2;
+    }
 
-      .header-subtitle {
-        font-size: 14px;
-        opacity: 0.8;
-        margin-top: 4px;
-      }
+    .mode-toggle button.active {
+      background: #0969da;
+      color: white;
+      border-color: #0969da;
+    }
 
-      .status-badge {
-        margin-left: auto;
-        padding: 8px 16px;
-        border-radius: 20px;
-        font-weight: 600;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
+    /* GitHub PR comment styling */
+    .pr-comment {
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #ffffff;
+    }
 
-      .status-badge.success {
-        background: rgba(46, 176, 57, 0.2);
-        color: #7cff8d;
-      }
+    .pr-comment-header {
+      padding: 8px 16px;
+      background: #f6f8fa;
+      border-bottom: 1px solid #d0d7de;
+      border-radius: 6px 6px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #57606a;
+    }
 
-      .status-badge.failure {
-        background: rgba(198, 43, 43, 0.2);
-        color: #ff8d8d;
-      }
+    .pr-comment-header img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+    }
 
-      /* Main content */
-      .content {
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-top: none;
-        border-radius: 0 0 12px 12px;
-        padding: 24px 32px;
-      }
+    .pr-comment-header strong {
+      color: #24292f;
+    }
 
-      /* Run info bar */
-      .run-info {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 12px 16px;
-        background: #f3f4f6;
-        border-radius: 8px;
-        margin-bottom: 24px;
-        font-size: 14px;
-        color: #6b7280;
-        flex-wrap: wrap;
-      }
+    .pr-comment-body {
+      padding: 16px;
+    }
 
-      .run-info a {
-        color: #5c4ee5;
-        text-decoration: none;
-        font-weight: 500;
-      }
+    /* Apply GitHub markdown styles */
+    .markdown-body {
+      box-sizing: border-box;
+      min-width: 200px;
+      max-width: 980px;
+      margin: 0 auto;
+    }
 
-      .run-info a:hover {
-        text-decoration: underline;
-      }
+    /* Fix for GitHub alerts/callouts */
+    .markdown-body blockquote {
+      margin: 16px 0;
+      padding: 0 1em;
+      color: #57606a;
+      border-left: 0.25em solid #d0d7de;
+    }
 
-      .run-info-divider {
-        width: 1px;
-        height: 16px;
-        background: #d1d5db;
-      }
+    /* GitHub-style note/warning/caution boxes */
+    .markdown-body blockquote p:first-child {
+      margin-top: 0;
+    }
 
-      /* Summary stats */
-      .summary {
-        display: flex;
-        gap: 16px;
-        margin-bottom: 24px;
-        flex-wrap: wrap;
-      }
+    /* GitHub alerts styling */
+    .markdown-body > blockquote:has(p:first-child:contains("[!NOTE]")),
+    .markdown-body > blockquote:has(p:first-child:contains("[!WARNING]")),
+    .markdown-body > blockquote:has(p:first-child:contains("[!IMPORTANT]")),
+    .markdown-body > blockquote:has(p:first-child:contains("[!CAUTION]")) {
+      padding: 8px 16px;
+      border-radius: 6px;
+    }
 
-      .summary-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 15px;
-      }
+    /* GitHub diff code block highlighting */
+    .markdown-body pre code .diff-addition,
+    .markdown-body pre code .hljs-addition {
+      background-color: rgba(46, 160, 67, 0.15);
+      display: block;
+    }
 
-      .summary-item.add {
-        background: #e5f5e7;
-        color: #2eb039;
-      }
+    .markdown-body pre code .diff-deletion,
+    .markdown-body pre code .hljs-deletion {
+      background-color: rgba(248, 81, 73, 0.15);
+      display: block;
+    }
 
-      .summary-item.change {
-        background: #fef9e5;
-        color: #d4a017;
-      }
+    /* Custom diff line highlighting - inline spans without extra spacing */
+    .diff-add {
+      background-color: rgba(46, 160, 67, 0.25);
+    }
 
-      .summary-item.destroy {
-        background: #fce8e8;
-        color: #c62b2b;
-      }
+    .diff-delete {
+      background-color: rgba(248, 81, 73, 0.25);
+    }
 
-      .summary-count {
-        font-size: 24px;
-        font-weight: 700;
-      }
+    .diff-change {
+      background-color: rgba(210, 153, 34, 0.25);
+    }
 
-      /* Resource sections */
-      .section {
-        margin-bottom: 16px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        overflow: hidden;
-      }
+    /* Info box for preview mode */
+    .preview-info {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
 
-      .section-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 16px 20px;
-        background: #f3f4f6;
-        cursor: pointer;
-        user-select: none;
-        transition: background-color 0.2s;
-      }
+    .preview-info-icon {
+      font-size: 24px;
+    }
 
-      .section-header:hover {
-        background: #e5e7eb;
-      }
+    .preview-info-text {
+      flex: 1;
+    }
 
-      .section-icon {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-      }
+    .preview-info-title {
+      font-weight: 600;
+      color: #24292f;
+      margin-bottom: 4px;
+    }
 
-      .section-title {
-        font-weight: 600;
-        font-size: 15px;
-        flex: 1;
-      }
-
-      .section-count {
-        padding: 4px 12px;
-        border-radius: 12px;
-        font-size: 13px;
-        font-weight: 600;
-      }
-
-      .section-chevron {
-        color: #6b7280;
-        transition: transform 0.2s;
-      }
-
-      .section.open .section-chevron {
-        transform: rotate(90deg);
-      }
-
-      .section-content {
-        display: none;
-        border-top: 1px solid #e5e7eb;
-      }
-
-      .section.open .section-content {
-        display: block;
-      }
-
-      /* Resource items */
-      .resource {
-        border-bottom: 1px solid #f3f4f6;
-      }
-
-      .resource:last-child {
-        border-bottom: none;
-      }
-
-      .resource-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 14px 20px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-
-      .resource-header:hover {
-        background: #fafafa;
-      }
-
-      .resource-symbol {
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 14px;
-        font-weight: 700;
-        width: 32px;
-        text-align: center;
-      }
-
-      .resource-address {
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 13px;
-        color: #374151;
-        flex: 1;
-        word-break: break-all;
-      }
-
-      .resource-chevron {
-        color: #6b7280;
-        transition: transform 0.2s;
-      }
-
-      .resource.open .resource-chevron {
-        transform: rotate(90deg);
-      }
-
-      .resource-details {
-        display: none;
-        padding: 0 20px 16px 64px;
-      }
-
-      .resource.open .resource-details {
-        display: block;
-      }
-
-      /* Code block for resource details */
-      pre {
-        background: #1e1e1e;
-        color: #d4d4d4;
-        padding: 16px;
-        border-radius: 8px;
-        overflow-x: auto;
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 13px;
-        line-height: 1.6;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-
-      /* Syntax highlighting in code blocks */
-      .hl-add { color: #73c990; }
-      .hl-remove { color: #e06c75; }
-      .hl-change { color: #e5c07b; }
-      .hl-replace { color: #c678dd; }
-      .hl-comment { color: #7f848e; font-style: italic; }
-      .hl-string { color: #98c379; }
-      .hl-keyword { color: #61afef; }
-      .hl-value { color: #d19a66; }
-
-      /* No changes message */
-      .no-changes {
-        text-align: center;
-        padding: 48px;
-        color: #6b7280;
-      }
-
-      .no-changes-icon {
-        font-size: 48px;
-        margin-bottom: 16px;
-      }
-
-      .no-changes-text {
-        font-size: 16px;
-        font-weight: 500;
-        color: #2eb039;
-      }
-
-      /* Footer */
-      .footer {
-        text-align: center;
-        padding: 16px;
-        color: #6b7280;
-        font-size: 12px;
-      }
-
-      .footer a {
-        color: #5c4ee5;
-        text-decoration: none;
-      }
-
-      .footer a:hover {
-        text-decoration: underline;
-      }
-
-      /* Responsive */
-      @media (max-width: 768px) {
-        body {
-          padding: 10px;
-        }
-
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
-          padding: 16px 20px;
-        }
-
-        .status-badge {
-          margin-left: 0;
-          margin-top: 12px;
-        }
-
-        .summary {
-          flex-direction: column;
-        }
-
-        .run-info {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 8px;
-        }
-
-        .run-info-divider {
-          display: none;
-        }
-      }
-    </style>
-
+    .preview-info-desc {
+      font-size: 14px;
+      color: #57606a;
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <header class="header">
-      <div class="header-logo">
-        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" width="40" height="40">
-    <g fill="#5c4ee5">
-      <path d="M22.4 0v20.2L40 30.4V10.2L22.4 0z"/>
-      <path d="M42.2 21.3v20.2l17.6-10.2V11.1L42.2 21.3z"/>
-      <path d="M4.2 11.1v20.2L22 41.5V21.3L4.2 11.1z"/>
-      <path d="M22.4 43.7V64l17.6-10.2V33.6l-17.6 10.1z"/>
-    </g>
-  </svg>
-        <div>
-          <div class="header-title">Terraform Plan</div>
-          <div class="header-subtitle">Infrastructure as Code</div>
-        </div>
-      </div>
-      <span class="status-badge success">✓ Plan Succeeded</span>
-    </header>
-
-    <main class="content">
-      <div class="run-info">
-        <a href="https://github.com/AshleyHollis/yt-summarizer/actions/runs/12345">Run #42</a>
-        <div class="run-info-divider"></div>
-        <span>2026-01-13 10:30:00 UTC</span>
-        <div class="run-info-divider"></div>
-        <span>by @developer</span>
-        <div class="run-info-divider"></div>
-        <a href="https://github.com/AshleyHollis/yt-summarizer/actions/runs/12345">View Workflow →</a>
-      </div>
-
-
-      <div class="summary">
-        <div class="summary-item add"><span class="summary-count">7</span> to add</div>
-        <div class="summary-item change"><span class="summary-count">12</span> to change</div>
-        <div class="summary-item destroy"><span class="summary-count">1</span> to destroy</div>
-      </div>
-
-
-
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon" style="background: #e5f5e7; color: #2eb039">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        </div>
-        <span class="section-title">Resources to Add</span>
-        <span class="section-count" style="background: #e5f5e7; color: #2eb039">7</span>
-        <svg class="section-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="section-content">
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #2eb039">+</span>
-        <span class="resource-address">module.github_oidc.azuread_application.github_actions</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-add">+ resource "azuread_application" "github_actions" {</span>
-<span class="hl-add">+ description = "Service principal for GitHub Actions OIDC authentication"</span>
-<span class="hl-add">+ display_name = "GitHub Actions OIDC"</span>
-<span class="hl-add">+ sign_in_audience = "AzureADMyOrg"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #2eb039">+</span>
-        <span class="resource-address">module.github_oidc.azuread_application_federated_identity_credential.main</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-add">+ resource "azuread_application_federated_identity_credential" "main" {</span>
-<span class="hl-change">~ audiences = null -&gt; ["api://AzureADTokenExchange"]</span>
-<span class="hl-add">+ description = "Federated credential for main branch"</span>
-<span class="hl-add">+ display_name = "github-oidc-main"</span>
-<span class="hl-add">+ issuer = "https://token.actions.githubusercontent.com"</span>
-<span class="hl-add">+ subject = "repo:AshleyHollis/yt-summarizer:ref:refs/heads/main"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #2eb039">+</span>
-        <span class="resource-address">module.github_oidc.azuread_application_federated_identity_credential.production</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-add">+ resource "azuread_application_federated_identity_credential" "production" {</span>
-<span class="hl-change">~ audiences = null -&gt; ["api://AzureADTokenExchange"]</span>
-<span class="hl-add">+ description = "Federated credential for production environment"</span>
-<span class="hl-add">+ display_name = "github-oidc-production"</span>
-<span class="hl-add">+ issuer = "https://token.actions.githubusercontent.com"</span>
-<span class="hl-add">+ subject = "repo:AshleyHollis/yt-summarizer:environment:production"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #2eb039">+</span>
-        <span class="resource-address">module.github_oidc.azuread_application_federated_identity_credential.pull_request</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-add">+ resource "azuread_application_federated_identity_credential" "pull_request" {</span>
-<span class="hl-change">~ audiences = null -&gt; ["api://AzureADTokenExchange"]</span>
-<span class="hl-add">+ description = "Federated credential for pull requests"</span>
-<span class="hl-add">+ display_name = "github-oidc-pull-request"</span>
-<span class="hl-add">+ issuer = "https://token.actions.githubusercontent.com"</span>
-<span class="hl-add">+ subject = "repo:AshleyHollis/yt-summarizer:pull_request"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #2eb039">+</span>
-        <span class="resource-address">module.github_oidc.azuread_service_principal.github_actions</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-add">+ resource "azuread_service_principal" "github_actions" {</span>
-<span class="hl-add">+ description = "Service principal for GitHub Actions"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #2eb039">+</span>
-        <span class="resource-address">module.github_oidc.azurerm_role_assignment.acr_push[0]</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-add">+ resource "azurerm_role_assignment" "acr_push" {</span>
-<span class="hl-add">+ role_definition_name = "AcrPush"</span>
-<span class="hl-add">+ scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg/providers/Microsoft.ContainerRegistry/registries/ytsummarizerregistry"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #2eb039">+</span>
-        <span class="resource-address">module.github_oidc.azurerm_role_assignment.contributor[0]</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-add">+ resource "azurerm_role_assignment" "contributor" {</span>
-<span class="hl-add">+ role_definition_name = "Contributor"</span>
-<span class="hl-add">+ scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg"</span>
-  }</pre>
-      </div>
-    </div>
-
-      </div>
-    </div>
-
-
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon" style="background: #e8f1fc; color: #5c4ee5">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        </div>
-        <span class="section-title">Resources to Replace</span>
-        <span class="section-count" style="background: #e8f1fc; color: #5c4ee5">1</span>
-        <svg class="section-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="section-content">
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #5c4ee5">-/+</span>
-        <span class="resource-address">module.cdn.azurerm_cdn_profile.profile</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-replace">-/+ resource "azurerm_cdn_profile" "profile" {</span>
-<span class="hl-comment"># forces replacement</span>
-<span class="hl-change">~ sku = "Standard_Verizon" -&gt; "Standard_Microsoft"</span>
-  }</pre>
-      </div>
-    </div>
-
-      </div>
-    </div>
-
-
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon" style="background: #fef9e5; color: #d4a017">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <span class="section-title">Resources to Update</span>
-        <span class="section-count" style="background: #fef9e5; color: #d4a017">11</span>
-        <svg class="section-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="section-content">
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.acr.azurerm_container_registry.acr</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_container_registry" "acr" {</span>
-<span class="hl-change">~ sku = "Basic" -&gt; "Standard"</span>
-<span class="hl-change">~ tags {</span>
-<span class="hl-add">    + managed-by = "terraform"</span>
-  }
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.aks.azurerm_kubernetes_cluster.aks</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_kubernetes_cluster" "aks" {</span>
-<span class="hl-change">~ default_node_pool {</span>
-<span class="hl-change">    ~ node_count = 2 -&gt; 3</span>
-  }
-<span class="hl-change">~ kubernetes_version = "1.28.5" -&gt; "1.29.0"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.key_vault.azurerm_key_vault_secret.secrets["sql-connection-string"]</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_key_vault_secret" "secrets" {</span>
-<span class="hl-change">~ content_type = "text/plain" -&gt; "application/x-connection-string"</span>
-<span class="hl-change">~ expiration_date = null -&gt; "2025-12-31T23:59:59Z"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.sql.azurerm_mssql_database.database</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_mssql_database" "database" {</span>
-<span class="hl-change">~ max_size_gb = 2 -&gt; 10</span>
-<span class="hl-change">~ sku_name = "Basic" -&gt; "S0"</span>
-<span class="hl-change">~ storage_account_type = "Local" -&gt; "Geo"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.sql.azurerm_mssql_server.server</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_mssql_server" "server" {</span>
-<span class="hl-change">~ minimum_tls_version = "1.0" -&gt; "1.2"</span>
-<span class="hl-change">~ public_network_access_enabled = true -&gt; false</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.storage.azurerm_storage_account.storage</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_storage_account" "storage" {</span>
-<span class="hl-change">~ account_replication_type = "LRS" -&gt; "GRS"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.storage.azurerm_storage_container.containers["embeddings"]</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_storage_container" "containers" {</span>
-<span class="hl-change">~ container_access_type = "private" -&gt; "blob"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.storage.azurerm_storage_container.containers["summaries"]</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_storage_container" "containers" {</span>
-<span class="hl-change">~ container_access_type = "private" -&gt; "blob"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.storage.azurerm_storage_container.containers["transcripts"]</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_storage_container" "containers" {</span>
-<span class="hl-change">~ container_access_type = "private" -&gt; "blob"</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.storage.azurerm_storage_queue.queues["embed-queue"]</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_storage_queue" "queues" {</span>
-<span class="hl-add">+ metadata = {"purpose":"embedding-jobs"}</span>
-  }</pre>
-      </div>
-    </div>
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #d4a017">~</span>
-        <span class="resource-address">module.swa.azurerm_static_web_app.swa</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-change">~ resource "azurerm_static_web_app" "swa" {</span>
-<span class="hl-change">~ sku_size = "Free" -&gt; "Standard"</span>
-<span class="hl-change">~ sku_tier = "Free" -&gt; "Standard"</span>
-  }</pre>
-      </div>
-    </div>
-
-      </div>
-    </div>
-
-
-    <div class="section">
-      <div class="section-header">
-        <div class="section-icon" style="background: #fce8e8; color: #c62b2b">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        </div>
-        <span class="section-title">Resources to Destroy</span>
-        <span class="section-count" style="background: #fce8e8; color: #c62b2b">1</span>
-        <svg class="section-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="section-content">
-
-    <div class="resource">
-      <div class="resource-header">
-        <span class="resource-symbol" style="color: #c62b2b">-</span>
-        <span class="resource-address">module.key_vault.azurerm_role_assignment.secrets_officer[0]</span>
-        <svg class="resource-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-      <div class="resource-details">
-        <pre><span class="hl-remove">- resource "azurerm_role_assignment" "secrets_officer" {</span>
-<span class="hl-remove">- id = "/subscriptions/12345678-1234-1234-1234-123456789abc/providers/Microsoft.Authorization/roleAssignments/abcdef12-3456-7890-abcd-ef1234567890"</span>
-<span class="hl-remove">- principal_id = "old-principal-id"</span>
-<span class="hl-remove">- role_definition_name = "Key Vault Secrets Officer"</span>
-<span class="hl-remove">- scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg/providers/Microsoft.KeyVault/vaults/ytsummarizerkv"</span>
-  }</pre>
-      </div>
-    </div>
-
-      </div>
-    </div>
-
-
-    </main>
-
-    <footer class="footer">
-      <p>Generated by <a href="https://github.com/hashicorp/terraform">Terraform</a> Plan Visualizer</p>
-    </footer>
+  <div class="mode-toggle">
+    <button onclick="location.href='?mode=light'" class="active">☀️ Light</button>
+    <button onclick="location.href='?mode=dark'" class="">🌙 Dark</button>
   </div>
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        // Toggle sections
-        document.querySelectorAll('.section-header').forEach(function(header) {
-          header.addEventListener('click', function() {
-            this.parentElement.classList.toggle('open');
-          });
-        });
+  <div class="github-container">
+    <div class="preview-info">
+      <div class="preview-info-icon">🔍</div>
+      <div class="preview-info-text">
+        <div class="preview-info-title">GitHub Preview Mode</div>
+        <div class="preview-info-desc">This preview uses GitHub's actual Primer CSS and marked.js GFM renderer. What you see here is exactly what will appear on GitHub.</div>
+      </div>
+    </div>
 
-        // Toggle resources
-        document.querySelectorAll('.resource-header').forEach(function(header) {
-          header.addEventListener('click', function() {
-            this.parentElement.classList.toggle('open');
-          });
-        });
+    <div class="pr-comment">
+      <div class="pr-comment-header">
+        <img src="https://avatars.githubusercontent.com/in/15368?s=64&v=4" alt="github-actions[bot]">
+        <span><strong>github-actions</strong> bot commented just now</span>
+      </div>
+      <div class="pr-comment-body">
+        <article class="markdown-body" id="content">
+          <!-- Markdown will be rendered here -->
+        </article>
+      </div>
+    </div>
+  </div>
 
-        // Open first section and first resource by default
-        var firstSection = document.querySelector('.section');
-        if (firstSection) {
-          firstSection.classList.add('open');
-          var firstResource = firstSection.querySelector('.resource');
-          if (firstResource) {
-            firstResource.classList.add('open');
-          }
+  <script>
+    // Configure marked for GitHub Flavored Markdown
+    marked.setOptions({
+      gfm: true,           // GitHub Flavored Markdown
+      breaks: false,       // GitHub doesn't convert \n to <br>
+      headerIds: true,     // Add IDs to headers
+      mangle: false,       // Don't mangle email addresses
+      pedantic: false,
+      sanitize: false,     // Allow HTML (GitHub allows it in comments)
+      smartLists: true,
+      smartypants: false,
+      xhtml: false
+    });
+
+    // The markdown content
+    const markdown = `<!-- terraform-plan-comment -->
+
+# ✅ Terraform Plan
+
+> 📋 **Run [#42](https://github.com/AshleyHollis/yt-summarizer/actions/runs/12345)** · 2026-01-13 08:48:50 UTC · @developer
+
+![add](https://img.shields.io/badge/add-7-2eb039?style=flat-square) ![change](https://img.shields.io/badge/change-12-d4a017?style=flat-square) ![destroy](https://img.shields.io/badge/destroy-1-c62b2b?style=flat-square)
+
+\`\`\`diff
++ 7 to add
+! 12 to change
+- 1 to destroy
+\`\`\`
+
+
+### ➕ Resources to Create · 7
+
+
+<details>
+<summary>🟢 <code>module.github_oidc.azuread_application.github_actions</code></summary>
+
+\`\`\`diff
++ resource "azuread_application" "github_actions" {
+      description = "Service principal for GitHub Actions OIDC authentication"
+      display_name = "GitHub Actions OIDC"
+      sign_in_audience = "AzureADMyOrg"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟢 <code>module.github_oidc.azuread_application_federated_identity_credential.main</code></summary>
+
+\`\`\`diff
++ resource "azuread_application_federated_identity_credential" "main" {
+       audiences = ["api://AzureADTokenExchange"]
+      description = "Federated credential for main branch"
+      display_name = "github-oidc-main"
+      issuer = "https://token.actions.githubusercontent.com"
+      subject = "repo:AshleyHollis/yt-summarizer:ref:refs/heads/main"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟢 <code>module.github_oidc.azuread_application_federated_identity_credential.production</code></summary>
+
+\`\`\`diff
++ resource "azuread_application_federated_identity_credential" "production" {
+       audiences = ["api://AzureADTokenExchange"]
+      description = "Federated credential for production environment"
+      display_name = "github-oidc-production"
+      issuer = "https://token.actions.githubusercontent.com"
+      subject = "repo:AshleyHollis/yt-summarizer:environment:production"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟢 <code>module.github_oidc.azuread_application_federated_identity_credential.pull_request</code></summary>
+
+\`\`\`diff
++ resource "azuread_application_federated_identity_credential" "pull_request" {
+       audiences = ["api://AzureADTokenExchange"]
+      description = "Federated credential for pull requests"
+      display_name = "github-oidc-pull-request"
+      issuer = "https://token.actions.githubusercontent.com"
+      subject = "repo:AshleyHollis/yt-summarizer:pull_request"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟢 <code>module.github_oidc.azuread_service_principal.github_actions</code></summary>
+
+\`\`\`diff
++ resource "azuread_service_principal" "github_actions" {
+      description = "Service principal for GitHub Actions"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟢 <code>module.github_oidc.azurerm_role_assignment.acr_push[0]</code></summary>
+
+\`\`\`diff
++ resource "azurerm_role_assignment" "acr_push" {
+      role_definition_name = "AcrPush"
+      scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg/providers/Microsoft.ContainerRegistry/registries/ytsummarizerregistry"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟢 <code>module.github_oidc.azurerm_role_assignment.contributor[0]</code></summary>
+
+\`\`\`diff
++ resource "azurerm_role_assignment" "contributor" {
+      role_definition_name = "Contributor"
+      scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg"
+}
+\`\`\`
+
+</details>
+
+
+### 🔄 Resources to Replace · 1
+
+
+<details>
+<summary>🟣 <code>module.cdn.azurerm_cdn_profile.profile</code></summary>
+
+\`\`\`diff
+-/+ resource "azurerm_cdn_profile" "profile" {
+    # forces replacement
+!!     sku = "Standard_Verizon" -> "Standard_Microsoft"
+}
+\`\`\`
+
+</details>
+
+
+### ✏️ Resources to Update · 11
+
+
+<details>
+<summary>🟡 <code>module.acr.azurerm_container_registry.acr</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_container_registry" "acr" {
+!     sku = "Basic" -> "Standard"
+!     tags {
++         managed-by = "terraform"
+!     }
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.aks.azurerm_kubernetes_cluster.aks</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_kubernetes_cluster" "aks" {
+!     default_node_pool {
+!         node_count = 2 -> 3
+!     }
+!     kubernetes_version = "1.28.5" -> "1.29.0"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.key_vault.azurerm_key_vault_secret.secrets["sql-connection-string"]</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_key_vault_secret" "secrets" {
+!     content_type = "text/plain" -> "application/x-connection-string"
+!     expiration_date = null -> "2025-12-31T23:59:59Z"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.sql.azurerm_mssql_database.database</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_mssql_database" "database" {
+!     max_size_gb = 2 -> 10
+!     sku_name = "Basic" -> "S0"
+!     storage_account_type = "Local" -> "Geo"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.sql.azurerm_mssql_server.server</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_mssql_server" "server" {
+!     minimum_tls_version = "1.0" -> "1.2"
+!     public_network_access_enabled = true -> false
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.storage.azurerm_storage_account.storage</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_storage_account" "storage" {
+!     account_replication_type = "LRS" -> "GRS"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.storage.azurerm_storage_container.containers["embeddings"]</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_storage_container" "containers" {
+!     container_access_type = "private" -> "blob"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.storage.azurerm_storage_container.containers["summaries"]</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_storage_container" "containers" {
+!     container_access_type = "private" -> "blob"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.storage.azurerm_storage_container.containers["transcripts"]</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_storage_container" "containers" {
+!     container_access_type = "private" -> "blob"
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.storage.azurerm_storage_queue.queues["embed-queue"]</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_storage_queue" "queues" {
++     metadata {
++         purpose = "embedding-jobs"
++     }
+}
+\`\`\`
+
+</details>
+
+<details>
+<summary>🟡 <code>module.swa.azurerm_static_web_app.swa</code></summary>
+
+\`\`\`diff
+~ resource "azurerm_static_web_app" "swa" {
+!     sku_size = "Free" -> "Standard"
+!     sku_tier = "Free" -> "Standard"
+}
+\`\`\`
+
+</details>
+
+
+### 🗑️ Resources to Destroy · 1
+
+
+<details>
+<summary>🔴 <code>module.key_vault.azurerm_role_assignment.secrets_officer[0]</code></summary>
+
+\`\`\`diff
+- resource "azurerm_role_assignment" "secrets_officer" {
+      scope = "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/yt-summarizer-rg/providers/Microsoft.KeyVault/vaults/ytsummarizerkv"
+}
+\`\`\`
+
+</details>
+
+---
+<sub>🔗 [View full workflow run](https://github.com/AshleyHollis/yt-summarizer/actions/runs/12345)</sub>
+`;
+
+    // Render markdown
+    document.getElementById('content').innerHTML = marked.parse(markdown);
+
+    // Apply diff highlighting to code blocks - wrap entire lines with background
+    document.querySelectorAll('pre code').forEach(block => {
+      const lines = block.innerHTML.split('\n');
+      let hasDiffMarkers = false;
+
+      const highlighted = lines.map(line => {
+        const textContent = line.replace(/<[^>]*>/g, ''); // Strip HTML tags for checking
+        const trimmed = textContent.trimStart();
+
+        if (trimmed.startsWith('+') && !trimmed.startsWith('+++')) {
+          hasDiffMarkers = true;
+          return '<span class="diff-add">' + line + '</span>';
+        } else if (trimmed.startsWith('-') && !trimmed.startsWith('---')) {
+          hasDiffMarkers = true;
+          return '<span class="diff-delete">' + line + '</span>';
+        } else if (trimmed.startsWith('~') || trimmed.startsWith('!')) {
+          hasDiffMarkers = true;
+          return '<span class="diff-change">' + line + '</span>';
         }
+        return line;
       });
-    </script>
 
+      if (hasDiffMarkers) {
+        block.innerHTML = highlighted.join('\n');
+      }
+    });
+
+    // Handle dark/light mode from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode');
+    if (mode === 'dark' && !false) {
+      location.href = '?mode=dark';
+    } else if (mode === 'light' && false) {
+      location.href = '?mode=light';
+    }
+  </script>
 </body>
 </html>
