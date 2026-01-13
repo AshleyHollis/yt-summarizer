@@ -1,0 +1,31 @@
+# Pre-commit.ci Configuration
+# This file configures the pre-commit.ci GitHub App for your repository
+#
+# Setup instructions:
+# 1. Go to https://pre-commit.ci
+# 2. Click "Add to GitHub" and select this repository
+# 3. Pre-commit.ci will automatically run on all PRs and pushes
+# 4. Pre-commit will fail if any checks fail, blocking merges
+
+# CI configuration
+ci:
+  # IMPORTANT: DO NOT enable auto-fix pre-commits in CI
+  # This prevents conflict loops and maintains developer productivity
+  autofix_prs: false
+
+  # When to skip hooks (empty = run all hooks)
+  skip: []
+
+  # Hook update schedule
+  autoupdate_schedule: weekly
+
+  # Commit message for hook updates
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+
+  # Enable push-based checking (runs on every push to main branch)
+  require_serial: true  # Run hooks serially (safer for debugging)
+  default_stages: [pre-commit, pre-push]  # Run on commit and push
+
+# Additional settings for pre-commit-ci
+repos: []
+# All hooks defined in .pre-commit-config.yaml will be used
