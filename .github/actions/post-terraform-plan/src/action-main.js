@@ -76,8 +76,8 @@ function main() {
   // Recalculate summary from parsed resources for accuracy
   const calculatedSummary = calculateSummary(resources);
 
-  // Use the calculated summary if it has more detail
-  const finalSummary = calculatedSummary.has_changes ? calculatedSummary : summary;
+  // Use calculated summary to match displayed resources
+  const finalSummary = calculatedSummary;
 
   // Get context from environment (set by GitHub Actions)
   const runNumber = process.env.GITHUB_RUN_NUMBER || '1';
