@@ -141,10 +141,20 @@ jobs:
   meta:
     name: Prepare image tag
     runs-on: ubuntu-latest
-    needs: [terraform]
+    needs: [terraform, detect-changes]
     if: |
       needs.terraform.result != 'failure' &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_deploy == 'true')
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.run_deploy == 'true') ||
+        (github.event_name != 'workflow_dispatch' && (
+          contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'k8s') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'docker')
+        ))
+      )
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
