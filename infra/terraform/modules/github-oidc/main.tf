@@ -89,6 +89,9 @@ resource "azuread_application_federated_identity_credential" "repository" {
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
   subject        = "repo:${var.github_organization}/${var.github_repository}"
+  lifecycle {
+    ignore_changes = [tags, description]
+  }
 }
 
 # -----------------------------------------------------------------------------
