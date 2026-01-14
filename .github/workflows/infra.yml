@@ -25,6 +25,12 @@ on:
           - plan
           - apply
           - destroy
+      run_apply:
+        description: 'Apply after plan (workflow_dispatch only)'
+        required: false
+        type: boolean
+        default: true
+
 
 concurrency:
   group: infra-prod
@@ -131,8 +137,9 @@ jobs:
       - name: Terraform Apply
         if: |
           (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-          (github.event.inputs.action == 'apply')
+          (github.event.inputs.action == 'apply' && github.event.inputs.run_apply == 'true')
         run: terraform apply -auto-approve tfplan
+
 
       - name: Terraform Destroy
         if: github.event.inputs.action == 'destroy'

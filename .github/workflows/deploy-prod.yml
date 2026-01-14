@@ -16,6 +16,33 @@ on:
       - "specs/**"
       - "k8s/overlays/previews/**"
       - ".github/workflows/preview*.yml"
+  workflow_dispatch:
+    inputs:
+      run_terraform:
+        description: 'Run terraform plan/apply'
+        required: false
+        type: boolean
+        default: true
+      apply_terraform:
+        description: 'Apply terraform changes (workflow_dispatch only)'
+        required: false
+        type: boolean
+        default: true
+      run_deploy:
+        description: 'Build and deploy backend'
+        required: false
+        type: boolean
+        default: true
+      run_frontend:
+        description: 'Deploy frontend'
+        required: false
+        type: boolean
+        default: true
+      run_health_check:
+        description: 'Run post-deploy health checks'
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: deploy-prod
@@ -32,11 +59,92 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Detect changes for Terraform gating
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed_areas: ${{ steps.detect.outputs.changed_areas }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: detect
+        uses: ./.github/actions/detect-pipeline-changes
+
+  # ---------------------------------------------------------------------------
+  # Apply infrastructure changes (optional)
+  # ---------------------------------------------------------------------------
+  terraform:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true') ||
+      (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform'))
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/terraform/environments/prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Azure credentials are configured
+        uses: ./.github/actions/verify-azure-credentials
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.7'
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate Terraform configuration
+        uses: ./.github/actions/validate-terraform-config
+        with:
+          working-directory: infra/terraform/environments/prod
+          backend-config: 'true'
+
+      - name: Terraform Plan
+        id: plan
+        uses: ./.github/actions/terraform-plan
+        with:
+          working-directory: 'infra/terraform/environments/prod'
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Terraform Apply
+        if: github.event_name != 'workflow_dispatch' || inputs.apply_terraform == 'true'
+        run: terraform apply -auto-approve tfplan
+
+  # ---------------------------------------------------------------------------
   # Build and Push Production Images (split)
   # ---------------------------------------------------------------------------
   meta:
     name: Prepare image tag
     runs-on: ubuntu-latest
+    needs: [terraform]
+    if: |
+      needs.terraform.result != 'failure' &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_deploy == 'true')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -173,6 +281,7 @@ jobs:
     name: Deploy Frontend
     runs-on: ubuntu-latest
     needs: [build-api, build-workers]
+    if: github.event_name != 'workflow_dispatch' || inputs.run_frontend == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -212,6 +321,7 @@ jobs:
     name: Health Check
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend]
+    if: github.event_name != 'workflow_dispatch' || inputs.run_health_check == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
