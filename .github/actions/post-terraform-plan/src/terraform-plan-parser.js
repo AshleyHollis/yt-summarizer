@@ -365,7 +365,7 @@ function formatResourceChange(change, action) {
     lines.push(`    # forces replacement`);
   }
 
-    // Get attribute changes with proper indentation (marker at column 0)
+  // Get attribute changes with proper indentation (marker at column 0)
   // For create/destroy: NO markers (resource block already indicates action) - use '  '
   // For replace: use '!!' markers to highlight critical nature
   // For update: use differentiated markers (+, -, !)
@@ -382,6 +382,10 @@ function formatResourceChange(change, action) {
   } else {
     // update uses '!' for modifications, '+' for adds, '-' for removes
     changeLines = findChanges(before, after, afterUnknown, '    ', undefined, false);
+  }
+
+  if (changeLines.length === 0 && action === 'update') {
+    return null;
   }
 
   changeLines.forEach(l => lines.push(l));
@@ -434,6 +438,10 @@ function parseJsonPlan(jsonString) {
       const resourceType = change.type;
       const resourceName = change.name;
       const details = formatResourceChange(change, action);
+
+      if (!details) {
+        continue;
+      }
 
       resources.push({ address, action, type: resourceType, name: resourceName, details });
     }
