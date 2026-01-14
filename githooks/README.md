@@ -4,24 +4,31 @@ This directory contains Git hooks for the repository, designed to enforce code q
 
 ## Overview
 
-| Hook | Stage | Purpose | Auto-Fix | Blocks |
-|------|-------|---------|----------|--------|
-| `pre-commit` | Before commit | Clean up code immediately | ✅ Yes | Bad commits |
-| `pre-push` | Before push | Catch issues before pushing | ❌ No | Bad pushes |
+| Hook | Stage | Purpose | Auto-Fix | Blocks | Platform |
+|------|-------|---------|----------|--------|----------|
+| `pre-commit` | Before commit | Clean up code immediately | ✅ Yes | Bad commits | PowerShell (cross-platform) |
+| `pre-push` | Before push | Catch issues before pushing | ❌ No | Bad pushes | PowerShell (cross-platform) |
 
 ## Setup
 
 ### Automatic Setup (Recommended)
 
-Run the setup script to copy hooks to `.git/hooks/`:
+Run setup script to copy hooks to `.git/hooks/`:
 
-```bash
-# Windows (PowerShell)
+```powershell
+# Windows (PowerShell) - works on all platforms with pwsh
 pwsh -File scripts/setup-githooks.ps1
-
-# Linux/macOS (Bash)
-bash scripts/setup-githooks.sh
 ```
+
+### Manual Setup
+
+```powershell
+# Copy hooks to .git/hooks/
+Copy-Item githooks/pre-commit .git/hooks/pre-commit
+Copy-Item githooks/pre-push .git/hooks/pre-push
+```
+
+**Note**: Git hooks are now PowerShell scripts for cross-platform compatibility. PowerShell Core (pwsh) is available on Windows, macOS, and Linux. On Windows, PowerShell 5.1+ is also available by default.
 
 ### Manual Setup
 
@@ -54,7 +61,7 @@ chmod +x .git/hooks/pre-push
 **Bypass**: `git commit --no-verify ...` (not recommended)
 
 **Example**:
-```bash
+```powershell
 # 1. Make changes
 vim my-file.yaml
 
@@ -70,7 +77,7 @@ git commit -m "feat: add new feature"
 
 # 4. Review and stage fixes
 git diff  # See what was auto-fixed
-git add .  # Stage the fixes
+git add .  # Stage fixes
 
 # 5. Commit again
 git commit -m "feat: add new feature"
@@ -93,7 +100,7 @@ git commit -m "feat: add new feature"
 **Bypass**: `git push --no-verify ...` (not recommended)
 
 **Example**:
-```bash
+```powershell
 # 1. Make changes
 vim my-file.yaml
 
@@ -149,12 +156,12 @@ git push origin my-branch
 **Cause**: Pre-commit found issues that couldn't be auto-fixed.
 
 **Fix**:
-```bash
+```powershell
 # See what failed
 pre-commit run --all-files --verbose
 
 # Fix issues manually
-vim <files-with-issues>
+code <files-with-issues>  # or vim, nano, etc.
 
 # Stage and commit again
 git add .
@@ -166,7 +173,7 @@ git commit -m "fix: address pre-commit issues"
 **Cause**: Pre-push found issues (auto-fix not run).
 
 **Fix**:
-```bash
+```powershell
 # Run pre-commit with auto-fix
 pre-commit run --all-files --verbose
 
@@ -186,14 +193,10 @@ git push origin my-branch
 **Cause**: Hooks not executable or not in correct location.
 
 **Fix**:
-```bash
+```powershell
 # Check hook exists
-ls -la .git/hooks/pre-commit
-ls -la .git/hooks/pre-push
-
-# Make executable (Linux/macOS)
-chmod +x .git/hooks/pre-commit
-chmod +x .git/hooks/pre-push
+Get-ChildItem .git/hooks/pre-commit
+Get-ChildItem .git/hooks/pre-push
 
 # Re-run setup
 pwsh -File scripts/setup-githooks.ps1
@@ -203,7 +206,7 @@ pwsh -File scripts/setup-githooks.ps1
 
 **Use case**: Emergency fixes, debugging, or quick experiments (not recommended)**
 
-```bash
+```powershell
 # Bypass pre-commit
 git commit --no-verify -m "fix: emergency"
 
@@ -218,7 +221,7 @@ git push --no-verify origin my-branch
 
 ### Configure Custom Hooks Path
 
-```bash
+```powershell
 # Set custom hooks directory
 git config core.hooksPath githooks
 
@@ -228,7 +231,7 @@ git config --unset core.hooksPath
 
 ### Temporarily Disable Hooks
 
-```bash
+```powershell
 # Disable pre-commit for one commit
 git commit --no-verify -m "commit message"
 

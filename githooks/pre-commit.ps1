@@ -65,7 +65,7 @@ if ($ExitCode -ne 0) {
     Write-ColorHost "  5. Commit again: git commit ..." $Colors.White
     Write-Host ""
     Write-ColorHost "To bypass ALL git hooks (not recommended):" $Colors.Red
-    Write-ColorHost "  $(Write-ColorHost 'git commit --no-verify ...' $Colors.Yellow)" $Colors.Red
+    Write-ColorHost "  git commit --no-verify ..." $Colors.Yellow
     Write-Host ""
     exit $ExitCode
 } else {

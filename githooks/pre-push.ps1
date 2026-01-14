@@ -64,11 +64,11 @@ if ($ExitCode -ne 0) {
     Write-ColorHost "  1. Run 'pre-commit run --all-files --verbose' to auto-fix issues" $Colors.White
     Write-ColorHost "  2. Review fixes: git diff" $Colors.White
     Write-ColorHost "  3. Add fixes: git add ." $Colors.White
-    Write-ColorHost "  4. Commit: git commit -m `"fix: apply pre-commit fixes`"" $Colors.White
+    Write-ColorHost "  4. Commit: git commit -m 'fix: apply pre-commit fixes'" $Colors.White
     Write-ColorHost "  5. Push again" $Colors.White
     Write-Host ""
     Write-ColorHost "To bypass PRE-PUSH check (not recommended):" $Colors.Red
-    Write-ColorHost "  $(Write-ColorHost 'git push --no-verify ...' $Colors.Yellow)" $Colors.Red
+    Write-ColorHost "  git push --no-verify ..." $Colors.Yellow
     Write-Host ""
     exit $ExitCode
 } else {
