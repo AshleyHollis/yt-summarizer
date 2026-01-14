@@ -1,101 +1,141 @@
-# Copilot Instructions
+# Agent Instructions (YT Summarizer)
 
-> **Note**: This file provides Aspire-specific guidance for AI coding agents. For comprehensive repository-wide instructions including available tools, scripts, and workflows, see [.github/copilot-instructions.md](.github/copilot-instructions.md).
+> This file is the single source of truth for agentic coding guidance. It merges the original
+> Aspire notes with repository rules from `.github/copilot-instructions.md`.
 
-This repository is set up to use Aspire. Aspire is an orchestrator for the entire application and will take care of configuring dependencies, building, and running the application. The resources that make up the application are defined in `apphost.cs` including application code and external dependencies.
+## Critical Rules (Read First)
+1. **Before marking ANY task complete, run** `./scripts/run-tests.ps1`.
+2. **E2E tests are mandatory** for completion; do not use `-SkipE2E` for final verification.
+3. If Aspire is not running, start it with the wrapper (see below) before E2E tests.
+4. Prefer official Aspire docs: https://aspire.dev and https://learn.microsoft.com/dotnet/aspire.
 
-## General recommendations for working with Aspire
-1. Before making any changes always run the apphost using `aspire run` and inspect the state of resources to make sure you are building from a known state.
-1. Changes to the _apphost.cs_ file will require a restart of the application to take effect.
-2. Make changes incrementally and run the aspire application using the `aspire run` command to validate changes.
-3. Use the Aspire MCP tools to check the status of resources and debug issues.
+## Repository Map
+- `apps/web`: Next.js frontend (TypeScript, Tailwind).
+- `services/api`: FastAPI backend.
+- `services/workers`: Python background workers.
+- `services/shared`: Shared Python libraries (DB, logging, queue).
+- `services/aspire`: Aspire AppHost + defaults.
+- `scripts`: PowerShell automation for tests, migrations, deploys.
+- `infra`: Terraform and deployment manifests.
 
-## Running the application
-To run the application run the following command:
+## Aspire Workflow
+- The app is orchestrated via Aspire; resources are defined in `services/aspire/AppHost/AppHost.cs`.
+- Changes to `AppHost.cs` require restarting Aspire.
+- Use the Aspire MCP tools to inspect resources and logs when debugging.
+- The repo includes a wrapper: `tools/aspire.cmd`.
+  - Running `aspire run` uses the wrapper automatically and detaches the process.
+  - Check logs via `Get-Content aspire.log -Tail 50`.
+  - Stop Aspire by closing the detached window or using Task Manager.
 
-```
-aspire run
-```
+## Dependency Setup
+- **Frontend**: `cd apps/web && npm install`
+- **API**: `cd services/api && uv sync`
+- **Workers**: `cd services/workers && uv sync`
+- **Shared**: `cd services/shared && uv sync`
 
-If there is already an instance of the application running it will prompt to stop the existing instance. You only need to restart the application if code in `apphost.cs` is changed, but if you experience problems it can be useful to reset everything to the starting state.
+## Build / Run Commands
+- **Aspire (full stack)**: `aspire run`
+- **Frontend dev server**: `cd apps/web && npm run dev`
+- **API dev server**: `cd services/api && uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000`
+- **Workers (example)**: `cd services/workers && uv run python -m transcribe`
+- **Migrations (shared)**:
+  - `cd services/shared && uv run alembic revision --autogenerate -m "description"`
+  - `cd services/shared && uv run alembic upgrade head`
 
-## Checking resources
-To check the status of resources defined in the app model use the _list resources_ tool. This will show you the current state of each resource and if there are any issues. If a resource is not running as expected you can use the _execute resource command_ tool to restart it or perform other actions.
+## Test Commands
+### Unified (Required)
+- **All tests (includes E2E)**: `./scripts/run-tests.ps1`
+- **Specific component**: `./scripts/run-tests.ps1 -Component api|workers|shared|web|e2e`
+- **Integration-only**: `./scripts/run-tests.ps1 -Mode integration`
+- **E2E-only**: `./scripts/run-tests.ps1 -Mode e2e`
+- **Smoke test**: `./scripts/smoke-test.ps1` (run after Aspire starts)
 
-## Listing integrations
-IMPORTANT! When a user asks you to add a resource to the app model you should first use the _list integrations_ tool to get a list of the current versions of all the available integrations. You should try to use the version of the integration which aligns with the version of the Aspire.AppHost.Sdk. Some integration versions may have a preview suffix. Once you have identified the correct integration you should always use the _get integration docs_ tool to fetch the latest documentation for the integration and follow the links to get additional guidance.
+### Single-test examples
+- **API/Workers/Shared (pytest)**:
+  - `cd services/api && uv run pytest tests/test_file.py::test_name`
+  - `cd services/workers && uv run pytest tests/test_file.py -k "partial_name"`
+  - `cd services/shared && uv run pytest tests/test_file.py -k "partial_name"`
+- **Frontend (Vitest)**:
+  - `cd apps/web && npm run test:run -- src/__tests__/components/SubmitVideoForm.test.tsx`
+  - `cd apps/web && npx vitest run src/__tests__/hooks/useHealthCheck.test.tsx`
+- **E2E (Playwright)**:
+  - `cd apps/web && npx playwright test e2e/smoke.spec.ts`
+  - `cd apps/web && npx playwright test e2e/video-flow.spec.ts --headed`
 
-## Debugging issues
-IMPORTANT! Aspire is designed to capture rich logs and telemetry for all resources defined in the app model. Use the following diagnostic tools when debugging issues with the application before making changes to make sure you are focusing on the right things.
+### Test Notes
+- E2E requires Aspire; the runner will start it if needed.
+- Playwright uses `USE_EXTERNAL_SERVER=true` when running against Aspire.
+- API live E2E tests require `E2E_TESTS_ENABLED=true` and `pytest -m ""`.
+- `./scripts/run-tests.ps1` defaults to `-Component detect` to auto-scope changes.
+- Use `-Component` for quicker iteration, but final run must include E2E.
 
-1. _list structured logs_; use this tool to get details about structured logs.
-2. _list console logs_; use this tool to get details about console logs.
-3. _list traces_; use this tool to get details about traces.
-4. _list trace structured logs_; use this tool to get logs related to a trace
+## Environment Variables
+- `DATABASE_URL`: SQL Server connection string for API/workers.
+- `AZURE_STORAGE_CONNECTION_STRING`: Azure/Azurite storage for queues/blobs.
+- `OPENAI_API_KEY`: Required for summarization workers.
+- `NEXT_PUBLIC_API_URL`: Public API URL for browser clients.
+- `API_URL`: Internal API URL for SSR calls.
 
-## Other Aspire MCP tools
+## Lint / Format
+- **Frontend lint**: `cd apps/web && npm run lint`
+- **Frontend format**: `cd apps/web && npx prettier --write .`
+- **Python lint**: `cd services/api && uv run ruff check .`
+- **Python format**: `cd services/api && uv run ruff format .`
+- `ruff.toml` defines import sorting (isort) and line length = 100.
 
-1. _select apphost_; use this tool if working with multiple app hosts within a workspace.
-2. _list apphosts_; use this tool to get details about active app hosts.
+## Code Style Guidelines
+### General
+- Prefer small, focused changes; avoid unrelated refactors.
+- Use `get_logger(__name__)` for Python logging and include context fields.
+- Keep line length to **100** (Python + TS/JS).
+- Preserve existing module boundaries (`api`, `workers`, `shared`, `apps/web`).
 
-## Playwright MCP server
+### Python (API/Workers/Shared)
+- Use type hints everywhere; prefer `list[str]`, `dict[str, Any]`, and union types (`str | None`).
+- Use `dataclass` for message payloads and small value objects.
+- Follow Ruff import ordering; first-party modules are `api`, `shared`, `workers`.
+- Favor explicit error handling with `try/except` and structured logs (`logger.warning`, `logger.exception`).
+- Raise FastAPI `HTTPException` with clear status + detail when handling routes.
+- Prefer async DB/session patterns from `shared.db.connection` and `AsyncSession`.
+- Use SQLAlchemy models from `shared.db.models` and shared helpers for storage/queues.
 
-The playwright MCP server has also been configured in this repository and you should use it to perform functional investigations of the resources defined in the app model as you work on the codebase. To get endpoints that can be used for navigation using the playwright MCP server use the list resources tool.
+### TypeScript / React (Frontend)
+- Use named exports for utilities and types; default exports are rare.
+- Components are `PascalCase` file names and functions (`MarkdownRenderer`).
+- Hooks use `useX` naming and live in `src/hooks`.
+- Keep API types in `src/services/api.ts` and shared types in `src/types`.
+- Prefer `type` or `interface` with explicit field docs for API contracts.
+- Use `async/await` for API calls; wrap errors in custom error classes where needed.
+- Keep UI logic in components and data access in `src/services`.
 
-## Updating the app host
-The user may request that you update the Aspire apphost. You can do this using the `aspire update` command. This will update the apphost to the latest version and some of the Aspire specific packages in referenced projects, however you may need to manually update other packages in the solution to ensure compatibility. You can consider using the `dotnet-outdated` with the users consent. To install the `dotnet-outdated` tool use the following command:
+### Formatting
+- Prettier config in `apps/web/.prettierrc`:
+  - `singleQuote: true`, `semi: true`, `printWidth: 100`, `tabWidth: 2`.
+- ESLint config: `apps/web/eslint.config.mjs` (Next.js core-web-vitals + TS).
+- Ruff config: `services/ruff.toml` (imports + lint rules).
 
-```
-dotnet tool install --global dotnet-outdated-tool
-```
+### Naming
+- Python: `snake_case` for modules/functions, `PascalCase` for classes.
+- TypeScript: `camelCase` variables/functions, `PascalCase` components/types.
+- Environment variables use `SCREAMING_SNAKE_CASE`.
 
-## Persistent containers
-IMPORTANT! Consider avoiding persistent containers early during development to avoid creating state management issues when restarting the app.
+### Error Handling & Logging
+- Prefer structured log fields over string concatenation.
+- Use `logger.exception` for unexpected failures to capture stack traces.
+- Preserve correlation IDs across HTTP and queue messages.
+- Use retry/backoff patterns for transient failures (see workers).
 
-## Aspire workload
-IMPORTANT! The aspire workload is obsolete. You should never attempt to install or use the Aspire workload.
+## Infrastructure & Ops Scripts
+- **Run migrations**: `./scripts/run-migrations.ps1`
+- **Start workers**: `./scripts/start-workers.ps1`
+- **Deploy infra**: `./scripts/deploy-infra.ps1`
+- CI helpers live under `scripts/ci/`.
 
-## Official documentation
-IMPORTANT! Always prefer official documentation when available. The following sites contain the official documentation for Aspire and related components:
+## Tooling & Automation Rules (Copilot Instructions)
+- Use **PowerShell** for scripts on Windows.
+- Use `gh` (GitHub CLI) for any GitHub operations (PRs, issues, runs).
+- Playwright MCP server is configured; use it for UI checks when needed.
+- Available tooling: .NET CLI, uv/pip, npm/pnpm, pytest, Vitest, Ruff, ESLint, Prettier.
 
-1. https://aspire.dev
-2. https://learn.microsoft.com/dotnet/aspire
-3. https://nuget.org (for specific integration package details)
-
-## Test Enforcement
-
-**CRITICAL: Before marking ANY task as [X] complete, you MUST run the test script:**
-
-```powershell
-.\scripts\run-tests.ps1
-```
-
-This script runs ALL test suites (Shared, Workers, API, Frontend, E2E) and outputs a PASS/FAIL result.
-
-### Options:
-```powershell
-# Run ALL tests (default - includes E2E, requires Aspire)
-.\scripts\run-tests.ps1
-
-# Skip E2E for faster development iteration
-.\scripts\run-tests.ps1 -SkipE2E
-
-# Run specific component only
-.\scripts\run-tests.ps1 -Component api
-```
-
-### Rules:
-1. **NEVER mark a task [X] if tests fail**
-2. **NEVER rationalize skipping E2E tests** - they catch integration issues that unit tests miss
-3. **If Aspire isn't running, the script will start it automatically**
-4. **Unit tests alone are NOT sufficient** - E2E tests are required for completion verification
-
-### What the tests check:
-- Shared package tests (pytest)
-- Worker tests (pytest, 98+ tests)
-- API tests (pytest, 470+ tests)
-- Frontend tests (Vitest, 246+ tests)
-- E2E tests (Playwright) - **This is the integration layer that catches real bugs**
-
-### Why this matters:
-Unit tests verify individual components work in isolation. E2E tests verify the **actual user experience** with real services running. A feature is NOT complete until both pass.
+## Cursor Rules
+- No `.cursor/rules` or `.cursorrules` files are present in this repository.

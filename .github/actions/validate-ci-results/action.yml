@@ -110,7 +110,12 @@ runs:
             "build-images")
               # Must have ACR configured AND (main branch OR changes to buildable areas)
               [[ "${{ inputs.acr-configured }}" == "true" ]] && \
-              ([[ "$IS_MAIN" == "true" ]] || [[ "$areas" =~ services/api ]] || [[ "$areas" =~ services/workers ]] || [[ "$areas" =~ services/shared ]] || [[ "$areas" =~ apps/web ]] || [[ "$areas" =~ docker ]])
+              ([[ "$IS_MAIN" == "true" ]] || \
+               [[ "$areas" =~ services/api ]] || \
+               [[ "$areas" =~ services/workers ]] || \
+               [[ "$areas" =~ services/shared ]] || \
+               [[ "$areas" =~ apps/web ]] || \
+               [[ "$areas" =~ docker ]])
               ;;
             *)
               return 1

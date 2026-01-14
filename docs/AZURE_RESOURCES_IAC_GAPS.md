@@ -1,0 +1,246 @@
+# Azure Resources Not Managed by Terraform
+
+**Date:** 2025-01-14  
+**Purpose:** Identify Azure AD/Entra ID and Azure resources that should be managed by Terraform
+
+## Executive Summary
+
+This document identifies Azure resources that were created manually but should be managed by Terraform to ensure consistency and reproducibility.
+
+## Findings
+
+### 1. Old GitHub Actions App Registration ⚠️ REDUNDANT
+
+**Status:** Redundant - Should be removed  
+**Location:** Azure AD / App Registrations
+
+**Details:**
+- **Name:** `yt-summarizer-github-actions`
+- **AppId:** `77b3cabf-1591-4c8d-bb4b-f4cc8ccc9278`
+- **Created:** 2026-01-09T03:23:49Z
+- **Service Principal:** Exists
+
+**Federated Credentials:**
+| Name | Subject |
+|------|---------|
+| github-environment-production | repo:AshleyHollis/yt-summarizer:environment:production |
+| github-pr | repo:AshleyHollis/yt-summarizer:pull_request |
+| github-main | repo:AshleyHollis/yt-summarizer:ref:refs/heads/main |
+
+**Role Assignments:**
+- **Contributor** on subscription `/subscriptions/28aefbe7-e2af-4b4a-9ce1-92d6672c31bd`
+
+**Issue:**
+- This app was created by the `scripts/setup-github-oidc.ps1` script
+- It's redundant because Terraform now manages the GitHub Actions OIDC via `modules/github-oidc`
+- Terraform-managed app: `github-actions-yt-summarizer` (AppId: `f005883d-5861-47b7-9d7a-177625da6811`)
+- Both apps have Contributor role on the same subscription, which is unnecessary duplication
+
+**Recommended Action:** Remove this old app registration:
+```bash
+az ad sp delete --id 77b3cabf-1591-4c8d-bb4b-f4cc8ccc9278
+```
+
+---
+
+### 2. Extra Federated Credentials on Terraform-Managed App ⚠️ OUT OF SYNC
+
+**Status:** Partially managed - Terraform config is out of sync  
+**Location:** Azure AD / App Registrations
+
+**Terraform-Managed App:** `github-actions-yt-summarizer`  
+**AppId:** `f005883d-5861-47b7-9d7a-177625da6811`
+
+**Federated Credentials (Terraform Config):**
+The Terraform module `modules/github-oidc/main.tf` defines 4 credentials:
+| Name | Subject | In Terraform |
+|------|---------|--------------|
+| github-main | repo:AshleyHollis/yt-summarizer:ref:refs/heads/* | ✅ Yes |
+| github-pr | repo:AshleyHollis/yt-summarizer:pull_request | ✅ Yes |
+| github-env-production | repo:AshleyHollis/yt-summarizer:environment:production | ✅ Yes |
+| github-repo | repo:AshleyHollis/yt-summarizer:tf-managed | ✅ Yes |
+
+**Federated Credentials (Actual Azure):**
+The actual app has 6 credentials:
+| Name | Subject | In Terraform |
+|------|---------|--------------|
+| github-repo | repo:AshleyHollis/yt-summarizer:tf-managed | ✅ Yes |
+| github-env-production | repo:AshleyHollis/yt-summarizer:environment:production | ✅ Yes |
+| **github-branch-003-preview-dns-cloudflare** | repo:AshleyHollis/yt-summarizer:ref:refs/heads/003-preview-dns-cloudflare | ❌ No |
+| **github-branch-fix-cicd-improvements** | repo:AshleyHollis/yt-summarizer:ref:refs/heads/fix/cicd-improvements | ❌ No |
+| github-main | repo:AshleyHollis/yt-summarizer:ref:refs/heads/* | ✅ Yes |
+| github-pr | repo:AshleyHollis/yt-summarizer:pull_request | ✅ Yes |
+
+**Issue:**
+- Two federated credentials were added manually for feature branches
+- These credentials are NOT in Terraform configuration
+- If Terraform is re-applied, these manually added credentials will be **REMOVED**
+- The wildcard `github-main` credential (`refs/heads/*`) should already cover these branches
+
+**Recommended Action:** Remove the manually added credentials (Terraform will handle them):
+```bash
+az ad app federated-credential delete --id f005883d-5861-47b7-9d7a-177625da6811 --federated-credential-id <cred-id>
+```
+
+---
+
+### 3. Key Vault Secrets ⚠️ NOT MANAGED BY TERRAFORM
+
+**Status:** Not in Terraform - Should be added  
+**Location:** Key Vault `kv-ytsumm-prd`
+
+**Secrets in Key Vault:**
+| Secret Name | Source | Managed by Terraform |
+|------------|--------|---------------------|
+| sql-connection-string | Terraform module `sql` | ✅ Yes |
+| storage-connection | Terraform module `storage` | ✅ Yes |
+| **argocd-admin-password** | Bootstrap script | ❌ No |
+| **cloudflare-api-token** | Manual setup | ❌ No |
+| **openai-api-key** | Manual setup | ❌ No |
+
+**Issue:**
+- Only `sql-connection-string` and `storage-connection` are defined in Terraform
+- Three secrets were added manually but are not in Terraform state
+- This creates a drift between code and actual infrastructure
+
+**Recommended Action:** Add missing secrets to Terraform `infra/terraform/environments/prod/main.tf`:
+```hcl
+module "key_vault" {
+  source = "../../modules/key-vault"
+
+  # ... existing configuration ...
+
+  secrets = {
+    "sql-connection-string"  = module.sql.connection_string
+    "storage-connection"     = module.storage.primary_connection_string
+    "openai-api-key"         = var.openai_api_key  # NEW: Add to variables.tf
+    "cloudflare-api-token"   = var.cloudflare_api_token  # NEW: Add to variables.tf
+  }
+
+  # Note: argocd-admin-password is auto-generated by Argo CD bootstrap
+  # and should not be managed in Terraform
+}
+```
+
+And add to `infra/terraform/environments/prod/variables.tf`:
+```hcl
+variable "openai_api_key" {
+  description = "OpenAI API key for summarization"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token for DNS-01 challenges"
+  type        = string
+  sensitive   = true
+}
+```
+
+---
+
+### 4. GitHub App for ArgoCD ℹ️ EXTERNAL RESOURCE
+
+**Status:** External resource - Correctly not managed by Terraform
+
+**Details:**
+- Created manually via `scripts/setup-argocd-github-app.ps1`
+- Stored in Kubernetes secret `github-app` (namespace: `argocd`)
+- Used by ArgoCD ApplicationSet for PR-based preview environments
+- This is a **GitHub** resource, not Azure
+
+**Recommended Action:** No changes needed. This is correctly external to Terraform.
+
+---
+
+## Summary Table
+
+| Resource | Status | Action Required | Priority |
+|----------|--------|----------------|----------|
+| Old GitHub Actions app (`yt-summarizer-github-actions`) | Redundant | Remove old app | High |
+| Extra federated credentials on main app | Out of sync | Remove or add to Terraform | Medium |
+| Key Vault secrets (argocd, cloudflare, openai) | Not managed | Add to Terraform | High |
+| GitHub App for ArgoCD | External | No action | N/A |
+
+---
+
+## Impact Analysis
+
+### Risks of Current State
+
+1. **Drift:** Infrastructure state differs from Terraform configuration
+2. **Inconsistency:** Manual and automated resource creation methods coexist
+3. **Cleanup Difficulty:** Old resources may be forgotten and accumulate
+4. **Credential Management:** Secrets outside Terraform are harder to rotate
+
+### Benefits of Remediation
+
+1. **Single Source of Truth:** All Azure resources declared in Terraform
+2. **Easier Recovery:** Complete infrastructure can be recreated from code
+3. **Clear Audit Trail:** All changes tracked in Git
+4. **Reduced Maintenance:** Fewer manual interventions needed
+
+---
+
+## Recommended Remediation Plan
+
+### Phase 1: Clean Up Redundant Resources (High Priority)
+
+1. Remove old GitHub Actions app:
+   ```bash
+   az ad sp delete --id 77b3cabf-1591-4c8d-bb4b-f4cc8ccc9278
+   ```
+
+2. Remove extra federated credentials from main app:
+   - `github-branch-003-preview-dns-cloudflare`
+   - `github-branch-fix-cicd-improvements`
+
+### Phase 2: Add Missing Secrets to Terraform (High Priority)
+
+1. Add `openai_api_key` and `cloudflare_api_token` variables
+2. Update `key_vault` module to include these secrets
+3. Import existing secrets into Terraform state:
+   ```bash
+   cd infra/terraform/environments/prod
+   terraform import azurerm_key_vault_secret.secrets["openai-api-key"] \
+     "https://kv-ytsumm-prd.vault.azure.net/secrets/openai-api-key"
+   terraform import azurerm_key_vault_secret.secrets["cloudflare-api-token"] \
+     "https://kv-ytsumm-prd.vault.azure.net/secrets/cloudflare-api-token"
+   ```
+
+### Phase 3: Validation (Medium Priority)
+
+1. Run `terraform plan` to verify no unexpected changes
+2. Test GitHub Actions workflows to ensure OIDC still works
+3. Verify ArgoCD continues to function properly
+
+---
+
+## References
+
+- Terraform GitHub OIDC module: `infra/terraform/modules/github-oidc/main.tf`
+- Key Vault module: `infra/terraform/modules/key-vault/main.tf`
+- Production environment: `infra/terraform/environments/prod/main.tf`
+- Setup scripts: `scripts/setup-github-oidc.ps1`, `scripts/bootstrap-argocd.ps1`
+
+---
+
+## Appendix: Commands to Identify Missing Resources
+
+```bash
+# List all Azure AD apps
+az ad app list --query "[?contains(displayName, 'yt-summarizer')].{displayName:displayName, appId:appId}" --output table
+
+# List federated credentials for an app
+az ad app federated-credential list --id <app-id> --query "[].{name:name, subject:subject}" --output table
+
+# List role assignments for a service principal
+az role assignment list --assignee <app-id> --query "[].{role:roleDefinitionName, scope:scope}" --output table
+
+# List secrets in Key Vault
+az keyvault secret list --vault-name kv-ytsumm-prd --query "[].name" --output table
+
+# Check Terraform state for resources
+terraform state list | grep azuread
+terraform state list | grep azurerm_key_vault_secret
+```

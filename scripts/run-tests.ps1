@@ -6,10 +6,10 @@
     Runs tests across all components: API, Workers, Shared, Frontend, and E2E.
 
     By default, runs ALL tests including E2E (requires Aspire running).
-    Use -SkipE2E for faster development iteration.
+    WARNING: -SkipE2E is for development iteration ONLY - per Constitution VI.5, E2E tests are REQUIRED for task completion.
 
 .PARAMETER SkipE2E
-    Skip E2E tests (faster, but incomplete verification)
+    Skip E2E tests (DEVELOPMENT ONLY - do NOT use for final verification per Constitution VI.5)
 
 .PARAMETER Component
     Run tests for a specific component only: 'api', 'workers', 'shared', 'web', 'e2e'

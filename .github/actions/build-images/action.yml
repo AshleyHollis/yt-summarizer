@@ -5,16 +5,13 @@ inputs:
   service:
     description: The service to build (api, workers, shared)
     required: true
-    type: string
   image-tag:
     description: The image tag to use
     required: true
-    type: string
   push:
     description: Whether to push images to registry (false for validation only)
     required: false
     default: 'true'
-    type: boolean
 
 runs:
   using: composite

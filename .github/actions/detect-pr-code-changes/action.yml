@@ -163,7 +163,13 @@ runs:
             if [[ "$file" =~ ^docs/ ]] || [[ "$file" =~ ^specs/ ]] || [[ "$file" =~ \.md$ ]]; then
               echo "     [skip] docs/specs/markdown"
             # Check if file triggers image building
-            elif [[ "$file" =~ ^services/api/ ]] || [[ "$file" =~ ^services/workers/ ]] || [[ "$file" =~ ^services/shared/ ]] || [[ "$file" =~ ^apps/web/ ]] || [[ "$file" =~ /Dockerfile ]] || [[ "$file" =~ ^docker-compose.*\.yml$ ]] || [[ "$file" == .dockerignore ]]; then
+            elif [[ "$file" =~ ^services/api/ ]] || \
+              [[ "$file" =~ ^services/workers/ ]] || \
+              [[ "$file" =~ ^services/shared/ ]] || \
+              [[ "$file" =~ ^apps/web/ ]] || \
+              [[ "$file" =~ /Dockerfile ]] || \
+              [[ "$file" =~ ^docker-compose.*\.yml$ ]] || \
+              [[ "$file" == .dockerignore ]]; then
               echo "     [BUILD] triggers image build"
               HAS_IMAGE_BUILD=true
               HAS_DEPLOYMENT=true

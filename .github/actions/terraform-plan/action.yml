@@ -10,10 +10,22 @@ inputs:
   sql-admin-password:
     description: 'SQL admin password'
     required: true
+  openai-api-key:
+    description: 'OpenAI API key'
+    required: true
+  cloudflare-api-token:
+    description: 'Cloudflare API token'
+    required: true
 outputs:
   plan_output:
-    description: 'Terraform plan output'
+    description: 'Raw terraform plan output'
     value: ${{ steps.plan.outputs.plan_output }}
+  formatted_plan:
+    description: 'Formatted plan for PR comments'
+    value: ${{ steps.format.outputs.formatted_plan }}
+  plan_summary:
+    description: 'JSON summary of plan changes'
+    value: ${{ steps.format.outputs.plan_summary }}
   outcome:
     description: 'Plan outcome (success/failure)'
     value: ${{ steps.plan.outcome }}
@@ -29,6 +41,8 @@ runs:
         terraform plan -no-color -input=false -out=tfplan \
           -var="subscription_id=${{ inputs.subscription-id }}" \
           -var="sql_admin_password=${{ inputs.sql-admin-password }}" \
+          -var="openai_api_key=${{ inputs.openai-api-key }}" \
+          -var="cloudflare_api_token=${{ inputs.cloudflare-api-token }}" \
           2>&1 | tee plan_output.txt
         PLAN_EXIT_CODE=$?
         echo "plan_output<<EOF" >> "$GITHUB_OUTPUT"
@@ -36,3 +50,36 @@ runs:
         echo "EOF" >> "$GITHUB_OUTPUT"
         exit $PLAN_EXIT_CODE
       continue-on-error: true
+
+    - name: Get JSON plan
+      id: format
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Get structured JSON output from terraform
+        terraform show -json tfplan > plan.json
+
+        # Parse plan summary from JSON
+        ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"]))) | length' plan.json)
+        CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | contains(["update"]))) | length' plan.json)
+        DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | contains(["delete"]))) | length' plan.json)
+
+        # Create JSON summary
+        SUMMARY=$(cat <<EOF
+        {
+          "add": $ADD,
+          "change": $CHANGE,
+          "destroy": $DESTROY,
+          "has_changes": $([ $ADD -gt 0 ] || [ $CHANGE -gt 0 ] || [ $DESTROY -gt 0 ] && echo "true" || echo "false")
+        }
+        EOF
+        )
+
+        echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
+        echo "$SUMMARY" >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+
+        # Output the full JSON plan for parsing
+        echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
+        cat plan.json >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"

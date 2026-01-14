@@ -1,0 +1,148 @@
+name: 'Post Terraform Plan'
+description: 'Posts Terraform plan to PR comments and generates pipeline summary with Terraform Cloud-like styling'
+inputs:
+  plan-summary:
+    description: 'JSON summary of plan changes (add, change, destroy, has_changes)'
+    required: true
+  formatted-plan:
+    description: 'Formatted terraform plan output (JSON)'
+    required: true
+  plan-outcome:
+    description: 'Plan outcome (success/failure)'
+    required: true
+  skip-pr-comment:
+    description: 'Skip posting to PR comment (true/false)'
+    required: false
+    default: 'false'
+outputs:
+  comment-id:
+    description: 'ID of the created or updated PR comment'
+    value: ${{ steps.post-pr.outputs.comment-id }}
+runs:
+  using: composite
+  steps:
+    - name: Save plan data to files
+      id: save-data
+      shell: bash
+      run: |
+        # Write data to files (safer than passing large JSON through env vars)
+        cat << 'PLAN_SUMMARY_EOF' > ${{ github.action_path }}/plan-summary.json
+        ${{ inputs.plan-summary }}
+        PLAN_SUMMARY_EOF
+
+        cat << 'FORMATTED_PLAN_EOF' > ${{ github.action_path }}/formatted-plan.json
+        ${{ inputs.formatted-plan }}
+        FORMATTED_PLAN_EOF
+
+        cat << 'PLAN_OUTCOME_EOF' > ${{ github.action_path }}/plan-outcome.txt
+        ${{ inputs.plan-outcome }}
+        PLAN_OUTCOME_EOF
+
+    - name: Generate PR Comment
+      id: generate-comment
+      if: ${{ inputs.skip-pr-comment != 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        PLAN_SUMMARY_PATH: ${{ github.action_path }}/plan-summary.json
+        FORMATTED_PLAN_PATH: ${{ github.action_path }}/formatted-plan.json
+        PLAN_OUTCOME_PATH: ${{ github.action_path }}/plan-outcome.txt
+        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
+      run: |
+        cd ${{ github.action_path }}
+        node src/action-main.js pr-comment > pr-comment.md
+
+    - name: Post to PR
+      id: post-pr
+      if: ${{ inputs.skip-pr-comment != 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ github.token }}
+        retries: 3
+        script: |
+          const fs = require('fs');
+
+          // Read generated comment
+          const commentPath = '${{ github.action_path }}/pr-comment.md';
+          const commentBody = fs.readFileSync(commentPath, 'utf8');
+
+          // Unique marker for finding this comment
+          const COMMENT_MARKER = '<!-- terraform-plan-comment -->';
+
+          core.info('Fetching existing comments...');
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            per_page: 100
+          });
+
+          // Find comment by unique marker
+          const botComment = comments.find(c => c.body && c.body.includes(COMMENT_MARKER));
+          core.info(`Found ${comments.length} comments, ${botComment ? 'updating existing #' + botComment.id : 'creating new'}`);
+
+          let commentId = null;
+          try {
+            if (botComment) {
+              core.info(`Updating comment ${botComment.id}...`);
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+              core.info('Comment updated');
+              commentId = botComment.id;
+            } else {
+              core.info('Creating comment...');
+              const result = await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+              core.info(`Comment created: ${result.data.id}`);
+              commentId = result.data.id;
+            }
+            core.notice(`Terraform plan posted to PR #${context.issue.number}`);
+          } catch (error) {
+            core.error(`Failed: ${error.message}`);
+            core.setFailed(error.stack);
+            throw error;
+          }
+
+          core.setOutput('comment-id', commentId);
+
+    - name: Generate Pipeline Summary
+      id: generate-summary
+      shell: bash
+      env:
+        PLAN_SUMMARY_PATH: ${{ github.action_path }}/plan-summary.json
+        FORMATTED_PLAN_PATH: ${{ github.action_path }}/formatted-plan.json
+        PLAN_OUTCOME_PATH: ${{ github.action_path }}/plan-outcome.txt
+        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
+      run: |
+        cd ${{ github.action_path }}
+        node src/action-main.js pipeline-summary > pipeline-summary.md
+
+    - name: Update pipeline summary
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+
+          // Read generated summary
+          const summaryPath = '${{ github.action_path }}/pipeline-summary.md';
+          const summaryContent = fs.readFileSync(summaryPath, 'utf8');
+
+          await core.summary
+            .addRaw(summaryContent)
+            .write();
+
+    - name: Store outputs
+      id: outputs
+      shell: bash
+      run: |
+        # Store comment-id if available (from PR post step)
+        if [ -n "${{ steps.post-pr.outputs.comment-id }}" ]; then
+          echo "comment-id=${{ steps.post-pr.outputs.comment-id }}" >> $GITHUB_OUTPUT
+        fi

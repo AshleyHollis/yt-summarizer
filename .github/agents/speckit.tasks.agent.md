@@ -74,7 +74,14 @@ The tasks.md should be immediately executable - each task must be specific enoug
 
 **CRITICAL**: Tasks MUST be organized by user story to enable independent implementation and testing.
 
-**Tests are OPTIONAL**: Only generate test tasks if explicitly requested in the feature specification or if user requests TDD approach.
+**Tests are NON-NEGOTIABLE (Constitution VI.5)**:
+- **ALWAYS** generate test tasks - NEVER skip or make them optional
+- Required test types per Constitution:
+  - Unit tests: MUST cover business logic, transformation functions, data models, service methods
+  - Integration tests: MUST cover database access, message contracts, cross-service communication
+  - E2E tests: MUST cover all user story acceptance criteria and critical user journeys
+- Test-driven approach: Tests MUST be written and FAIL before implementation tasks
+- **NO EXCEPTIONS**: Even if spec doesn't mention tests, they MUST be included
 
 ### Checklist Format (REQUIRED)
 

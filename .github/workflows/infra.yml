@@ -28,7 +28,7 @@ on:
 
 concurrency:
   group: infra-prod
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   TF_VERSION: '1.5.7'
@@ -45,7 +45,7 @@ jobs:
     name: Check Changes
     runs-on: ubuntu-latest
     outputs:
-      terraform_changed: ${{ steps.filter.outputs.stage_validate_terraform }}
+      terraform_changed: ${{ steps.compute.outputs.terraform_changed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,6 +55,15 @@ jobs:
       - name: Detect changes
         id: filter
         uses: ./.github/actions/detect-pipeline-changes
+
+      - name: Compute terraform changed
+        id: compute
+        run: |
+          if [[ "${{ steps.filter.outputs.changed_areas }}" == *"infra/terraform"* ]]; then
+            echo "terraform_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "terraform_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   terraform:
     name: Terraform
@@ -104,42 +113,16 @@ jobs:
           working-directory: 'infra/terraform/environments/prod'
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         continue-on-error: true
 
-      - name: Post Plan to PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        env:
-          PLAN_OUTPUT: ${{ steps.plan.outputs.plan_output }}
+      - name: Post Plan to PR and Summary
+        uses: ./.github/actions/post-terraform-plan
         with:
-          script: |
-            const planOutput = process.env.PLAN_OUTPUT || 'No plan output available';
-            const truncatedPlan = planOutput.length > 60000
-              ? planOutput.substring(0, 60000) + '\n\n... (truncated)'
-              : planOutput;
-
-            const body = `### 🏗️ Terraform Plan - Production
-
-            #### Initialization: \`${{ steps.init.outcome }}\`
-            #### Validation: \`${{ steps.validate.outcome }}\`
-            #### Plan: \`${{ steps.plan.outcome }}\`
-
-            <details><summary>Show Plan Output</summary>
-
-            \`\`\`hcl
-            ${truncatedPlan}
-            \`\`\`
-
-            </details>
-
-            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
+          plan-summary: ${{ steps.plan.outputs.plan_summary }}
+          formatted-plan: ${{ steps.plan.outputs.formatted_plan }}
+          plan-outcome: ${{ steps.plan.outcome }}
 
       - name: Plan Status
         if: steps.plan.outcome == 'failure'

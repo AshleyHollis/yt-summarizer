@@ -77,7 +77,11 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
-
+variable "secrets_officer_principal_id" {
+  description = "Principal ID to grant Key Vault Secrets Officer role (optional, defaults to current user)"
+  type        = string
+  default     = null
+}
 # -----------------------------------------------------------------------------
 # Resources
 # -----------------------------------------------------------------------------
@@ -95,11 +99,13 @@ resource "azurerm_key_vault" "vault" {
   tags = var.tags
 }
 
-# Grant the current user/identity access to manage secrets
+# Grant a specific principal access to manage secrets (optional)
+# If not specified, secrets can still be created via GitHub OIDC Contributor role
 resource "azurerm_role_assignment" "secrets_officer" {
-  scope                = azurerm_key_vault.vault.id
+  count                = var.secrets_officer_principal_id != null ? 1 : 0
+  scope               = azurerm_key_vault.vault.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id        = var.secrets_officer_principal_id
 }
 
 # Create secrets
@@ -108,8 +114,6 @@ resource "azurerm_key_vault_secret" "secrets" {
   name         = each.key
   value        = sensitive(each.value)
   key_vault_id = azurerm_key_vault.vault.id
-
-  depends_on = [azurerm_role_assignment.secrets_officer]
 }
 
 # -----------------------------------------------------------------------------

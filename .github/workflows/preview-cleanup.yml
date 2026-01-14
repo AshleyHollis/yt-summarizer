@@ -98,7 +98,7 @@ jobs:
     name: Cleanup Images (Optional)
     runs-on: ubuntu-latest
     # Only run if we want to clean up images (can be disabled to save costs)
-    if: false  # Set to true to enable image cleanup
+    if: ${{ vars.CLEANUP_PR_IMAGES == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

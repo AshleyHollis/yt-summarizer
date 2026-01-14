@@ -1,3 +1,13 @@
+ci:
+  autofix_prs: false  # Auto-fix disabled in pre-commit.ci (remote)
+  autofix_commit_msg: "style: pre-commit.ci auto fixes"
+  autoupdate_schedule: weekly  # Update hooks weekly
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  skip: []  # Hooks to skip in CI (empty = run all)
+  # Push-based enforcement: Fail push if pre-commit checks fail
+  default_stages: []  # Run on all stages (commit, push, etc.)
+  submodules: false
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -29,5 +39,16 @@ repos:
     hooks:
       - id: yamllint
         name: Lint YAML files
-        args: ['-d', '{extends: relaxed, rules: {line-length: {max: 200}, comments: {min-spaces-from-content: 1}}}']
+        args: ['-d', '{extends: relaxed, rules: {line-length: {max: 200}, comments: {min-spaces-from-content: 1}, new-lines: disable}}']
+
         exclude: ^k8s/.*\.yaml$  # K8s manifests often have long lines
+
+  - repo: local
+    hooks:
+      - id: always-run-precommit
+        name: Pre-commit validator
+        entry: python tools/pre-commit.local
+        language: system
+        always_run: true  # Runs even if SKIP_PRE_COMMIT is set
+        pass_filenames: false  # Pre-commit wrapper handles files itself
+        verbose: true  # Show output

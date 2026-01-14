@@ -135,12 +135,52 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   tags = var.tags
+
+  # Ignore Azure-managed attributes that would cause cluster replacement
+  lifecycle {
+    ignore_changes = [
+      # Azure-managed add-ons and features
+      azure_policy_enabled,
+      http_application_routing_enabled,
+      local_account_disabled,
+      open_service_mesh_enabled,
+      custom_ca_trust_certificates_base64,
+      cost_analysis_enabled,
+
+      # Azure-managed networking
+      kubelet_identity,
+      network_profile[0].load_balancer_profile[0].managed_outbound_ip_count,
+      network_profile[0].load_balancer_profile[0].idle_timeout_in_minutes,
+      network_profile[0].load_balancer_profile[0].managed_outbound_ipv6_count,
+      network_profile[0].load_balancer_profile[0].outbound_ip_address_ids,
+      network_profile[0].load_balancer_profile[0].outbound_ip_prefix_ids,
+      network_profile[0].load_balancer_profile[0].outbound_ports_allocated,
+      network_profile[0].load_balancer_profile[0].backend_pool_type,
+
+      # Azure-managed node provisioning
+      node_provisioning_profile,
+
+      # Azure-managed node pool defaults
+      default_node_pool[0].tags,
+      default_node_pool[0].zones,
+      default_node_pool[0].node_public_ip_enabled,
+      default_node_pool[0].fips_enabled,
+      default_node_pool[0].host_encryption_enabled,
+      default_node_pool[0].only_critical_addons_enabled,
+      default_node_pool[0].max_count,
+      default_node_pool[0].min_count,
+      default_node_pool[0].upgrade_settings,
+
+      # Azure-managed identity defaults
+      identity[0].identity_ids,
+    ]
+  }
 }
 
 # Grant AKS access to pull images from ACR
 resource "azurerm_role_assignment" "acr_pull" {
   count                = var.attach_acr ? 1 : 0
-  principal_id         = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  principal_id         = try(azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id, null)
   role_definition_name = "AcrPull"
   scope                = var.acr_id
 }
@@ -195,7 +235,7 @@ output "cluster_ca_certificate" {
 
 output "kubelet_identity_object_id" {
   description = "Object ID of the kubelet managed identity"
-  value       = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  value       = try(azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id, null)
 }
 
 output "identity_principal_id" {

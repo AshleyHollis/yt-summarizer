@@ -280,6 +280,8 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
+    outputs:
+      test_duration: ${{ steps.finish.outputs.test_duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -290,10 +292,23 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           working-directory: services/shared
 
+      - name: Record tests start
+        id: start
+        uses: ./.github/actions/record-test-duration
+        with:
+          test-name: Shared Tests
+
       - name: Run shared tests
         uses: ./.github/actions/run-pytest
         with:
           working-directory: services/shared
+
+      - name: Record tests finish
+        id: finish
+        uses: ./.github/actions/record-test-duration
+        with:
+          start-time: ${{ steps.start.outputs.started_at }}
+          test-name: Shared Tests
 
   test-api:
     name: Test API

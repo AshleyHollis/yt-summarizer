@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+import os
+import shutil
+import subprocess
+import sys
+
+
+CI_ENV_VARS = ("CI", "GITHUB_ACTIONS", "CONTINUOUS_INTEGRATION", "JENKINS_URL")
+PRE_COMMIT_ENV_VARS = (
+    "PRE_COMMIT",
+    "PRE_COMMIT_CI",
+    "PRE_COMMIT_ALLOW_NO_CONFIG",
+    "PRE_COMMIT_COLOR",
+    "PRE_COMMIT_HOME",
+)
+
+
+def is_ci_environment() -> bool:
+    return any(os.getenv(name) for name in CI_ENV_VARS)
+
+
+def is_pre_commit_environment() -> bool:
+    return any(os.getenv(name) for name in PRE_COMMIT_ENV_VARS)
+
+
+if is_ci_environment() or is_pre_commit_environment():
+    print("Running in CI or pre-commit, skipping wrapper...", flush=True)
+    sys.exit(0)
+
+pre_commit_path = shutil.which("pre-commit")
+if not pre_commit_path:
+    print("ERROR: pre-commit not found on PATH", file=sys.stderr)
+    print("Install pre-commit: pip install pre-commit")
+    sys.exit(1)
+
+print("")
+print("========================================")
+print("VALIDATING PRE-COMMIT")
+print("========================================")
+print(f"Pre-commit found at: {pre_commit_path}")
+print("Running pre-commit --all-files --verbose...")
+
+result = subprocess.run([pre_commit_path, "run", "--all-files", "--verbose"], check=False)
+if result.returncode != 0:
+    print("")
+    print("========================================")
+    print("PRE-COMMIT VALIDATION FAILED")
+    print("========================================")
+    print("")
+    print("The local pre-commit found issues that must be fixed.")
+    print("")
+    print("How to fix:")
+    print("  1. Run 'pre-commit run --all-files --verbose' to auto-fix issues")
+    print("  2. Review the changes with 'git diff'")
+    print("  3. Add the fixes: 'git add .'")
+    print("  4. Commit again")
+    print("")
+    print("To bypass ALL git hooks (not recommended):")
+    print("  Use: git commit --no-verify ...")
+    print("")
+    sys.exit(result.returncode)
+
+print("")
+print("========================================")
+print("PRE-COMMIT VALIDATION PASSED")
+print("========================================")
+print("")
+sys.exit(0)

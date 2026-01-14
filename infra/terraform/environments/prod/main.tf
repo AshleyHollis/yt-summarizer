@@ -56,14 +56,17 @@ module "acr" {
 module "key_vault" {
   source = "../../modules/key-vault"
 
-  name                     = "kv-${local.name_prefix}"
-  resource_group_name      = azurerm_resource_group.main.name
-  location                 = azurerm_resource_group.main.location
-  purge_protection_enabled = true
+  name                         = "kv-${local.name_prefix}"
+  resource_group_name          = azurerm_resource_group.main.name
+  location                     = azurerm_resource_group.main.location
+  purge_protection_enabled     = true
+  secrets_officer_principal_id = var.key_vault_secrets_officer_principal_id
 
   secrets = {
     "sql-connection-string" = module.sql.connection_string
     "storage-connection"    = module.storage.primary_connection_string
+    "openai-api-key"        = var.openai_api_key
+    "cloudflare-api-token"  = var.cloudflare_api_token
   }
 
   tags = local.common_tags
@@ -135,12 +138,10 @@ module "aks" {
   kubernetes_version  = var.kubernetes_version
 
   # Single-node for cost savings (~$97/month)
-  node_count     = 1
-  node_vm_size   = var.aks_node_size
-  node_pool_name = "system2"
-
-  # ACR integration
-  acr_id = module.acr.id
+  node_count      = 1
+  node_vm_size    = var.aks_node_size
+  node_pool_name  = "system2"
+  os_disk_size_gb = var.aks_os_disk_size_gb
 
   # Enable Workload Identity for External Secrets
   enable_workload_identity = true
@@ -189,6 +190,22 @@ module "swa" {
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   sku_tier            = "Free"
+
+  tags = local.common_tags
+}
+
+# -----------------------------------------------------------------------------
+# GitHub Actions OIDC
+# Creates Azure AD app registration and federated credentials for CI/CD
+# -----------------------------------------------------------------------------
+
+module "github_oidc" {
+  source = "../../modules/github-oidc"
+
+  github_organization     = "AshleyHollis"
+  github_repository       = "yt-summarizer"
+  assign_contributor_role = false
+  acr_id                  = ""
 
   tags = local.common_tags
 }
@@ -270,6 +287,32 @@ output "storage_primary_endpoint" {
   value = module.storage.primary_blob_endpoint
 }
 
+# GitHub Actions OIDC outputs
+output "github_oidc_application_id" {
+  description = "GitHub Actions OIDC - Application (Client) ID for AZURE_CLIENT_ID secret"
+  value       = module.github_oidc.application_id
+}
+
+output "github_oidc_tenant_id" {
+  description = "GitHub Actions OIDC - Tenant ID for AZURE_TENANT_ID secret"
+  value       = module.github_oidc.tenant_id
+}
+
+output "github_oidc_subscription_id" {
+  description = "GitHub Actions OIDC - Subscription ID for AZURE_SUBSCRIPTION_ID secret"
+  value       = module.github_oidc.subscription_id
+}
+
+output "github_oidc_secrets" {
+  description = "GitHub repository secrets configuration (copy these to GitHub)"
+  value       = module.github_oidc.github_secrets
+}
+
+output "github_oidc_federated_credentials" {
+  description = "Federated credential subjects configured for GitHub Actions"
+  value       = module.github_oidc.federated_credentials
+}
+
 # Output for post-deploy instructions
 output "post_deploy_instructions" {
   value = <<-EOT
@@ -277,16 +320,23 @@ output "post_deploy_instructions" {
     ╔═══════════════════════════════════════════════════════════════════════════╗
     ║ NEXT STEPS: Bootstrap Argo CD and Cluster Components                      ║
     ╠═══════════════════════════════════════════════════════════════════════════╣
-    ║ 1. Get AKS credentials:                                                    ║
+    ║ 1. Configure GitHub Secrets (REQUIRED FOR CI/CD):                         ║
+    ║    Go to: https://github.com/AshleyHollis/yt-summarizer/settings/secrets/actions ║
+    ║                                                                            ║
+    ║    AZURE_CLIENT_ID = ${module.github_oidc.application_id}                ║
+    ║    AZURE_TENANT_ID = ${module.github_oidc.tenant_id}                     ║
+    ║    AZURE_SUBSCRIPTION_ID = ${module.github_oidc.subscription_id}         ║
+    ║                                                                            ║
+    ║ 2. Get AKS credentials:                                                    ║
     ║    az aks get-credentials --resource-group ${azurerm_resource_group.main.name} --name ${module.aks.name}   ║
     ║                                                                            ║
-    ║ 2. Bootstrap Argo CD:                                                      ║
+    ║ 3. Bootstrap Argo CD:                                                      ║
     ║    ./scripts/bootstrap-argocd.ps1                                          ║
     ║                                                                            ║
-    ║ 3. Apply infrastructure apps (ingress-nginx, external-secrets):            ║
+    ║ 4. Apply infrastructure apps (ingress-nginx, external-secrets):            ║
     ║    kubectl apply -f k8s/argocd/infra-apps.yaml                             ║
     ║                                                                            ║
-    ║ 4. Apply application configs:                                              ║
+    ║ 5. Apply application configs:                                              ║
     ║    kubectl apply -f k8s/argocd/prod-app.yaml                               ║
     ║    kubectl apply -f k8s/argocd/preview-appset.yaml                         ║
     ╚═══════════════════════════════════════════════════════════════════════════╝

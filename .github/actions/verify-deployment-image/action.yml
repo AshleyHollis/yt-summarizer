@@ -301,18 +301,18 @@ runs:
 
         # Create a minimal test pod
         cat <<EOF | kubectl apply -n "${TEST_NAMESPACE_ORIGINAL}" -f - &>/dev/null
-apiVersion: v1
-kind: Pod
-metadata:
-  name: ${TEST_POD_NAME}
-spec:
-  restartPolicy: Never
-  serviceAccountName: yt-summarizer-sa
-  containers:
-    - name: test
-      image: ${TEST_IMAGE}
-      command: ["sh", "-c", "echo 'ACR pull test successful' && exit 0"]
-EOF
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: ${TEST_POD_NAME}
+        spec:
+          restartPolicy: Never
+          serviceAccountName: yt-summarizer-sa
+          containers:
+            - name: test
+              image: ${TEST_IMAGE}
+              command: ["sh", "-c", "echo 'ACR pull test successful' && exit 0"]
+        EOF
 
         echo "  ⏳ Testing image pull (max 45s)..."
         PULL_TEST_PASSED=false
@@ -350,8 +350,9 @@ EOF
               echo "::error::       --role AcrPull --scope /subscriptions/.../resourceGroups/.../providers/Microsoft.ContainerRegistry/registries/${REGISTRY}"
               echo "::error:: "
               echo "::error::  → Prefer granting AKS kubelet identity the 'AcrPull' role on the ACR (recommended)"
-              echo "::error::     - az role assignment create --assignee <kubelet-identity> --role AcrPull --scope /subscriptions/.../resourceGroups/.../providers/Microsoft.ContainerRegistry/registries/${REGISTRY}"
-              echo "::error::  → As a fallback, imagePullSecrets (docker-registry secrets) can be used, but ensure they are managed and rotated securely if present."}   }]}] }}}
+              echo "::error::     - az role assignment create --assignee <kubelet-identity> --role AcrPull"
+              echo "::error::       --scope /subscriptions/.../resourceGroups/.../providers/Microsoft.ContainerRegistry/registries/${REGISTRY}"
+              echo "::error::  → As a fallback, imagePullSecrets (docker-registry secrets) can be used, but ensure they are managed and rotated securely if present."
             elif [[ "$ERROR_MSG" == *"not found"* ]] || [[ "$ERROR_MSG" == *"manifest unknown"* ]]; then
               echo "::error::  → Image tag does not exist in ACR (already caught earlier, but double-check)"
             elif [[ "$ERROR_MSG" == *"network"* ]] || [[ "$ERROR_MSG" == *"timeout"* ]]; then
