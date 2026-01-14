@@ -2,6 +2,12 @@
 # Runs for all environments to ensure code quality before commits
 # Cannot be skipped via SKIP_PRE_COMMIT
 
+# Skip in CI - pre-commit.ci already runs pre-commit directly
+if ($env:GITHUB_ACTIONS -eq "true") {
+    Write-Host "Running in CI, skipping pre-commit wrapper..." -ForegroundColor Gray
+    exit 0
+}
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Red
 Write-Host "VALIDATING PRE-COMMIT" -ForegroundColor Red
