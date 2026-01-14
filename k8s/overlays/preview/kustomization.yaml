@@ -26,11 +26,11 @@ patches:
   - path: patches/replicas-patch.yaml
   - path: patches/migration-job-patch.yaml
 images:
-  - 
+  -
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
     newTag: pr-16-1261f4c
-  - 
+  -
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
     newTag: pr-16-1261f4c
