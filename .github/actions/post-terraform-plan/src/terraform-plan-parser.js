@@ -66,6 +66,18 @@ function formatValue(value, unknown = false) {
   return JSON.stringify(value);
 }
 
+function hasVisibleMarker(marker) {
+  return marker && marker !== '  ' && marker !== '';
+}
+
+function buildIndent(marker, prefix) {
+  return hasVisibleMarker(marker) ? `${marker} ${prefix}` : prefix;
+}
+
+function formatLine(marker, prefix, content) {
+  return `${buildIndent(marker, prefix)}${content}`;
+}
+
 /**
  * Format an array value with multi-line Terraform-style output
  * Declarative approach: define structure once, then template lines
@@ -76,29 +88,17 @@ function formatValue(value, unknown = false) {
  * @returns {Array<string>} Array of formatted lines
  */
 function formatMultilineArray(arr, prefix, key, marker = '  ') {
+  const lineIndent = buildIndent(marker, prefix);
+  const valueIndent = buildIndent(marker, `${prefix}  `);
+
   if (arr.length === 0) {
-    return [`${marker} ${prefix}${key} = []`];
+    return [`${lineIndent}${key} = []`];
   }
 
-  // Define indentation structure - all relative to content start
-  // Pattern: marker + ' ' + prefix + [content]
-  // All markers in this function are at the same level, so we use:
-  //   - marker + ' ' + prefix for opening and closing brace (always aligned)
-  //   - marker + ' ' + prefix + '    ' for inner content (4 more spaces)
-  //
-  // Example with marker='  ' (create) and prefix='    ' (4 spaces):
-  //      tags = [          <- '  ' + ' ' + '    ' = 7 characters before "tags"
-  //          "value",      <- '  ' + ' ' + '    ' + '    ' = 11 characters before "value"
-  //          "value2",     <- same as above
-  //      ]                 <- '  ' + ' ' + '    ' = 7 characters before "]"
-  const markerPrefix = `${marker} ${prefix}`;
-  const valueIndent = `${markerPrefix}    `;
-
-  // Build lines declaratively
   return [
-    `${markerPrefix}${key} = [`,
+    `${lineIndent}${key} = [`,
     ...arr.map(item => `${valueIndent}${formatValue(item, false)},`),
-    `${markerPrefix}]`
+    `${lineIndent}]`
   ];
 }
 
@@ -230,11 +230,9 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
     if (nestedLines.length > 0 || shouldUseMarkerForBlocks) {
       // Use computed marker (or '  ' for no marker)
       const blockMarker = shouldUseMarkerForBlocks ? marker : '  ';
-      lines.push(`${blockMarker} ${prefix}${key} {`);
+      lines.push(formatLine(blockMarker, prefix, `${key} {`));
       nestedLines.forEach(l => lines.push(l));
-      // Closing brace: use same spacing as opening line for consistency
-      // Opening: marker + ' ' + prefix -> closing should match
-      lines.push(`${blockMarker} ${prefix}}`);
+      lines.push(formatLine(blockMarker, prefix, '}'));
     }
     continue;
   }
@@ -256,25 +254,22 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
             const nestedLines = findChanges(bItem, aItem, unknownItem || {}, prefix + '    ', forceMarker, isReplace);
             if (nestedLines.length > 0) {
               const arrayMarker = shouldUseMarkerForBlocks ? (isReplace ? '!!' : '!') : marker;
-              lines.push(`${arrayMarker} ${prefix}${key} {`);
+              lines.push(formatLine(arrayMarker, prefix, `${key} {`));
               nestedLines.forEach(l => lines.push(l));
-              // Closing brace: use same spacing as opening line for consistency
-              lines.push(`${arrayMarker} ${prefix}}`);
+              lines.push(formatLine(arrayMarker, prefix, '}'));
             }
           } else if (aItem && !bItem) {
             const itemMarker = marker;
-            lines.push(`${itemMarker} ${prefix}${key} {`);
+            lines.push(formatLine(itemMarker, prefix, `${key} {`));
             const itemForceMarker = shouldUseMarkerForBlocks ? undefined : '  ';
             const nestedLines = findChanges({}, aItem, unknownItem || {}, prefix + '    ', itemForceMarker, false);
             nestedLines.forEach(l => lines.push(l));
-            // Closing brace: use same spacing as opening line for consistency
-            lines.push(`${itemMarker} ${prefix}}`);
+            lines.push(formatLine(itemMarker, prefix, '}'));
           } else if (bItem && !aItem) {
             const itemMarker = marker;
-            lines.push(`${itemMarker} ${prefix}${key} {`);
-            lines.push(`${itemMarker} ${prefix}    # (block removed)`);
-            // Closing brace: use same spacing as opening line for consistency
-            lines.push(`${itemMarker} ${prefix}}`);
+            lines.push(formatLine(itemMarker, prefix, `${key} {`));
+            lines.push(formatLine(itemMarker, `${prefix}    `, '# (block removed)'));
+            lines.push(formatLine(itemMarker, prefix, '}'));
           }
         }
       } else {
@@ -286,17 +281,15 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
             const arrayLines = formatMultilineArray(val, prefix, key, marker);
             lines.push(...arrayLines);
           } else if (val.length === 1) {
-            // Single element: inline format
-            lines.push(`${marker} ${prefix}${key} = ${formatValue(val, isUnknown)}`);
+            lines.push(formatLine(marker, prefix, `${key} = ${formatValue(val, isUnknown)}`));
           } else {
-            lines.push(`${marker} ${prefix}${key} = []`);
+            lines.push(formatLine(marker, prefix, `${key} = []`));
           }
         } else if (JSON.stringify(beforeArr) !== JSON.stringify(afterArr)) {
-          // Array comparison: show before -> after on the line
           const beforeFormatted = formatValue(beforeVal, false);
           const afterFormatted = formatValue(afterVal, isUnknown);
           const arrayMarker = isReplace ? '!!' : '!';
-          lines.push(`${arrayMarker} ${prefix}${key} = ${beforeFormatted} -> ${afterFormatted}`);
+          lines.push(formatLine(arrayMarker, prefix, `${key} = ${beforeFormatted} -> ${afterFormatted}`));
         }
       }
       continue;
@@ -304,36 +297,32 @@ function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = n
 
     // Simple value handling with multi-line array formatting
     if (marker === '  ') {
-      // No marker case (create/destroy) - show multi-line arrays or single-line values
       const val = beforeExists ? beforeVal : afterVal;
       if (Array.isArray(val) && val.length > 1) {
         const arrayLines = formatMultilineArray(val, prefix, key, '  ');
         lines.push(...arrayLines);
       } else {
-        lines.push(`  ${prefix}${key} = ${formatValue(val, isUnknown)}`);
+        lines.push(formatLine(marker, prefix, `${key} = ${formatValue(val, isUnknown)}`));
       }
     } else if (!beforeExists && afterExists) {
-      // Value added
       if (Array.isArray(afterVal) && afterVal.length > 1) {
         const arrayLines = formatMultilineArray(afterVal, prefix, key, '+');
         lines.push(...arrayLines);
       } else {
-        lines.push(`+ ${prefix}${key} = ${formatValue(afterVal, isUnknown)}`);
+        lines.push(formatLine('+', prefix, `${key} = ${formatValue(afterVal, isUnknown)}`));
       }
     } else if (beforeExists && !afterExists) {
-      // Value removed
       if (Array.isArray(beforeVal) && beforeVal.length > 1) {
         const arrayLines = formatMultilineArray(beforeVal, prefix, key, '-');
         lines.push(...arrayLines);
       } else {
-        lines.push(`- ${prefix}${key} = ${formatValue(beforeVal, false)}`);
+        lines.push(formatLine('-', prefix, `${key} = ${formatValue(beforeVal, false)}`));
       }
     } else if (beforeExists && afterExists) {
-      // Value changed - arrays show inline, not multi-line for diff
       const beforeFormatted = formatValue(beforeVal, false);
       const afterFormatted = formatValue(afterVal, isUnknown);
       const changeMarker = isReplace ? '!!' : '!';
-      lines.push(`${changeMarker} ${prefix}${key} = ${beforeFormatted} -> ${afterFormatted}`);
+      lines.push(formatLine(changeMarker, prefix, `${key} = ${beforeFormatted} -> ${afterFormatted}`));
     }
   }
 
