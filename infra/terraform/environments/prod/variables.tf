@@ -73,3 +73,15 @@ variable "github_repo" {
   type        = string
   default     = "yt-summarizer"
 }
+
+variable "openai_api_key" {
+  description = "OpenAI API key for summarization"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token for DNS-01 challenges"
+  type        = string
+  sensitive   = true
+}

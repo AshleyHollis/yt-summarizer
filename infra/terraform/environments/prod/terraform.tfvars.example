@@ -1,4 +1,7 @@
 # Production Environment Variables
 # These values should be customized for your deployment
+# Note: In GitHub Actions, these are provided via repository secrets
 
 sql_admin_password = "CHANGE_ME_IN_PRODUCTION"
+openai_api_key = "sk-CHANGE_ME"
+cloudflare_api_token = "CHANGE_ME"

@@ -10,6 +10,12 @@ inputs:
   sql-admin-password:
     description: 'SQL admin password'
     required: true
+  openai-api-key:
+    description: 'OpenAI API key'
+    required: true
+  cloudflare-api-token:
+    description: 'Cloudflare API token'
+    required: true
 outputs:
   plan_output:
     description: 'Raw terraform plan output'
@@ -35,6 +41,8 @@ runs:
         terraform plan -no-color -input=false -out=tfplan \
           -var="subscription_id=${{ inputs.subscription-id }}" \
           -var="sql_admin_password=${{ inputs.sql-admin-password }}" \
+          -var="openai_api_key=${{ inputs.openai-api-key }}" \
+          -var="cloudflare_api_token=${{ inputs.cloudflare-api-token }}" \
           2>&1 | tee plan_output.txt
         PLAN_EXIT_CODE=$?
         echo "plan_output<<EOF" >> "$GITHUB_OUTPUT"

@@ -65,6 +65,8 @@ module "key_vault" {
   secrets = {
     "sql-connection-string" = module.sql.connection_string
     "storage-connection"    = module.storage.primary_connection_string
+    "openai-api-key"        = var.openai_api_key
+    "cloudflare-api-token"  = var.cloudflare_api_token
   }
 
   tags = local.common_tags
@@ -202,8 +204,8 @@ module "github_oidc" {
 
   github_organization     = "AshleyHollis"
   github_repository       = "yt-summarizer"
-  assign_contributor_role = true
-  acr_id                  = module.acr.id
+  assign_contributor_role = false
+  acr_id                  = ""
 
   tags = local.common_tags
 }

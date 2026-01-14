@@ -55,17 +55,17 @@ resource "azuread_service_principal" "github_actions" {
 resource "azuread_application_federated_identity_credential" "main" {
   application_id = azuread_application.github_actions.id
   display_name   = "github-main"
-  description    = "Federated credential for GitHub Actions on main branch"
+  description    = ""
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
-  subject        = "repo:${var.github_organization}/${var.github_repository}:ref:refs/heads/main"
+  subject        = "repo:${var.github_organization}/${var.github_repository}:ref:refs/heads/*"
 }
 
 # Pull request credential - for all PRs
 resource "azuread_application_federated_identity_credential" "pull_request" {
   application_id = azuread_application.github_actions.id
   display_name   = "github-pr"
-  description    = "Federated credential for GitHub Actions pull requests"
+  description    = ""
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
   subject        = "repo:${var.github_organization}/${var.github_repository}:pull_request"
