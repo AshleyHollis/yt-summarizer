@@ -3,7 +3,14 @@
 # Cannot be skipped via SKIP_PRE_COMMIT
 
 # Skip in CI - pre-commit.ci already runs pre-commit directly
-if ($env:GITHUB_ACTIONS) {
+# Check for CI environment by looking for common CI environment variables
+$IsCI = $false
+if ($env:CI -eq "true") { $IsCI = $true }
+if ($env:GITHUB_ACTIONS -eq "true") { $IsCI = $true }
+if ($env:CONTINUOUS_INTEGRATION -eq "true") { $IsCI = $true }
+if ($env:JENKINS_URL) { $IsCI = $true }
+
+if ($IsCI) {
     Write-Host "Running in CI, skipping pre-commit wrapper..." -ForegroundColor Gray
     exit 0
 }
