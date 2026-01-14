@@ -40,7 +40,19 @@ variable "kubernetes_version" {
 variable "aks_node_size" {
   description = "VM size for AKS nodes"
   type        = string
-  default     = "Standard_B4als_v2"  # 4 vCPUs, 8GB RAM, 100 max pods
+  default     = "Standard_B4als_v2" # 4 vCPUs, 8GB RAM, 100 max pods
+}
+
+variable "aks_os_disk_size_gb" {
+  description = "OS disk size for AKS nodes in GB"
+  type        = number
+  default     = 128
+}
+
+variable "key_vault_secrets_officer_principal_id" {
+  description = "Principal ID with Key Vault Secrets Officer access"
+  type        = string
+  default     = "eac9556a-cd81-431f-a1ec-d6940b2d92d3"
 }
 
 variable "domain" {
@@ -48,6 +60,7 @@ variable "domain" {
   type        = string
   default     = "yt-summarizer.example.com"
 }
+
 
 variable "github_org" {
   description = "GitHub organization/owner name"

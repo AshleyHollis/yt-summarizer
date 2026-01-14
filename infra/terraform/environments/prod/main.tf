@@ -17,10 +17,9 @@ locals {
   name_prefix = "ytsumm-prd"
 
   common_tags = {
-    Environment       = local.environment
-    Project           = "yt-summarizer"
-    ManagedBy         = "terraform"
-    TestPipelineDate   = "2026-01-13-v2"
+    Environment = local.environment
+    Project     = "yt-summarizer"
+    ManagedBy   = "terraform"
   }
 }
 
@@ -57,10 +56,11 @@ module "acr" {
 module "key_vault" {
   source = "../../modules/key-vault"
 
-  name                     = "kv-${local.name_prefix}"
-  resource_group_name      = azurerm_resource_group.main.name
-  location                 = azurerm_resource_group.main.location
-  purge_protection_enabled = true
+  name                         = "kv-${local.name_prefix}"
+  resource_group_name          = azurerm_resource_group.main.name
+  location                     = azurerm_resource_group.main.location
+  purge_protection_enabled     = true
+  secrets_officer_principal_id = var.key_vault_secrets_officer_principal_id
 
   secrets = {
     "sql-connection-string" = module.sql.connection_string
@@ -136,9 +136,10 @@ module "aks" {
   kubernetes_version  = var.kubernetes_version
 
   # Single-node for cost savings (~$97/month)
-  node_count     = 1
-  node_vm_size   = var.aks_node_size
-  node_pool_name = "system2"
+  node_count      = 1
+  node_vm_size    = var.aks_node_size
+  node_pool_name  = "system2"
+  os_disk_size_gb = var.aks_os_disk_size_gb
 
   # Enable Workload Identity for External Secrets
   enable_workload_identity = true
