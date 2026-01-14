@@ -82,16 +82,13 @@ resource "azuread_application_federated_identity_credential" "production" {
 }
 
 # Repository-wide credential - wildcard for any workflow
-resource "azuread_application_federated_identity_credential" "repository" {
+resource "azuread_application_federated_identity_credential" "repository-tf" {
   application_id = azuread_application.github_actions.id
   display_name   = "github-repo"
-  description    = "Federated credential for any GitHub Actions workflow in repository"
+  description    = "Federated credential for any GitHub Actions workflow in repository (managed by Terraform)"
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
-  subject        = "repo:${var.github_organization}/${var.github_repository}"
-  lifecycle {
-    ignore_changes = [tags, description]
-  }
+  subject        = "repo:${var.github_organization}/${var.github_repository}:tf-managed"
 }
 
 # -----------------------------------------------------------------------------
