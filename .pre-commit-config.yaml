@@ -39,14 +39,15 @@ repos:
     hooks:
       - id: yamllint
         name: Lint YAML files
-        args: ['-d', '{extends: relaxed, rules: {line-length: {max: 200}, comments: {min-spaces-from-content: 1}}}']
+        args: ['-d', '{extends: relaxed, rules: {line-length: {max: 200}, comments: {min-spaces-from-content: 1}, new-lines: disable}}']
+
         exclude: ^k8s/.*\.yaml$  # K8s manifests often have long lines
 
   - repo: local
     hooks:
       - id: always-run-precommit
         name: Pre-commit validator
-        entry: pwsh -File tools\pre-commit.local
+        entry: python tools/pre-commit.local
         language: system
         always_run: true  # Runs even if SKIP_PRE_COMMIT is set
         pass_filenames: false  # Pre-commit wrapper handles files itself

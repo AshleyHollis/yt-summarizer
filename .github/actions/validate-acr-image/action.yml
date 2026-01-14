@@ -86,7 +86,13 @@ runs:
 
             # List available tags for this repository to help debugging
             echo "::group::📦 Available Tags in ${REPOSITORY}"
-            az acr repository show-tags --name "$REGISTRY" --repository "$REPOSITORY" --orderby time_desc --output table --top 20 2>/dev/null || echo "Could not list tags (permission issue or repository doesn't exist)"
+            az acr repository show-tags \
+              --name "$REGISTRY" \
+              --repository "$REPOSITORY" \
+              --orderby time_desc \
+              --output table \
+              --top 20 2>/dev/null || \
+              echo "Could not list tags (permission issue or repository doesn't exist)"
             echo "::endgroup::"
 
             exit 1

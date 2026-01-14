@@ -136,4 +136,3 @@ Double-check:
 - You're in the correct directory (`infra/terraform/environments/prod`)
 - Terraform is initialized
 - The resource ID matches exactly (no extra spaces, quotes, etc.)
-

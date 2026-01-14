@@ -177,4 +177,3 @@ output "connection_string" {
   value       = "Server=tcp:${azurerm_mssql_server.server.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.database.name};User ID=${var.admin_username};Password=${var.admin_password};Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
   sensitive   = true
 }
-

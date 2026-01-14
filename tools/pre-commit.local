@@ -1,67 +1,57 @@
-# Pre-commit validator that ALWAYS runs local pre-commit
-# Runs for all environments to ensure code quality before commits
-# Cannot be skipped via SKIP_PRE_COMMIT
+#!/usr/bin/env python3
+import os
+import shutil
+import subprocess
+import sys
 
-# Skip in CI - pre-commit.ci already runs pre-commit directly
-# Check for CI environment by looking for common CI environment variables
-$IsCI = $false
-if ($env:CI -eq "true") { $IsCI = $true }
-if ($env:GITHUB_ACTIONS -eq "true") { $IsCI = $true }
-if ($env:CONTINUOUS_INTEGRATION -eq "true") { $IsCI = $true }
-if ($env:JENKINS_URL) { $IsCI = $true }
 
-if ($IsCI) {
-    Write-Host "Running in CI, skipping pre-commit wrapper..." -ForegroundColor Gray
-    exit 0
-}
+CI_ENV_VARS = ("CI", "GITHUB_ACTIONS", "CONTINUOUS_INTEGRATION", "JENKINS_URL")
 
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Red
-Write-Host "VALIDATING PRE-COMMIT" -ForegroundColor Red
-Write-Host "========================================" -ForegroundColor Red
 
-# Find and validate pre-commit executable
-$PreCommitName = "pre-commit"
-$PreCommit = Get-Command $PreCommitName -ErrorAction SilentlyContinue
+def is_ci_environment() -> bool:
+    return any(os.getenv(name) for name in CI_ENV_VARS)
 
-if (-not $PreCommit) {
-    Write-Error "ERROR: pre-commit not found on PATH" -ForegroundColor Red
-    Write-Host "Install pre-commit: pip install pre-commit" -ForegroundColor Yellow
-    exit 1
-}
 
-Write-Host "Pre-commit found at: $($PreCommit.Source)" -ForegroundColor Gray
+if is_ci_environment():
+    print("Running in CI, skipping pre-commit wrapper...", flush=True)
+    sys.exit(0)
 
-# Run local pre-commit with auto-fix
-Write-Host "Running pre-commit --all-files --verbose..." -ForegroundColor Cyan
-& pre-commit run --all-files --verbose
-$ExitCode = $LASTEXITCODE
+pre_commit_path = shutil.which("pre-commit")
+if not pre_commit_path:
+    print("ERROR: pre-commit not found on PATH", file=sys.stderr)
+    print("Install pre-commit: pip install pre-commit")
+    sys.exit(1)
 
-if ($ExitCode -ne 0) {
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Red
-    Write-Host "PRE-COMMIT VALIDATION FAILED" -ForegroundColor Red
-    Write-Host "========================================" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "The local pre-commit found issues that must be fixed." -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Commits will be BLOCKED until issues are resolved." -ForegroundColor Red
-    Write-Host ""
-    Write-Host "How to fix:" -ForegroundColor Yellow
-    Write-Host "  1. Run 'pre-commit run --all-files --verbose' to auto-fix issues" -ForegroundColor White
-    Write-Host "  2. Review the changes with 'git diff'" -ForegroundColor White
-    Write-Host "  3. Add the fixes: 'git add .'" -ForegroundColor White
-    Write-Host "  4. Commit again" -ForegroundColor White
-    Write-Host ""
-    Write-Host "To bypass ALL git hooks (not recommended):" -ForegroundColor Red
-    Write-Host "  Use: git commit --no-verify ..." -ForegroundColor Red
-    Write-Host ""
-    exit $ExitCode
-} else {
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Green
-    Write-Host "PRE-COMMIT VALIDATION PASSED" -ForegroundColor Green
-    Write-Host "========================================" -ForegroundColor Green
-    Write-Host ""
-    exit 0
-}
+print("")
+print("========================================")
+print("VALIDATING PRE-COMMIT")
+print("========================================")
+print(f"Pre-commit found at: {pre_commit_path}")
+print("Running pre-commit --all-files --verbose...")
+
+result = subprocess.run([pre_commit_path, "run", "--all-files", "--verbose"], check=False)
+if result.returncode != 0:
+    print("")
+    print("========================================")
+    print("PRE-COMMIT VALIDATION FAILED")
+    print("========================================")
+    print("")
+    print("The local pre-commit found issues that must be fixed.")
+    print("")
+    print("How to fix:")
+    print("  1. Run 'pre-commit run --all-files --verbose' to auto-fix issues")
+    print("  2. Review the changes with 'git diff'")
+    print("  3. Add the fixes: 'git add .'")
+    print("  4. Commit again")
+    print("")
+    print("To bypass ALL git hooks (not recommended):")
+    print("  Use: git commit --no-verify ...")
+    print("")
+    sys.exit(result.returncode)
+
+print("")
+print("========================================")
+print("PRE-COMMIT VALIDATION PASSED")
+print("========================================")
+print("")
+sys.exit(0)
