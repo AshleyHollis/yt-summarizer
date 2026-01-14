@@ -6,14 +6,25 @@ import sys
 
 
 CI_ENV_VARS = ("CI", "GITHUB_ACTIONS", "CONTINUOUS_INTEGRATION", "JENKINS_URL")
+PRE_COMMIT_ENV_VARS = (
+    "PRE_COMMIT",
+    "PRE_COMMIT_CI",
+    "PRE_COMMIT_ALLOW_NO_CONFIG",
+    "PRE_COMMIT_COLOR",
+    "PRE_COMMIT_HOME",
+)
 
 
 def is_ci_environment() -> bool:
     return any(os.getenv(name) for name in CI_ENV_VARS)
 
 
-if is_ci_environment():
-    print("Running in CI, skipping pre-commit wrapper...", flush=True)
+def is_pre_commit_environment() -> bool:
+    return any(os.getenv(name) for name in PRE_COMMIT_ENV_VARS)
+
+
+if is_ci_environment() or is_pre_commit_environment():
+    print("Running in CI or pre-commit, skipping wrapper...", flush=True)
     sys.exit(0)
 
 pre_commit_path = shutil.which("pre-commit")
