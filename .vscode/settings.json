@@ -11,7 +11,7 @@
         ".specify/scripts/powershell/": true
     },
     "terminal.integrated.env.windows": {
-        "PATH": "${workspaceFolder}\\tools;${env:PATH}"
+        "PATH": "${workspaceFolder}${separator}tools;${env:PATH}"
     },
 
     // ─── Memory Optimization Settings ───────────────────────────────────────────
