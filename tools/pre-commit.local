@@ -3,7 +3,7 @@
 # Cannot be skipped via SKIP_PRE_COMMIT
 
 # Skip in CI - pre-commit.ci already runs pre-commit directly
-if ($null -ne $env:GITHUB_ACTIONS) {
+if ($env:GITHUB_ACTIONS) {
     Write-Host "Running in CI, skipping pre-commit wrapper..." -ForegroundColor Gray
     exit 0
 }
