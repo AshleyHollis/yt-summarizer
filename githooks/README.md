@@ -22,13 +22,29 @@ pwsh -File scripts/setup-githooks.ps1
 
 ### Manual Setup
 
+**Windows users**: Git needs to be configured to use PowerShell for hooks
+
 ```powershell
-# Copy hooks to .git/hooks/
-Copy-Item githooks/pre-commit .git/hooks/pre-commit
-Copy-Item githooks/pre-push .git/hooks/pre-push
+# Configure Git to use PowerShell for hooks
+git config --global core.hooksPath githooks
+
+# Or configure per-repository (recommended)
+git config core.hooksPath githooks
 ```
 
-**Note**: Git hooks are now PowerShell scripts for cross-platform compatibility. PowerShell Core (pwsh) is available on Windows, macOS, and Linux. On Windows, PowerShell 5.1+ is also available by default.
+**Linux/macOS users**:
+
+```bash
+# Copy hooks to .git/hooks/
+cp githooks/pre-commit .git/hooks/pre-commit
+cp githooks/pre-push .git/hooks/pre-push
+
+# Make hooks executable
+chmod +x .git/hooks/pre-commit
+chmod +x .git/hooks/pre-push
+```
+
+**Important**: Git hooks are now PowerShell scripts for cross-platform compatibility. PowerShell Core (pwsh) is available on Windows, macOS, and Linux. On Windows, PowerShell 5.1+ is also available by default.
 
 ### Manual Setup
 
