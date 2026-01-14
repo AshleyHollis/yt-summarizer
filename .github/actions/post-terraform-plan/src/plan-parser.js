@@ -53,12 +53,18 @@ function parseResourceChange(change) {
   const actions = change.change.actions;
   const action = determineActionType(actions);
 
+  const details = formatResourceChange(change, action);
+
+  if (!details) {
+    return null;
+  }
+
   return {
     address: change.address,
     action,
     type: change.type,
     name: change.name,
-    details: formatResourceChange(change, action)
+    details
   };
 }
 

@@ -58,6 +58,11 @@ function formatResourceChange(change, action) {
 
   // Get attribute changes with canonical format (no indentation logic)
   const changeLines = findChanges(before, after, afterUnknown, '    ', forceMarker, isReplace);
+
+  if (changeLines.length === 0 && action === 'update') {
+    return null;
+  }
+
   changeLines.forEach(l => lines.push(l));
   lines.push('}');
 
