@@ -9,6 +9,20 @@ This directory contains Git hooks for the repository, designed to enforce code q
 | `pre-commit` | Before commit | Clean up code immediately | ✅ Yes | Bad commits | PowerShell (cross-platform) |
 | `pre-push` | Before push | Catch issues before pushing | ❌ No | Bad pushes | PowerShell (cross-platform) |
 
+## Windows Compatibility
+
+**Important for Windows users**: Git hooks are PowerShell scripts. On Windows, you must configure Git to use the `githooks` directory:
+
+```powershell
+# Configure per-repository (recommended)
+git config core.hooksPath githooks
+
+# Or configure globally for all repos
+git config --global core.hooksPath githooks
+```
+
+This tells Git to run hooks from the `githooks/` directory directly. The hooks include batch wrappers (`pre-commit.bat`, `pre-push.bat`) that call PowerShell scripts on Windows. On Unix-like systems, Git runs `.ps1` files directly with the `#!/usr/bin/env pwsh` shebang.
+
 ## Setup
 
 ### Automatic Setup (Recommended)
