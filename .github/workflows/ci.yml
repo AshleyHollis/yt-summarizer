@@ -756,8 +756,52 @@ jobs:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   # ===========================================================================
-  # PHASE 8: FINAL STATUS CHECK
+  # PHASE 8: WORKFLOW VALIDATION
   # ===========================================================================
+  # Validates GitHub Actions workflow syntax and linting
+  # Runs when workflow/CI files change (or always on main)
+  # ===========================================================================
+  validate-workflows:
+    name: Validate Workflows
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      needs.detect-changes.outputs.is_main_branch == 'true' ||
+      contains(needs.detect-changes.outputs.changed_areas, 'ci')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate workflow YAML syntax
+        run: python scripts/validate_workflows.py
+
+      - name: Run actionlint
+        uses: reviewdog/action-actionlint@v1
+        continue-on-error: true
+        with:
+          fail_level: none
+          filter_mode: nofilter
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Run pre-commit on workflow files
+        run: |
+          pre-commit run --files .github/workflows/*.yml || true
+          pre-commit run --files .github/workflows/*.yaml || true
+
+  # ===========================================================================
+  # PHASE 9: FINAL STATUS CHECK
+  # ===========================================================================
+
   # always() ensures this runs regardless of job results
   # Validates that:
   #   1. Required jobs ran (based on changed_areas)
@@ -787,10 +831,31 @@ jobs:
       - validate-kustomize
       - kubernetes-validate
       - secret-scanning
+      - validate-workflows
+
     if: always()
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Write execution rationale
+        run: |
+          {
+            echo "## CI Execution Rationale"
+            echo ""
+            echo "- Mode: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch (full validation)' || 'PR (change-based)' }}"
+            echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
+            echo "- Lint Python: ${{ needs.lint-python.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || (contains(needs.detect-changes.outputs.changed_areas, 'services/api') || contains(needs.detect-changes.outputs.changed_areas, 'services/workers') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) && 'python changes' || 'no python changes' }})"
+            echo "- Lint Frontend: ${{ needs.lint-frontend.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || contains(needs.detect-changes.outputs.changed_areas, 'apps/web') && 'frontend changes' || 'no frontend changes' }})"
+            echo "- Security Scans (Python/JS): ${{ needs.scan-python-security.result }}/${{ needs.scan-javascript-security.result }}"
+            echo "- Tests (shared/api/workers/frontend): ${{ needs.test-shared.result }}/${{ needs.test-api.result }}/${{ needs.test-workers.result }}/${{ needs.test-frontend.result }}"
+            echo "- Build Images: ${{ needs.build-images.result }} (ACR: ${{ vars.ACR_NAME != '' && 'configured' || 'not configured' }})"
+            echo "- Build Images (validate): ${{ needs.build-images-validate.result }}"
+            echo "- Terraform Validate: ${{ needs.validate-terraform.result }}"
+            echo "- K8s Validate: ${{ needs.kubernetes-validate.result }}"
+            echo "- Secret Scanning: ${{ needs.secret-scanning.result }}"
+            echo "- Workflow Validation: ${{ needs.validate-workflows.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || contains(needs.detect-changes.outputs.changed_areas, 'ci') && 'ci/workflow changes' || 'no ci changes' }})"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create CI Summary
         uses: ./.github/actions/create-ci-summary
@@ -817,6 +882,7 @@ jobs:
           image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
           repository: ${{ github.repository }}
           run-id: ${{ github.run_id }}
+
 
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results

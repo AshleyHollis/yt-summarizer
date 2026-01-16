@@ -16,6 +16,29 @@ on:
       - "specs/**"
       - "k8s/overlays/previews/**"
       - ".github/workflows/preview*.yml"
+  workflow_dispatch:
+    inputs:
+      run_terraform:
+        description: 'Run terraform plan/apply'
+        required: false
+        type: boolean
+        default: true
+      run_deploy:
+        description: 'Build and deploy backend'
+        required: false
+        type: boolean
+        default: true
+      run_frontend:
+        description: 'Deploy frontend'
+        required: false
+        type: boolean
+        default: true
+      run_health_check:
+        description: 'Run post-deploy health checks'
+        required: false
+        type: boolean
+        default: true
+
 
 concurrency:
   group: deploy-prod
@@ -30,13 +53,193 @@ permissions:
   id-token: write
   contents: write
 
+
 jobs:
+  # ---------------------------------------------------------------------------
+  # Detect changes for Terraform gating
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed_areas: ${{ steps.detect.outputs.changed_areas }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: detect
+        uses: ./.github/actions/detect-pipeline-changes
+
+  # ---------------------------------------------------------------------------
+  # Wait for CI to succeed (auto-apply gate)
+  # ---------------------------------------------------------------------------
+  wait-for-ci:
+    name: Wait for CI
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Skip wait on manual dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "Skipping CI wait for manual dispatch."
+
+      - name: Wait for CI workflow to complete
+        if: github.event_name != 'workflow_dispatch'
+        uses: ./.github/actions/wait-for-ci
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          commit-sha: ${{ github.sha }}
+          timeout-seconds: '1800'
+
+  # ---------------------------------------------------------------------------
+  # Plan and apply infrastructure changes (auto-apply)
+  # ---------------------------------------------------------------------------
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: [detect-changes, wait-for-ci]
+    if: |
+      needs.wait-for-ci.result == 'success' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true') ||
+       (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
+    outputs:
+      plan_summary: ${{ steps.plan.outputs.plan_summary }}
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/terraform/environments/prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Azure credentials are configured
+        uses: ./.github/actions/verify-azure-credentials
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.7'
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate Terraform configuration
+        uses: ./.github/actions/validate-terraform-config
+        with:
+          working-directory: infra/terraform/environments/prod
+          backend-config: 'true'
+
+      - name: Terraform Plan
+        id: plan
+        uses: ./.github/actions/terraform-plan
+        with:
+          working-directory: 'infra/terraform/environments/prod'
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Upload Terraform plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            infra/terraform/environments/prod/tfplan
+            infra/terraform/environments/prod/plan_output.txt
+            infra/terraform/environments/prod/plan.json
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: |
+      needs.terraform-plan.result == 'success' &&
+      fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true
+    environment:
+      name: production
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/terraform/environments/prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Azure credentials are configured
+        uses: ./.github/actions/verify-azure-credentials
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.7'
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download Terraform plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: infra/terraform/environments/prod
+
+      - name: Validate Terraform configuration
+        uses: ./.github/actions/validate-terraform-config
+        with:
+          working-directory: infra/terraform/environments/prod
+          backend-config: 'true'
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+
   # ---------------------------------------------------------------------------
   # Build and Push Production Images (split)
   # ---------------------------------------------------------------------------
   meta:
     name: Prepare image tag
     runs-on: ubuntu-latest
+    needs: [terraform-apply, detect-changes, wait-for-ci]
+    if: |
+      needs.wait-for-ci.result == 'success' &&
+      needs.terraform-apply.result != 'failure' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.run_deploy == 'true') ||
+        (github.event_name != 'workflow_dispatch' && (
+          contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'k8s') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'docker')
+        ))
+      )
+
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -173,6 +376,7 @@ jobs:
     name: Deploy Frontend
     runs-on: ubuntu-latest
     needs: [build-api, build-workers]
+    if: github.event_name != 'workflow_dispatch' || inputs.run_frontend == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -212,6 +416,7 @@ jobs:
     name: Health Check
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend]
+    if: github.event_name != 'workflow_dispatch' || inputs.run_health_check == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -239,9 +444,24 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [meta, update-overlay, deploy-frontend, health-check]
+    needs: [meta, update-overlay, deploy-frontend, health-check, detect-changes, wait-for-ci, terraform-plan, terraform-apply]
     if: always()
     steps:
+      - name: Write execution rationale
+        run: |
+          {
+            echo "## Prod Deployment Rationale"
+            echo ""
+            echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
+            echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
+            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true' && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
+            echo "- Terraform apply: ${{ needs.terraform-apply.result }} (reason: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true && 'plan has changes' || 'no changes' }})"
+            echo "- Backend deploy tag: ${{ needs.meta.outputs.image_tag || 'n/a' }}"
+            echo "- Overlay update: ${{ needs.update-overlay.result }}"
+            echo "- Frontend deploy: ${{ needs.deploy-frontend.result }}"
+            echo "- Health check: ${{ needs.health-check.result }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Generate summary
         uses: ./.github/actions/create-prod-summary
         with:
@@ -250,3 +470,4 @@ jobs:
           update-overlay-result: ${{ needs.update-overlay.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend.result }}
           health-check-result: ${{ needs.health-check.result }}
+
