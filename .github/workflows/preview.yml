@@ -172,6 +172,8 @@ jobs:
     if: |
       (github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true') ||
       (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.infra_changed == 'true')
+    outputs:
+      plan_summary: ${{ steps.plan.outputs.plan_summary }}
     permissions:
       id-token: write
       contents: read
@@ -182,6 +184,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
 
       - name: Verify Azure credentials are configured
         uses: ./.github/actions/verify-azure-credentials
@@ -957,11 +960,29 @@ jobs:
   preview-status-check:
     name: Preview Status Check
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, update-overlay, verify-deployment, deploy-frontend-preview, e2e-tests, get-ingress]
+    needs: [detect-changes, wait-for-ci, update-overlay, verify-deployment, deploy-frontend-preview, e2e-tests, get-ingress, terraform, check-concurrency]
     if: always()
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Write execution rationale
+        run: |
+          {
+            echo "## Preview Execution Rationale"
+            echo ""
+            echo "- Needs deployment: ${{ needs.detect-changes.outputs.needs_deployment }}"
+            echo "- Needs image build: ${{ needs.detect-changes.outputs.needs_image_build }}"
+            echo "- Infra changed: ${{ needs.detect-changes.outputs.infra_changed }}"
+            echo "- Terraform plan: ${{ needs.terraform.result }} (changes: ${{ needs.terraform.result == 'success' && fromJson(needs.terraform.outputs.plan_summary).has_changes || 'n/a' }})"
+            echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
+            echo "- Concurrency gate: ${{ needs.check-concurrency.outputs.can_deploy || 'n/a' }}"
+            echo "- Overlay update: ${{ needs.update-overlay.result }}"
+            echo "- Backend verify: ${{ needs.verify-deployment.result }}"
+            echo "- Frontend deploy: ${{ needs.deploy-frontend-preview.result }}"
+            echo "- E2E tests: ${{ needs.e2e-tests.result }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check preview pipeline status
         uses: ./.github/actions/check-preview-status
@@ -974,3 +995,4 @@ jobs:
           deploy-frontend-result: ${{ needs.deploy-frontend-preview.result }}
           e2e-tests-result: ${{ needs.e2e-tests.result }}
           api-url-configured: ${{ needs.get-ingress.outputs.preview_url }}
+

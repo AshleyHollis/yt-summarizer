@@ -792,6 +792,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Write execution rationale
+        run: |
+          {
+            echo "## CI Execution Rationale"
+            echo ""
+            echo "- Mode: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch (full validation)' || 'PR (change-based)' }}"
+            echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
+            echo "- Lint Python: ${{ needs.lint-python.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || (contains(needs.detect-changes.outputs.changed_areas, 'services/api') || contains(needs.detect-changes.outputs.changed_areas, 'services/workers') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) && 'python changes' || 'no python changes' }})"
+            echo "- Lint Frontend: ${{ needs.lint-frontend.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || contains(needs.detect-changes.outputs.changed_areas, 'apps/web') && 'frontend changes' || 'no frontend changes' }})"
+            echo "- Security Scans (Python/JS): ${{ needs.scan-python-security.result }}/${{ needs.scan-javascript-security.result }}"
+            echo "- Tests (shared/api/workers/frontend): ${{ needs.test-shared.result }}/${{ needs.test-api.result }}/${{ needs.test-workers.result }}/${{ needs.test-frontend.result }}"
+            echo "- Build Images: ${{ needs.build-images.result }} (ACR: ${{ vars.ACR_NAME != '' && 'configured' || 'not configured' }})"
+            echo "- Build Images (validate): ${{ needs.build-images-validate.result }}"
+            echo "- Terraform Validate: ${{ needs.validate-terraform.result }}"
+            echo "- K8s Validate: ${{ needs.kubernetes-validate.result }}"
+            echo "- Secret Scanning: ${{ needs.secret-scanning.result }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Create CI Summary
         uses: ./.github/actions/create-ci-summary
         with:
@@ -817,6 +835,7 @@ jobs:
           image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
           repository: ${{ github.repository }}
           run-id: ${{ github.run_id }}
+
 
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results
