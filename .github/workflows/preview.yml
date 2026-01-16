@@ -53,7 +53,8 @@ on:
         description: 'Apply terraform changes (workflow_dispatch only)'
         required: false
         type: boolean
-        default: false
+        default: true
+
       run_e2e:
         description: 'Run E2E tests'
         required: false
@@ -231,8 +232,12 @@ jobs:
         run: exit 1
 
       - name: Terraform Apply
-        if: github.event_name == 'workflow_dispatch' && inputs.apply_terraform == 'true'
+        if: |
+          steps.plan.outcome == 'success' &&
+          fromJson(steps.plan.outputs.plan_summary).has_changes == true &&
+          (github.event_name != 'workflow_dispatch' || inputs.apply_terraform == 'true')
         run: terraform apply -auto-approve tfplan
+
 
   # ===========================================================================
   # PHASE 2: WAIT FOR CI COMPLETION

@@ -23,11 +23,6 @@ on:
         required: false
         type: boolean
         default: true
-      apply_terraform:
-        description: 'Apply terraform changes (workflow_dispatch only)'
-        required: false
-        type: boolean
-        default: true
       run_deploy:
         description: 'Build and deploy backend'
         required: false
@@ -44,6 +39,7 @@ on:
         type: boolean
         default: true
 
+
 concurrency:
   group: deploy-prod
   cancel-in-progress: false
@@ -56,6 +52,7 @@ env:
 permissions:
   id-token: write
   contents: write
+
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -77,15 +74,41 @@ jobs:
         uses: ./.github/actions/detect-pipeline-changes
 
   # ---------------------------------------------------------------------------
-  # Apply infrastructure changes (optional)
+  # Wait for CI to succeed (auto-apply gate)
   # ---------------------------------------------------------------------------
-  terraform:
-    name: Terraform Apply
+  wait-for-ci:
+    name: Wait for CI
     runs-on: ubuntu-latest
     needs: detect-changes
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Skip wait on manual dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "Skipping CI wait for manual dispatch."
+
+      - name: Wait for CI workflow to complete
+        if: github.event_name != 'workflow_dispatch'
+        uses: ./.github/actions/wait-for-ci
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          commit-sha: ${{ github.sha }}
+          timeout-seconds: '1800'
+
+  # ---------------------------------------------------------------------------
+  # Plan and apply infrastructure changes (auto-apply)
+  # ---------------------------------------------------------------------------
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: [detect-changes, wait-for-ci]
     if: |
-      (github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true') ||
-      (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform'))
+      needs.wait-for-ci.result == 'success' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true') ||
+       (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
+    outputs:
+      plan_summary: ${{ steps.plan.outputs.plan_summary }}
     permissions:
       id-token: write
       contents: read
@@ -131,9 +154,68 @@ jobs:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
+      - name: Upload Terraform plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            infra/terraform/environments/prod/tfplan
+            infra/terraform/environments/prod/plan_output.txt
+            infra/terraform/environments/prod/plan.json
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: |
+      needs.terraform-plan.result == 'success' &&
+      fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true
+    environment:
+      name: production
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/terraform/environments/prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Azure credentials are configured
+        uses: ./.github/actions/verify-azure-credentials
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.7'
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download Terraform plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: infra/terraform/environments/prod
+
+      - name: Validate Terraform configuration
+        uses: ./.github/actions/validate-terraform-config
+        with:
+          working-directory: infra/terraform/environments/prod
+          backend-config: 'true'
+
       - name: Terraform Apply
-        if: github.event_name != 'workflow_dispatch' || inputs.apply_terraform == 'true'
         run: terraform apply -auto-approve tfplan
+
 
   # ---------------------------------------------------------------------------
   # Build and Push Production Images (split)
@@ -141,9 +223,10 @@ jobs:
   meta:
     name: Prepare image tag
     runs-on: ubuntu-latest
-    needs: [terraform, detect-changes]
+    needs: [terraform-apply, detect-changes, wait-for-ci]
     if: |
-      needs.terraform.result != 'failure' &&
+      needs.wait-for-ci.result == 'success' &&
+      needs.terraform-apply.result != 'failure' &&
       (
         (github.event_name == 'workflow_dispatch' && inputs.run_deploy == 'true') ||
         (github.event_name != 'workflow_dispatch' && (
@@ -155,6 +238,8 @@ jobs:
           contains(needs.detect-changes.outputs.changed_areas, 'docker')
         ))
       )
+
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
