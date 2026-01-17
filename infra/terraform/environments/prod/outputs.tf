@@ -75,6 +75,22 @@ output "auth0_credentials_stored" {
   } : null
 }
 
+output "auth0_preview_application_client_id" {
+  description = "Auth0 Preview BFF application client ID (shared by all preview environments)"
+  value       = var.enable_auth0 ? module.auth0_preview[0].application_client_id : null
+}
+
+output "auth0_preview_credentials_stored" {
+  description = "Auth0 Preview BFF credentials stored in Azure Key Vault (shared by all preview environments)"
+  value = var.enable_auth0 ? {
+    domain         = "Stored as: auth0-preview-domain"
+    client_id      = "Stored as: auth0-preview-client-id"
+    client_secret  = "Stored as: auth0-preview-client-secret (sensitive)"
+    session_secret = "Stored as: auth0-preview-session-secret (sensitive)"
+    note           = "These credentials are synced to Kubernetes preview namespaces via ExternalSecret"
+  } : null
+}
+
 # GitHub Actions OIDC outputs
 output "github_oidc_application_id" {
   description = "GitHub Actions OIDC - Application (Client) ID for AZURE_CLIENT_ID secret"

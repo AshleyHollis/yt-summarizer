@@ -149,3 +149,39 @@ variable "auth0_allowed_web_origins" {
     "https://*.azurestaticapps.net",
   ]
 }
+
+# -----------------------------------------------------------------------------
+# Preview Auth0 Application Variables
+# -----------------------------------------------------------------------------
+# Preview environments share a single Auth0 application to avoid creating
+# individual apps per PR. Wildcards in URLs allow all preview-pr-* namespaces.
+
+variable "auth0_preview_api_identifier" {
+  description = "Auth0 API identifier for preview environments (leave empty to skip API creation)"
+  type        = string
+  default     = "" # Preview environments don't need a separate API resource server
+}
+
+variable "auth0_preview_allowed_callback_urls" {
+  description = "Allowed Auth0 callback URLs for preview environments"
+  type        = list(string)
+  default = [
+    "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+  ]
+}
+
+variable "auth0_preview_allowed_logout_urls" {
+  description = "Allowed Auth0 logout URLs for preview environments"
+  type        = list(string)
+  default = [
+    "https://*.azurestaticapps.net",
+  ]
+}
+
+variable "auth0_preview_allowed_web_origins" {
+  description = "Allowed Auth0 web origins for preview environments"
+  type        = list(string)
+  default = [
+    "https://*.azurestaticapps.net",
+  ]
+}

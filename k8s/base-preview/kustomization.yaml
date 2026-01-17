@@ -21,7 +21,7 @@ resources:
   - externalsecret-db.yaml
   - externalsecret-openai.yaml
   - externalsecret-storage.yaml
-  # externalsecret-auth0.yaml removed - not available in preview until Terraform runs on main
+  - externalsecret-auth0.yaml
   - migration-job.yaml
 
 labels:

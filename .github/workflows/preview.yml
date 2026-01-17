@@ -924,12 +924,8 @@ jobs:
         working-directory: apps/web
         run: npm ci
 
-      - name: Wait for ArgoCD sync
-        uses: ./.github/actions/wait-for-argocd-sync
-        with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          timeout-seconds: '60'
+      # No need to wait for Argo CD sync again - verify-deployment job already did this
+      # and this job depends on verify-deployment, so we know the sync completed successfully
 
       - name: Wait for API to be ready
         uses: ./.github/actions/health-check

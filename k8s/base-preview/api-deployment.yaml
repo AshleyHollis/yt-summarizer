@@ -58,8 +58,26 @@ spec:
                 secretKeyRef:
                   name: openai-credentials
                   key: api-key
-            # Auth0 credentials not available in preview environments
-            # They will be added after Terraform runs on main branch
+            - name: AUTH0_DOMAIN
+              valueFrom:
+                secretKeyRef:
+                  name: auth0-credentials
+                  key: domain
+            - name: AUTH0_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: auth0-credentials
+                  key: client-id
+            - name: AUTH0_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auth0-credentials
+                  key: client-secret
+            - name: AUTH0_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auth0-credentials
+                  key: session-secret
           resources:
             requests:
               cpu: 100m
