@@ -22,6 +22,16 @@
 name: Detect Pipeline Changes
 description: Detects which parts of the codebase have changed to optimize pipeline execution
 
+inputs:
+  base-sha:
+    description: 'Base commit SHA to compare against (defaults to auto-detect based on event type)'
+    required: false
+    default: ''
+  head-sha:
+    description: 'Head commit SHA to compare (defaults to HEAD)'
+    required: false
+    default: 'HEAD'
+
 outputs:
   changed_areas:
     description: Space-separated list of changed areas (e.g., "apps/web services/api k8s")
@@ -36,4 +46,10 @@ runs:
     - name: Detect changes
       id: detect
       shell: pwsh
-      run: .\scripts\ci\detect-changes.ps1 -OutputFormat github-actions
+      env:
+        BASE_SHA_INPUT: ${{ inputs.base-sha }}
+        HEAD_SHA_INPUT: ${{ inputs.head-sha }}
+      run: |
+        $baseShaParam = if ($env:BASE_SHA_INPUT) { "-BaseSha", $env:BASE_SHA_INPUT } else { @() }
+        $headShaParam = if ($env:HEAD_SHA_INPUT) { "-HeadSha", $env:HEAD_SHA_INPUT } else { @() }
+        & .\scripts\ci\detect-changes.ps1 @baseShaParam @headShaParam -OutputFormat github-actions

@@ -112,6 +112,9 @@ jobs:
       - name: Detect changes
         id: detect
         uses: ./.github/actions/detect-pipeline-changes
+        with:
+          base-sha: ${{ github.event.before || 'HEAD~1' }}
+          head-sha: ${{ github.sha }}
 
   # ---------------------------------------------------------------------------
   # Wait for CI to succeed (auto-apply gate)
