@@ -17,4 +17,3 @@ provider "auth0" {
 
 # Helm and Kubernetes providers will be configured after AKS is created
 # using data sources to get credentials
-

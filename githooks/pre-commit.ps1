@@ -34,17 +34,17 @@ Write-ColorHost "RUNNING PRE-COMMIT VALIDATION" $Colors.Cyan
 Write-ColorHost "========================================" $Colors.Cyan
 Write-Host ""
 
-# Check if pre-commit command exists
-$PreCommit = Get-Command pre-commit -ErrorAction SilentlyContinue
-if (-not $PreCommit) {
-    Write-ColorHost "ERROR: pre-commit not found on PATH" $Colors.Red
-    Write-ColorHost "Install pre-commit: pip install pre-commit" $Colors.Yellow
+# Check if Python exists
+$Python = Get-Command python -ErrorAction SilentlyContinue
+if (-not $Python) {
+    Write-ColorHost "ERROR: python not found on PATH" $Colors.Red
+    Write-ColorHost "Install Python or add it to PATH." $Colors.Yellow
     exit 1
 }
 
-# Run pre-commit with auto-fix
-Write-ColorHost "Running pre-commit --all-files --verbose..." $Colors.Cyan
-$process = Start-Process -FilePath "pre-commit" -ArgumentList "run", "--all-files", "--verbose" -NoNewWindow -Wait -PassThru
+# Run pre-commit with auto-fix via Python module
+Write-ColorHost "Running python -m pre_commit run --all-files --verbose..." $Colors.Cyan
+$process = Start-Process -FilePath "python" -ArgumentList "-m", "pre_commit", "run", "--all-files", "--verbose" -NoNewWindow -Wait -PassThru
 $ExitCode = $process.ExitCode
 
 if ($ExitCode -ne 0) {

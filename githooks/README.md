@@ -123,8 +123,8 @@ git commit -m "feat: add new feature"
 **Runs on**: Every `git push` command
 
 **Behavior**:
-1. Requires `pre-commit` installed; push blocked if missing
-2. Executes `tools/pre-commit.local` wrapper
+1. Requires Python installed; push blocked if missing
+2. Runs `python -m pre_commit run --all-files --verbose`
 3. Pre-commit runs WITHOUT auto-fix (validation only)
 4. Checks all hooks in `.pre-commit-config.yaml`
 

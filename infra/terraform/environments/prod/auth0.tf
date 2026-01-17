@@ -12,4 +12,3 @@ module "auth0" {
   allowed_logout_urls   = var.auth0_allowed_logout_urls
   allowed_web_origins   = var.auth0_allowed_web_origins
 }
-

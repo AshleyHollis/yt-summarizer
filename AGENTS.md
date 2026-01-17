@@ -5,9 +5,10 @@
 
 ## Critical Rules (Read First)
 1. **Before marking ANY task complete, run** `./scripts/run-tests.ps1`.
-2. **E2E tests are mandatory** for completion; do not use `-SkipE2E` for final verification.
-3. If Aspire is not running, start it with the wrapper (see below) before E2E tests.
-4. Prefer official Aspire docs: https://aspire.dev and https://learn.microsoft.com/dotnet/aspire.
+2. **Run pre-commit locally before pushing**: `python -m pre_commit run --all-files --verbose`.
+3. **E2E tests are mandatory** for completion; do not use `-SkipE2E` for final verification.
+4. If Aspire is not running, start it with the wrapper (see below) before E2E tests.
+5. Prefer official Aspire docs: https://aspire.dev and https://learn.microsoft.com/dotnet/aspire.
 
 ## Repository Map
 - `apps/web`: Next.js frontend (TypeScript, Tailwind).

@@ -478,4 +478,3 @@ jobs:
           update-overlay-result: ${{ needs.update-overlay.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend.result }}
           health-check-result: ${{ needs.health-check.result }}
-

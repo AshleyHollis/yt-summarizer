@@ -976,7 +976,6 @@ jobs:
           {
             echo "## Preview Execution Rationale"
             echo ""
-            echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas || 'n/a' }}"
             echo "- Needs deployment: ${{ needs.detect-changes.outputs.needs_deployment }}"
             echo "- Needs image build: ${{ needs.detect-changes.outputs.needs_image_build }}"
             echo "- Infra changed: ${{ needs.detect-changes.outputs.infra_changed }}"
@@ -1000,4 +999,3 @@ jobs:
           deploy-frontend-result: ${{ needs.deploy-frontend-preview.result }}
           e2e-tests-result: ${{ needs.e2e-tests.result }}
           api-url-configured: ${{ needs.get-ingress.outputs.preview_url }}
-
