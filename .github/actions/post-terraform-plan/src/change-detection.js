@@ -106,12 +106,12 @@ function formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnk
   if (marker === '  ') {
     const val = beforeVal !== undefined ? beforeVal : afterVal;
     const isSensitive = beforeVal !== undefined ? beforeSensitive : afterSensitive;
-    
+
     if (Array.isArray(val) && val.length > 1) {
       const arrayLines = formatMultilineArray(val, prefix, key, '  ');
       return arrayLines.join('\n').split('\n');
     }
-    
+
     const formattedVal = isSensitive ? formatSensitiveValue(val) : formatValue(val, isUnknown);
     return `${marker} ${key} = ${formattedVal}`;
   }
