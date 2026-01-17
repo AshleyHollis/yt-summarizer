@@ -1,11 +1,9 @@
 ci:
-  autofix_prs: false  # Auto-fix disabled in pre-commit.ci (remote)
+  autofix_prs: true  # Auto-fix enabled in pre-commit.ci (will create fixup commits)
   autofix_commit_msg: "style: pre-commit.ci auto fixes"
   autoupdate_schedule: weekly  # Update hooks weekly
   autoupdate_commit_msg: "chore: update pre-commit hooks"
   skip: []  # Hooks to skip in CI (empty = run all)
-  # Push-based enforcement: Fail push if pre-commit checks fail
-  default_stages: []  # Run on all stages (commit, push, etc.)
   submodules: false
 
 repos:

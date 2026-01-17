@@ -6,13 +6,13 @@
 param(
     [Parameter(Mandatory=$false)]
     [string]$Auth0Domain = $env:AUTH0_DOMAIN,
-    
+
     [Parameter(Mandatory=$false)]
     [string]$ClientId = $env:AUTH0_CLIENT_ID,
-    
+
     [Parameter(Mandatory=$false)]
     [string]$ClientSecret = $env:AUTH0_CLIENT_SECRET,
-    
+
     [switch]$ShowCurrentPermissions
 )
 
@@ -100,12 +100,12 @@ Write-Host "🔍 Step 2: Finding Auth0 Management API..." -ForegroundColor Cyan
 try {
     $resourceServers = Invoke-RestMethod -Uri "https://$Auth0Domain/api/v2/resource-servers" -Headers $headers -Method Get
     $managementApi = $resourceServers | Where-Object { $_.identifier -eq "https://$Auth0Domain/api/v2/" }
-    
+
     if (-not $managementApi) {
         Write-Host "❌ Could not find Management API resource server!" -ForegroundColor Red
         exit 1
     }
-    
+
     $managementApiId = $managementApi.id
     Write-Host "✅ Found Management API (ID: $managementApiId)" -ForegroundColor Green
     Write-Host ""
@@ -121,40 +121,40 @@ Write-Host "🔍 Step 3: Checking current permissions..." -ForegroundColor Cyan
 
 try {
     $clientGrants = Invoke-RestMethod -Uri "https://$Auth0Domain/api/v2/client-grants?client_id=$ClientId" -Headers $headers -Method Get
-    
+
     $existingGrant = $clientGrants | Where-Object { $_.audience -eq "https://$Auth0Domain/api/v2/" }
-    
+
     if ($existingGrant) {
         Write-Host "✅ Found existing client grant (ID: $($existingGrant.id))" -ForegroundColor Green
         Write-Host ""
         Write-Host "Current scopes:" -ForegroundColor Yellow
         $existingGrant.scope | ForEach-Object { Write-Host "   - $_" -ForegroundColor Gray }
         Write-Host ""
-        
+
         if ($ShowCurrentPermissions) {
             Write-Host "✅ Current permissions displayed above" -ForegroundColor Green
             exit 0
         }
-        
+
         # Check if all required scopes are present
         $missingScopes = $requiredScopes | Where-Object { $_ -notin $existingGrant.scope }
-        
+
         if ($missingScopes.Count -eq 0) {
             Write-Host "✅ All required permissions are already granted!" -ForegroundColor Green
             exit 0
         }
-        
+
         Write-Host "⚠️  Missing scopes:" -ForegroundColor Yellow
         $missingScopes | ForEach-Object { Write-Host "   - $_" -ForegroundColor Red }
         Write-Host ""
-        
+
         # Update existing grant
         Write-Host "📝 Step 4: Updating client grant with required scopes..." -ForegroundColor Cyan
-        
+
         $updateBody = @{
             scope = $requiredScopes
         } | ConvertTo-Json
-        
+
         try {
             $updated = Invoke-RestMethod -Uri "https://$Auth0Domain/api/v2/client-grants/$($existingGrant.id)" -Headers $headers -Method Patch -Body $updateBody
             Write-Host "✅ Successfully updated client grant!" -ForegroundColor Green
@@ -165,7 +165,7 @@ try {
         catch {
             Write-Host "❌ Failed to update client grant!" -ForegroundColor Red
             Write-Host $_.Exception.Message -ForegroundColor Red
-            
+
             if ($_.Exception.Response) {
                 $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
                 $reader.BaseStream.Position = 0
@@ -179,16 +179,16 @@ try {
     else {
         Write-Host "⚠️  No existing client grant found" -ForegroundColor Yellow
         Write-Host ""
-        
+
         # Create new client grant
         Write-Host "📝 Step 4: Creating new client grant..." -ForegroundColor Cyan
-        
+
         $createBody = @{
             client_id = $ClientId
             audience  = "https://$Auth0Domain/api/v2/"
             scope     = $requiredScopes
         } | ConvertTo-Json
-        
+
         try {
             $created = Invoke-RestMethod -Uri "https://$Auth0Domain/api/v2/client-grants" -Headers $headers -Method Post -Body $createBody
             Write-Host "✅ Successfully created client grant!" -ForegroundColor Green
@@ -199,7 +199,7 @@ try {
         catch {
             Write-Host "❌ Failed to create client grant!" -ForegroundColor Red
             Write-Host $_.Exception.Message -ForegroundColor Red
-            
+
             if ($_.Exception.Response) {
                 $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
                 $reader.BaseStream.Position = 0
@@ -210,7 +210,7 @@ try {
             exit 1
         }
     }
-    
+
     Write-Host ""
     Write-Host "✅ Configuration complete!" -ForegroundColor Green
     Write-Host ""
