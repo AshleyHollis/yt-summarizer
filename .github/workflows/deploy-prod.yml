@@ -105,7 +105,7 @@ jobs:
     needs: [detect-changes, wait-for-ci]
     if: |
       needs.wait-for-ci.result == 'success' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true') ||
+      ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == true) ||
        (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
     outputs:
       plan_summary: ${{ steps.plan.outputs.plan_summary }}
@@ -244,7 +244,7 @@ jobs:
       needs.wait-for-ci.result == 'success' &&
       needs.terraform-apply.result != 'failure' &&
       (
-        (github.event_name == 'workflow_dispatch' && inputs.run_deploy == 'true') ||
+        (github.event_name == 'workflow_dispatch' && inputs.run_deploy == true) ||
         (github.event_name != 'workflow_dispatch' && (
           contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
           contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
@@ -392,7 +392,7 @@ jobs:
     name: Deploy Frontend
     runs-on: ubuntu-latest
     needs: [build-api, build-workers]
-    if: github.event_name != 'workflow_dispatch' || inputs.run_frontend == 'true'
+    if: github.event_name != 'workflow_dispatch' || inputs.run_frontend == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -432,7 +432,7 @@ jobs:
     name: Health Check
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend]
-    if: github.event_name != 'workflow_dispatch' || inputs.run_health_check == 'true'
+    if: github.event_name != 'workflow_dispatch' || inputs.run_health_check == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -470,7 +470,7 @@ jobs:
             echo ""
             echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
-            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true' && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
+            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
             echo "- Terraform apply: ${{ needs.terraform-apply.result }} (reason: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true && 'plan has changes' || 'no changes' }})"
             echo "- Backend deploy tag: ${{ needs.meta.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
