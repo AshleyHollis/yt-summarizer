@@ -25,7 +25,7 @@ images:
 # Production-specific patches
 patches:
   - path: patches/configmap-patch.yaml
-  - path: patches/ingress-patch.yaml
+  - path: patches/httproute-patch.yaml
   # Production resource requests/limits per deployment
   - target:
       group: apps
