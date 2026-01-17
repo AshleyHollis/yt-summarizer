@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: yt-summarizer-to-gateway
+  namespace: gateway-system
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/component: gateway
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    namespace: yt-summarizer
+  to:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
