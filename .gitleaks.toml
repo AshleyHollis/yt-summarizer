@@ -20,15 +20,17 @@ useDefault = true
     '''.*\.tfvars\.example''',
     # CI/test docker compose (only contains dummy values)
     '''docker-compose\.ci\.yml''',
-    # Test fixtures and test files (very broad)
-    '''tests/''',
-    '''test_''',
-    '''_test\.py''',
-    '''conftest\.py''',
-    '''\.spec\.(ts|js)''',
-    # Documentation (all markdown)
-    '''\.md$''',
-  ]
+  # Test fixtures and test files (very broad)
+  '''tests/''',
+  '''test_''',
+  '''_test\.py''',
+  '''conftest\.py''',
+  '''\.spec\.(ts|js)''',
+  # Documentation (all markdown)
+  '''\.md$''',
+  # Development scripts with test credentials
+  '''scripts/start-workers\.ps1''',
+]
 
   # Regex patterns that are not secrets (matches in the secret value itself)
   regexes = [
