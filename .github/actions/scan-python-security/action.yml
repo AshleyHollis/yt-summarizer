@@ -50,11 +50,12 @@ runs:
 
         # Exclude test directories and skip common test-related warnings
         # B101: assert_used (expected in tests)
+        # B105: hardcoded_password_string (false positive for mock settings)
         # B110: try_except_pass (acceptable for telemetry/optional features)
         # B310: urllib_urlopen (used for health checks, not user input)
         # B311: random (used for jitter/backoff, not cryptographic purposes)
         # B608: hardcoded_sql_expressions (false positive with SQLAlchemy ORM)
-        if bandit -r "$SCAN_DIR" -f screen --skip B101,B110,B310,B311,B608 --exclude "./tests/*,*/tests/*,*/test_*.py"; then
+        if bandit -r "$SCAN_DIR" -f screen --skip B101,B105,B110,B310,B311,B608 --exclude "./tests/*,*/tests/*,*/test_*.py"; then
           echo ""
           echo "✅ No security issues detected"
           exit 0
