@@ -11,7 +11,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .middleware import CorrelationIdMiddleware
 from .routes import auth, batches, channels, copilot, health, jobs, library, threads, videos
 
-
 # Import shared modules (path will be configured via PYTHONPATH)
 try:
     from shared.config import get_settings
