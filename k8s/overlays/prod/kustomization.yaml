@@ -13,10 +13,10 @@ resources:
 images:
 - name: yt-summarizer-api
   newName: acrytsummprd.azurecr.io/yt-summarizer-api
-  newTag: latest
+  newTag: sha-e43f28a
 - name: yt-summarizer-workers
   newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-  newTag: latest
+  newTag: sha-e43f28a
 patches:
 - path: patches/configmap-patch.yaml
 - path: patches/httproute-patch.yaml

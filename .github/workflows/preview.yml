@@ -19,6 +19,52 @@
 # - Image tags from CI: pr-<number>-<sha>
 # - No fallback to existing images if CI fails (fail fast)
 #
+# IMAGE BUILD STRATEGY:
+# ---------------------
+# Two-path strategy based on change detection (similar to production):
+#
+# Path 1: CODE CHANGES (wait for CI to build images)
+#   - Triggers: services/api, services/workers, services/shared, apps/web, docker
+#   - CI Builds: pr-{number}-{sha} tag (e.g., pr-42-abc1234)
+#   - wait-for-ci: Waits for CI workflow, extracts image tag
+#   - Validates: Image exists in ACR and is pullable by AKS
+#   - Updates: Preview overlay with new PR-scoped tag
+#   - Result: ArgoCD deploys new code to preview namespace
+#
+# Path 2: K8S-ONLY CHANGES (use existing PR image)
+#   - Triggers: k8s manifests (no code changes in PR)
+#   - get-production-tag: Searches PR git history backwards
+#   - Finds: Most recent commit in THIS PR that changed code
+#   - Fallback: If no code changes in PR, uses production SHA tag
+#   - Validates: Image exists in ACR
+#   - Updates: Preview overlay with found tag (same image, new config)
+#   - Result: ArgoCD deploys config changes only
+#
+# IMAGE TAG FORMAT:
+#   - Preview: pr-{number}-{7-char-sha} (PR-scoped, deterministic)
+#   - Example: pr-42-abc1234 (PR #42, commit abc1234)
+#   - Fallback: sha-{commit} (production tag, if no PR code changes)
+#
+# KEY DIFFERENCES FROM PRODUCTION:
+#   - Preview: Waits for CI (images built in separate workflow)
+#   - Production: Builds images inline (in same workflow)
+#   - Preview: PR-scoped tags (pr-42-*)
+#   - Production: SHA tags (sha-*)
+#   - Preview: Searches PR history for last code change
+#   - Production: Reads current prod kustomization
+#   - Preview: Deploys to preview-pr-{number} namespace
+#   - Production: Deploys to yt-summarizer namespace
+#
+# RATIONALE:
+#   - Deterministic: Each preview traceable to specific PR commit
+#   - Efficient: Don't rebuild images for K8s-only changes
+#   - Safe: Image validation ensures ACR has required tags
+#   - Isolated: Each PR gets its own namespace + image tags
+#   - Fast: CI builds in parallel, preview waits and deploys
+#
+# See also: deploy-prod.yml for production image strategy
+#           docs/preview-image-build-strategy.md for full details
+#
 # =============================================================================
 
 name: Preview Deployment
