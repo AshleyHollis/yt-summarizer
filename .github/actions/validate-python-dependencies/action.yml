@@ -52,6 +52,7 @@ runs:
       if: inputs.check-missing == 'true'
       shell: bash
       working-directory: ${{ inputs.service-path }}
+      continue-on-error: ${{ inputs.fail-on-warnings == 'false' }}
       run: |
         echo "════════════════════════════════════════════════════════════════"
         echo "🔍 Scanning for Missing Dependencies (deptry)"
