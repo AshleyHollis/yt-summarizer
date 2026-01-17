@@ -160,7 +160,7 @@ After Terraform creates the BFF application, it automatically stores the credent
    ```powershell
    # List all Auth0 secrets (should show both service account and BFF credentials)
    az keyvault secret list --vault-name "kv-ytsumm-prd" --query "[?starts_with(name, 'auth0-')].name"
-   
+
    # Expected output:
    # - auth0-terraform-domain (service account)
    # - auth0-terraform-client-id (service account)

@@ -71,4 +71,3 @@ resource "azurerm_key_vault_secret" "auth0_session_secret" {
 
   depends_on = [module.key_vault]
 }
-
