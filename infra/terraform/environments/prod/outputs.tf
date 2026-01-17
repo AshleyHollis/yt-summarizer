@@ -55,13 +55,24 @@ output "storage_primary_endpoint" {
 }
 
 output "auth0_application_client_id" {
-  description = "Auth0 application client ID for the API BFF"
+  description = "Auth0 BFF application client ID (also stored in Key Vault as 'auth0-client-id')"
   value       = var.enable_auth0 ? module.auth0[0].application_client_id : null
 }
 
 output "auth0_api_identifier" {
   description = "Auth0 API identifier (audience)"
   value       = var.enable_auth0 ? module.auth0[0].api_identifier : null
+}
+
+output "auth0_credentials_stored" {
+  description = "Auth0 BFF credentials stored in Azure Key Vault"
+  value = var.enable_auth0 ? {
+    domain         = "Stored as: auth0-domain"
+    client_id      = "Stored as: auth0-client-id"
+    client_secret  = "Stored as: auth0-client-secret (sensitive)"
+    session_secret = "Stored as: auth0-session-secret (sensitive)"
+    note           = "These credentials are synced to Kubernetes via ExternalSecret"
+  } : null
 }
 
 # GitHub Actions OIDC outputs
@@ -104,18 +115,26 @@ output "post_deploy_instructions" {
     ║    AZURE_TENANT_ID = ${module.github_oidc.tenant_id}                     ║
     ║    AZURE_SUBSCRIPTION_ID = ${module.github_oidc.subscription_id}         ║
     ║                                                                            ║
-    ║ 2. Get AKS credentials:                                                    ║
+    ║ 2. Verify Auth0 BFF Credentials in Key Vault:                             ║
+    ║    az keyvault secret list --vault-name ${module.key_vault.name} --query "[?starts_with(name, 'auth0-')].name" ║
+    ║    ✅ Should show: auth0-domain, auth0-client-id, auth0-client-secret, auth0-session-secret ║
+    ║                                                                            ║
+    ║ 3. Get AKS credentials:                                                    ║
     ║    az aks get-credentials --resource-group ${azurerm_resource_group.main.name} --name ${module.aks.name}   ║
     ║                                                                            ║
-    ║ 3. Bootstrap Argo CD:                                                      ║
+    ║ 4. Bootstrap Argo CD:                                                      ║
     ║    ./scripts/bootstrap-argocd.ps1                                          ║
     ║                                                                            ║
-    ║ 4. Apply infrastructure apps (ingress-nginx, external-secrets):            ║
+    ║ 5. Apply infrastructure apps (ingress-nginx, external-secrets):            ║
     ║    kubectl apply -f k8s/argocd/infra-apps.yaml                             ║
     ║                                                                            ║
-    ║ 5. Apply application configs:                                              ║
+    ║ 6. Apply application configs:                                              ║
     ║    kubectl apply -f k8s/argocd/prod-app.yaml                               ║
     ║    kubectl apply -f k8s/argocd/preview-appset.yaml                         ║
+    ║                                                                            ║
+    ║ 7. Verify ExternalSecret synced Auth0 credentials:                         ║
+    ║    kubectl get secret auth0-credentials -n yt-summarizer                   ║
+    ║    kubectl get secret auth0-credentials -n preview-pr-<NUMBER>             ║
     ╚═══════════════════════════════════════════════════════════════════════════╝
   EOT
 }

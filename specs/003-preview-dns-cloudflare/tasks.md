@@ -161,10 +161,13 @@
 
 ### Auth0 Configuration (External)
 
-- [ ] T056 [US4] Add wildcard callback URL pattern in Auth0 Dashboard for preview APIs
-- [ ] T057 [US4] Add production and staging callback URLs in Auth0 Dashboard
-- [ ] T058 [US4] Add allowed web origins for production web and *.azurestaticapps.net
+- [X] T056 [US4] Add wildcard callback URL pattern in Auth0 Dashboard for preview APIs (via Terraform variables)
+- [X] T057 [US4] Add production and staging callback URLs in Auth0 Dashboard (via Terraform variables)
+- [X] T058 [US4] Add allowed web origins for production web and *.azurestaticapps.net (via Terraform variables)
 - [X] T058a [US4] Add Auth0 Terraform module in infra/terraform/modules/auth0/main.tf and wire into infra/terraform/environments/prod
+- [X] T058b [US4] Create ExternalSecret for Auth0 credentials in k8s/base/externalsecret-auth0.yaml and k8s/base-preview/externalsecret-auth0.yaml
+- [X] T058c [US4] Update API deployment manifests with Auth0 environment variables
+- [X] T058d [US4] Create Auth0 setup runbook in docs/runbooks/auth0-setup.md
 
 ### Validation
 

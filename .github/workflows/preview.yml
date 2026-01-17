@@ -179,6 +179,29 @@ jobs:
       contents: read
       pull-requests: write
     env:
+      # =======================================================================
+      # Auth0 Terraform Service Account Credentials
+      # =======================================================================
+      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
+      # M2M application that allows Terraform to manage Auth0 resources.
+      #
+      # IMPORTANT: These are NOT the credentials for the user-facing application.
+      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
+      # application for end-user authentication. Those BFF credentials will be
+      # different and must be stored in Azure Key Vault after Terraform completes.
+      #
+      # Service Account Details:
+      #   - Application: "Terraform Service Account" (M2M)
+      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
+      #   - Purpose: Manage Auth0 resources via Terraform
+      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
+      #
+      # What Terraform Creates:
+      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
+      #   - Auth0 API: "yt-summarizer-api" (resource server)
+      #
+      # Documentation: docs/auth0-terraform-service-account.md
+      # =======================================================================
       AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
       AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
       AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}

@@ -16,6 +16,11 @@ terraform {
 # Variables
 # -----------------------------------------------------------------------------
 
+variable "auth0_domain" {
+  description = "Auth0 tenant domain (e.g., yourapp.us.auth0.com)"
+  type        = string
+}
+
 variable "application_name" {
   description = "Auth0 application name for the API BFF"
   type        = string
@@ -72,6 +77,12 @@ resource "auth0_client" "bff" {
   ]
 }
 
+# Read back the client to get the generated client_secret
+data "auth0_client" "bff" {
+  client_id  = auth0_client.bff.client_id
+  depends_on = [auth0_client.bff]
+}
+
 resource "auth0_resource_server" "api" {
   count = var.api_identifier != "" ? 1 : 0
 
@@ -85,9 +96,20 @@ resource "auth0_resource_server" "api" {
 # Outputs
 # -----------------------------------------------------------------------------
 
+output "auth0_domain" {
+  description = "Auth0 tenant domain"
+  value       = var.auth0_domain
+}
+
 output "application_client_id" {
   description = "Auth0 application client ID"
   value       = auth0_client.bff.client_id
+}
+
+output "application_client_secret" {
+  description = "Auth0 application client secret"
+  value       = data.auth0_client.bff.client_secret
+  sensitive   = true
 }
 
 output "application_name" {

@@ -90,6 +90,12 @@ variable "cloudflare_api_token" {
 # Auth0
 # -----------------------------------------------------------------------------
 
+variable "auth0_domain" {
+  description = "Auth0 tenant domain (e.g., yourapp.us.auth0.com). Read from AUTH0_DOMAIN environment variable."
+  type        = string
+  default     = ""
+}
+
 variable "enable_auth0" {
   description = "Enable Auth0 resources (requires proper Auth0 Management API permissions)"
   type        = bool
