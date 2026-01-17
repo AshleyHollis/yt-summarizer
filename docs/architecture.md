@@ -156,7 +156,11 @@ Response: Answer + Citations + Video Cards
 | Chat UI | CopilotKit | Copilot interface |
 | API | FastAPI (Python 3.11+) | REST endpoints |
 | Orchestration | .NET Aspire | Local dev orchestration |
+| Edge Routing | NGINX Gateway Fabric + Gateway API | TLS termination and HTTP routing |
+| DNS Automation | ExternalDNS + Cloudflare | Preview and production DNS management |
+| Certificates | cert-manager (DNS-01) | Wildcard TLS certificates |
 | Database | Azure SQL (serverless) | Operational data + vectors |
+
 | Vector Search | VECTOR columns (SQL Server 2025) | Semantic search |
 | Queue | Azure Storage Queue | Async job processing |
 | Blob Storage | Azure Blob Storage | Large artifacts (transcripts, summaries) |

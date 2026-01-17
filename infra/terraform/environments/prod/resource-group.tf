@@ -1,5 +1,9 @@
 # =============================================================================
-# Production Environment Configuration
+# Resource Group
 # =============================================================================
-# Single production environment - previews share this infrastructure
-# but run in different AKS namespaces
+
+resource "azurerm_resource_group" "main" {
+  name     = "rg-${local.name_prefix}"
+  location = var.location
+  tags     = local.common_tags
+}

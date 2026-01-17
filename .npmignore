@@ -1,0 +1,26 @@
+# =============================================================================
+# NPM Ignore
+# =============================================================================
+
+# Dependencies
+node_modules/
+
+# Builds
+build/
+dist/
+.next/
+out/
+
+# Coverage
+coverage/
+
+# Logs and temp
+*.log
+
+# Environment files
+.env*
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/

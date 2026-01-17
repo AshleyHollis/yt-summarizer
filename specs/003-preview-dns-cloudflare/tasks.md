@@ -145,26 +145,29 @@
 
 ### Auth0 BFF Implementation
 
-- [ ] T047 [US4] Create auth routes module in services/api/src/api/routes/auth.py
-- [ ] T048 [US4] Implement GET /api/auth/login endpoint with returnTo param
-- [ ] T049 [US4] Implement GET /api/auth/callback/auth0 endpoint with session cookie
-- [ ] T050 [US4] Implement POST /api/auth/logout endpoint (local logout)
-- [ ] T051 [US4] Implement GET /api/auth/me endpoint for current user info
-- [ ] T052 [US4] Register auth routes in main.py in services/api/src/api/main.py
+- [X] T047 [US4] Create auth routes module in services/api/src/api/routes/auth.py
+- [X] T048 [US4] Implement GET /api/auth/login endpoint with returnTo param
+- [X] T049 [US4] Implement GET /api/auth/callback/auth0 endpoint with session cookie
+- [X] T050 [US4] Implement POST /api/auth/logout endpoint (local logout)
+- [X] T051 [US4] Implement GET /api/auth/me endpoint for current user info
+- [X] T052 [US4] Register auth routes in main.py in services/api/src/api/main.py
 
 ### CORS Configuration
 
-- [ ] T053 [US4] Update CORS configuration with new allowed origins in services/api/src/api/main.py
-- [ ] T054 [US4] Add regex pattern for *.azurestaticapps.net origins
-- [ ] T055 [US4] Ensure allow_credentials=True with origin reflection (not wildcard)
+- [X] T053 [US4] Update CORS configuration with new allowed origins in services/api/src/api/main.py
+- [X] T054 [US4] Add regex pattern for *.azurestaticapps.net origins
+- [X] T055 [US4] Ensure allow_credentials=True with origin reflection (not wildcard)
+
 
 ### Auth0 Configuration (External)
 
 - [ ] T056 [US4] Add wildcard callback URL pattern in Auth0 Dashboard for preview APIs
 - [ ] T057 [US4] Add production and staging callback URLs in Auth0 Dashboard
 - [ ] T058 [US4] Add allowed web origins for production web and *.azurestaticapps.net
+- [X] T058a [US4] Add Auth0 Terraform module in infra/terraform/modules/auth0/main.tf and wire into infra/terraform/environments/prod
 
 ### Validation
+
 
 - [ ] T059 [US4] Test login flow from preview API endpoint
 - [ ] T060 [US4] Test cross-origin credentialed request from SWA preview to API preview
@@ -182,10 +185,11 @@
 
 ### Runbook Creation
 
-- [ ] T062 [P] [US5] Create Cloudflare setup runbook in docs/runbooks/cloudflare-setup.md
-- [ ] T063 [P] [US5] Create cert-manager DNS-01 troubleshooting runbook in docs/runbooks/cert-manager-dns01-troubleshooting.md
-- [ ] T064 [P] [US5] Create ExternalDNS troubleshooting runbook in docs/runbooks/external-dns-troubleshooting.md
-- [ ] T065 [P] [US5] Create Gateway/HTTPRoute troubleshooting runbook in docs/runbooks/gateway-troubleshooting.md
+- [X] T062 [P] [US5] Create Cloudflare setup runbook in docs/runbooks/cloudflare-setup.md
+- [X] T063 [P] [US5] Create cert-manager DNS-01 troubleshooting runbook in docs/runbooks/cert-manager-dns01-troubleshooting.md
+- [X] T064 [P] [US5] Create ExternalDNS troubleshooting runbook in docs/runbooks/external-dns-troubleshooting.md
+- [X] T065 [P] [US5] Create Gateway/HTTPRoute troubleshooting runbook in docs/runbooks/gateway-troubleshooting.md
+
 
 ### Runbook Validation
 
@@ -201,14 +205,15 @@
 
 **Purpose**: Remove legacy nip.io/sslip.io references and old Ingress resources
 
-- [ ] T069 Remove sslip.io hostname logic from compute-preview-urls action in .github/actions/compute-preview-urls/action.yml
-- [ ] T070 Remove old ingress-patch.yaml from preview overlay in k8s/overlays/preview/patches/ingress-patch.yaml
-- [ ] T071 [P] Remove api-ingress.yaml from base in k8s/base/api-ingress.yaml
-- [ ] T072 [P] Remove api-ingress.yaml from base-preview in k8s/base-preview/api-ingress.yaml
-- [ ] T073 Update base kustomization to remove Ingress reference in k8s/base/kustomization.yaml
-- [ ] T074 Update base-preview kustomization to remove Ingress reference in k8s/base-preview/kustomization.yaml
-- [ ] T075 Search codebase for remaining nip.io/sslip.io/xip.io references and remove
-- [ ] T076 Update architecture documentation in docs/architecture.md
+- [X] T069 Remove sslip.io hostname logic from compute-preview-urls action in .github/actions/compute-preview-urls/action.yml
+- [X] T070 Remove old ingress-patch.yaml from preview overlay in k8s/overlays/preview/patches/ingress-patch.yaml
+- [X] T071 [P] Remove api-ingress.yaml from base in k8s/base/api-ingress.yaml
+- [X] T072 [P] Remove api-ingress.yaml from base-preview in k8s/base-preview/api-ingress.yaml
+- [X] T073 Update base kustomization to remove Ingress reference in k8s/base/kustomization.yaml
+- [X] T074 Update base-preview kustomization to remove Ingress reference in k8s/base-preview/kustomization.yaml
+- [X] T075 Search codebase for remaining nip.io/sslip.io/xip.io references and remove
+- [X] T076 Update architecture documentation in docs/architecture.md
+
 - [ ] T077 Final validation: all quickstart.md checks pass
 
 **Checkpoint**: Migration complete, no legacy DNS references remain

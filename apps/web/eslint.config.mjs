@@ -11,10 +11,15 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "node_modules/**",
+    "dist/**",
+    "coverage/**",
+    "*.min.js",
     "next-env.d.ts",
     // Build artifacts
     "playwright-report/**",
     "test-results/**",
+
   ]),
   // Custom rule overrides for existing codebase patterns
   {

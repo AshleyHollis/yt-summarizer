@@ -85,3 +85,55 @@ variable "cloudflare_api_token" {
   type        = string
   sensitive   = true
 }
+
+# -----------------------------------------------------------------------------
+# Auth0
+# -----------------------------------------------------------------------------
+
+variable "auth0_application_name" {
+  description = "Auth0 application name for the API BFF"
+  type        = string
+  default     = "yt-summarizer-api-bff"
+}
+
+variable "auth0_api_name" {
+  description = "Auth0 API name (resource server)"
+  type        = string
+  default     = "YT Summarizer API"
+}
+
+variable "auth0_api_identifier" {
+  description = "Auth0 API identifier (audience)"
+  type        = string
+  default     = "https://api.yt-summarizer.apps.ashleyhollis.com"
+}
+
+variable "auth0_allowed_callback_urls" {
+  description = "Allowed Auth0 callback URLs for the BFF"
+  type        = list(string)
+  default = [
+    "https://api.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+    "https://api-stg.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+    "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+  ]
+}
+
+variable "auth0_allowed_logout_urls" {
+  description = "Allowed Auth0 logout URLs for the BFF"
+  type        = list(string)
+  default = [
+    "https://web.yt-summarizer.apps.ashleyhollis.com",
+    "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
+    "https://*.azurestaticapps.net",
+  ]
+}
+
+variable "auth0_allowed_web_origins" {
+  description = "Allowed Auth0 web origins for CORS/session flows"
+  type        = list(string)
+  default = [
+    "https://web.yt-summarizer.apps.ashleyhollis.com",
+    "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
+    "https://*.azurestaticapps.net",
+  ]
+}

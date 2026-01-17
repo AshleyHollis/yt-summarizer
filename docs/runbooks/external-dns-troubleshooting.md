@@ -9,7 +9,8 @@ This runbook covers troubleshooting and verifying ExternalDNS operations with Ga
 - **Source:** `gateway-httproute`
 - **Provider:** Cloudflare
 - **Domain Filter:** `apps.ashleyhollis.com`
-- **Namespace:** `external-dns`
+- **Namespace:** `gateway-system`
+
 - **Watched Resources:** HTTPRoute resources across all namespaces
 
 ## How ExternalDNS Works with HTTPRoutes
@@ -61,14 +62,14 @@ When an HTTPRoute is deleted (e.g., PR closed, namespace deleted):
 
 ```bash
 # Check ExternalDNS pod status
-kubectl get pods -n external-dns
+kubectl get pods -n gateway-system
 
 # Expected output:
 # NAME                            READY   STATUS    RESTARTS   AGE
 # external-dns-xxxxxxxxxx-xxxxx   1/1     Running   0          1d
 
 # Check logs for errors
-kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=50
+kubectl logs -n gateway-system -l app.kubernetes.io/name=external-dns --tail=50
 ```
 
 ### Verify DNS Record Creation (Preview Deployment)
@@ -90,7 +91,7 @@ kubectl get httproute api-httproute -n preview-pr-<NUMBER> -o yaml | grep extern
 # external-dns.alpha.kubernetes.io/hostname: api-pr-<NUMBER>.yt-summarizer.apps.ashleyhollis.com
 
 # 3. Check ExternalDNS logs for record creation
-kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100 | grep "api-pr-<NUMBER>"
+kubectl logs -n gateway-system -l app.kubernetes.io/name=external-dns --tail=100 | grep "api-pr-<NUMBER>"
 
 # Expected log entries:
 # level=info msg="Desired change: CREATE api-pr-<NUMBER>.yt-summarizer.apps.ashleyhollis.com A [endpoint=20.187.186.135]"
@@ -126,7 +127,7 @@ kubectl get httproute -n preview-pr-<NUMBER> 2>&1
 # Error from server (NotFound): namespaces "preview-pr-<NUMBER>" not found
 
 # 3. Check ExternalDNS logs for deletion
-kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100 | grep "api-pr-<NUMBER>"
+kubectl logs -n gateway-system -l app.kubernetes.io/name=external-dns --tail=100 | grep "api-pr-<NUMBER>"
 
 # Expected log entries:
 # level=info msg="Desired change: DELETE api-pr-<NUMBER>.yt-summarizer.apps.ashleyhollis.com A"
@@ -167,7 +168,7 @@ kubectl describe httproute api-httproute -n preview-pr-<NUMBER>
 # Annotations: external-dns.alpha.kubernetes.io/hostname: api-pr-<NUMBER>.yt-summarizer.apps.ashleyhollis.com
 
 # 2. Check ExternalDNS logs for errors
-kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 | grep -i error
+kubectl logs -n gateway-system -l app.kubernetes.io/name=external-dns --tail=200 | grep -i error
 
 # Common errors:
 # - "zone not found" → Domain filter issue
@@ -213,14 +214,14 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
 
    ```bash
    # Check ExternalSecret for Cloudflare token
-   kubectl get externalsecret cloudflare-api-token -n external-dns
+   kubectl get externalsecret cloudflare-api-token -n gateway-system
 
    # Expected:
    # NAME                   STORE                       REFRESH   STATUS
    # cloudflare-api-token   azure-keyvault-cluster      1h        SecretSynced
 
    # If not synced, force refresh:
-   kubectl delete secret cloudflare-api-token -n external-dns
+   kubectl delete secret cloudflare-api-token -n gateway-system
    # Secret will be recreated automatically within 1 minute
    ```
 
@@ -228,7 +229,7 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
 
    ```bash
    # Check ExternalDNS deployment args
-   kubectl get deployment external-dns -n external-dns -o yaml | grep domain-filter
+   kubectl get deployment external-dns -n gateway-system -o yaml | grep domain-filter
 
    # Expected:
    # - --domain-filter=apps.ashleyhollis.com
@@ -246,13 +247,13 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
 
 ```bash
 # 1. Check if ExternalDNS saw the deletion
-kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=500 | grep "api-pr-<NUMBER>" | grep DELETE
+kubectl logs -n gateway-system -l app.kubernetes.io/name=external-dns --tail=500 | grep "api-pr-<NUMBER>" | grep DELETE
 
 # Expected:
 # level=info msg="Desired change: DELETE api-pr-<NUMBER>.yt-summarizer.apps.ashleyhollis.com A"
 
 # 2. Check for Cloudflare API errors
-kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 | grep -i "cloudflare.*error"
+kubectl logs -n gateway-system -l app.kubernetes.io/name=external-dns --tail=200 | grep -i "cloudflare.*error"
 ```
 
 **Common Causes & Solutions:**
@@ -261,7 +262,7 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
 
    ```bash
    # Restart ExternalDNS to force re-sync
-   kubectl rollout restart deployment external-dns -n external-dns
+   kubectl rollout restart deployment external-dns -n gateway-system
 
    # ExternalDNS will re-sync all records and delete orphaned ones
    ```
@@ -270,7 +271,7 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
 
    ```bash
    # Check logs for rate limit errors
-   kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns | grep -i "rate limit"
+   kubectl logs -n gateway-system -l app.kubernetes.io/name=external-dns | grep -i "rate limit"
 
    # Solution: Wait 5-10 minutes, ExternalDNS will retry
    ```
@@ -297,10 +298,10 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 |
 
 ```bash
 # Check pod status
-kubectl get pods -n external-dns
+kubectl get pods -n gateway-system
 
 # Check pod logs
-kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --previous
+kubectl logs -n gateway-system -l app.kubernetes.io/name=external-dns --previous
 
 # Common errors:
 # - "invalid Cloudflare API token" → Token issue
@@ -313,16 +314,16 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --previous
 1. **Verify Cloudflare secret exists:**
 
    ```bash
-   kubectl get secret cloudflare-api-token -n external-dns
+   kubectl get secret cloudflare-api-token -n gateway-system
 
    # If missing, check ExternalSecret
-   kubectl describe externalsecret cloudflare-api-token -n external-dns
+   kubectl describe externalsecret cloudflare-api-token -n gateway-system
    ```
 
 2. **Check deployment configuration:**
 
    ```bash
-   kubectl describe deployment external-dns -n external-dns
+   kubectl describe deployment external-dns -n gateway-system
 
    # Look for:
    # - Correct image version
@@ -333,8 +334,8 @@ kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --previous
 3. **Restart deployment:**
 
    ```bash
-   kubectl rollout restart deployment external-dns -n external-dns
-   kubectl rollout status deployment external-dns -n external-dns
+   kubectl rollout restart deployment external-dns -n gateway-system
+   kubectl rollout status deployment external-dns -n gateway-system
    ```
 
 ### Stale DNS Records After Multiple PR Cycles
@@ -359,11 +360,11 @@ kubectl get httproute -A | grep yt-summarizer
 
 ```bash
 # Force ExternalDNS to re-sync and clean up orphaned records
-kubectl annotate deployment external-dns -n external-dns \
+kubectl annotate deployment external-dns -n gateway-system \
   force-sync="$(date +%s)" --overwrite
 
 # Or restart ExternalDNS
-kubectl rollout restart deployment external-dns -n external-dns
+kubectl rollout restart deployment external-dns -n gateway-system
 
 # ExternalDNS will:
 # 1. List all HTTPRoutes
