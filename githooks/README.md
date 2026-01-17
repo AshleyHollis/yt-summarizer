@@ -123,9 +123,10 @@ git commit -m "feat: add new feature"
 **Runs on**: Every `git push` command
 
 **Behavior**:
-1. Executes `tools/pre-commit.local` wrapper
-2. Pre-commit runs WITHOUT auto-fix (validation only)
-3. Checks all hooks in `.pre-commit-config.yaml`
+1. Requires `pre-commit` installed; push blocked if missing
+2. Executes `tools/pre-commit.local` wrapper
+3. Pre-commit runs WITHOUT auto-fix (validation only)
+4. Checks all hooks in `.pre-commit-config.yaml`
 
 **Outcomes**:
 - ✅ **All checks pass**: Push allowed

@@ -40,9 +40,10 @@ Write-Host ""
 # Check if pre-commit command exists
 $PreCommit = Get-Command pre-commit -ErrorAction SilentlyContinue
 if (-not $PreCommit) {
-    Write-ColorHost "WARNING: pre-commit not found on PATH" $Colors.Yellow
-    Write-ColorHost "Pre-push validation skipped (will rely on CI)" $Colors.Yellow
-    exit 0
+    Write-ColorHost "ERROR: pre-commit not found on PATH" $Colors.Red
+    Write-ColorHost "Install pre-commit: pip install pre-commit" $Colors.Yellow
+    Write-ColorHost "Push blocked to enforce local auto-fix." $Colors.Red
+    exit 1
 }
 
 # Run pre-commit local validation (no auto-fix)
