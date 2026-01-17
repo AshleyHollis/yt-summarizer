@@ -44,13 +44,12 @@ useDefault = true
     '''YourSecurePassword123!''',
     '''YourStrong@Passw0rd''',
     '''Your.*Passw.*''',
-    # Generic example password patterns
-    '''Password=Your.*''',
-    '''password.*=.*Your.*''',
     # Test API keys (not real)
     '''sk-test-.*''',
     '''sk-fake-.*''',
     '''test-key.*''',
     '''test-api-key''',
     '''fake-''',
-  ]
+    # Azure Storage account keys
+    '''AccountKey=.{20,}''',
+]
