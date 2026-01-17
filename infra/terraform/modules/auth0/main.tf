@@ -77,10 +77,12 @@ resource "auth0_client" "bff" {
   ]
 }
 
-# Read back the client to get the generated client_secret
-data "auth0_client" "bff" {
-  client_id  = auth0_client.bff.client_id
-  depends_on = [auth0_client.bff]
+# Retrieve the client credentials (including client_secret)
+# The auth0_client_credentials resource retrieves the secret after creation
+resource "auth0_client_credentials" "bff" {
+  client_id = auth0_client.bff.id
+
+  authentication_method = "client_secret_post"
 }
 
 resource "auth0_resource_server" "api" {
@@ -108,7 +110,7 @@ output "application_client_id" {
 
 output "application_client_secret" {
   description = "Auth0 application client secret"
-  value       = data.auth0_client.bff.client_secret
+  value       = auth0_client_credentials.bff.client_secret
   sensitive   = true
 }
 
