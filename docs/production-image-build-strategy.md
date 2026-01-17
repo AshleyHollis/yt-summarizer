@@ -2,10 +2,64 @@
 
 ## Overview
 
-The production deployment pipeline uses a **two-path image strategy** to optimize build efficiency while maintaining deterministic, auditable deployments.
+The production deployment pipeline **reuses images built by the CI workflow** to eliminate duplicate builds while maintaining deterministic, auditable deployments. This is a **two-path strategy** based on what changed:
+
+- **Path 1 (Code changes)**: Wait for CI workflow → Extract SHA tag → Validate → Deploy
+- **Path 2 (K8s-only changes)**: Read existing prod kustomization → Validate → Deploy
+
+**Key Principle**: Images are built **once** by CI workflow when code merges to main, then **reused** by production workflow.
 
 ## Decision Tree
 
+```
+┌────────────────────────────────────────────────────────────┐
+│  PR Merged to Main                                         │
+└────────────────────────────────────────────────────────────┘
+                          │
+                          ↓
+            ┌─────────────────────────┐
+            │  CI Workflow Triggered  │
+            │  • Builds sha-{commit}  │
+            │  • Pushes to ACR        │
+            └─────────────────────────┘
+                          │
+                          ↓
+            ┌─────────────────────────┐
+            │  Production Workflow    │
+            │  • Detects changes      │
+            │  • Waits for CI         │
+            └─────────────────────────┘
+                          │
+          ┌───────────────┴───────────────┐
+          │                               │
+          ↓                               ↓
+    CODE CHANGES?                   K8S/INFRA ONLY?
+    (services/*, apps/web,          (k8s/*, infra/*)
+     docker/*)                      
+          │                               │
+          ↓                               ↓
+  ┌─────────────────────┐       ┌─────────────────────┐
+  │ USE CI-BUILT IMAGE  │       │ USE EXISTING IMAGE  │
+  │ • Extract sha-abc   │       │ • Read prod kust.   │
+  │ • Validate in ACR   │       │ • Validate in ACR   │
+  │ • NO rebuild        │       │ • Use existing tag  │
+  │ • Reuse CI image    │       │ • Update k8s only   │
+  └─────────────────────┘       └─────────────────────┘
+          │                               │
+          └───────────────┬───────────────┘
+                          ↓
+            ┌─────────────────────────┐
+            │  Update Kustomization   │
+            │  • Use determined tag   │
+            │  • Commit to main       │
+            └─────────────────────────┘
+                          ↓
+            ┌─────────────────────────┐
+            │  ArgoCD Auto-Sync       │
+            │  • Detects kust change  │
+            │  • Pulls image from ACR │
+            │  • Deploys to AKS       │
+            └─────────────────────────┘
 ```
 ┌────────────────────────────────────────────────────────────┐
 │  PR Merged to Main                                         │
@@ -75,7 +129,7 @@ The production deployment pipeline uses a **two-path image strategy** to optimiz
 | **Rollback** | Easy to revert to previous SHA |
 | **GitOps** | Deployment history = git history |
 
-## Path 1: Code Changes (Build New Images)
+## Path 1: Code Changes (Reuse CI-Built Images)
 
 ### Triggers
 Changes to any of:
@@ -86,25 +140,48 @@ Changes to any of:
 - `docker/**` or `**/Dockerfile*` - Container definitions
 
 ### Workflow
-1. **meta** job generates tag: `sha-{current-commit}`
-2. **build-api** job builds and pushes API image
-3. **build-workers** job builds and pushes workers image
-4. Both images tagged as:
-   - `acrytsummprd.azurecr.io/yt-summarizer-api:sha-abc1234`
-   - `acrytsummprd.azurecr.io/yt-summarizer-api:latest`
-5. **update-overlay** job updates `k8s/overlays/prod/kustomization.yaml`
-6. Kustomization committed to main → ArgoCD syncs
+1. **CI workflow** (triggered on push to main) builds images:
+   - Generates tag: `sha-{current-commit}`
+   - Builds and pushes API image to ACR
+   - Builds and pushes workers image to ACR
+   - Tags as both `sha-abc1234` and `latest`
+
+2. **Production workflow** (also triggered on push to main):
+   - **wait-for-ci** job waits for CI workflow to complete
+   - **get-ci-image-tag** job:
+     - Extracts SHA from current commit: `sha-{commit}`
+     - Validates image exists in ACR
+     - Outputs tag for downstream jobs
+   - **update-overlay** job updates `k8s/overlays/prod/kustomization.yaml`
+   - Kustomization committed to main → ArgoCD syncs
+
+### Key Difference vs Old Approach
+
+| Aspect | ❌ Old (Wasteful) | ✅ New (Efficient) |
+|--------|------------------|-------------------|
+| **CI Workflow** | Builds `sha-{commit}` | Builds `sha-{commit}` |
+| **Prod Workflow** | Rebuilds `sha-{commit}` | **Waits & reuses** |
+| **Total Builds** | 2x (duplicate) | 1x (CI only) |
+| **Time Saved** | - | 5-10 minutes |
+| **ACR Storage** | Duplicate layers | Single image |
 
 ### Example
 ```yaml
 # Commit e43f28a changes services/api/main.py
-# → Builds sha-e43f28a
-# → Updates kustomization:
+# 
+# 1. CI workflow:
+#    - Builds acrytsummprd.azurecr.io/yt-summarizer-api:sha-e43f28a
+#    - Pushes to ACR
+# 
+# 2. Production workflow:
+#    - Waits for CI to finish
+#    - Validates sha-e43f28a exists in ACR
+#    - Updates kustomization:
 
 images:
   - name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: sha-e43f28a  # ← NEW TAG
+    newTag: sha-e43f28a  # ← CI-BUILT IMAGE (not rebuilt)
 ```
 
 ## Path 2: K8s/Infra Only (Use Existing Image)
@@ -144,14 +221,27 @@ images:
 
 ## Comparison with Preview Workflow
 
+Both production and preview workflows **reuse CI-built images** instead of rebuilding them.
+
 | Aspect | Production | Preview |
 |--------|------------|---------|
 | **Tag format** | `sha-{commit}` | `pr-{number}-{sha}` |
-| **Code changes** | Build new sha-tagged image | Wait for CI, use pr-tagged image |
+| **Code changes** | Wait for CI, use sha-tagged image | Wait for CI, use pr-tagged image |
 | **No code changes** | Read current prod kustomization | Search PR history backwards |
 | **Fallback** | None needed (prod is source) | Use prod kustomization tag |
 | **Update target** | `k8s/overlays/prod/` (main branch) | `k8s/overlays/preview/` (PR branch) |
 | **ArgoCD source** | Watches `main` branch | Watches PR branches |
+| **Image source** | CI (push to main event) | CI (pull_request event) |
+
+### Why Both Reuse CI Images
+
+**Before optimization**:
+- Production workflow rebuilt images → 5-10 min wasted
+- Preview workflow rebuilt images → 5-10 min wasted
+
+**After optimization**:
+- CI workflow builds once
+- Production & Preview workflows reuse → Time saved, no duplicate storage
 
 ## Image Lifecycle
 
@@ -163,28 +253,37 @@ images:
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  2. CI BUILDS IMAGE (if triggered)                          │
+│  2. CI WORKFLOW BUILDS IMAGE (push to main event)           │
 │     Tag: sha-e43f28a                                        │
 │     Also tagged: latest                                     │
 │     Pushed to: acrytsummprd.azurecr.io                      │
+│     Duration: ~5-10 minutes                                 │
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  3. KUSTOMIZATION UPDATED                                   │
+│  3. PRODUCTION WORKFLOW WAITS FOR CI                        │
+│     Waits: Until CI workflow completes                      │
+│     Extracts: sha-e43f28a from current commit               │
+│     Validates: Image exists in ACR                          │
+│     Duration: ~30 seconds (validation only, no build)       │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│  4. KUSTOMIZATION UPDATED                                   │
 │     File: k8s/overlays/prod/kustomization.yaml              │
 │     newTag: sha-e43f28a                                     │
 │     Committed to main with [skip ci]                        │
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  4. ARGOCD AUTO-SYNC                                        │
+│  5. ARGOCD AUTO-SYNC                                        │
 │     Detects: kustomization.yaml change                      │
 │     Pulls: acrytsummprd.azurecr.io/.../sha-e43f28a         │
 │     Deploys: To namespace yt-summarizer                     │
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  5. PRODUCTION RUNNING                                      │
+│  6. PRODUCTION RUNNING                                      │
 │     API: yt-summarizer-api:sha-e43f28a                     │
 │     Workers: yt-summarizer-workers:sha-e43f28a             │
 │     Traceable to: git commit e43f28a                        │
@@ -193,18 +292,38 @@ images:
 
 ## When Images Are Built
 
-| Change Type | Example Files | Builds Image? | Tag Used |
-|-------------|---------------|---------------|----------|
-| API code | `services/api/main.py` | ✅ Yes | `sha-{new-commit}` |
-| Worker code | `services/workers/transcribe.py` | ✅ Yes | `sha-{new-commit}` |
-| Shared lib | `services/shared/db/models.py` | ✅ Yes | `sha-{new-commit}` |
-| Frontend | `apps/web/src/App.tsx` | ✅ Yes | `sha-{new-commit}` |
-| Dockerfile | `services/api/Dockerfile` | ✅ Yes | `sha-{new-commit}` |
-| K8s config | `k8s/base/deployment.yaml` | ❌ No | `sha-{last-prod}` |
-| Resource limits | `k8s/overlays/prod/patches/` | ❌ No | `sha-{last-prod}` |
-| Terraform | `infra/terraform/main.tf` | ❌ No | N/A (infra only) |
-| Docs | `docs/api.md`, `README.md` | ❌ No | N/A (skipped) |
-| CI workflows | `.github/workflows/*.yml` | ❌ No | N/A (skipped) |
+**Critical: Images are ONLY built by CI workflow, never by production workflow.**
+
+| Change Type | Example Files | CI Builds Image? | Prod Workflow Action | Tag Used |
+|-------------|---------------|------------------|----------------------|----------|
+| API code | `services/api/main.py` | ✅ Yes | ⏳ Wait & reuse | `sha-{new-commit}` |
+| Worker code | `services/workers/transcribe.py` | ✅ Yes | ⏳ Wait & reuse | `sha-{new-commit}` |
+| Shared lib | `services/shared/db/models.py` | ✅ Yes | ⏳ Wait & reuse | `sha-{new-commit}` |
+| Frontend | `apps/web/src/App.tsx` | ✅ Yes | ⏳ Wait & reuse | `sha-{new-commit}` |
+| Dockerfile | `services/api/Dockerfile` | ✅ Yes | ⏳ Wait & reuse | `sha-{new-commit}` |
+| K8s config | `k8s/base/deployment.yaml` | ❌ No | 📖 Read existing | `sha-{last-prod}` |
+| Resource limits | `k8s/overlays/prod/patches/` | ❌ No | 📖 Read existing | `sha-{last-prod}` |
+| Terraform | `infra/terraform/main.tf` | ❌ No | N/A (infra only) | N/A |
+| Docs | `docs/api.md`, `README.md` | ❌ No | N/A (skipped) | N/A |
+| CI workflows | `.github/workflows/*.yml` | ❌ No | N/A (skipped) | N/A |
+
+### Build Flow Comparison
+
+**Old (Duplicate Builds)**:
+```
+Merge to main
+  ├─ CI Workflow: Build sha-abc1234 (5-10 min)
+  └─ Prod Workflow: Build sha-abc1234 AGAIN (5-10 min) ← WASTE
+     Total: 10-20 minutes
+```
+
+**New (Single Build)**:
+```
+Merge to main
+  ├─ CI Workflow: Build sha-abc1234 (5-10 min)
+  └─ Prod Workflow: Wait & reuse sha-abc1234 (30 sec) ← EFFICIENT
+     Total: 5-10 minutes (50% faster)
+```
 
 ## Secrets and Configuration
 
@@ -300,10 +419,19 @@ newTag: sha-abc1234
 A: Digests are great but harder to read/audit. SHA tags provide both immutability and human readability.
 
 **Q: Can we manually trigger an image rebuild?**
-A: Yes, use workflow_dispatch with `run_deploy: true` input.
+A: Images are built by CI workflow only. To rebuild: push new commit or manually trigger CI workflow.
 
 **Q: What if we need to deploy a hotfix?**
-A: Merge to main → workflow detects code change → builds new SHA → deploys automatically.
+A: Merge to main → CI builds new SHA → production waits for CI → deploys automatically.
 
 **Q: How do we handle database migrations?**
 A: Alembic migrations run via init containers in K8s, referenced by same SHA tag.
+
+**Q: Why did we change from inline builds to CI reuse?**
+A: Eliminated duplicate builds. Before: CI + Prod both built (10-20 min). After: Only CI builds (5-10 min).
+
+**Q: What if CI fails but we need to deploy K8s changes?**
+A: K8s-only changes use Path 2 (read existing prod image), don't depend on CI.
+
+**Q: How does this compare to preview workflow?**
+A: Both now reuse CI images. Production uses `sha-{commit}`, preview uses `pr-{number}-{sha}`.

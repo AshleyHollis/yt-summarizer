@@ -9,15 +9,16 @@
 # ---------------------
 # Two-path strategy based on change detection:
 #
-# Path 1: CODE CHANGES (build new images)
+# Path 1: CODE CHANGES (use CI-built images)
 #   - Triggers: services/api, services/workers, services/shared, apps/web, docker
-#   - Generates: sha-{commit} tag (e.g., sha-e43f28a)
-#   - Builds: New API and Workers container images
-#   - Updates: Production kustomization with new SHA tag
-#   - Result: ArgoCD deploys new code
+#   - CI Workflow: Builds images as sha-{commit} (runs in parallel)
+#   - Production: Waits for CI, extracts sha-{commit} tag
+#   - Validates: Image exists in ACR
+#   - Updates: Production kustomization with CI-built SHA tag
+#   - Result: ArgoCD deploys CI-tested code
 #
 # Path 2: K8S/INFRA ONLY (use existing production image)
-#   - Triggers: k8s manifests, infra/terraform
+#   - Triggers: k8s manifests, infra/terraform (no code changes)
 #   - Reads: Current production kustomization for SHA tag
 #   - Validates: Image exists in ACR
 #   - Updates: Production kustomization (same image, new config)
@@ -25,16 +26,24 @@
 #
 # IMAGE TAG FORMAT:
 #   - Production: sha-{7-char-commit-sha} (deterministic, immutable)
-#   - Also tagged: latest (convenience only, NOT used in kustomization)
+#   - Built by CI: Once per commit (no duplication)
 #   - Never use: Non-deterministic tags in production kustomization
 #
 # RATIONALE:
+#   - Efficient: Images built once in CI, reused by production
+#   - Consistent: Same images that passed all CI tests
+#   - Fast: No duplicate builds (5-10 min saved per deployment)
 #   - Deterministic: Each deployment traceable to git commit
-#   - Efficient: Don't rebuild images for K8s-only changes
 #   - Safe: Image validation ensures ACR has required tags
 #   - Auditable: Git history = deployment history
 #
+# KEY DIFFERENCE FROM OLD APPROACH:
+#   - OLD: Production built images inline (duplicate of CI builds)
+#   - NEW: Production waits for CI and uses CI-built images
+#   - BENEFIT: 5-10 minutes faster, no ACR storage waste
+#
 # See also: preview.yml for PR-scoped image strategy
+#           ci.yml for image building logic
 
 name: Deploy to Production
 
@@ -311,12 +320,18 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
-  # Build and Push Production Images (split)
+  # Get CI Image Tag (Code Changes)
   # ---------------------------------------------------------------------------
-  meta:
-    name: Prepare image tag
+  # For code changes, CI workflow has already built and pushed images.
+  # This job extracts the image tag from CI artifacts (same as preview workflow).
+  #
+  # CI builds images as sha-{commit} when code is pushed to main.
+  # We use that same image instead of rebuilding.
+  # ---------------------------------------------------------------------------
+  get-ci-image-tag:
+    name: Get CI Image Tag
     runs-on: ubuntu-latest
-    needs: [terraform-apply, detect-changes, wait-for-ci]
+    needs: [detect-changes, wait-for-ci, terraform-apply]
     if: |
       needs.wait-for-ci.result == 'success' &&
       needs.terraform-apply.result != 'failure' &&
@@ -330,88 +345,38 @@ jobs:
           contains(needs.detect-changes.outputs.changed_areas, 'docker')
         ))
       )
-
-
+    outputs:
+      image_tag: ${{ steps.extract.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Generate image tag
-        id: tag
-        uses: ./.github/actions/generate-image-tag
+      - name: Extract image tag from CI
+        id: extract
+        shell: bash
+        run: |
+          # CI has already built images with sha-{commit} tag
+          # Extract that tag (wait-for-ci ensures CI completed successfully)
+          SHORT_SHA=$(git rev-parse --short=7 ${{ github.sha }})
+          IMAGE_TAG="sha-${SHORT_SHA}"
+          
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "✅ Using CI-built image tag: $IMAGE_TAG"
+
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          commit-sha: ${{ github.sha }}
-    outputs:
-      image_tag: ${{ steps.tag.outputs.image-tag }}
-      short_sha: ${{ steps.tag.outputs.short-sha }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-  build-api:
-    name: Build and push API image
-    runs-on: ubuntu-latest
-    needs: [meta]
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      api_digest: ${{ steps.build.outputs.digest }}
-      image_tag: ${{ needs.meta.outputs.image_tag }}
-      api_build_duration: ${{ steps.build.outputs.build_duration }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Azure ACR Login
-        uses: ./.github/actions/azure-acr-login
+      - name: Validate CI image exists in ACR
+        uses: ./.github/actions/validate-acr-image
         with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          acr-name: ${{ env.ACR_NAME }}
-
-      - name: Build and push API image
-        id: build
-        uses: ./.github/actions/docker-build-push
-        with:
-          dockerfile: services/api/Dockerfile
-          image-name: yt-summarizer-api
-          image-tag: ${{ needs.meta.outputs.image_tag }}
-          registry: ${{ env.ACR_LOGIN_SERVER }}
-          cache-name: api
-          add-latest-tag: 'true'
-
-  build-workers:
-    name: Build and push Workers image
-    runs-on: ubuntu-latest
-    needs: [meta]
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      workers_digest: ${{ steps.build.outputs.digest }}
-      image_tag: ${{ needs.meta.outputs.image_tag }}
-      workers_build_duration: ${{ steps.build.outputs.build_duration }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Azure ACR Login
-        uses: ./.github/actions/azure-acr-login
-        with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          acr-name: ${{ env.ACR_NAME }}
-
-      - name: Build and push Workers image
-        id: build
-        uses: ./.github/actions/docker-build-push
-        with:
-          dockerfile: services/workers/Dockerfile
-          image-name: yt-summarizer-workers
-          image-tag: ${{ needs.meta.outputs.image_tag }}
-          registry: ${{ env.ACR_LOGIN_SERVER }}
-          cache-name: workers
-          add-latest-tag: 'true'
+          registry: ${{ env.ACR_NAME }}
+          repository: yt-summarizer-api
+          tag: ${{ steps.extract.outputs.image_tag }}
+          fail-if-missing: 'true'
 
   # ---------------------------------------------------------------------------
   # Get Last Production Image (for K8s-only or infra-only changes)
@@ -493,13 +458,13 @@ jobs:
   update-overlay:
     name: Update Production Overlay
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, meta, build-api, build-workers, get-last-prod-image]
+    needs: [detect-changes, wait-for-ci, terraform-apply, get-ci-image-tag, get-last-prod-image]
     if: |
       always() && !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
       needs.terraform-apply.result != 'failure' &&
       (
-        needs.meta.result == 'success' ||
+        needs.get-ci-image-tag.result == 'success' ||
         needs.get-last-prod-image.result == 'success'
       )
     steps:
@@ -517,13 +482,13 @@ jobs:
         id: determine-tag
         shell: bash
         run: |
-          # Path 1: New build (meta job succeeded - code changes)
-          if [ "${{ needs.meta.result }}" = "success" ]; then
-            IMAGE_TAG="${{ needs.meta.outputs.image_tag }}"
-            DEPLOYMENT_TYPE="new-build"
-            echo "📦 Using newly built image: $IMAGE_TAG"
+          # Path 1: Code changes (get-ci-image-tag succeeded - uses CI-built images)
+          if [ "${{ needs.get-ci-image-tag.result }}" = "success" ]; then
+            IMAGE_TAG="${{ needs.get-ci-image-tag.outputs.image_tag }}"
+            DEPLOYMENT_TYPE="ci-build"
+            echo "📦 Using CI-built image: $IMAGE_TAG"
 
-          # Path 2: Existing prod image (get-last-prod-image succeeded - K8s/infra only)
+          # Path 2: K8s/infra only (get-last-prod-image succeeded - reuses existing prod image)
           elif [ "${{ needs.get-last-prod-image.result }}" = "success" ]; then
             IMAGE_TAG="${{ needs.get-last-prod-image.outputs.image_tag }}"
             DEPLOYMENT_TYPE="existing-image"
@@ -531,7 +496,7 @@ jobs:
             echo "ℹ️  Deploying K8s/infra changes only (no code changes)"
 
           else
-            echo "::error::Neither meta nor get-last-prod-image succeeded"
+            echo "::error::Neither get-ci-image-tag nor get-last-prod-image succeeded"
             echo "::error::This should not happen - check job dependencies"
             exit 1
           fi
@@ -568,8 +533,10 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    needs: [build-api, build-workers]
-    if: github.event_name != 'workflow_dispatch' || inputs.run_frontend == true
+    needs: [update-overlay]
+    if: |
+      needs.update-overlay.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_frontend == true)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -637,7 +604,7 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [meta, get-last-prod-image, update-overlay, deploy-frontend, health-check, detect-changes, wait-for-ci, terraform-plan, terraform-apply]
+    needs: [get-ci-image-tag, get-last-prod-image, update-overlay, deploy-frontend, health-check, detect-changes, wait-for-ci, terraform-plan, terraform-apply]
     if: always()
     steps:
       - name: Checkout code
@@ -652,7 +619,7 @@ jobs:
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
             echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
             echo "- Terraform apply: ${{ needs.terraform-apply.result }} (reason: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true && 'plan has changes' || 'no changes' }})"
-            echo "- Backend deploy tag: ${{ needs.meta.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag || 'n/a' }}"
+            echo "- Backend deploy tag: ${{ needs.get-ci-image-tag.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
             echo "- Frontend deploy: ${{ needs.deploy-frontend.result }}"
             echo "- Health check: ${{ needs.health-check.result }}"
@@ -661,7 +628,7 @@ jobs:
       - name: Generate summary
         uses: ./.github/actions/create-prod-summary
         with:
-          image-tag: ${{ needs.meta.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag }}
+          image-tag: ${{ needs.get-ci-image-tag.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag }}
           commit-sha: ${{ github.sha }}
           update-overlay-result: ${{ needs.update-overlay.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend.result }}
