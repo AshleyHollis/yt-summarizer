@@ -88,6 +88,10 @@ chmod +x .git/hooks/pre-push
 - ✅ **All checks pass**: Commit allowed
 - ❌ **Any check fails**: Commit blocked, show fix instructions
 
+**pre-commit.ci policy**:
+- Server-side auto-fix commits are disabled (`ci.autofix_prs: false`).
+- Ensure the GitHub app setting "Auto-fix PRs" stays off to prevent bot commits.
+
 **Bypass**: `git commit --no-verify ...` (not recommended)
 
 **Example**:
