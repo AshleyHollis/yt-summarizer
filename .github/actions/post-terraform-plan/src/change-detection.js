@@ -13,7 +13,7 @@ const {
   isComputedAttribute
 } = require('./utils/value-validator');
 
-const { formatValue } = require('./formatters/value-formatter');
+const { formatValue, formatSensitiveValue } = require('./formatters/value-formatter');
 const { formatMultilineArray, formatInlineArray } = require('./formatters/array-formatter');
 const { determineMarker, shouldUseMarkersForBlocks } = require('./formatters/diff-marker');
 
@@ -95,19 +95,25 @@ function shouldSkipComputedAttr(key, afterExists, forceMarker) {
  * @param {*} afterVal - After value
  * @param {boolean} isUnknown - Whether value is unknown
  * @param {boolean} isReplace - Whether this is replace action
+ * @param {boolean} beforeSensitive - Whether before value is sensitive
+ * @param {boolean} afterSensitive - Whether after value is sensitive
  * @returns {string} Formatted change line
  */
-function formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnknown, isReplace) {
+function formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnknown, isReplace, beforeSensitive = false, afterSensitive = false) {
   const changeMarker = isReplace ? '!!' : marker;
 
   // No marker case (create/destroy) - show multi-line arrays or single-line values
   if (marker === '  ') {
     const val = beforeVal !== undefined ? beforeVal : afterVal;
+    const isSensitive = beforeVal !== undefined ? beforeSensitive : afterSensitive;
+
     if (Array.isArray(val) && val.length > 1) {
       const arrayLines = formatMultilineArray(val, prefix, key, '  ');
       return arrayLines.join('\n').split('\n');
     }
-    return `${marker} ${key} = ${formatValue(val, isUnknown)}`;
+
+    const formattedVal = isSensitive ? formatSensitiveValue(val) : formatValue(val, isUnknown);
+    return `${marker} ${key} = ${formattedVal}`;
   }
 
   // Value added
@@ -116,7 +122,8 @@ function formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnk
       const arrayLines = formatMultilineArray(afterVal, prefix, key, '+');
       return arrayLines.join('\n').split('\n');
     }
-    return `${marker} ${key} = ${formatValue(afterVal, isUnknown)}`;
+    const formattedVal = afterSensitive ? formatSensitiveValue(afterVal) : formatValue(afterVal, isUnknown);
+    return `${marker} ${key} = ${formattedVal}`;
   }
 
   // Value removed
@@ -125,17 +132,112 @@ function formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnk
       const arrayLines = formatMultilineArray(beforeVal, prefix, key, '-');
       return arrayLines.join('\n').split('\n');
     }
-    return `${marker} ${key} = ${formatValue(beforeVal, false)}`;
+    const formattedVal = beforeSensitive ? formatSensitiveValue(beforeVal) : formatValue(beforeVal, false);
+    return `${marker} ${key} = ${formattedVal}`;
   }
 
   // Value changed
-  const beforeFormatted = formatValue(beforeVal, false);
-  const afterFormatted = formatValue(afterVal, isUnknown);
+  const beforeFormatted = beforeSensitive ? formatSensitiveValue(beforeVal) : formatValue(beforeVal, false);
+  const afterFormatted = afterSensitive ? formatSensitiveValue(afterVal) : formatValue(afterVal, isUnknown);
   return `${changeMarker} ${key} = ${beforeFormatted} -> ${afterFormatted}`;
 }
 
 /**
- * Format array of objects (blocks) changes
+ * Recursively find changes between before/after states
+ *
+ * Generates canonical output format - indentation logic applied by post-processor
+ *
+ * @param {Object} before - Before state
+ * @param {Object} after - After state
+ * @param {Object} afterUnknown - Unknown values
+ * @param {Object} beforeSensitive - Sensitive value markers for before state
+ * @param {Object} afterSensitive - Sensitive value markers for after state
+ * @param {string} prefix - Indentation prefix (spaces only, no markers)
+ * @param {string|null} forceMarker - Force all lines to use this marker
+ * @param {boolean} isReplace - Whether this change is part of a force replacement action
+ * @returns {string[]} Array of formatted change lines
+ */
+function findChanges(before, after, afterUnknown, beforeSensitive, afterSensitive, prefix = '  ', forceMarker = null, isReplace = false) {
+  const lines = [];
+  before = before || {};
+  after = after || {};
+  afterUnknown = afterUnknown || {};
+  beforeSensitive = beforeSensitive || {};
+  afterSensitive = afterSensitive || {};
+
+  const allKeys = new Set([
+    ...Object.keys(before),
+    ...Object.keys(after)
+  ]);
+
+  for (const key of Array.from(allKeys).sort()) {
+    const beforeVal = before[key];
+    const afterVal = after[key];
+    const isUnknown = afterUnknown[key];
+    const isBeforeSensitive = beforeSensitive[key] === true;
+    const isAfterSensitive = afterSensitive[key] === true;
+
+    const beforeExists = key in before;
+    const afterExists = key in after;
+
+    // Check if this change should be displayed
+    if (!shouldDisplayChange(beforeExists, afterExists, beforeVal, afterVal)) {
+      continue;
+    }
+
+    // Skip identical values if not forcing markers
+    if (shouldSkipIdentical(beforeExists, afterExists, beforeVal, afterVal, forceMarker)) {
+      continue;
+    }
+
+    // Skip computed attributes for destroy
+    if (shouldSkipComputedAttr(key, afterExists, forceMarker)) {
+      continue;
+    }
+
+    // Determine marker
+    const marker = determineMarker(beforeExists, afterExists, forceMarker, isReplace);
+
+    // Handle nested objects/blocks
+    if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
+        (typeof beforeVal === 'object' || beforeVal === undefined || beforeVal === null) &&
+        (!beforeVal || !Array.isArray(beforeVal))) {
+      const nestedBeforeSensitive = typeof beforeSensitive[key] === 'object' ? beforeSensitive[key] : {};
+      const nestedAfterSensitive = typeof afterSensitive[key] === 'object' ? afterSensitive[key] : {};
+      const nestedLines = formatNestedBlock(beforeVal, afterVal, isUnknown || {}, nestedBeforeSensitive, nestedAfterSensitive, prefix, forceMarker, isReplace, key);
+      lines.push(...nestedLines);
+      continue;
+    }
+
+    // Handle arrays
+    if (Array.isArray(afterVal) || Array.isArray(beforeVal)) {
+      const beforeArr = Array.isArray(beforeVal) ? beforeVal : [];
+      const afterArr = Array.isArray(afterVal) ? afterVal : [];
+
+      if (isArrayofObjects(beforeArr) || isArrayofObjects(afterArr)) {
+        const arrayLines = formatArrayOfObjects(beforeArr, afterArr, isUnknown || {}, prefix, forceMarker, isReplace, key);
+        lines.push(...arrayLines);
+      } else {
+        const arrayLines = formatSimpleArray(beforeArr, afterArr, isUnknown || {}, prefix, forceMarker, isReplace, key, isUnknown, beforeExists, afterExists);
+        lines.push(...arrayLines);
+      }
+      continue;
+    }
+
+    // Handle simple values
+    const simpleValueResult = formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnknown, isReplace, isBeforeSensitive, isAfterSensitive);
+    if (Array.isArray(simpleValueResult)) {
+      lines.push(...simpleValueResult);
+    } else {
+      lines.push(simpleValueResult);
+    }
+  }
+
+  return lines;
+}
+
+/**
+ * Format array of objects changes
  *
  * Generates canonical output - indentation will be applied by post-processor
  *
@@ -159,7 +261,7 @@ function formatArrayOfObjects(beforeArr, afterArr, afterUnknown, prefix, forceMa
     const unknownItem = Array.isArray(afterUnknown) ? afterUnknown[i] : afterUnknown;
 
     if (bItem && aItem) {
-      const nestedLines = findChanges(bItem, aItem, unknownItem || {}, prefix + '    ', forceMarker, isReplace);
+      const nestedLines = findChanges(bItem, aItem, unknownItem || {}, {}, {}, prefix + '    ', forceMarker, isReplace);
       if (nestedLines.length > 0) {
         const useMarker = useMarkers ? (isReplace ? '!!' : '!') : '  ';
         lines.push(`${useMarker} ${key} {`);
@@ -170,7 +272,7 @@ function formatArrayOfObjects(beforeArr, afterArr, afterUnknown, prefix, forceMa
       const itemMarker = !forceMarker || (forceMarker !== '  ' && forceMarker !== '') ? '+' : '  ';
       lines.push(`${itemMarker} ${key} {`);
       const itemForceMarker = useMarkers ? undefined : '  ';
-      const nestedLines = findChanges({}, aItem, unknownItem || {}, prefix + '    ', itemForceMarker, false);
+      const nestedLines = findChanges({}, aItem, unknownItem || {}, {}, {}, prefix + '    ', itemForceMarker, false);
       nestedLines.forEach(l => lines.push(l));
       lines.push(`  }`);
     } else if (bItem && !aItem) {
@@ -229,25 +331,27 @@ function formatSimpleArray(beforeArr, afterArr, afterUnknown, prefix, forceMarke
 }
 
 /**
- * Format nested block/object changes
+ * Format nested block changes
  *
  * Generates canonical output - indentation will be applied by post-processor
  *
  * @param {*} beforeVal - Before value
  * @param {*} afterVal - After value
  * @param {Object} afterUnknown - Unknown values
+ * @param {Object} beforeSensitive - Sensitive markers for before state
+ * @param {Object} afterSensitive - Sensitive markers for after state
  * @param {string} prefix - Indentation prefix
  * @param {string|null} forceMarker - Forced marker
  * @param {boolean} isReplace - Whether this is replace action
  * @param {string} key - Attribute key
  * @returns {Array<string>} Array of formatted lines or empty array
  */
-function formatNestedBlock(beforeVal, afterVal, afterUnknown, prefix, forceMarker, isReplace, key) {
+function formatNestedBlock(beforeVal, afterVal, afterUnknown, beforeSensitive, afterSensitive, prefix, forceMarker, isReplace, key) {
   const lines = [];
   const useMarkers = shouldUseMarkersForBlocks(forceMarker);
 
   const nestedBefore = (typeof beforeVal === 'object' && beforeVal !== null) ? beforeVal : {};
-  const nestedLines = findChanges(nestedBefore, afterVal, afterUnknown || {}, prefix + '    ', forceMarker, isReplace);
+  const nestedLines = findChanges(nestedBefore, afterVal, afterUnknown || {}, beforeSensitive || {}, afterSensitive || {}, prefix + '    ', forceMarker, isReplace);
 
   if (nestedLines.length > 0 || useMarkers) {
     const blockMarker = useMarkers ? determineMarker(
@@ -259,98 +363,6 @@ function formatNestedBlock(beforeVal, afterVal, afterUnknown, prefix, forceMarke
     lines.push(`${blockMarker} ${key} {`);
     nestedLines.forEach(l => lines.push(l));
     lines.push(`  }`);
-  }
-
-  return lines;
-}
-
-/**
- * Recursively find all changes between before and after states
- * Format optimized for GitHub diff syntax highlighting (markers at column 0)
- *
- * Markers used:
- *   '+' - Added lines (green, only for updates)
- *   '-' - Removed lines (red, only for updates)
- *   '!' - Modified lines (yellow/orange, only for updates)
- *   '!!' - Force replacement lines (bright red, only for replaces)
- *   '  ' - No marker (create/destroy actions)
- *
- * @param {Object} before - Before state
- * @param {Object} after - After state
- * @param {Object} afterUnknown - Unknown values in after state
- * @param {string} prefix - Indentation prefix (spaces only, no markers)
- * @param {string|null} forceMarker - Force all lines to use this marker
- * @param {boolean} isReplace - Whether this change is part of a force replacement action
- * @returns {string[]} Array of formatted change lines
- */
-function findChanges(before, after, afterUnknown, prefix = '  ', forceMarker = null, isReplace = false) {
-  const lines = [];
-  before = before || {};
-  after = after || {};
-  afterUnknown = afterUnknown || {};
-
-  const allKeys = new Set([
-    ...Object.keys(before),
-    ...Object.keys(after)
-  ]);
-
-  for (const key of Array.from(allKeys).sort()) {
-    const beforeVal = before[key];
-    const afterVal = after[key];
-    const isUnknown = afterUnknown[key];
-
-    const beforeExists = key in before;
-    const afterExists = key in after;
-
-    // Check if this change should be displayed
-    if (!shouldDisplayChange(beforeExists, afterExists, beforeVal, afterVal)) {
-      continue;
-    }
-
-    // Skip identical values if not forcing markers
-    if (shouldSkipIdentical(beforeExists, afterExists, beforeVal, afterVal, forceMarker)) {
-      continue;
-    }
-
-    // Skip computed attributes for destroy
-    if (shouldSkipComputedAttr(key, afterExists, forceMarker)) {
-      continue;
-    }
-
-    // Determine marker
-    const marker = determineMarker(beforeExists, afterExists, forceMarker, isReplace);
-
-    // Handle nested objects/blocks
-    if (typeof afterVal === 'object' && afterVal !== null && !Array.isArray(afterVal) &&
-        (typeof beforeVal === 'object' || beforeVal === undefined || beforeVal === null) &&
-        (!beforeVal || !Array.isArray(beforeVal))) {
-      const nestedLines = formatNestedBlock(beforeVal, afterVal, isUnknown || {}, prefix, forceMarker, isReplace, key);
-      lines.push(...nestedLines);
-      continue;
-    }
-
-    // Handle arrays
-    if (Array.isArray(afterVal) || Array.isArray(beforeVal)) {
-      const beforeArr = Array.isArray(beforeVal) ? beforeVal : [];
-      const afterArr = Array.isArray(afterVal) ? afterVal : [];
-
-      if (isArrayofObjects(beforeArr) || isArrayofObjects(afterArr)) {
-        const arrayLines = formatArrayOfObjects(beforeArr, afterArr, isUnknown || {}, prefix, forceMarker, isReplace, key);
-        lines.push(...arrayLines);
-      } else {
-        const arrayLines = formatSimpleArray(beforeArr, afterArr, isUnknown || {}, prefix, forceMarker, isReplace, key, isUnknown, beforeExists, afterExists);
-        lines.push(...arrayLines);
-      }
-      continue;
-    }
-
-    // Handle simple values
-    const simpleValueResult = formatSimpleValueChange(marker, prefix, key, beforeVal, afterVal, isUnknown, isReplace);
-    if (Array.isArray(simpleValueResult)) {
-      lines.push(...simpleValueResult);
-    } else {
-      lines.push(simpleValueResult);
-    }
   }
 
   return lines;
