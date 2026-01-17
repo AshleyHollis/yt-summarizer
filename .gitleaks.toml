@@ -4,7 +4,7 @@
 title = "yt-summarizer gitleaks config"
 
 [extend]
-# Extend the default gitleaks config
+# Extend   default gitleaks config
 useDefault = true
 
 # Allowlist rules for false positives
@@ -20,19 +20,19 @@ useDefault = true
     '''.*\.tfvars\.example''',
     # CI/test docker compose (only contains dummy values)
     '''docker-compose\.ci\.yml''',
-  # Test fixtures and test files (very broad)
-  '''tests/''',
-  '''test_''',
-  '''_test\.py''',
-  '''conftest\.py''',
-  '''\.spec\.(ts|js)''',
-  # Documentation (all markdown)
-  '''\.md$''',
-  # Development scripts with test credentials
-  '''scripts/start-workers\.ps1''',
-]
+    # Test fixtures and test files (very broad)
+    '''tests/''',
+    '''test_''',
+    '''_test\.py''',
+    '''conftest\.py''',
+    '''\.spec\.(ts|js)''',
+    # Documentation (all markdown)
+    '''\.md$''',
+    # Development scripts with test credentials
+    '''scripts/start-workers\.ps1''',
+  ]
 
-  # Regex patterns that are not secrets (matches in the secret value itself)
+  # Regex patterns that are not secrets (matches in   secret value itself)
   regexes = [
     # Variable placeholder patterns
     '''var\.(sql_admin_password|admin_password|api_key)''',
@@ -50,6 +50,6 @@ useDefault = true
     '''test-key.*''',
     '''test-api-key''',
     '''fake-''',
-    # Azure Storage account keys
-    '''AccountKey=.{20,}''',
-]
+    # Azurite well-known development key (NOT production keys)
+    '''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
+  ]
