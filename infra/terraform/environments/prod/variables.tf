@@ -90,6 +90,12 @@ variable "cloudflare_api_token" {
 # Auth0
 # -----------------------------------------------------------------------------
 
+variable "enable_auth0" {
+  description = "Enable Auth0 resources (requires proper Auth0 Management API permissions)"
+  type        = bool
+  default     = false
+}
+
 variable "auth0_application_name" {
   description = "Auth0 application name for the API BFF"
   type        = string

@@ -56,12 +56,12 @@ output "storage_primary_endpoint" {
 
 output "auth0_application_client_id" {
   description = "Auth0 application client ID for the API BFF"
-  value       = module.auth0.application_client_id
+  value       = var.enable_auth0 ? module.auth0[0].application_client_id : null
 }
 
 output "auth0_api_identifier" {
   description = "Auth0 API identifier (audience)"
-  value       = module.auth0.api_identifier
+  value       = var.enable_auth0 ? module.auth0[0].api_identifier : null
 }
 
 # GitHub Actions OIDC outputs
