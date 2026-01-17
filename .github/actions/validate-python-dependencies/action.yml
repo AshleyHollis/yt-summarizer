@@ -32,7 +32,9 @@ runs:
     - name: Install dependency scanning tools
       shell: bash
       run: |
-        uv tool install deptry pip-audit pipdeptree
+        uv tool install deptry
+        uv tool install pip-audit
+        uv tool install pipdeptree
 
     - name: Display dependency tree
       shell: bash
