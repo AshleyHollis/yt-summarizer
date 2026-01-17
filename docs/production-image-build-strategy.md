@@ -22,7 +22,7 @@ The production deployment pipeline uses a **two-path image strategy** to optimiz
           ↓                               ↓
     CODE CHANGES?                   K8S/INFRA ONLY?
     (services/*, apps/web,          (k8s/*, infra/*)
-     docker/*)                      
+     docker/*)  
           │                               │
           ↓                               ↓
   ┌─────────────────────┐       ┌─────────────────────┐

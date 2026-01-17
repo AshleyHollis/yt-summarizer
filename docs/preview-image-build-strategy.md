@@ -22,7 +22,7 @@ The preview deployment pipeline uses a **two-path image strategy** to create iso
           ↓                               ↓
     CODE CHANGES?                   K8S-ONLY CHANGES?
     (services/*, apps/web,          (k8s/* only)
-     docker/*)                      
+     docker/*)  
           │                               │
           ↓                               ↓
   ┌─────────────────────┐       ┌─────────────────────┐
@@ -455,7 +455,7 @@ A: Yes, K8s-only changes deploy automatically with existing images.
 A: Preview workflow fails too (no fallback). Fix CI first, then re-run.
 
 **Q: How long does preview deployment take?**
-A: 
+A:
 - With CI images: ~3-5 minutes (wait + deploy)
 - K8s-only: ~2-3 minutes (no build needed)
 
