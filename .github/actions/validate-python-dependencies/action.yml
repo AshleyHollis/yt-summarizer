@@ -32,7 +32,7 @@ runs:
     - name: Install dependency scanning tools
       shell: bash
       run: |
-        pip install deptry pip-audit pipdeptree
+        uv tool install deptry pip-audit pipdeptree
 
     - name: Display dependency tree
       shell: bash
@@ -42,7 +42,7 @@ runs:
         echo "📦 Dependency Tree (pipdeptree - first 50 lines)"
         echo "════════════════════════════════════════════════════════════════"
         echo ""
-        pipdeptree --python $(which python) 2>/dev/null | head -n 50 || true
+        uv run pipdeptree --python $(which python) 2>/dev/null | head -n 50 || true
         echo ""
         echo "(Output truncated for readability)"
 
@@ -68,7 +68,7 @@ runs:
 
         # Ignore DEP003 (transitive dependencies) for editable local packages
         # Ignore DEP002 (unused deps) for dev/test/infrastructure packages
-        if deptry "$SRC_DIR" --extend-exclude "test.*" --ignore DEP003,DEP002; then
+        if uv run deptry "$SRC_DIR" --extend-exclude "test.*" --ignore DEP003,DEP002; then
           echo ""
           echo "✅ No missing dependencies detected"
         else
@@ -92,7 +92,7 @@ runs:
       continue-on-error: ${{ inputs.fail-on-warnings == 'false' }}
       run: |
         echo "🔍 Scanning for unused dependencies..."
-        deptry src --extend-exclude "test.*" --ignore-obsolete DEP004 || {
+        uv run deptry src --extend-exclude "test.*" --ignore-obsolete DEP004 || {
           echo "⚠️  UNUSED DEPENDENCIES DETECTED"
           echo "Consider removing unused packages from pyproject.toml"
           exit 1
@@ -110,7 +110,7 @@ runs:
         echo "════════════════════════════════════════════════════════════════"
         echo ""
 
-        if pip-audit --desc --skip-editable; then
+        if uv run pip-audit --desc; then
           echo ""
           echo "✅ No security vulnerabilities detected"
         else
