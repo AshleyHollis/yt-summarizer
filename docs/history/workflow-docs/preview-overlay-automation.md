@@ -39,7 +39,7 @@ Two issues were identified:
    - path: patches/migration-job-patch.yaml
 ```
 
-**Reason:** Gateway API uses HTTPRoute instead of Ingress. The old patch was causing ArgoCD sync failures due to nginx ingress admission webhook rejecting deprecated nip.io hostnames.
+**Reason:** Gateway API uses HTTPRoute instead of Ingress. The old patch was causing ArgoCD sync failures due to nginx ingress admission webhook rejecting legacy wildcard hostnames.
 
 ### 2. Added Clear Documentation
 

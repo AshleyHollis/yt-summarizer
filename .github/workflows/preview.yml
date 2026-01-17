@@ -170,7 +170,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: detect-changes
     if: |
-      (github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_terraform == true) ||
       (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.infra_changed == 'true')
     outputs:
       plan_summary: ${{ steps.plan.outputs.plan_summary }}
@@ -178,6 +178,37 @@ jobs:
       id-token: write
       contents: read
       pull-requests: write
+    env:
+      # =======================================================================
+      # Auth0 Terraform Service Account Credentials
+      # =======================================================================
+      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
+      # M2M application that allows Terraform to manage Auth0 resources.
+      #
+      # IMPORTANT: These are NOT the credentials for the user-facing application.
+      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
+      # application for end-user authentication. Those BFF credentials will be
+      # different and must be stored in Azure Key Vault after Terraform completes.
+      #
+      # Service Account Details:
+      #   - Application: "Terraform Service Account" (M2M)
+      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
+      #   - Purpose: Manage Auth0 resources via Terraform
+      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
+      #
+      # What Terraform Creates:
+      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
+      #   - Auth0 API: "yt-summarizer-api" (resource server)
+      #
+      # Documentation: docs/auth0-terraform-service-account.md
+      # =======================================================================
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: true
     defaults:
       run:
         working-directory: infra/terraform/environments/prod
@@ -238,7 +269,7 @@ jobs:
         if: |
           steps.plan.outcome == 'success' &&
           fromJson(steps.plan.outputs.plan_summary).has_changes == true &&
-          (github.event_name != 'workflow_dispatch' || inputs.apply_terraform == 'true')
+          (github.event_name != 'workflow_dispatch' || inputs.apply_terraform == true)
         run: terraform apply -auto-approve tfplan
 
 
@@ -419,9 +450,8 @@ jobs:
     name: Check Preview Limit
     runs-on: ubuntu-latest
     if: |
-      always() &&
-      !cancelled() &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_preview == 'true') &&
+      always() && !cancelled() &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.detect-changes.result == 'success' &&
       needs.detect-changes.outputs.needs_deployment == 'true' &&
       needs.wait-for-ci.result == 'success' &&
@@ -482,7 +512,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       always() && !cancelled() &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_preview == 'true') &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true'
     needs: [check-concurrency, detect-changes]
@@ -527,7 +557,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       always() && !cancelled() &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_preview == 'true') &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success' &&
@@ -627,7 +657,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       always() && !cancelled() &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_preview == 'true') &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.update-overlay.result == 'success'
@@ -710,7 +740,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       always() && !cancelled() &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_preview == 'true') &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success'
@@ -804,7 +834,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       always() && !cancelled() &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_preview == 'true') &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.verify-deployment.result == 'success' &&
@@ -871,8 +901,8 @@ jobs:
       - check-concurrency
     if: >-
       always() && !cancelled() &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_preview == 'true') &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_e2e == 'true') &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_e2e == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.post-preview-comment.result == 'success' &&
@@ -894,12 +924,8 @@ jobs:
         working-directory: apps/web
         run: npm ci
 
-      - name: Wait for ArgoCD sync
-        uses: ./.github/actions/wait-for-argocd-sync
-        with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          timeout-seconds: '60'
+      # No need to wait for Argo CD sync again - verify-deployment job already did this
+      # and this job depends on verify-deployment, so we know the sync completed successfully
 
       - name: Wait for API to be ready
         uses: ./.github/actions/health-check
@@ -972,11 +998,10 @@ jobs:
           {
             echo "## Preview Execution Rationale"
             echo ""
-            echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas || 'n/a' }}"
             echo "- Needs deployment: ${{ needs.detect-changes.outputs.needs_deployment }}"
             echo "- Needs image build: ${{ needs.detect-changes.outputs.needs_image_build }}"
             echo "- Infra changed: ${{ needs.detect-changes.outputs.infra_changed }}"
-            echo "- Terraform plan: ${{ needs.terraform.result }} (changes: ${{ needs.terraform.result == 'success' && fromJson(needs.terraform.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true' && 'manual request' || needs.detect-changes.outputs.infra_changed == 'true' && 'infra changes' || 'not requested' }})"
+            echo "- Terraform plan: ${{ needs.terraform.result }} (changes: ${{ needs.terraform.result == 'success' && fromJson(needs.terraform.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || needs.detect-changes.outputs.infra_changed == 'true' && 'infra changes' || 'not requested' }})"
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }} (reason: ${{ needs.detect-changes.outputs.needs_deployment == 'true' && 'deployment needed' || 'no deployment' }})"
             echo "- Concurrency gate: ${{ needs.check-concurrency.outputs.can_deploy || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
@@ -996,4 +1021,3 @@ jobs:
           deploy-frontend-result: ${{ needs.deploy-frontend-preview.result }}
           e2e-tests-result: ${{ needs.e2e-tests.result }}
           api-url-configured: ${{ needs.get-ingress.outputs.preview_url }}
-

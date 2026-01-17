@@ -4,7 +4,7 @@
 title = "yt-summarizer gitleaks config"
 
 [extend]
-# Extend the default gitleaks config
+# Extend   default gitleaks config
 useDefault = true
 
 # Allowlist rules for false positives
@@ -28,9 +28,11 @@ useDefault = true
     '''\.spec\.(ts|js)''',
     # Documentation (all markdown)
     '''\.md$''',
+    # Development scripts with test credentials
+    '''scripts/start-workers\.ps1''',
   ]
 
-  # Regex patterns that are not secrets (matches in the secret value itself)
+  # Regex patterns that are not secrets (matches in   secret value itself)
   regexes = [
     # Variable placeholder patterns
     '''var\.(sql_admin_password|admin_password|api_key)''',
@@ -42,13 +44,12 @@ useDefault = true
     '''YourSecurePassword123!''',
     '''YourStrong@Passw0rd''',
     '''Your.*Passw.*''',
-    # Generic example password patterns
-    '''Password=Your.*''',
-    '''password.*=.*Your.*''',
     # Test API keys (not real)
     '''sk-test-.*''',
     '''sk-fake-.*''',
     '''test-key.*''',
     '''test-api-key''',
     '''fake-''',
+    # Azurite well-known development key (NOT production keys)
+    '''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
   ]

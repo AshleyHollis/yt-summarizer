@@ -12,7 +12,7 @@ resources:
   - configmap.yaml
   - api-deployment.yaml
   - api-service.yaml
-  - api-ingress.yaml
+
   - api-httproute.yaml
   - transcribe-worker-deployment.yaml
   - summarize-worker-deployment.yaml
@@ -21,6 +21,7 @@ resources:
   - externalsecret-db.yaml
   - externalsecret-openai.yaml
   - externalsecret-storage.yaml
+  - externalsecret-auth0.yaml
   - migration-job.yaml
 
 labels:

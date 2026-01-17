@@ -13,7 +13,7 @@ spec:
   parentRefs:
   - name: main-gateway
     namespace: gateway-system
-    sectionName: https
+    sectionName: https-yt-summarizer
   hostnames:
   - "api.yt-summarizer.apps.ashleyhollis.com"
   rules:
@@ -23,5 +23,5 @@ spec:
         value: /
     backendRefs:
     - name: api
-      port: 8000
+      port: 80
       weight: 100

@@ -1,15 +1,15 @@
 # Preview overlay - updated by GitHub Actions
-# PR: #12
-# Image Tag: pr-12-84f2652
-# Commit: 84f2652c16f67b4b76c5eb445d89da59387662b0
-# Updated: 2026-01-12T08:55:54Z
+# PR: #19
+# Image Tag: pr-19-16f0822
+# Commit: 16f08229d4bb86d21b415809f66ad70988e977d3
+# Updated: 2026-01-17T09:04:23Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 metadata:
   annotations:
     config.kubernetes.io/local-config: "true"
-namespace: preview-pr-12
+namespace: preview-pr-19
 resources:
   - ../../base-preview
   - resource-quota.yaml
@@ -20,17 +20,16 @@ patches:
   - path: patches/externalsecret-storage-patch.yaml
   - path: patches/configmap-patch.yaml
   - path: patches/api-deployment-patch.yaml
-  - path: patches/ingress-delete-patch.yaml
   - path: patches/httproute-patch.yaml
   - path: patches/resources-patch.yaml
   - path: patches/replicas-patch.yaml
   - path: patches/migration-job-patch.yaml
 images:
-  -
+  - 
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: pr-12-84f2652
-  -
+    newTag: pr-19-16f0822
+  - 
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: pr-12-84f2652
+    newTag: pr-19-16f0822

@@ -11,7 +11,7 @@ resources:
   - ../base/configmap.yaml
   - ../base/api-deployment.yaml
   - ../base/api-service.yaml
-  - ../base/api-ingress.yaml
+
   - ../base/transcribe-worker-deployment.yaml
   - ../base/summarize-worker-deployment.yaml
   - ../base/embed-worker-deployment.yaml

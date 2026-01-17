@@ -61,7 +61,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 # B008: Depends() in defaults (FastAPI pattern), B904/B905: raise from/zip strict
 # B007: unused loop var, SIM*: simplifications, F401/F841: unused imports/vars, E712: == True
 # E402: Module level import not at top (used for circular import workaround)
-ignore = ["E501", "E402", "B008", "B904", "B905", "B007", "SIM102", "SIM103", "SIM105", "SIM112", "SIM113", "SIM117", "F401", "F841", "E712"]
+# UP017: datetime.UTC requires module-level import which conflicts with our pattern
+ignore = ["E501", "E402", "B008", "B904", "B905", "B007", "SIM102", "SIM103", "SIM105", "SIM112", "SIM113", "SIM117", "F401", "F841", "E712", "UP017"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

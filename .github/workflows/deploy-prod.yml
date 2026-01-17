@@ -105,13 +105,44 @@ jobs:
     needs: [detect-changes, wait-for-ci]
     if: |
       needs.wait-for-ci.result == 'success' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true') ||
+      ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == true) ||
        (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
     outputs:
       plan_summary: ${{ steps.plan.outputs.plan_summary }}
     permissions:
       id-token: write
       contents: read
+    env:
+      # =======================================================================
+      # Auth0 Terraform Service Account Credentials
+      # =======================================================================
+      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
+      # M2M application that allows Terraform to manage Auth0 resources.
+      #
+      # IMPORTANT: These are NOT the credentials for the user-facing application.
+      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
+      # application for end-user authentication. Those BFF credentials will be
+      # different and must be stored in Azure Key Vault after Terraform completes.
+      #
+      # Service Account Details:
+      #   - Application: "Terraform Service Account" (M2M)
+      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
+      #   - Purpose: Manage Auth0 resources via Terraform
+      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
+      #
+      # What Terraform Creates:
+      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
+      #   - Auth0 API: "yt-summarizer-api" (resource server)
+      #
+      # Documentation: docs/auth0-terraform-service-account.md
+      # =======================================================================
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: true
     defaults:
       run:
         working-directory: infra/terraform/environments/prod
@@ -175,6 +206,37 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      # =======================================================================
+      # Auth0 Terraform Service Account Credentials
+      # =======================================================================
+      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
+      # M2M application that allows Terraform to manage Auth0 resources.
+      #
+      # IMPORTANT: These are NOT the credentials for the user-facing application.
+      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
+      # application for end-user authentication. Those BFF credentials will be
+      # different and must be stored in Azure Key Vault after Terraform completes.
+      #
+      # Service Account Details:
+      #   - Application: "Terraform Service Account" (M2M)
+      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
+      #   - Purpose: Manage Auth0 resources via Terraform
+      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
+      #
+      # What Terraform Creates:
+      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
+      #   - Auth0 API: "yt-summarizer-api" (resource server)
+      #
+      # Documentation: docs/auth0-terraform-service-account.md
+      # =======================================================================
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: true
     defaults:
       run:
         working-directory: infra/terraform/environments/prod
@@ -228,7 +290,7 @@ jobs:
       needs.wait-for-ci.result == 'success' &&
       needs.terraform-apply.result != 'failure' &&
       (
-        (github.event_name == 'workflow_dispatch' && inputs.run_deploy == 'true') ||
+        (github.event_name == 'workflow_dispatch' && inputs.run_deploy == true) ||
         (github.event_name != 'workflow_dispatch' && (
           contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
           contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
@@ -376,7 +438,7 @@ jobs:
     name: Deploy Frontend
     runs-on: ubuntu-latest
     needs: [build-api, build-workers]
-    if: github.event_name != 'workflow_dispatch' || inputs.run_frontend == 'true'
+    if: github.event_name != 'workflow_dispatch' || inputs.run_frontend == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -416,7 +478,7 @@ jobs:
     name: Health Check
     runs-on: ubuntu-latest
     needs: [update-overlay, deploy-frontend]
-    if: github.event_name != 'workflow_dispatch' || inputs.run_health_check == 'true'
+    if: github.event_name != 'workflow_dispatch' || inputs.run_health_check == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -454,7 +516,7 @@ jobs:
             echo ""
             echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
-            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == 'true' && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
+            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
             echo "- Terraform apply: ${{ needs.terraform-apply.result }} (reason: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true && 'plan has changes' || 'no changes' }})"
             echo "- Backend deploy tag: ${{ needs.meta.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
@@ -470,4 +532,3 @@ jobs:
           update-overlay-result: ${{ needs.update-overlay.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend.result }}
           health-check-result: ${{ needs.health-check.result }}
-

@@ -8,3 +8,4 @@ resources:
   - gatewayclass.yaml
   - externalsecret-cloudflare.yaml
   - gateway.yaml
+  - referencegrant.yaml

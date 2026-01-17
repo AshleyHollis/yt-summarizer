@@ -88,6 +88,10 @@ chmod +x .git/hooks/pre-push
 - ✅ **All checks pass**: Commit allowed
 - ❌ **Any check fails**: Commit blocked, show fix instructions
 
+**pre-commit.ci policy**:
+- Server-side auto-fix commits are disabled (`ci.autofix_prs: false`).
+- Ensure the GitHub app setting "Auto-fix PRs" stays off to prevent bot commits.
+
 **Bypass**: `git commit --no-verify ...` (not recommended)
 
 **Example**:
@@ -119,9 +123,10 @@ git commit -m "feat: add new feature"
 **Runs on**: Every `git push` command
 
 **Behavior**:
-1. Executes `tools/pre-commit.local` wrapper
-2. Pre-commit runs WITHOUT auto-fix (validation only)
-3. Checks all hooks in `.pre-commit-config.yaml`
+1. Requires Python installed; push blocked if missing
+2. Runs `python -m pre_commit run --all-files --verbose`
+3. Pre-commit runs WITHOUT auto-fix (validation only)
+4. Checks all hooks in `.pre-commit-config.yaml`
 
 **Outcomes**:
 - ✅ **All checks pass**: Push allowed

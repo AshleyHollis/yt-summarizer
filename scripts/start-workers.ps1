@@ -8,7 +8,8 @@ param(
     [int]$SqlPort = 32798
 )
 
-$azurite_conn = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:${BlobPort}/devstoreaccount1;QueueEndpoint=http://127.0.0.1:${QueuePort}/devstoreaccount1;TableEndpoint=http://127.0.0.1:${TablePort}/devstoreaccount1"
+# TODO: Configure with real credentials or environment variables
+# $azurite_conn = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=YOUR_ACCOUNT_KEY_HERE;BlobEndpoint=http://127.0.0.1:${BlobPort}/devstoreaccount1;QueueEndpoint=http://127.0.0.1:${QueuePort}/devstoreaccount1;TableEndpoint=http://127.0.0.1:${TablePort}/devstoreaccount1"
 $sql_conn = "Server=localhost,${SqlPort};Database=ytsummarizer;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True"
 
 # Set environment variables at machine level for the current session

@@ -43,6 +43,7 @@ runs:
           -var="sql_admin_password=${{ inputs.sql-admin-password }}" \
           -var="openai_api_key=${{ inputs.openai-api-key }}" \
           -var="cloudflare_api_token=${{ inputs.cloudflare-api-token }}" \
+          -var="auth0_domain=${AUTH0_DOMAIN:-}" \
           2>&1 | tee plan_output.txt
         PLAN_EXIT_CODE=$?
         echo "plan_output<<EOF" >> "$GITHUB_OUTPUT"

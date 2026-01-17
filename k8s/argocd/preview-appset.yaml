@@ -62,6 +62,7 @@ spec:
         # Fast polling ensures Argo CD picks up overlay changes within 15s
         requeueAfterSeconds: 15
 
+
   # Template for each discovered PR
   template:
     metadata:

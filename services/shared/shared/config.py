@@ -322,6 +322,46 @@ class LoggingSettings(BaseSettings):
     )
 
 
+class AuthSettings(BaseSettings):
+    """Auth0 BFF configuration settings."""
+
+    model_config = SettingsConfigDict(env_prefix="AUTH0_")
+
+    domain: str = Field(
+        default="",
+        description="Auth0 domain (e.g., tenant.auth0.com)",
+    )
+    client_id: str = Field(
+        default="",
+        description="Auth0 application client ID",
+    )
+    client_secret: str = Field(
+        default="",
+        description="Auth0 application client secret",
+    )
+    audience: str | None = Field(
+        default=None,
+        description="Optional Auth0 API audience",
+    )
+    session_secret: str = Field(
+        default="",
+        description="Secret used to sign auth state payloads",
+    )
+    session_ttl_seconds: int = Field(
+        default=86400,
+        ge=60,
+        description="Session TTL in seconds",
+    )
+    default_return_to: str = Field(
+        default="https://web.yt-summarizer.apps.ashleyhollis.com",
+        description="Default return URL after login",
+    )
+    session_cookie_name: str = Field(
+        default="session",
+        description="Cookie name used for auth sessions",
+    )
+
+
 class APISettings(BaseSettings):
     """API server settings."""
 
@@ -342,8 +382,16 @@ class APISettings(BaseSettings):
         description="Enable debug mode",
     )
     cors_origins: list[str] = Field(
-        default=["http://localhost:3000"],
+        default=[
+            "http://localhost:3000",
+            "https://web.yt-summarizer.apps.ashleyhollis.com",
+            "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
+        ],
         description="Allowed CORS origins",
+    )
+    cors_origin_regex: str | None = Field(
+        default=r"^https://.*\.azurestaticapps\.net$",
+        description="Allowed CORS origin regex patterns",
     )
 
 
@@ -375,6 +423,7 @@ class Settings(BaseSettings):
     queue: QueueSettings = Field(default_factory=QueueSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     api: APISettings = Field(default_factory=APISettings)
+    auth: AuthSettings = Field(default_factory=AuthSettings)
 
     @property
     def is_development(self) -> bool:

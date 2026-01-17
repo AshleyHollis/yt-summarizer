@@ -37,17 +37,18 @@ Write-ColorHost "Running pre-commit to ensure no issues before pushing..." $Colo
 Write-ColorHost "This prevents you from pushing code that will fail in CI." $Colors.Cyan
 Write-Host ""
 
-# Check if pre-commit command exists
-$PreCommit = Get-Command pre-commit -ErrorAction SilentlyContinue
-if (-not $PreCommit) {
-    Write-ColorHost "WARNING: pre-commit not found on PATH" $Colors.Yellow
-    Write-ColorHost "Pre-push validation skipped (will rely on CI)" $Colors.Yellow
-    exit 0
+# Check if Python exists
+$Python = Get-Command python -ErrorAction SilentlyContinue
+if (-not $Python) {
+    Write-ColorHost "ERROR: python not found on PATH" $Colors.Red
+    Write-ColorHost "Install Python or add it to PATH." $Colors.Yellow
+    Write-ColorHost "Push blocked to enforce local auto-fix." $Colors.Red
+    exit 1
 }
 
 # Run pre-commit local validation (no auto-fix)
-Write-ColorHost "Running pre-commit --all-files --verbose..." $Colors.Cyan
-$process = Start-Process -FilePath "pre-commit" -ArgumentList "run", "--all-files", "--verbose" -NoNewWindow -Wait -PassThru
+Write-ColorHost "Running python -m pre_commit run --all-files --verbose..." $Colors.Cyan
+$process = Start-Process -FilePath "python" -ArgumentList "-m", "pre_commit", "run", "--all-files", "--verbose" -NoNewWindow -Wait -PassThru
 $ExitCode = $process.ExitCode
 
 if ($ExitCode -ne 0) {

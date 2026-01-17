@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .middleware import CorrelationIdMiddleware
-from .routes import batches, channels, copilot, health, jobs, library, threads, videos
+from .routes import auth, batches, channels, copilot, health, jobs, library, threads, videos
 
 # Import shared modules (path will be configured via PYTHONPATH)
 try:
@@ -25,7 +25,12 @@ except ImportError:
             environment = "development"
 
             class api:
-                cors_origins = ["http://localhost:3000"]
+                cors_origins = [
+                    "http://localhost:3000",
+                    "https://web.yt-summarizer.apps.ashleyhollis.com",
+                    "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
+                ]
+                cors_origin_regex = r"^https://.*\.azurestaticapps\.net$"
                 debug = True
 
             class logging:
@@ -168,6 +173,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.api.cors_origins,
+        allow_origin_regex=settings.api.cors_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -184,7 +190,9 @@ def create_app() -> FastAPI:
 
     # Register routes
     app.include_router(health.router, tags=["Health"])
+    app.include_router(auth.router)
     app.include_router(videos.router)
+
     app.include_router(jobs.router)
     app.include_router(library.router)
     app.include_router(channels.router)

@@ -147,6 +147,114 @@ runs:
             echo "  Target Branch/Revision: ${TARGET_REV}"
             echo "  Synced to Commit: ${SYNCED_REV:0:8}..."
 
+            # EARLY FAILURE DETECTION: Check for common issues in the namespace
+            if kubectl get namespace ${NAMESPACE} &>/dev/null; then
+              echo ""
+              echo "  🔍 Checking for common deployment issues..."
+
+              # Check 1: ExternalSecret failures (missing secrets, Key Vault access issues)
+              FAILED_EXTERNALSECRETS=$(kubectl get externalsecrets -n ${NAMESPACE} -o json 2>/dev/null | jq -r '.items[] | select(.status.conditions[]? | select(.type=="Ready" and .status=="False")) | .metadata.name' 2>/dev/null || echo "")
+              if [ -n "$FAILED_EXTERNALSECRETS" ]; then
+                echo "  ❌ FAILED EXTERNALSECRETS DETECTED:"
+                for ES in $FAILED_EXTERNALSECRETS; do
+                  ES_MSG=$(kubectl get externalsecret ${ES} -n ${NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "Unknown error")
+                  echo "::error::ExternalSecret '${ES}' failed: ${ES_MSG}"
+                  echo "  - ${ES}: ${ES_MSG}"
+
+                  # Provide helpful troubleshooting based on error message
+                  if [[ "$ES_MSG" == *"could not get secret data from provider"* ]]; then
+                    echo "::error::Possible causes:"
+                    echo "::error::  1. Secret does not exist in Azure Key Vault"
+                    echo "::error::  2. Workload Identity does not have 'Get' permission on Key Vault secrets"
+                    echo "::error::  3. SecretStore is not configured for this namespace"
+                    echo "::error::  4. Key Vault firewall is blocking access"
+                  elif [[ "$ES_MSG" == *"SecretStore"* ]]; then
+                    echo "::error::Possible causes:"
+                    echo "::error::  1. SecretStore '${ES_MSG}' does not exist in namespace ${NAMESPACE}"
+                    echo "::error::  2. SecretStore is misconfigured"
+                  fi
+                done
+                exit 1
+              fi
+
+              # Check 2: ImagePullBackOff errors (ACR access, missing images)
+              IMAGEPULL_ERRORS=$(kubectl get pods -n ${NAMESPACE} -o json 2>/dev/null | jq -r '.items[] | select(.status.containerStatuses[]? | select(.state.waiting.reason? | test("ImagePullBackOff|ErrImagePull"))) | .metadata.name' 2>/dev/null || echo "")
+              if [ -n "$IMAGEPULL_ERRORS" ]; then
+                echo "  ❌ IMAGE PULL ERRORS DETECTED:"
+                for POD in $IMAGEPULL_ERRORS; do
+                  echo "::error::Pod '${POD}' cannot pull image"
+
+                  # Get the specific image and error
+                  IMAGE=$(kubectl get pod ${POD} -n ${NAMESPACE} -o jsonpath='{.status.containerStatuses[0].image}' 2>/dev/null || echo "Unknown")
+                  REASON=$(kubectl get pod ${POD} -n ${NAMESPACE} -o jsonpath='{.status.containerStatuses[0].state.waiting.message}' 2>/dev/null || echo "")
+
+                  echo "  - Pod: ${POD}"
+                  echo "  - Image: ${IMAGE}"
+                  echo "  - Error: ${REASON}"
+
+                  # Show pod events for more context
+                  echo ""
+                  echo "::group::Pod Events for ${POD}"
+                  kubectl describe pod ${POD} -n ${NAMESPACE} 2>/dev/null | grep -A 20 "Events:" || echo "Cannot get events"
+                  echo "::endgroup::"
+                done
+
+                echo "::error::Possible causes:"
+                echo "::error::  1. Image does not exist in ACR (check CI build succeeded)"
+                echo "::error::  2. AKS kubelet identity lacks 'AcrPull' role on ACR"
+                echo "::error::  3. ACR firewall is blocking AKS cluster"
+                echo "::error::  4. Image pull secrets are missing or expired"
+                exit 1
+              fi
+
+              # Check 3: CreateContainerConfigError (missing secrets, invalid env vars)
+              CONFIG_ERRORS=$(kubectl get pods -n ${NAMESPACE} -o json 2>/dev/null | jq -r '.items[] | select(.status.containerStatuses[]? | select(.state.waiting.reason? | test("CreateContainerConfigError"))) | .metadata.name' 2>/dev/null || echo "")
+              if [ -n "$CONFIG_ERRORS" ]; then
+                echo "  ❌ CONTAINER CONFIG ERRORS DETECTED:"
+                for POD in $CONFIG_ERRORS; do
+                  ERROR_MSG=$(kubectl get pod ${POD} -n ${NAMESPACE} -o jsonpath='{.status.containerStatuses[0].state.waiting.message}' 2>/dev/null || echo "")
+                  echo "::error::Pod '${POD}' has container config error: ${ERROR_MSG}"
+
+                  # Show pod events
+                  echo ""
+                  echo "::group::Pod Events for ${POD}"
+                  kubectl describe pod ${POD} -n ${NAMESPACE} 2>/dev/null | grep -A 20 "Events:" || echo "Cannot get events"
+                  echo "::endgroup::"
+                done
+
+                echo "::error::Possible causes:"
+                echo "::error::  1. Missing Kubernetes Secret referenced in deployment"
+                echo "::error::  2. ExternalSecret failed to create the required secret"
+                echo "::error::  3. Invalid environment variable reference"
+                echo "::error::  4. ConfigMap is missing"
+                exit 1
+              fi
+
+              # Check 4: CrashLoopBackOff (application errors, missing dependencies)
+              CRASHLOOP_PODS=$(kubectl get pods -n ${NAMESPACE} -o json 2>/dev/null | jq -r '.items[] | select(.status.containerStatuses[]? | select(.state.waiting.reason? | test("CrashLoopBackOff"))) | .metadata.name' 2>/dev/null || echo "")
+              if [ -n "$CRASHLOOP_PODS" ]; then
+                echo "  ❌ CRASH LOOP DETECTED:"
+                for POD in $CRASHLOOP_PODS; do
+                  echo "::error::Pod '${POD}' is crash looping"
+
+                  # Get logs from previous container run
+                  echo ""
+                  echo "::group::Logs for ${POD} (previous run)"
+                  kubectl logs ${POD} -n ${NAMESPACE} --previous --tail=50 2>/dev/null || kubectl logs ${POD} -n ${NAMESPACE} --tail=50 2>/dev/null || echo "Cannot get logs"
+                  echo "::endgroup::"
+                done
+
+                echo "::error::Possible causes:"
+                echo "::error::  1. Application code is failing at startup"
+                echo "::error::  2. Missing required environment variables"
+                echo "::error::  3. Cannot connect to database/dependencies"
+                echo "::error::  4. Configuration error in the application"
+                exit 1
+              fi
+
+              echo "  ✅ No common deployment issues detected"
+            fi
+
             # Check if application is even running a sync operation
             OPERATION_RUNNING=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
             OPERATION_MSG=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.message}' 2>/dev/null || echo "")
