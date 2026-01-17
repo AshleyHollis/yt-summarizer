@@ -50,6 +50,9 @@ runs:
         BASE_SHA_INPUT: ${{ inputs.base-sha }}
         HEAD_SHA_INPUT: ${{ inputs.head-sha }}
       run: |
-        $baseShaParam = if ($env:BASE_SHA_INPUT) { "-BaseSha", $env:BASE_SHA_INPUT } else { @() }
-        $headShaParam = if ($env:HEAD_SHA_INPUT) { "-HeadSha", $env:HEAD_SHA_INPUT } else { @() }
-        & .\scripts\ci\detect-changes.ps1 @baseShaParam @headShaParam -OutputFormat github-actions
+        $params = @()
+        if ($env:BASE_SHA_INPUT) { $params += '-BaseSha'; $params += $env:BASE_SHA_INPUT }
+        if ($env:HEAD_SHA_INPUT) { $params += '-HeadSha'; $params += $env:HEAD_SHA_INPUT }
+        $params += '-OutputFormat'
+        $params += 'github-actions'
+        & .\scripts\ci\detect-changes.ps1 @params
