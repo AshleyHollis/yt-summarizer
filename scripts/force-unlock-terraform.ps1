@@ -4,7 +4,7 @@
 # Only use this when you're certain no other Terraform operations are running.
 
 param(
-    [string]$StorageAccountName = "stytsummprdtfstate",
+    [string]$StorageAccountName = "stytsummarizertfstate",
     [string]$ContainerName = "tfstate",
     [string]$BlobName = "prod.tfstate"
 )
@@ -31,7 +31,7 @@ try {
         --account-name $StorageAccountName `
         --container-name $ContainerName `
         --blob-name $BlobName `
-        --break-period 0
+        --auth-mode login
 
     Write-Host "✅ Lease broken successfully" -ForegroundColor Green
     Write-Host ""

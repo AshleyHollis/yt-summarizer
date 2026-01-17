@@ -93,7 +93,7 @@ variable "cloudflare_api_token" {
 variable "enable_auth0" {
   description = "Enable Auth0 resources (requires proper Auth0 Management API permissions)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "auth0_application_name" {
