@@ -151,7 +151,7 @@ runs:
             if kubectl get namespace ${NAMESPACE} &>/dev/null; then
               echo ""
               echo "  🔍 Checking for common deployment issues..."
-              
+
               # Check 1: ExternalSecret failures (missing secrets, Key Vault access issues)
               FAILED_EXTERNALSECRETS=$(kubectl get externalsecrets -n ${NAMESPACE} -o json 2>/dev/null | jq -r '.items[] | select(.status.conditions[]? | select(.type=="Ready" and .status=="False")) | .metadata.name' 2>/dev/null || echo "")
               if [ -n "$FAILED_EXTERNALSECRETS" ]; then
@@ -160,7 +160,7 @@ runs:
                   ES_MSG=$(kubectl get externalsecret ${ES} -n ${NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "Unknown error")
                   echo "::error::ExternalSecret '${ES}' failed: ${ES_MSG}"
                   echo "  - ${ES}: ${ES_MSG}"
-                  
+
                   # Provide helpful troubleshooting based on error message
                   if [[ "$ES_MSG" == *"could not get secret data from provider"* ]]; then
                     echo "::error::Possible causes:"
@@ -183,22 +183,22 @@ runs:
                 echo "  ❌ IMAGE PULL ERRORS DETECTED:"
                 for POD in $IMAGEPULL_ERRORS; do
                   echo "::error::Pod '${POD}' cannot pull image"
-                  
+
                   # Get the specific image and error
                   IMAGE=$(kubectl get pod ${POD} -n ${NAMESPACE} -o jsonpath='{.status.containerStatuses[0].image}' 2>/dev/null || echo "Unknown")
                   REASON=$(kubectl get pod ${POD} -n ${NAMESPACE} -o jsonpath='{.status.containerStatuses[0].state.waiting.message}' 2>/dev/null || echo "")
-                  
+
                   echo "  - Pod: ${POD}"
                   echo "  - Image: ${IMAGE}"
                   echo "  - Error: ${REASON}"
-                  
+
                   # Show pod events for more context
                   echo ""
                   echo "::group::Pod Events for ${POD}"
                   kubectl describe pod ${POD} -n ${NAMESPACE} 2>/dev/null | grep -A 20 "Events:" || echo "Cannot get events"
                   echo "::endgroup::"
                 done
-                
+
                 echo "::error::Possible causes:"
                 echo "::error::  1. Image does not exist in ACR (check CI build succeeded)"
                 echo "::error::  2. AKS kubelet identity lacks 'AcrPull' role on ACR"
@@ -214,14 +214,14 @@ runs:
                 for POD in $CONFIG_ERRORS; do
                   ERROR_MSG=$(kubectl get pod ${POD} -n ${NAMESPACE} -o jsonpath='{.status.containerStatuses[0].state.waiting.message}' 2>/dev/null || echo "")
                   echo "::error::Pod '${POD}' has container config error: ${ERROR_MSG}"
-                  
+
                   # Show pod events
                   echo ""
                   echo "::group::Pod Events for ${POD}"
                   kubectl describe pod ${POD} -n ${NAMESPACE} 2>/dev/null | grep -A 20 "Events:" || echo "Cannot get events"
                   echo "::endgroup::"
                 done
-                
+
                 echo "::error::Possible causes:"
                 echo "::error::  1. Missing Kubernetes Secret referenced in deployment"
                 echo "::error::  2. ExternalSecret failed to create the required secret"
@@ -236,14 +236,14 @@ runs:
                 echo "  ❌ CRASH LOOP DETECTED:"
                 for POD in $CRASHLOOP_PODS; do
                   echo "::error::Pod '${POD}' is crash looping"
-                  
+
                   # Get logs from previous container run
                   echo ""
                   echo "::group::Logs for ${POD} (previous run)"
                   kubectl logs ${POD} -n ${NAMESPACE} --previous --tail=50 2>/dev/null || kubectl logs ${POD} -n ${NAMESPACE} --tail=50 2>/dev/null || echo "Cannot get logs"
                   echo "::endgroup::"
                 done
-                
+
                 echo "::error::Possible causes:"
                 echo "::error::  1. Application code is failing at startup"
                 echo "::error::  2. Missing required environment variables"
@@ -251,7 +251,7 @@ runs:
                 echo "::error::  4. Configuration error in the application"
                 exit 1
               fi
-              
+
               echo "  ✅ No common deployment issues detected"
             fi
 
