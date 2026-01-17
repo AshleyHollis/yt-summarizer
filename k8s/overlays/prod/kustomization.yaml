@@ -125,11 +125,11 @@ patches:
                     memory: 512Mi
   - path: patches/priority-class-patch.yaml
 images:
-  - 
+  -
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
     newTag: sha-79f0b00
-  - 
+  -
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
     newTag: sha-79f0b00

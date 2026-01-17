@@ -22,7 +22,7 @@ The production deployment workflow needs to commit kustomization updates directl
    - **GitHub App name**: `YT Summarizer Deploy Bot` (or your preferred unique name)
    - **Description**: `Automated deployment bot for YT Summarizer production deployments`
    - **Homepage URL**: `https://github.com/AshleyHollis/yt-summarizer`
-   
+
 3. **Webhook**:
    - ✅ **Uncheck** "Active" (we don't need webhooks)
 
@@ -167,7 +167,7 @@ After completing all steps, verify:
 
 **Cause**: App doesn't have required permissions
 
-**Fix**: 
+**Fix**:
 1. Go to app settings
 2. Update Repository permissions → Contents → Read and write
 3. Accept the permission update on the installation
