@@ -35,7 +35,7 @@ The production deployment pipeline **reuses images built by the CI workflow** to
           ↓                               ↓
     CODE CHANGES?                   K8S/INFRA ONLY?
     (services/*, apps/web,          (k8s/*, infra/*)
-     docker/*)                      
+     docker/*)  
           │                               │
           ↓                               ↓
   ┌─────────────────────┐       ┌─────────────────────┐
@@ -168,11 +168,11 @@ Changes to any of:
 ### Example
 ```yaml
 # Commit e43f28a changes services/api/main.py
-# 
+#
 # 1. CI workflow:
 #    - Builds acrytsummprd.azurecr.io/yt-summarizer-api:sha-e43f28a
 #    - Pushes to ACR
-# 
+#
 # 2. Production workflow:
 #    - Waits for CI to finish
 #    - Validates sha-e43f28a exists in ACR

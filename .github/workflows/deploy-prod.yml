@@ -359,7 +359,7 @@ jobs:
           # Extract that tag (wait-for-ci ensures CI completed successfully)
           SHORT_SHA=$(git rev-parse --short=7 ${{ github.sha }})
           IMAGE_TAG="sha-${SHORT_SHA}"
-          
+
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "✅ Using CI-built image tag: $IMAGE_TAG"
 
