@@ -19,6 +19,7 @@ images:
   newTag: sha-07bbad4
 patches:
 - path: patches/configmap-patch.yaml
+- path: patches/ingress-delete-patch.yaml
 - path: patches/httproute-patch.yaml
 - target:
     group: apps
