@@ -5,6 +5,23 @@
  */
 
 /**
+ * Format a sensitive value for display
+ * @param {*} value - The value to format (will be redacted)
+ * @returns {string} Redacted value string
+ */
+function formatSensitiveValue(value) {
+  // Show null/undefined/empty string as-is for clarity
+  if (value === null || value === undefined) {
+    return formatValue(value);
+  }
+  if (value === '') {
+    return '""';
+  }
+  // Redact all other values
+  return '(sensitive value)';
+}
+
+/**
  * Format a value for display (Terraform-style)
  * @param {*} value - The value to format
  * @param {boolean} unknown - Whether the value is unknown (known after apply)
@@ -32,5 +49,6 @@ function formatValue(value, unknown = false) {
 }
 
 module.exports = {
-  formatValue
+  formatValue,
+  formatSensitiveValue
 };
