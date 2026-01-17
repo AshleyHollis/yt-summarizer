@@ -50,13 +50,13 @@ patches:
           spec:
             containers:
               - name: worker
-                  resources:
-                    requests:
-                      cpu: 25m
-                      memory: 128Mi
-                    limits:
-                      cpu: 500m
-                      memory: 512Mi
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
   - target:
       group: apps
       version: v1
