@@ -2,97 +2,140 @@
 # Production Overlay Kustomization
 # =============================================================================
 # Single production environment - auto-synced by Argo CD on merge to main
-# Last updated: 2026-01-12T04:10:00Z
+# Last updated: 2026-01-17T12:02:48Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: yt-summarizer
 resources:
-- ../../base
-- priority-class.yaml
-images:
-- name: yt-summarizer-api
-  newName: acrytsummprd.azurecr.io/yt-summarizer-api
-  newTag: sha-e43f28a
-- name: yt-summarizer-workers
-  newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-  newTag: sha-e43f28a
+  - ../../base
+  - priority-class.yaml
 patches:
-- path: patches/configmap-patch.yaml
-- path: patches/httproute-patch.yaml
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: api
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api\nspec:\n  template:\n    spec:\n      containers:\n        - name: api\n          resources:\n            requests:\n              cpu: 25m\n              memory: 128Mi\n            limits:\n              cpu: 500m\n              memory: 512Mi"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: transcribe-worker
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: transcribe-worker\nspec:\n  template:\n    spec:\n      containers:\n        - name: worker\n          resources:\n            requests:\n              cpu: 25m\n              memory: 128Mi\n            limits:\n              cpu: 500m\n              memory: 512Mi"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: summarize-worker
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: summarize-worker\nspec:\n  template:\n    spec:\n      containers:\n        - name: worker\n          resources:\n            requests:\n              cpu: 25m\n              memory: 128Mi\n            limits:\n              cpu: 500m\n              memory: 512Mi"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: embed-worker
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: embed-worker\nspec:\n  template:\n    spec:\n      containers:\n        - name: worker\n          resources:\n            requests:\n              cpu: 25m\n              memory: 128Mi\n            limits:\n              cpu: 500m\n              memory: 512Mi"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: relationships-worker
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: relationships-worker\nspec:\n  template:\n    spec:\n      containers:\n        - name: worker\n          resources:\n            requests:\n              cpu: 25m\n              memory: 128Mi\n            limits:\n              cpu: 500m\n              memory: 512Mi"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: api
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api\nspec:\n  template:\n    spec:\n      priorityClassName: production-critical"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: transcribe-worker
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: transcribe-worker\nspec:\n  template:\n    spec:\n      priorityClassName: production-critical"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: summarize-worker
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: summarize-worker\nspec:\n  template:\n    spec:\n      priorityClassName: production-critical"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: embed-worker
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: embed-worker\nspec:\n  template:\n    spec:\n      priorityClassName: production-critical"
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: relationships-worker
-    namespace: yt-summarizer
-  patch: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: relationships-worker\nspec:\n  template:\n    spec:\n      priorityClassName: production-critical"
+  - path: patches/configmap-patch.yaml
+  - path: patches/httproute-patch.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: api
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        template:
+          spec:
+            containers:
+              - name: api
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: transcribe-worker
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: transcribe-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                  resources:
+                    requests:
+                      cpu: 25m
+                      memory: 128Mi
+                    limits:
+                      cpu: 500m
+                      memory: 512Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: summarize-worker
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: summarize-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: embed-worker
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: embed-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: relationships-worker
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: relationships-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+  - path: patches/priority-class-patch.yaml
+images:
+  - 
+    name: yt-summarizer-api
+    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newTag: sha-79f0b00
+  - 
+    name: yt-summarizer-workers
+    newName: acrytsummprd.azurecr.io/yt-summarizer-workers
+    newTag: sha-79f0b00
 labels:
 - pairs:
-    environment: production
-    app.kubernetes.io/part-of: yt-summarizer
+    environment: "production"
+    app.kubernetes.io/part-of: "yt-summarizer"
 commonAnnotations:
   deployment.kubernetes.io/environment: production
