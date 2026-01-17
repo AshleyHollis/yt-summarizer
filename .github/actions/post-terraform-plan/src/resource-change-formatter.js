@@ -44,6 +44,8 @@ function formatResourceChange(change, action) {
   const before = change.change.before || {};
   const after = change.change.after || {};
   const afterUnknown = change.change.after_unknown || {};
+  const beforeSensitive = change.change.before_sensitive || {};
+  const afterSensitive = change.change.after_sensitive || {};
 
   const isReplace = isReplaceAction(action);
   const forceMarker = getForceMarkerForAction(action);
@@ -57,7 +59,7 @@ function formatResourceChange(change, action) {
   }
 
   // Get attribute changes with canonical format (no indentation logic)
-  const changeLines = findChanges(before, after, afterUnknown, '    ', forceMarker, isReplace);
+  const changeLines = findChanges(before, after, afterUnknown, beforeSensitive, afterSensitive, '    ', forceMarker, isReplace);
 
   if (changeLines.length === 0 && action === 'update') {
     return null;

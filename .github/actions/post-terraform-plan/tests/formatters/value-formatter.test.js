@@ -3,7 +3,7 @@
  */
 
 const assert = require('assert');
-const { formatValue } = require('../../src/formatters/value-formatter');
+const { formatValue, formatSensitiveValue } = require('../../src/formatters/value-formatter');
 
 let testsPassed = 0;
 let testsFailed = 0;
@@ -95,6 +95,44 @@ describe('Value Formatter Module', () => {
       assert.ok(result.includes('quote'));
       assert.strictEqual(result.charAt(0), '"');
       assert.strictEqual(result.charAt(result.length - 1), '"');
+    });
+  });
+
+  describe('formatSensitiveValue', () => {
+    test('redacts non-empty string values', () => {
+      assert.strictEqual(formatSensitiveValue('password123'), '(sensitive value)');
+      assert.strictEqual(formatSensitiveValue('secret-key'), '(sensitive value)');
+    });
+
+    test('redacts number values', () => {
+      assert.strictEqual(formatSensitiveValue(12345), '(sensitive value)');
+      assert.strictEqual(formatSensitiveValue(0), '(sensitive value)');
+    });
+
+    test('redacts boolean values', () => {
+      assert.strictEqual(formatSensitiveValue(true), '(sensitive value)');
+      assert.strictEqual(formatSensitiveValue(false), '(sensitive value)');
+    });
+
+    test('redacts array values', () => {
+      assert.strictEqual(formatSensitiveValue([1, 2, 3]), '(sensitive value)');
+      assert.strictEqual(formatSensitiveValue(['a', 'b']), '(sensitive value)');
+    });
+
+    test('redacts object values', () => {
+      assert.strictEqual(formatSensitiveValue({ key: 'value' }), '(sensitive value)');
+    });
+
+    test('shows null as null', () => {
+      assert.strictEqual(formatSensitiveValue(null), 'null');
+    });
+
+    test('shows undefined as null', () => {
+      assert.strictEqual(formatSensitiveValue(undefined), 'null');
+    });
+
+    test('shows empty string as empty quoted string', () => {
+      assert.strictEqual(formatSensitiveValue(''), '""');
     });
   });
 });
