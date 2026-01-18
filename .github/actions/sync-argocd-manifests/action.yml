@@ -1,0 +1,46 @@
+# Reusable Argo CD manifests synchronization action
+# Applies Argo CD application manifests to the cluster
+
+name: 'Sync Argo CD Manifests'
+description: 'Apply Argo CD application manifests to the cluster'
+
+inputs:
+  mode:
+    description: 'Sync mode: all, infra, apps (default: all)'
+    required: false
+    default: 'all'
+  dry-run:
+    description: 'Perform dry-run without applying changes (default: false)'
+    required: false
+    default: 'false'
+  namespace:
+    description: 'Argo CD namespace (default: argocd)'
+    required: false
+    default: 'argocd'
+  verbose:
+    description: 'Enable verbose output (default: false)'
+    required: false
+    default: 'false'
+  skip-validation:
+    description: 'Skip pre-apply validation (default: false)'
+    required: false
+    default: 'false'
+
+outputs:
+  applied:
+    description: 'Whether manifests were applied (false for dry-run)'
+    value: ${{ steps.sync.outputs.applied }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Sync Argo CD manifests
+      id: sync
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        NAMESPACE: ${{ inputs.namespace }}
+        VERBOSE: ${{ inputs.verbose }}
+        SKIP_VALIDATION: ${{ inputs.skip-validation }}
+      run: ${{ github.action_path }}/script.sh
