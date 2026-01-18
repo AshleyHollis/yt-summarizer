@@ -53,12 +53,9 @@ jobs:
           min-age-hours: '168'  # 7 days
           max-prs-to-check: '100'
 
-      - name: Report cleanup results
-        if: always()
-        run: |
-          if [[ "${{ steps.cleanup.outputs.deleted-count }}" != "0" ]]; then
-            echo "✅ Cleaned up ${{ steps.cleanup.outputs.deleted-count }} stale environment(s)"
-            echo "💡 Deleted environments for PRs: ${{ steps.cleanup.outputs.stale-prs }}"
-          else
-            echo "✅ No stale environments found or all cleanup completed"
-          fi
+       - name: Report cleanup results
+         if: always()
+         run: scripts/workflows/cleanup-swa-report-results.sh
+         env:
+           DELETED_COUNT: ${{ steps.cleanup.outputs.deleted-count }}
+           STALE_PRS: ${{ steps.cleanup.outputs.stale-prs }}
