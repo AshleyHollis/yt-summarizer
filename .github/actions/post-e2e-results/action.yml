@@ -112,26 +112,8 @@ runs:
 
     - name: Create E2E summary
       shell: bash
-      run: |
-        OUTCOME="${{ inputs.test-outcome }}"
-        if [ "$OUTCOME" = "success" ]; then
-          echo "## ✅ E2E Tests Passed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All end-to-end tests completed successfully!" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "## ❌ E2E Tests Failed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Some tests failed. Check the Playwright report artifact for details." >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Test Environment" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-        echo "| **Preview URL** | ${{ inputs.preview-url }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| **Commit** | \`${{ inputs.commit-sha }}\` |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- 📦 **Playwright Report**: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+      env:
+        TEST_OUTCOME: ${{ inputs.test-outcome }}
+        PREVIEW_URL: ${{ inputs.preview-url }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+      run: ${{ github.action_path }}/post-e2e-results.sh

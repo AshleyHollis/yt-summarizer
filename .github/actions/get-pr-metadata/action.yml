@@ -52,22 +52,13 @@ runs:
     - name: Extract PR metadata
       id: extract
       shell: bash
-      run: |
-        EVENT_NAME="${{ inputs.event-name }}"
-
-        if [ "$EVENT_NAME" = "pull_request" ]; then
-          echo "pr_number=${{ inputs.pr-number-context }}" >> $GITHUB_OUTPUT
-          echo "pr_head_ref=${{ inputs.pr-head-ref-context }}" >> $GITHUB_OUTPUT
-          echo "pr_head_sha=${{ inputs.pr-head-sha-context }}" >> $GITHUB_OUTPUT
-          echo "base_sha=${{ inputs.pr-base-sha-context }}" >> $GITHUB_OUTPUT
-        elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-          PR_NUM="${{ inputs.pr-number-input }}"
-          if [ -n "$PR_NUM" ]; then
-            echo "pr_number=$PR_NUM" >> $GITHUB_OUTPUT
-          else
-            echo "pr_number=" >> $GITHUB_OUTPUT
-          fi
-          echo "pr_head_ref=${{ inputs.current-ref }}" >> $GITHUB_OUTPUT
-          echo "pr_head_sha=${{ inputs.current-sha }}" >> $GITHUB_OUTPUT
-          echo "base_sha=origin/main" >> $GITHUB_OUTPUT
-        fi
+      env:
+        EVENT_NAME: ${{ inputs.event-name }}
+        PR_NUMBER_INPUT: ${{ inputs.pr-number-input }}
+        PR_NUMBER_CONTEXT: ${{ inputs.pr-number-context }}
+        PR_HEAD_REF_CONTEXT: ${{ inputs.pr-head-ref-context }}
+        PR_HEAD_SHA_CONTEXT: ${{ inputs.pr-head-sha-context }}
+        PR_BASE_SHA_CONTEXT: ${{ inputs.pr-base-sha-context }}
+        CURRENT_REF: ${{ inputs.current-ref }}
+        CURRENT_SHA: ${{ inputs.current-sha }}
+      run: ${{ github.action_path }}/get-pr-metadata.sh
