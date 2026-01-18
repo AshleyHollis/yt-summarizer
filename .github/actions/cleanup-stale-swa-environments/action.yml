@@ -58,15 +58,5 @@ runs:
         STALE_COUNT: ${{ steps.find.outputs.stale_count || '0' }}
         STALE_PRS: ${{ steps.cleanup.outputs.stale_prs || steps.find.outputs.stale_prs || 'none' }}
         DRY_RUN: ${{ inputs.dry-run }}
-      run: |
-        cat >> $GITHUB_STEP_SUMMARY << EOF
-        ## 🗑️ SWA Environment Cleanup Report
-
-        **Mode:** $([ "$DRY_RUN" == "true" ] && echo "🔍 Dry Run" || echo "🗑️ Active Deletion")
-        **Stale Environments Found:** $STALE_COUNT
-        **Environments Processed:** $DELETED_COUNT
-
-        $([ "$STALE_COUNT" != "0" ] && echo "**PR Numbers:** $STALE_PRS" || echo "_No stale environments detected_")
-
-        > **Note:** Stale environments are from PRs closed more than ${{ inputs.min-age-hours }} hour(s) ago.
-        EOF
+        MIN_AGE_HOURS: ${{ inputs.min-age-hours }}
+      run: bash ${{ github.action_path }}/generate-summary.sh
