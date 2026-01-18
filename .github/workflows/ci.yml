@@ -458,6 +458,34 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '90'
 
+      - name: Validate Argo CD manifest syntax
+        if: contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
+        shell: bash
+        run: |
+          echo "Validating Argo CD manifest files..."
+          
+          # Validate YAML syntax
+          for file in k8s/argocd/*.yaml; do
+            if [[ -f "$file" ]]; then
+              echo "Checking $file..."
+              if ! yq eval '.' "$file" > /dev/null 2>&1; then
+                echo "::error::Invalid YAML syntax in $file"
+                exit 1
+              fi
+              
+              # Check for Application/ApplicationSet kind
+              kind=$(yq eval '.kind' "$file" 2>/dev/null || echo "")
+              if [[ -n "$kind" ]] && [[ "$kind" != "Application" ]] && [[ "$kind" != "ApplicationSet" ]]; then
+                echo "::warning::Unexpected kind '$kind' in $file (expected Application or ApplicationSet)"
+              fi
+              
+              echo "  ✓ $file is valid"
+            fi
+          done
+          
+          echo ""
+          echo "All Argo CD manifests passed validation!"
+
 
   # ===========================================================================
   # PHASE 6: IMAGE BUILDING (Conditional)
