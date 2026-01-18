@@ -121,8 +121,8 @@ concurrency:
 
 
 env:
-  ACR_NAME: acrytsummprd
-  ACR_LOGIN_SERVER: acrytsummprd.azurecr.io
+  ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
   MAX_PREVIEWS: 3
 
 permissions:
@@ -630,7 +630,7 @@ jobs:
         uses: azure/aks-set-context@v4
         with:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AZURE_AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Verify cluster can pull image
         # Runs after AKS context + ACR login are configured

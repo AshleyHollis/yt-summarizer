@@ -54,21 +54,21 @@ echo "✓ Application exists: $APP_NAME"
 
 REPO_URL=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.repoURL}')
 TARGET_REV=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.targetRevision}')
-PATH=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.path}')
+SOURCE_PATH=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.path}')
 DEST_NS=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.destination.namespace}')
 
-if [[ -z "$REPO_URL" ]] || [[ -z "$TARGET_REV" ]] || [[ -z "$PATH" ]]; then
+if [[ -z "$REPO_URL" ]] || [[ -z "$TARGET_REV" ]] || [[ -z "$SOURCE_PATH" ]]; then
     echo "::error::Application has incomplete configuration"
     echo "  Repository: $REPO_URL"
     echo "  Target Revision: $TARGET_REV"
-    echo "  Path: $PATH"
+    echo "  Path: $SOURCE_PATH"
     exit 1
 fi
 
 echo "✓ Configuration valid"
 echo "  Repo: $REPO_URL"
 echo "  Target: $TARGET_REV"
-echo "  Path: $PATH"
+echo "  Path: $SOURCE_PATH"
 echo "  Dest Namespace: $DEST_NS"
 
 # =============================================================================
