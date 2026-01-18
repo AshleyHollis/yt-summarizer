@@ -637,12 +637,12 @@ jobs:
           timeout-seconds: '60'
 
       - name: Validate Argo CD readiness (fail-fast)
-        shell: bash
-        env:
-          APP_NAME: yt-summarizer-prod
-          ARGOCD_NAMESPACE: argocd
-          CHECK_TIMEOUT: 60
-        run: ./.github/actions/verify-deployment/check-argocd-readiness.sh -v
+        uses: ./.github/actions/check-argocd-readiness
+        with:
+          app-name: yt-summarizer-prod
+          namespace: argocd
+          timeout: '60'
+          verbose: 'true'
         continue-on-error: false
 
       - name: Wait for Argo CD to sync
