@@ -18,8 +18,8 @@ runs:
   steps:
     - name: Build frontend
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         NEXT_PUBLIC_API_URL: ${{ inputs.api-url }}
         NEXT_PUBLIC_ENVIRONMENT: ${{ inputs.environment }}
-        WORKING_DIRECTORY: ${{ inputs.working-directory }}
       run: bash ${{ github.action_path }}/script.sh
