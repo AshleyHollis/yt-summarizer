@@ -806,8 +806,8 @@ jobs:
       - name: Build frontend
         working-directory: apps/web
         env:
-          # Use proxy route for client-side requests
-          NEXT_PUBLIC_API_URL: /api/proxy
+          # Use full backend URL for client-side requests (SWA doesn't support Next.js rewrites)
+          NEXT_PUBLIC_API_URL: ${{ vars.PRODUCTION_API_URL }}
           NEXT_PUBLIC_ENVIRONMENT: production
         run: npm run build
 
