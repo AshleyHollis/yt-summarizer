@@ -124,8 +124,25 @@ function generatePrComment(options) {
   sections.push(`> 📋 **Run [#${runNumber}](${runUrl})** · ${timestamp} · @${actor}`);
   sections.push('');
 
-  // Summary badges for visual impact
-  if (hasChanges) {
+  // Check for errors first
+  if (summary.error) {
+    sections.push('```diff');
+    sections.push(`- ❌ Terraform Plan Failed`);
+    sections.push('');
+    sections.push(`Error: ${summary.error}`);
+    sections.push('```');
+    sections.push('');
+    sections.push('> ⚠️ **The plan failed to execute.** Check the workflow logs for detailed error messages.');
+    sections.push('');
+  } else if (planOutcome === 'failure') {
+    sections.push('```diff');
+    sections.push(`- ❌ Terraform Plan Failed`);
+    sections.push('');
+    sections.push('Check the workflow logs for error details.');
+    sections.push('```');
+    sections.push('');
+  } else if (hasChanges) {
+    // Summary badges for visual impact
     const badges = [];
     if (summary.add > 0) badges.push(badge('add', summary.add, '2eb039'));
     if (summary.change > 0) badges.push(badge('change', summary.change, 'd4a017'));
@@ -142,10 +159,8 @@ function generatePrComment(options) {
     if (summary.destroy > 0) sections.push(`- ${summary.destroy} to destroy`);
     sections.push('```');
     sections.push('');
-  }
-
-  // No changes - success message
-  if (!hasChanges) {
+  } else {
+    // No changes - success message
     sections.push('```');
     sections.push('✨ No changes. Your infrastructure matches the configuration.');
     sections.push('```');
