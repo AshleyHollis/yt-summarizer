@@ -41,7 +41,7 @@ set -eo pipefail
 
 OVERLAY_DIR="${OVERLAY_DIR:?OVERLAY_DIR not set}"
 OVERLAY_NAME="${OVERLAY_NAME:?OVERLAY_NAME not set}"
-OUTPUT_FILE="${OUTPUT_FILE:}"
+OUTPUT_FILE="${OUTPUT_FILE:-}"
 OVERLAY_FILE="$OVERLAY_DIR/kustomization.yaml"
 
 # Determine output file
