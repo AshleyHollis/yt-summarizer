@@ -182,9 +182,12 @@ check_pod_issues() {
 echo "Starting verification with fail-fast enabled..."
 echo ""
 
-APP_NAME=$(kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/instance}' 2>/dev/null || echo "")
+# Determine app name: use provided env var, or derive from deployment labels, or default to preview pattern
 if [ -z "$APP_NAME" ]; then
-  APP_NAME=$(echo ${NAMESPACE} | sed 's/^/preview-/')
+  APP_NAME=$(kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/instance}' 2>/dev/null || echo "")
+  if [ -z "$APP_NAME" ]; then
+    APP_NAME=$(echo ${NAMESPACE} | sed 's/^/preview-/')
+  fi
 fi
 
 for i in $(seq 1 $MAX_ATTEMPTS); do
