@@ -46,7 +46,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       });
 
       const currentUrl = page.url();
-      
+
       // If the page stayed on /add, it's a public route (skip the redirect test)
       if (currentUrl.includes('/add') && !currentUrl.includes('/login')) {
         test.skip(true, '/add is a public route - no redirect expected');
@@ -194,11 +194,11 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       // Should see a login/sign in link somewhere
       // This could be in the navbar or elsewhere
       const loginLink = page.getByRole('link', { name: /sign in|log in/i });
-      
+
       // If no login link, that's okay - user can navigate to /login directly
       // This test is just checking that the navigation makes sense for unauthenticated users
       const loginLinkCount = await loginLink.count();
-      
+
       // Either there's a login link, or the user can access /login directly
       // Both are valid implementations
       expect(loginLinkCount >= 0).toBeTruthy();
@@ -216,7 +216,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       });
 
       const currentUrl = new URL(page.url());
-      
+
       // May have returnTo parameter (implementation-specific)
       // This is optional behavior - some apps use returnTo, others use session state
       // Just verify we're on the login page

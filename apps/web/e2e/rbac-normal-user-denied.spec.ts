@@ -36,7 +36,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
   /**
    * NOTE: These tests assume the authenticated user does NOT have admin role.
    * In a full implementation, you would have a separate storage state for normal users.
-   * 
+   *
    * For now, these tests will be skipped or may fail if the test user has admin role.
    * To properly test, create playwright/.auth/normal-user.json with a non-admin user.
    */
@@ -129,7 +129,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
 
       // Should show user's current role (if they have one)
       const pageContent = await page.textContent('body');
-      
+
       // Page mentions role information
       expect(pageContent).toBeTruthy();
       expect(pageContent!.toLowerCase()).toContain('role');
@@ -177,7 +177,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
 
         // Admin link should not be visible
         const adminLink = page.getByTestId('admin-nav-link');
-        
+
         // Check if admin link exists
         const adminLinkCount = await adminLink.count();
 
@@ -275,8 +275,8 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
           await page.goto(`http://localhost:3000${route}`);
 
           await page.waitForURL(
-            (url) => 
-              url.pathname.includes('/access-denied') || 
+            (url) =>
+              url.pathname.includes('/access-denied') ||
               url.pathname.includes('/admin') ||
               url.pathname.includes('/404'),
             { timeout: 10000 }
@@ -318,7 +318,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
 
       // Test on mobile viewport
       await page.setViewportSize({ width: 375, height: 667 });
-      
+
       const heading = page.getByRole('heading', { name: /access denied/i });
       await expect(heading).toBeVisible();
 
@@ -333,7 +333,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
 
     test('access-denied page loads without JavaScript errors', async ({ page }) => {
       const errors: string[] = [];
-      
+
       page.on('pageerror', (error) => {
         errors.push(error.message);
       });

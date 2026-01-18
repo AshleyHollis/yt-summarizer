@@ -1,11 +1,11 @@
 /**
  * Error Boundary Component
- * 
+ *
  * React Error Boundary to catch and display authentication errors gracefully.
  * Prevents the entire app from crashing when auth-related errors occur.
- * 
+ *
  * @module ErrorBoundary
- * 
+ *
  * Implementation: T066
  */
 
@@ -20,10 +20,10 @@ import React, { Component, ReactNode, ErrorInfo } from 'react';
 interface ErrorBoundaryProps {
   /** Child components to wrap with error boundary */
   children: ReactNode;
-  
+
   /** Optional fallback UI to show when error occurs */
   fallback?: (error: Error, errorInfo: ErrorInfo) => ReactNode;
-  
+
   /** Optional callback when error is caught */
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
@@ -31,10 +31,10 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   /** Whether an error has been caught */
   hasError: boolean;
-  
+
   /** The caught error (if any) */
   error: Error | null;
-  
+
   /** React error info with component stack */
   errorInfo: ErrorInfo | null;
 }
@@ -45,22 +45,22 @@ interface ErrorBoundaryState {
 
 /**
  * Error Boundary for React Component Errors
- * 
+ *
  * Catches JavaScript errors anywhere in the child component tree and displays
  * a fallback UI instead of crashing the entire application.
- * 
+ *
  * @remarks
  * Error boundaries catch errors during:
  * - Rendering
  * - Lifecycle methods
  * - Constructors of child components
- * 
+ *
  * Error boundaries do NOT catch errors in:
  * - Event handlers (use try/catch instead)
  * - Asynchronous code (setTimeout, requestAnimationFrame, etc.)
  * - Server-side rendering
  * - Errors thrown in the error boundary itself
- * 
+ *
  * @example
  * ```tsx
  * // Wrap authentication UI with error boundary
@@ -70,7 +70,7 @@ interface ErrorBoundaryState {
  *   </AuthProvider>
  * </ErrorBoundary>
  * ```
- * 
+ *
  * @example
  * ```tsx
  * // Custom fallback UI and error reporting
@@ -91,7 +91,7 @@ interface ErrorBoundaryState {
  *   </AuthProvider>
  * </ErrorBoundary>
  * ```
- * 
+ *
  * @see https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -106,7 +106,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   /**
    * Static lifecycle method called when error is caught
-   * 
+   *
    * @param error - The error that was thrown
    * @returns New state to trigger re-render with error UI
    */
@@ -120,7 +120,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   /**
    * Lifecycle method called after error is caught
-   * 
+   *
    * @param error - The error that was thrown
    * @param errorInfo - React error info with component stack trace
    */

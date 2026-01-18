@@ -1,11 +1,11 @@
 /**
  * Auth Loading Component
- * 
+ *
  * Loading spinner and skeleton UI for authentication state transitions.
  * Provides a smooth user experience while auth state is being determined.
- * 
+ *
  * @module AuthLoading
- * 
+ *
  * Implementation: T067
  */
 
@@ -20,10 +20,10 @@ import React from 'react';
 interface AuthLoadingProps {
   /** Loading message to display (optional) */
   message?: string;
-  
+
   /** Size variant: small, medium, large */
   size?: 'small' | 'medium' | 'large';
-  
+
   /** Whether to show full-screen overlay */
   fullScreen?: boolean;
 }
@@ -34,7 +34,7 @@ interface AuthLoadingProps {
 
 /**
  * Animated loading spinner
- * 
+ *
  * @param size - Spinner size (small: 4, medium: 8, large: 12)
  */
 function Spinner({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) {
@@ -74,37 +74,37 @@ function Spinner({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) {
 
 /**
  * Auth Loading Component
- * 
+ *
  * Displays a loading spinner with optional message while authentication
  * state is being determined.
- * 
+ *
  * @param props - Component props
  * @param props.message - Optional loading message
  * @param props.size - Size variant (default: 'medium')
  * @param props.fullScreen - Whether to show full-screen overlay (default: false)
  * @returns Loading UI component
- * 
+ *
  * @remarks
  * Use this component when:
  * - Initial auth state is loading (on app mount)
  * - User is being redirected after login
  * - Session is being refreshed
  * - User is being logged out
- * 
+ *
  * @example
  * ```tsx
  * // Basic usage in AuthContext
  * function AuthProvider({ children }) {
  *   const { isLoading } = useAuth();
- *   
+ *
  *   if (isLoading) {
  *     return <AuthLoading message="Loading authentication..." />;
  *   }
- *   
+ *
  *   return children;
  * }
  * ```
- * 
+ *
  * @example
  * ```tsx
  * // Full-screen loading overlay
@@ -114,7 +114,7 @@ function Spinner({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) {
  *   fullScreen
  * />
  * ```
- * 
+ *
  * @example
  * ```tsx
  * // Small inline loading spinner
@@ -161,19 +161,19 @@ export function AuthLoading({
 
 /**
  * Skeleton loading placeholder for user profile
- * 
+ *
  * Shows a pulsing skeleton UI while user profile is loading.
  * Matches the structure of the UserProfile component.
- * 
+ *
  * @example
  * ```tsx
  * function UserProfileContainer() {
  *   const { user, isLoading } = useAuth();
- *   
+ *
  *   if (isLoading) {
  *     return <UserProfileSkeleton />;
  *   }
- *   
+ *
  *   return <UserProfile user={user} />;
  * }
  * ```
@@ -183,11 +183,11 @@ export function UserProfileSkeleton() {
     <div className="flex items-center gap-3 animate-pulse">
       {/* Avatar skeleton */}
       <div className="w-10 h-10 bg-gray-300 rounded-full" />
-      
+
       <div className="flex flex-col gap-2">
         {/* Name skeleton */}
         <div className="h-4 w-24 bg-gray-300 rounded" />
-        
+
         {/* Email skeleton */}
         <div className="h-3 w-32 bg-gray-200 rounded" />
       </div>
@@ -197,18 +197,18 @@ export function UserProfileSkeleton() {
 
 /**
  * Skeleton loading placeholder for navigation menu
- * 
+ *
  * Shows pulsing skeleton UI for navigation items while auth state is loading.
- * 
+ *
  * @example
  * ```tsx
  * function Navigation() {
  *   const { isLoading, isAuthenticated } = useAuth();
- *   
+ *
  *   if (isLoading) {
  *     return <NavigationSkeleton />;
  *   }
- *   
+ *
  *   return <NavigationMenu />;
  * }
  * ```
@@ -218,13 +218,13 @@ export function NavigationSkeleton() {
     <div className="flex items-center gap-4 animate-pulse">
       {/* Nav item 1 */}
       <div className="h-4 w-16 bg-gray-300 rounded" />
-      
+
       {/* Nav item 2 */}
       <div className="h-4 w-20 bg-gray-300 rounded" />
-      
+
       {/* Nav item 3 */}
       <div className="h-4 w-14 bg-gray-300 rounded" />
-      
+
       {/* User menu */}
       <div className="w-8 h-8 bg-gray-300 rounded-full" />
     </div>
@@ -233,22 +233,22 @@ export function NavigationSkeleton() {
 
 /**
  * Skeleton loading placeholder for protected page content
- * 
+ *
  * Shows pulsing skeleton UI for page content while auth is being verified.
- * 
+ *
  * @example
  * ```tsx
  * function ProtectedPage() {
  *   const { isLoading, hasRole } = useAuth();
- *   
+ *
  *   if (isLoading) {
  *     return <PageContentSkeleton />;
  *   }
- *   
+ *
  *   if (!hasRole('admin')) {
  *     return <AccessDenied />;
  *   }
- *   
+ *
  *   return <AdminDashboard />;
  * }
  * ```
@@ -258,10 +258,10 @@ export function PageContentSkeleton() {
     <div className="space-y-4 animate-pulse">
       {/* Page title */}
       <div className="h-8 w-64 bg-gray-300 rounded" />
-      
+
       {/* Subtitle */}
       <div className="h-4 w-96 bg-gray-200 rounded" />
-      
+
       <div className="space-y-3 mt-8">
         {/* Content lines */}
         <div className="h-4 bg-gray-200 rounded w-full" />

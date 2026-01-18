@@ -163,4 +163,3 @@ setup('authenticate as normal user', async ({ page }) => {
  * - Direct token injection: Complex with @auth0/nextjs-auth0 encrypted sessions
  * - Mock authentication: Not realistic enough for E2E tests
  */
-

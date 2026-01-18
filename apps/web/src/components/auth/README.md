@@ -325,7 +325,7 @@ import { hasRole } from '@/lib/auth-utils';
 
 function MyComponent() {
   const { user } = useAuth();
-  
+
   if (hasRole(user, 'admin')) {
     return <AdminView />;
   }
@@ -693,7 +693,7 @@ export const config = {
 
 **Cause**: Auth0 Action not triggered or misconfigured
 
-**Solution**: 
+**Solution**:
 1. Verify Action is deployed in Auth0 Dashboard
 2. Check Action is bound to "post-login" trigger
 3. View Action logs in Auth0 Dashboard for errors

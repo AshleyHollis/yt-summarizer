@@ -1,6 +1,6 @@
 /**
  * Unit tests for useAuth hook
- * 
+ *
  * @module useAuth.test
  */
 

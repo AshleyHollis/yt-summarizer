@@ -277,13 +277,13 @@ resource "auth0_action" "add_role_claims" {
      */
     exports.onExecutePostLogin = async (event, api) => {
       const namespace = 'https://yt-summarizer.com/';
-      
+
       if (event.user.app_metadata && event.user.app_metadata.role) {
         const role = event.user.app_metadata.role;
-        
+
         // Add role to ID token
         api.idToken.setCustomClaim(`$${namespace}role`, role);
-        
+
         // Add role to access token
         api.accessToken.setCustomClaim(`$${namespace}role`, role);
       }

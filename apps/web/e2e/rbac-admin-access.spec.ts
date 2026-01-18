@@ -90,7 +90,7 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
 
       // Look for management section headings or links
       const pageContent = await page.textContent('body');
-      
+
       // Admin dashboard typically has these sections (may vary by implementation)
       // Just verify the page has substantial admin-related content
       expect(pageContent).toBeTruthy();
@@ -162,7 +162,7 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
 
     test('admin page loads without errors', async ({ page }) => {
       const errors: string[] = [];
-      
+
       page.on('pageerror', (error) => {
         errors.push(error.message);
       });
@@ -189,12 +189,12 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
 
       // Look for management section links
       const pageContent = await page.textContent('body');
-      
+
       // Admin dashboard typically has links to various admin functions
       // Verify the page has interactive elements (links/buttons)
       const links = page.locator('a');
       const linkCount = await links.count();
-      
+
       // Should have multiple links (navigation + admin sections)
       expect(linkCount).toBeGreaterThan(5);
     });

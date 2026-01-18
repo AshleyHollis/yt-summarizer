@@ -111,7 +111,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
         // Should see both admin link and user profile
         await expect(adminLink).toBeVisible();
-        
+
         const userProfile = page.getByTestId('user-profile');
         await expect(userProfile).toBeVisible({ timeout: 10000 });
       } finally {
@@ -169,7 +169,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
       // Click Add link
       const addLink = page.getByRole('link', { name: /^add$/i }).first();
       await addLink.click();
-      
+
       // Should navigate
       const url = page.url();
       expect(url).toContain('/add');
@@ -225,7 +225,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
       if (badgeCount > 0) {
         await expect(roleBadge).toBeVisible();
-        
+
         const badgeText = await roleBadge.textContent();
         expect(badgeText).toBeTruthy();
       }
@@ -242,7 +242,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
         // Should see sign in link instead of user profile
         const signInLink = page.getByRole('link', { name: /sign in/i });
-        
+
         // May redirect to login, or show sign in button
         // Just verify navigation loads
         const nav = page.locator('nav');
@@ -262,7 +262,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
         // Admin link should not be visible
         const adminLink = page.getByTestId('admin-nav-link');
         const adminLinkCount = await adminLink.count();
-        
+
         expect(adminLinkCount).toBe(0);
       } finally {
         await context.close();
@@ -279,7 +279,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
         // User profile should not be visible
         const userProfile = page.getByTestId('user-profile');
         const profileCount = await userProfile.count();
-        
+
         expect(profileCount).toBe(0);
       } finally {
         await context.close();
@@ -293,7 +293,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
       // Tab through navigation
       await page.keyboard.press('Tab');
-      
+
       // Should focus on first focusable element
       const activeElement = await page.evaluate(() => document.activeElement?.tagName);
       expect(['A', 'BUTTON']).toContain(activeElement);
@@ -318,7 +318,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
         // Admin link should be focusable
         await adminLink.focus();
-        
+
         const isFocused = await adminLink.evaluate((el) => el === document.activeElement);
         expect(isFocused).toBeTruthy();
       } finally {

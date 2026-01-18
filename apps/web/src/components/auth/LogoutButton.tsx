@@ -1,10 +1,10 @@
 /**
  * LogoutButton Component
- * 
+ *
  * Provides a button to log out the current user.
- * 
+ *
  * @module LogoutButton
- * 
+ *
  * Implementation: T021
  */
 
@@ -24,16 +24,16 @@ interface LogoutButtonProps {
 
 /**
  * LogoutButton Component
- * 
+ *
  * Displays a logout button that clears the user session.
  * Redirects to the Auth0 logout endpoint which clears the session and redirects home.
- * 
+ *
  * @param props - Component props
- * 
+ *
  * @example
  * ```tsx
  * import { LogoutButton } from '@/components/auth/LogoutButton';
- * 
+ *
  * export default function Header() {
  *   return (
  *     <div>
@@ -42,7 +42,7 @@ interface LogoutButtonProps {
  *   );
  * }
  * ```
- * 
+ *
  * @example
  * ```tsx
  * // With custom styling

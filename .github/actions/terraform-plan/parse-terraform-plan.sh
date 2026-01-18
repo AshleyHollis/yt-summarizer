@@ -14,7 +14,7 @@
 if [ ! -f "tfplan" ]; then
   echo "::error::tfplan file not found - terraform plan may have failed"
   echo "::error::Check the 'Run terraform plan' step output for errors"
-  
+
   # Output empty summary to prevent downstream failures
   SUMMARY=$(cat <<EOF
 {
@@ -26,15 +26,15 @@ if [ ! -f "tfplan" ]; then
 }
 EOF
 )
-  
+
   echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
   echo "$SUMMARY" >> "$GITHUB_OUTPUT"
   echo "EOF" >> "$GITHUB_OUTPUT"
-  
+
   echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
   echo "{}" >> "$GITHUB_OUTPUT"
   echo "EOF" >> "$GITHUB_OUTPUT"
-  
+
   exit 1
 fi
 

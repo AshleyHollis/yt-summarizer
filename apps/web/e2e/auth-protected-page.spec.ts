@@ -318,7 +318,7 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       // Should have expected user fields
       expect(userData).toHaveProperty('email');
       expect(userData).toHaveProperty('sub');
-      
+
       // Email should match test user
       expect(userData.email).toContain('@');
     });
@@ -335,10 +335,10 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       // Session cookies should be HttpOnly and Secure (cannot check directly in E2E)
       // But we can verify the session works correctly
       const cookies = await page.context().cookies();
-      
+
       // Should have auth-related cookies
-      const authCookies = cookies.filter(c => 
-        c.name.includes('auth') || 
+      const authCookies = cookies.filter(c =>
+        c.name.includes('auth') ||
         c.name.includes('session') ||
         c.name.startsWith('appSession')
       );
@@ -378,15 +378,15 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
 
     test('page load performance is acceptable', async ({ page }) => {
       const startTime = Date.now();
-      
+
       await page.goto('/');
-      
+
       // Wait for user profile to be visible (page fully loaded)
       const userProfile = page.getByTestId('user-profile');
       await expect(userProfile).toBeVisible({ timeout: 10000 });
-      
+
       const loadTime = Date.now() - startTime;
-      
+
       // Page should load in reasonable time (< 5 seconds)
       expect(loadTime).toBeLessThan(5000);
     });

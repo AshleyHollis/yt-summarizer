@@ -1,10 +1,10 @@
 /**
  * UserProfile Component
- * 
+ *
  * Displays authenticated user information including avatar, name, email, and role.
- * 
+ *
  * @module UserProfile
- * 
+ *
  * Implementation: T020
  */
 
@@ -16,14 +16,14 @@ import { getUserDisplayName } from '@/lib/auth-utils';
 
 /**
  * UserProfile Component
- * 
+ *
  * Displays user profile information when authenticated.
  * Shows a login prompt when not authenticated.
- * 
+ *
  * @example
  * ```tsx
  * import { UserProfile } from '@/components/auth/UserProfile';
- * 
+ *
  * export default function Header() {
  *   return (
  *     <div className="flex items-center gap-4">

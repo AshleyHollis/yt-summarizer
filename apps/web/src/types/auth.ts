@@ -1,9 +1,9 @@
 /**
  * Authentication Error Types
- * 
+ *
  * Defines custom error classes for authentication-related failures.
  * Each error type represents a specific failure mode with clear semantics.
- * 
+ *
  * @module auth-errors
  */
 
@@ -11,11 +11,11 @@ import { Role } from '@/contexts/AuthContext';
 
 /**
  * Base authentication error.
- * 
+ *
  * @remarks
  * All auth-related errors extend this base class for consistent error handling.
  * Follows single responsibility principle (FR-034): one error type per failure mode.
- * 
+ *
  * @example
  * ```typescript
  * try {
@@ -30,7 +30,7 @@ import { Role } from '@/contexts/AuthContext';
 export class AuthError extends Error {
   /**
    * Creates a new AuthError.
-   * 
+   *
    * @param message - Human-readable error message
    * @param code - Machine-readable error code
    * @param statusCode - HTTP status code (default: 500)
@@ -42,7 +42,7 @@ export class AuthError extends Error {
   ) {
     super(message);
     this.name = 'AuthError';
-    
+
     // Maintain proper stack trace in V8 engines
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, AuthError);
@@ -52,20 +52,20 @@ export class AuthError extends Error {
 
 /**
  * Session expired error.
- * 
+ *
  * @remarks
  * Thrown when a user's session has expired during active use.
  * UI should redirect to login with "Session expired" message and preserve
  * the intended destination URL for post-login redirect.
- * 
+ *
  * See: FR-015a (Session expiration handling)
- * 
+ *
  * @example
  * ```typescript
  * if (sessionExpired) {
  *   throw new SessionExpiredError();
  * }
- * 
+ *
  * // In error boundary or catch block:
  * if (error instanceof SessionExpiredError) {
  *   router.push(`/login?returnTo=${currentPath}&message=session-expired`);
@@ -75,7 +75,7 @@ export class AuthError extends Error {
 export class SessionExpiredError extends AuthError {
   /**
    * Creates a new SessionExpiredError.
-   * 
+   *
    * @param message - Custom message (default: "Your session has expired. Please log in again.")
    */
   constructor(message: string = 'Your session has expired. Please log in again.') {
@@ -86,26 +86,26 @@ export class SessionExpiredError extends AuthError {
 
 /**
  * Unauthorized access error.
- * 
+ *
  * @remarks
  * Thrown when a user attempts to access a resource they don't have permission for.
  * Typically used for role-based access control violations.
- * 
+ *
  * See: FR-007 (Protect admin-only routes)
- * 
+ *
  * @example
  * ```typescript
  * function AdminDashboard() {
  *   const { hasRole } = useAuth();
- *   
+ *
  *   if (!hasRole('admin')) {
  *     throw new UnauthorizedError('Admin access required', 'admin');
  *   }
- *   
+ *
  *   return <div>Admin Dashboard</div>;
  * }
  * ```
- * 
+ *
  * @example
  * ```typescript
  * // In middleware
@@ -120,7 +120,7 @@ export class SessionExpiredError extends AuthError {
 export class UnauthorizedError extends AuthError {
   /**
    * Creates a new UnauthorizedError.
-   * 
+   *
    * @param message - Custom message (default: generic permission denied message)
    * @param requiredRole - Role required to access the resource (optional)
    */
@@ -135,20 +135,20 @@ export class UnauthorizedError extends AuthError {
 
 /**
  * OAuth authentication failed error.
- * 
+ *
  * @remarks
  * Thrown when OAuth flow fails (user denies consent, provider error, etc.).
  * UI should display inline error with retry option and choice of different provider.
- * 
+ *
  * See: FR-015b (OAuth failure error handling)
- * 
+ *
  * @example
  * ```typescript
  * // In OAuth callback handler
  * if (error === 'access_denied') {
  *   throw new OAuthError('You denied the login request.', 'google');
  * }
- * 
+ *
  * // In error boundary:
  * if (error instanceof OAuthError) {
  *   return (
@@ -165,7 +165,7 @@ export class UnauthorizedError extends AuthError {
 export class OAuthError extends AuthError {
   /**
    * Creates a new OAuthError.
-   * 
+   *
    * @param message - Custom message (default: generic OAuth failure message)
    * @param provider - OAuth provider name (e.g., 'google', 'github')
    */
@@ -180,10 +180,10 @@ export class OAuthError extends AuthError {
 
 /**
  * Type guard to check if an error is an AuthError or subclass.
- * 
+ *
  * @param error - Error to check
  * @returns True if error is an AuthError instance
- * 
+ *
  * @example
  * ```typescript
  * try {
@@ -203,10 +203,10 @@ export function isAuthError(error: unknown): error is AuthError {
 
 /**
  * Get user-friendly error message from any error.
- * 
+ *
  * @param error - Error to extract message from
  * @returns User-friendly error message
- * 
+ *
  * @example
  * ```typescript
  * try {
@@ -220,10 +220,10 @@ export function getErrorMessage(error: unknown): string {
   if (isAuthError(error)) {
     return error.message;
   }
-  
+
   if (error instanceof Error) {
     return error.message;
   }
-  
+
   return 'An unknown error occurred';
 }

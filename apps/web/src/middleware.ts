@@ -104,7 +104,7 @@ export async function middleware(request: NextRequest) {
 
 /**
  * Configure which routes run this middleware
- * 
+ *
  * This matcher excludes:
  * - Static files (_next/static)
  * - Image optimization files (_next/image)

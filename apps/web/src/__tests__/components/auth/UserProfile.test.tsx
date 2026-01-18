@@ -1,6 +1,6 @@
 /**
  * Unit tests for UserProfile component
- * 
+ *
  * @module UserProfile.test
  */
 
@@ -265,7 +265,7 @@ describe('UserProfile Component', () => {
 
 /**
  * Notes for T020 Implementation:
- * 
+ *
  * 1. Component should receive user from useAuth() hook, not as a prop
  * 2. Consider adding a loading skeleton while user data is loading
  * 3. Consider using getUserDisplayName() utility from auth-utils.ts

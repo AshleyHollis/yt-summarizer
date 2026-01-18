@@ -1,10 +1,10 @@
 /**
  * LoginButton Component
- * 
+ *
  * Provides social login buttons for Google and GitHub OAuth.
- * 
+ *
  * @module LoginButton
- * 
+ *
  * Implementation: T019
  */
 
@@ -19,14 +19,14 @@ type Provider = 'google-oauth2' | 'github';
 
 /**
  * LoginButton Component
- * 
+ *
  * Displays login buttons for Google and GitHub OAuth providers.
  * Redirects to Auth0 login page with the selected provider.
- * 
+ *
  * @example
  * ```tsx
  * import { LoginButton } from '@/components/auth/LoginButton';
- * 
+ *
  * export default function LoginPage() {
  *   return (
  *     <div>
@@ -50,7 +50,7 @@ export function LoginButton() {
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold text-center mb-6">Sign In</h2>
-      
+
       <div className="space-y-3">
         {/* Google OAuth Button */}
         <button

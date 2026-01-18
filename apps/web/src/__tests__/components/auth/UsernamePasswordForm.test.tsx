@@ -1,6 +1,6 @@
 /**
  * Unit tests for UsernamePasswordForm component
- * 
+ *
  * @module UsernamePasswordForm.test
  */
 
@@ -432,7 +432,7 @@ describe('UsernamePasswordForm Component', () => {
 
 /**
  * Notes for T041 Implementation:
- * 
+ *
  * 1. Component should use Auth0 SDK's handleLogin with Username-Password-Authentication connection
  * 2. Form should POST to /api/auth/login with connection parameter
  * 3. Email validation should use standard regex pattern

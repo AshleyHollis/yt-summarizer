@@ -1,10 +1,10 @@
 /**
  * Login Page
- * 
+ *
  * Public login page that displays social login options and username/password authentication.
- * 
+ *
  * @module login-page
- * 
+ *
  * Implementation: T022 (social login), T042 (username/password)
  */
 
@@ -19,10 +19,10 @@ export const metadata: Metadata = {
 
 /**
  * Login Page Component
- * 
+ *
  * Displays the login page with social authentication options and username/password form.
  * Accessible to unauthenticated users.
- * 
+ *
  * @example
  * Navigate to /login to access this page
  */

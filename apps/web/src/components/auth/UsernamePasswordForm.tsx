@@ -1,10 +1,10 @@
 /**
  * UsernamePasswordForm Component
- * 
+ *
  * Provides username/password authentication form for test accounts.
- * 
+ *
  * @module UsernamePasswordForm
- * 
+ *
  * Implementation: T041
  */
 
@@ -14,14 +14,14 @@ import React, { useState, FormEvent } from 'react';
 
 /**
  * UsernamePasswordForm Component
- * 
+ *
  * Displays a form for username/password authentication via Auth0 database connection.
  * Includes email validation, password visibility toggle, and loading states.
- * 
+ *
  * @example
  * ```tsx
  * import { UsernamePasswordForm } from '@/components/auth/UsernamePasswordForm';
- * 
+ *
  * export default function LoginPage() {
  *   return (
  *     <div>

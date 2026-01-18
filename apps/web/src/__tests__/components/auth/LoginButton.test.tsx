@@ -1,6 +1,6 @@
 /**
  * Unit tests for LoginButton component
- * 
+ *
  * @module LoginButton.test
  */
 
@@ -180,7 +180,7 @@ describe('LoginButton Component', () => {
 
 /**
  * Notes for T019 Implementation:
- * 
+ *
  * 1. Component should use Auth0 SDK's handleLogin with connection parameter
  * 2. Buttons should navigate to /api/auth/login?connection={provider}
  * 3. Consider adding loading states for better UX

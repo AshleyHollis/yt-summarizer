@@ -100,7 +100,7 @@ If you want a separate development tenant:
    ```bash
    # Generate random secret
    AUTH0_SECRET="$(openssl rand -hex 32)"
-   
+
    # Your Auth0 application settings
    AUTH0_BASE_URL="http://localhost:3000"
    AUTH0_ISSUER_BASE_URL="https://YOUR-TENANT.us.auth0.com"
@@ -204,13 +204,13 @@ This step adds role information to the ID token so the app can enforce RBAC.
    ```javascript
    exports.onExecutePostLogin = async (event, api) => {
      const namespace = 'https://yt-summarizer.com/';
-     
+
      if (event.user.app_metadata && event.user.app_metadata.role) {
        const role = event.user.app_metadata.role;
-       
+
        // Add role to ID token
        api.idToken.setCustomClaim(`${namespace}role`, role);
-       
+
        // Add role to access token (for API authorization)
        api.accessToken.setCustomClaim(`${namespace}role`, role);
      }

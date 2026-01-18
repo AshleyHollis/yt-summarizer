@@ -157,7 +157,7 @@ setup('authenticate', async ({ request }) => {
       scope: 'openid profile email'
     }
   });
-  
+
   const tokens = await response.json();
   // Save to playwright/.auth/user.json
   await context.storageState({ path: authFile });
@@ -222,7 +222,7 @@ test('admin user sees admin features', async () => {
       'https://yt-summarizer.com/role': 'admin'
     }
   });
-  
+
   render(<AdminPanel />);
   expect(screen.getByText('Admin Dashboard')).toBeInTheDocument();
 });
@@ -255,7 +255,7 @@ test('admin user sees admin features', async () => {
 resource "auth0_connection" "google" {
   name = "google-oauth2"
   strategy = "google-oauth2"
-  
+
   options {
     client_id = var.google_oauth_client_id
     client_secret = var.google_oauth_client_secret
@@ -266,7 +266,7 @@ resource "auth0_connection" "google" {
 resource "auth0_connection" "github" {
   name = "github"
   strategy = "github"
-  
+
   options {
     client_id = var.github_oauth_client_id
     client_secret = var.github_oauth_client_secret
