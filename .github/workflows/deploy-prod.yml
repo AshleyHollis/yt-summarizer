@@ -519,6 +519,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [update-overlay, get-ci-image-tag, get-last-prod-image]
     if: |
+      !cancelled() &&
       needs.update-overlay.result == 'success'
     steps:
       - name: Checkout code
@@ -591,6 +592,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [update-overlay, verify-deployment]
     if: |
+      !cancelled() &&
       needs.update-overlay.result == 'success' &&
       needs.verify-deployment.result == 'success' &&
       (github.event_name != 'workflow_dispatch' || inputs.run_frontend != false)
