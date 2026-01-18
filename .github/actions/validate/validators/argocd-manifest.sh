@@ -137,15 +137,60 @@ if [[ "$OPERATION_STATE" == "Running" ]]; then
   # Check how long operation has been running
   STARTED_AT=$(kubectl get application "${APP_NAME}" -n "$ARGOCD_NS" -o jsonpath='{.status.operationState.startedAt}' 2>/dev/null || echo "")
   if [[ -n "$STARTED_AT" ]]; then
-    # Try to parse timestamp (may fail on some systems)
+    # Parse RFC3339 timestamp - try multiple methods for cross-platform compatibility
+    # Argo CD returns format like: 2026-01-18T10:59:37Z
+    ELAPSED=-1
+
+    # Method 1: Try GNU date with -d (Linux)
     if START_TIME=$(date -d "$STARTED_AT" +%s 2>/dev/null); then
       CURRENT_TIME=$(date +%s)
       ELAPSED=$((CURRENT_TIME - START_TIME))
-      log_info "  Operation running for: ${ELAPSED}s"
+    # Method 2: Try BSD date with -j (macOS)
+    elif START_TIME=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$STARTED_AT" +%s 2>/dev/null); then
+      CURRENT_TIME=$(date +%s)
+      ELAPSED=$((CURRENT_TIME - START_TIME))
+    # Method 3: Use Python as fallback (most portable)
+    elif command -v python3 &>/dev/null; then
+      PYTHON_CMD='from datetime import datetime, timezone; '
+      PYTHON_CMD+='started = datetime.fromisoformat("$STARTED_AT".replace("Z", "+00:00")); '
+      PYTHON_CMD+='now = datetime.now(timezone.utc); '
+      PYTHON_CMD+='print(int((now - started).total_seconds()))'
+      ELAPSED=$(python3 -c "$PYTHON_CMD" 2>/dev/null || echo "-1")
+    fi
 
-      if [[ $ELAPSED -gt 300 ]]; then
-        log_error "Operation has been running for ${ELAPSED}s (>5 minutes) - likely stuck!"
-        echo ""
+    if [[ $ELAPSED -ge 0 ]]; then
+      log_info "  Operation running for: ${ELAPSED}s"
+    else
+      log_warning "Cannot parse operation timestamp - assuming stuck"
+      ELAPSED=9999  # Force cleanup check
+    fi
+
+    if [[ $ELAPSED -gt 300 ]]; then
+      log_error "Operation has been running for ${ELAPSED}s (>5 minutes) - likely stuck!"
+      echo ""
+
+      # Auto-cleanup in CI/CD environments
+      if [[ "${AUTO_CLEANUP_STUCK_OPS:-false}" == "true" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        log_warning "Automatically aborting stuck operation..."
+        if kubectl patch application "${APP_NAME}" -n "$ARGOCD_NS" --type merge -p '{"operation":null}' 2>/dev/null; then
+          log_success "Stuck operation aborted successfully"
+          sleep 2  # Give Argo CD time to process
+
+          # Re-check operation state
+          NEW_STATE=$(kubectl get application "${APP_NAME}" -n "$ARGOCD_NS" -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
+          if [[ "$NEW_STATE" == "None" ]] || [[ -z "$NEW_STATE" ]]; then
+            log_success "Application is now ready for sync"
+            echo ""
+            log_info "Continuing validation after cleanup..."
+          else
+            log_error "Failed to clear operation state (still: ${NEW_STATE})"
+            exit 1
+          fi
+        else
+          log_error "Failed to abort stuck operation"
+          exit 1
+        fi
+      else
         log_info "Recommended actions:"
         echo "  1. Check Argo CD controller logs"
         echo "  2. Check for stuck hook jobs: kubectl get jobs -n ${TARGET_NS:-$DEST_NAMESPACE}"

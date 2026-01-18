@@ -618,6 +618,14 @@ jobs:
         with:
           kustomize-version: '5.8.0'
 
+      - name: Cleanup stuck Argo CD operations
+        uses: ./.github/actions/cleanup-argocd-operation
+        with:
+          app-name: yt-summarizer-prod
+          namespace: argocd
+          timeout-threshold: '300'
+        continue-on-error: false
+
       - name: Pre-deployment validation
         uses: ./.github/actions/validate
         with:

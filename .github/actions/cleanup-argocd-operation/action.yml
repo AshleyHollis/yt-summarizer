@@ -1,0 +1,141 @@
+name: Clean Up Stuck Argo CD Operation
+description: Detects and aborts stuck Argo CD sync operations to prevent deployment failures
+
+inputs:
+  app-name:
+    description: Name of the Argo CD application
+    required: true
+  namespace:
+    description: Namespace where Argo CD is installed
+    required: false
+    default: argocd
+  timeout-threshold:
+    description: Time in seconds before an operation is considered stuck
+    required: false
+    default: '300'
+  force:
+    description: Force cleanup even if operation is not stuck
+    required: false
+    default: 'false'
+
+outputs:
+  cleaned:
+    description: Whether a stuck operation was cleaned up (true/false)
+    value: ${{ steps.cleanup.outputs.cleaned }}
+  operation-state:
+    description: The operation state before cleanup
+    value: ${{ steps.cleanup.outputs.operation-state }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check and cleanup stuck operation
+      id: cleanup
+      shell: bash
+      run: |
+        APP_NAME="${{ inputs.app-name }}"
+        NAMESPACE="${{ inputs.namespace }}"
+        THRESHOLD="${{ inputs.timeout-threshold }}"
+        FORCE="${{ inputs.force }}"
+
+        echo "🔍 Checking Argo CD application: $APP_NAME"
+
+        # Check if application exists
+        if ! kubectl get application "$APP_NAME" -n "$NAMESPACE" &>/dev/null; then
+          echo "❌ Application '$APP_NAME' not found in namespace '$NAMESPACE'"
+          exit 1
+        fi
+
+        # Get operation state
+        OPERATION_STATE=$(kubectl get application "$APP_NAME" -n "$NAMESPACE" \
+          -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
+
+        echo "operation-state=$OPERATION_STATE" >> "$GITHUB_OUTPUT"
+        echo "  Operation State: $OPERATION_STATE"
+
+        # If no operation or operation is not running, nothing to do
+        if [[ "$OPERATION_STATE" != "Running" ]] && [[ "$FORCE" != "true" ]]; then
+          echo "✅ No running operation detected"
+          echo "cleaned=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # Check operation duration
+        STARTED_AT=$(kubectl get application "$APP_NAME" -n "$NAMESPACE" \
+          -o jsonpath='{.status.operationState.startedAt}' 2>/dev/null || echo "")
+
+        SHOULD_CLEANUP=false
+
+        if [[ "$FORCE" == "true" ]]; then
+          echo "⚠️  Force cleanup enabled"
+          SHOULD_CLEANUP=true
+        elif [[ -n "$STARTED_AT" ]]; then
+          # Parse RFC3339 timestamp - try multiple methods for cross-platform compatibility
+          # Argo CD returns format like: 2026-01-18T10:59:37Z
+
+          # Method 1: Try GNU date with -d (Linux)
+          if START_TIME=$(date -d "$STARTED_AT" +%s 2>/dev/null); then
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            echo "  Operation Duration: ${ELAPSED}s"
+          # Method 2: Try BSD date with -j (macOS)
+          elif START_TIME=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$STARTED_AT" +%s 2>/dev/null); then
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            echo "  Operation Duration: ${ELAPSED}s"
+          # Method 3: Use Python as fallback (most portable)
+          elif command -v python3 &>/dev/null; then
+            PYTHON_CMD='from datetime import datetime, timezone; '
+            PYTHON_CMD+='started = datetime.fromisoformat("$STARTED_AT".replace("Z", "+00:00")); '
+            PYTHON_CMD+='now = datetime.now(timezone.utc); '
+            PYTHON_CMD+='print(int((now - started).total_seconds()))'
+            ELAPSED=$(python3 -c "$PYTHON_CMD" 2>/dev/null || echo "-1")
+            if [[ $ELAPSED -ge 0 ]]; then
+              echo "  Operation Duration: ${ELAPSED}s"
+            else
+              echo "⚠️  Cannot parse timestamp, assuming operation is stuck"
+              SHOULD_CLEANUP=true
+              ELAPSED=9999  # Force cleanup
+            fi
+          else
+            echo "⚠️  Cannot parse timestamp (no date/python available), assuming operation is stuck"
+            SHOULD_CLEANUP=true
+            ELAPSED=9999  # Force cleanup
+          fi
+
+          if [[ $ELAPSED -gt $THRESHOLD ]]; then
+            echo "⚠️  Operation has been running for ${ELAPSED}s (threshold: ${THRESHOLD}s)"
+            SHOULD_CLEANUP=true
+          fi
+        fi
+
+        if [[ "$SHOULD_CLEANUP" == "true" ]]; then
+          echo ""
+          echo "🔧 Aborting stuck operation..."
+
+          if kubectl patch application "$APP_NAME" -n "$NAMESPACE" \
+            --type merge -p '{"operation":null}' 2>/dev/null; then
+            echo "✅ Successfully aborted operation"
+            echo "cleaned=true" >> "$GITHUB_OUTPUT"
+
+            # Wait a moment for Argo CD to process
+            sleep 3
+
+            # Verify cleanup
+            NEW_STATE=$(kubectl get application "$APP_NAME" -n "$NAMESPACE" \
+              -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
+
+            if [[ "$NEW_STATE" == "None" ]] || [[ -z "$NEW_STATE" ]]; then
+              echo "✅ Application is ready for new operations"
+            else
+              echo "⚠️  Operation state is now: $NEW_STATE"
+            fi
+          else
+            echo "❌ Failed to abort operation"
+            echo "cleaned=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+        else
+          echo "✅ Operation is within acceptable time threshold"
+          echo "cleaned=false" >> "$GITHUB_OUTPUT"
+        fi
