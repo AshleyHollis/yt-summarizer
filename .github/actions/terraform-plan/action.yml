@@ -49,4 +49,6 @@ runs:
       id: format
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      # Only parse if plan succeeded, but always run to provide empty output
       run: ${{ github.action_path }}/parse-terraform-plan.sh
+      continue-on-error: true

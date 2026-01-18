@@ -26,8 +26,16 @@ terraform plan -no-color -input=false -out=tfplan \
 
 PLAN_EXIT_CODE=$?
 
+# Capture plan output to GITHUB_OUTPUT
 echo "plan_output<<EOF" >> "$GITHUB_OUTPUT"
 cat plan_output.txt >> "$GITHUB_OUTPUT"
 echo "EOF" >> "$GITHUB_OUTPUT"
+
+# Provide clear error message if plan failed
+if [ $PLAN_EXIT_CODE -ne 0 ]; then
+  echo "::error::Terraform plan failed with exit code $PLAN_EXIT_CODE"
+  echo "::error::Review the plan output above for detailed error messages"
+  # Note: tfplan file will NOT exist if plan failed
+fi
 
 exit $PLAN_EXIT_CODE
