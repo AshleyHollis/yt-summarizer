@@ -13,8 +13,8 @@ inputs:
   deploy-frontend-result:
     description: 'Result of deploy-frontend job'
     required: true
-  health-check-result:
-    description: 'Result of health-check job'
+  verify-deployment-result:
+    description: 'Result of verify-deployment job'
     required: true
 runs:
   using: composite
@@ -26,5 +26,5 @@ runs:
         COMMIT_SHA: ${{ inputs.commit-sha }}
         UPDATE_OVERLAY_RESULT: ${{ inputs.update-overlay-result }}
         DEPLOY_FRONTEND_RESULT: ${{ inputs.deploy-frontend-result }}
-        HEALTH_CHECK_RESULT: ${{ inputs.health-check-result }}
+        VERIFY_DEPLOYMENT_RESULT: ${{ inputs.verify-deployment-result }}
       run: ${{ github.action_path }}/create-prod-summary.sh
