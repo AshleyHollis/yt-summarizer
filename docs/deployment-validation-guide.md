@@ -281,7 +281,84 @@ kubectl get secret db-credentials -n yt-summarizer -o jsonpath='{.data}'
 kubectl get pod -n yt-summarizer -l app=database
 ```
 
-### Scenario 5: Application Crash Loop
+### Scenario 5: Sync Loop (Synced → OutOfSync Repeatedly)
+
+**Error Message:**
+```
+❌ SYNC LOOP DETECTED (fail-fast at 3/36):
+  Argo CD is repeatedly syncing successfully but immediately returning to OutOfSync.
+  
+  Pattern detected:
+    - Operation completes successfully (Succeeded)
+    - Sync status briefly becomes 'Synced'
+    - Immediately flips back to 'OutOfSync'
+    - This has repeated 3 times
+  
+  Common causes:
+    1. Resource has fields that are modified by controllers/admission webhooks
+    2. Spec in git doesn't match actual desired state
+    3. ignoreDifferences configuration needed for certain fields
+    4. Resource is managed by multiple controllers (conflict)
+```
+
+**Root Cause:**
+The most common cause is **Jobs with Sync hooks** combined with **selfHeal: true**:
+1. Job completes successfully and `.status` fields change (completionTime, succeeded, etc.)
+2. selfHeal detects difference between desired state (no status) and actual state (completed)
+3. selfHeal triggers new sync, creating a new Job (due to BeforeHookCreation delete policy)
+4. Loop repeats infinitely
+
+**Fix:**
+Add `ignoreDifferences` to the Argo CD Application to ignore Job status fields:
+
+```yaml
+# k8s/argocd/prod-app.yaml
+spec:
+  ignoreDifferences:
+    # Ignore Job completion status to prevent sync loop with selfHeal
+    - group: batch
+      kind: Job
+      jqPathExpressions:
+        - .status.completionTime
+        - .status.conditions
+        - .status.startTime
+        - .status.succeeded
+        - .status.active
+        - .status.failed
+```
+
+**Other Common Resources Needing ignoreDifferences:**
+```yaml
+# Deployments (Kubernetes adds default values)
+- group: apps
+  kind: Deployment
+  jqPathExpressions:
+    - .spec.replicas  # If using HPA
+    - .spec.template.spec.containers[].resources  # If modified by VPA
+
+# Services (cloud providers modify)
+- group: ""
+  kind: Service
+  jqPathExpressions:
+    - .spec.clusterIP
+    - .spec.clusterIPs
+    - .metadata.annotations.cloud\.google\.com  # Cloud-specific annotations
+```
+
+**Verification:**
+```bash
+# Watch for sync loop pattern
+kubectl get application yt-summarizer-prod -n argocd -w
+
+# Check which resources are out of sync
+kubectl get application yt-summarizer-prod -n argocd \
+  -o jsonpath='{.status.resources}' | jq '.[] | select(.status != "Synced")'
+
+# View diff between desired and actual state
+argocd app diff yt-summarizer-prod
+```
+
+### Scenario 6: Application Crash Loop
 
 **Error Message:**
 ```
