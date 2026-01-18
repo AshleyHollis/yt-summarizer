@@ -637,14 +637,13 @@ jobs:
           timeout-seconds: '60'
 
       - name: Validate Argo CD readiness (fail-fast)
-        shell: bash
-        env:
-          APP_NAME: yt-summarizer-prod
-          ARGOCD_NAMESPACE: argocd
-          CHECK_TIMEOUT: 60
-        run: ./.github/actions/verify-deployment/check-argocd-readiness.sh -v
+        uses: ./.github/actions/check-argocd-readiness
+        with:
+          app-name: yt-summarizer-prod
+          namespace: argocd
+          timeout: '60'
+          verbose: 'true'
         continue-on-error: false
-
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
         with:
@@ -666,7 +665,7 @@ jobs:
       - name: Verify API deployment image
         uses: ./.github/actions/verify-deployment
         with:
-          namespace: prod
+          namespace: yt-summarizer
           deployment-name: api
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
@@ -676,7 +675,7 @@ jobs:
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-workers
         with:
-          namespace: prod
+          namespace: yt-summarizer
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           image-name: yt-summarizer-workers
