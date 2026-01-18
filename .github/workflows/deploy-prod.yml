@@ -663,25 +663,25 @@ jobs:
             echo "image_tag=${{ needs.get-last-prod-image.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify API deployment image
-        uses: ./.github/actions/verify-deployment
-        with:
-          namespace: prod
-          deployment-name: api
-          expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: yt-summarizer-api
-          app-name: yt-summarizer-prod
+       - name: Verify API deployment image
+         uses: ./.github/actions/verify-deployment
+         with:
+           namespace: yt-summarizer
+           deployment-name: api
+           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
+           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+           image-name: yt-summarizer-api
+           app-name: yt-summarizer-prod
 
-      - name: Verify workers deployment image
-        uses: ./.github/actions/verify-workers
-        with:
-          namespace: prod
-          expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: yt-summarizer-workers
-          workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
-          fail-on-mismatch: 'true'
+       - name: Verify workers deployment image
+         uses: ./.github/actions/verify-workers
+         with:
+           namespace: yt-summarizer
+           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
+           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+           image-name: yt-summarizer-workers
+           workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+           fail-on-mismatch: 'true'
 
       - name: Collect deployment diagnostics on failure
         if: failure()
