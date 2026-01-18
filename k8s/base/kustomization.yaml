@@ -9,7 +9,6 @@ namespace: yt-summarizer
 resources:
   - namespace.yaml
   - configmap.yaml
-  - secretstore.yaml
   - api-deployment.yaml
   - api-service.yaml
 

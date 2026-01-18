@@ -212,8 +212,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/AshleyHollis/yt-summarizer
-    # TODO: Change to 'main' after prod-secretstore overlay is merged
-    targetRevision: fix/cicd-improvements
+    targetRevision: main
     path: k8s/overlays/prod-secretstore
     # Use Kustomize to apply Workload Identity patches
   destination:
