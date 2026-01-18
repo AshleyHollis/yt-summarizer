@@ -616,6 +616,13 @@ jobs:
           tag: ${{ steps.determine-tag.outputs.image_tag }}
           run-k8s-pull-test: 'true'
 
+      - name: Validate image tag format
+        if: needs.get-ci-image-tag.result == 'success'
+        uses: ./.github/actions/validate-image-tag
+        with:
+          ci-image-tag: ${{ steps.determine-tag.outputs.image_tag }}
+          commit-sha: ${{ github.sha }}
+
       - name: Commit and push changes
         uses: ./.github/actions/commit-kustomization
         with:
