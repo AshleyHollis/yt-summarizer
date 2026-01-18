@@ -784,15 +784,28 @@ jobs:
   # ---------------------------------------------------------------------------
   # Deploy Frontend to SWA
   # ---------------------------------------------------------------------------
+  # DECOUPLED FROM BACKEND: Frontend deployment is independent of backend jobs.
+  # Frontend can deploy whenever:
+  #   - apps/web code changes (auto)
+  #   - Workflow dispatch with run_frontend=true (manual)
+  #   - Workflow/CI files change (for env var updates)
+  #
+  # This allows frontend-only deployments without requiring backend image validation.
+  # ---------------------------------------------------------------------------
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    needs: [update-overlay, verify-deployment]
+    needs: [detect-changes, wait-for-ci]
     if: |
       !cancelled() &&
-      needs.update-overlay.result == 'success' &&
-      needs.verify-deployment.result == 'success' &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_frontend != false)
+      needs.wait-for-ci.result == 'success' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.run_frontend != false) ||
+        (github.event_name != 'workflow_dispatch' && (
+          contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
+          contains(needs.detect-changes.outputs.changed_areas, 'ci')
+        ))
+      )
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
