@@ -23,6 +23,25 @@ echo "  Namespace: ${NAMESPACE}"
 echo "  Timeout: ${TIMEOUT}s"
 echo ""
 
+# CRITICAL PRE-CHECK: Verify namespace exists
+echo "::group::🔍 Pre-check: Verify namespace exists"
+if ! kubectl get namespace ${NAMESPACE} &>/dev/null; then
+  echo "::error::❌ CRITICAL: Namespace '${NAMESPACE}' does not exist!"
+  echo ""
+  echo "Available namespaces:"
+  kubectl get namespaces -o name | sed 's/^namespace\//  /'
+  echo ""
+  echo "Common production namespace names to check:"
+  echo "  - yt-summarizer (actual production namespace)"
+  echo "  - prod (legacy name)"
+  echo "  - production"
+  echo "::endgroup::"
+  exit 1
+fi
+echo "✅ Namespace '${NAMESPACE}' exists"
+echo "::endgroup::"
+echo ""
+
 # CRITICAL PRE-CHECK: Verify overlay actually contains expected image tag
 # If APP_NAME not provided, derive it from namespace
 if [ -z "$APP_NAME" ]; then
@@ -140,7 +159,22 @@ check_pod_issues() {
   local deployment=$2
   local fail_on_error=${3:-false}
 
-  local pods=$(kubectl get pods -n ${namespace} -l app=${deployment} -o name 2>/dev/null)
+  # Try multiple label selectors to find pods
+  local pods=""
+  
+  # Try app.kubernetes.io/name label first (new standard)
+  pods=$(kubectl get pods -n ${namespace} -l app.kubernetes.io/name=${deployment} -o name 2>/dev/null)
+  
+  # Fallback to app label (legacy)
+  if [ -z "$pods" ]; then
+    pods=$(kubectl get pods -n ${namespace} -l app=${deployment} -o name 2>/dev/null)
+  fi
+  
+  # Fallback to deployment owner reference
+  if [ -z "$pods" ]; then
+    pods=$(kubectl get pods -n ${namespace} --field-selector=metadata.ownerReferences[*].name=${deployment} -o name 2>/dev/null)
+  fi
+  
   if [ -z "$pods" ]; then
     return 0
   fi
@@ -234,7 +268,11 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
     echo "✅ Deployment ${DEPLOYMENT} has correct image: ${CURRENT_IMAGE}"
 
     echo "::group::🔍 Pod Image Verification"
-    POD_IMAGES=$(kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o jsonpath='{.items[*].spec.containers[0].image}' 2>/dev/null)
+    # Try multiple label selectors to find pods
+    POD_IMAGES=$(kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=${DEPLOYMENT} -o jsonpath='{.items[*].spec.containers[0].image}' 2>/dev/null)
+    if [ -z "$POD_IMAGES" ]; then
+      POD_IMAGES=$(kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o jsonpath='{.items[*].spec.containers[0].image}' 2>/dev/null)
+    fi
     if [ -n "$POD_IMAGES" ]; then
       echo "  Pod images: ${POD_IMAGES}"
       if echo "${POD_IMAGES}" | grep -q "${EXPECTED_TAG}"; then
@@ -252,7 +290,10 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
         echo "::group::📋 Final Status Summary"
         kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o wide
         echo ""
-        kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o wide
+        # Try to get pods with proper label selector
+        kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=${DEPLOYMENT} -o wide 2>/dev/null || \
+          kubectl get pods -n ${NAMESPACE} -l app=${DEPLOYMENT} -o wide 2>/dev/null || \
+          echo "  (Could not find pods with standard labels)"
         echo "::endgroup::"
         echo ""
         echo "🎉 Verification complete! Deployment is healthy and using correct image."
