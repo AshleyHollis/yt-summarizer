@@ -119,5 +119,19 @@ spec:
 
       revisionHistoryLimit: 3
 
+      # Ignore differences to prevent sync loops
+      ignoreDifferences:
+        # Ignore Job completion status to prevent sync loop with selfHeal
+        # Jobs with Sync hooks complete successfully but status changes trigger re-sync
+        - group: batch
+          kind: Job
+          jqPathExpressions:
+            - .status.completionTime
+            - .status.conditions
+            - .status.startTime
+            - .status.succeeded
+            - .status.active
+            - .status.failed
+
   syncPolicy:
     preserveResourcesOnDeletion: false
