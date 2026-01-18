@@ -580,6 +580,11 @@ jobs:
           target-namespace: yt-summarizer
           timeout-seconds: '60'
 
+      - name: Validate Argo CD readiness (fail-fast)
+        shell: bash
+        run: ./.github/actions/verify-deployment/check-argocd-readiness.sh yt-summarizer-prod -v
+        continue-on-error: false
+
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
         with:
@@ -617,6 +622,19 @@ jobs:
           image-name: yt-summarizer-workers
           workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
           fail-on-mismatch: 'true'
+
+      - name: Collect deployment diagnostics on failure
+        if: failure()
+        shell: bash
+        run: ./scripts/diagnose-argocd-deployment.sh yt-summarizer-prod ./diagnostics
+
+      - name: Upload diagnostics artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+           name: deployment-diagnostics-prod
+           path: diagnostics/
+           retention-days: 7
 
       - name: Run API health checks
         uses: ./.github/actions/health-check
