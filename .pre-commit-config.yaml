@@ -38,11 +38,19 @@ repos:
       - id: yamllint
         name: Lint YAML files
         args: ['-d', '{extends: relaxed, rules: {line-length: {max: 200}, comments: {min-spaces-from-content: 1}, new-lines: disable}}']
-
         exclude: ^k8s/.*\.yaml$  # K8s manifests often have long lines
 
   - repo: local
     hooks:
+      - id: check-script-permissions
+        name: Check script executable permissions
+        entry: python tools/check-script-permissions.py
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [commit]
+        verbose: true
+
       - id: always-run-precommit
         name: Pre-commit validator
         entry: python tools/pre-commit.local
