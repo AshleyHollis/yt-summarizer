@@ -8,7 +8,7 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: The examples below include test tasks. Tests are **NON-NEGOTIABLE** per Constitution VI.5 - **ALL features MUST include unit, integration, and E2E tests**. Tests are NEVER optional.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -51,6 +51,7 @@ description: "Task list template for feature implementation"
 - [ ] T001 Create project structure per implementation plan
 - [ ] T002 Initialize [language] project with [framework] dependencies
 - [ ] T003 [P] Configure linting and formatting tools
+- [ ] T004 [P] Setup test infrastructure (pytest, vitest, playwright, etc.)
 
 ---
 
@@ -62,12 +63,12 @@ description: "Task list template for feature implementation"
 
 Examples of foundational tasks (adjust based on your project):
 
-- [ ] T004 Setup database schema and migrations framework
-- [ ] T005 [P] Implement authentication/authorization framework
-- [ ] T006 [P] Setup API routing and middleware structure
-- [ ] T007 Create base models/entities that all stories depend on
-- [ ] T008 Configure error handling and logging infrastructure
-- [ ] T009 Setup environment configuration management
+- [ ] T005 Setup database schema and migrations framework
+- [ ] T006 [P] Implement authentication/authorization framework
+- [ ] T007 [P] Setup API routing and middleware structure
+- [ ] T008 Create base models/entities that all stories depend on
+- [ ] T009 Configure error handling and logging infrastructure
+- [ ] T010 Setup environment configuration management
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -77,14 +78,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Goal**: [Brief description of what this story delivers]
 
-**Independent Test**: [How to verify this story works on its own]
-
-### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
-
-> **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
-
-- [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+**Automated Test Coverage**: E2E tests verify this story in `tests/e2e/test_us1_*.spec.ts`
 
 ### Implementation for User Story 1
 
@@ -125,24 +119,51 @@ Examples of foundational tasks (adjust based on your project):
 
 **Goal**: [Brief description of what this story delivers]
 
-**Independent Test**: [How to verify this story works on its own]
-
-### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
-
-- [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+**Automated Test Coverage**: E2E tests verify this story in `tests/e2e/test_us3_*.spec.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T027 [US3] Implement [Service] in src/services/[service].py
-- [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T024 [P] [US3] Create [Entity] model in src/models/[entity].py
+- [ ] T025 [US3] Implement [Service] in src/services/[service].py
+- [ ] T026 [US3] Implement [endpoint/feature] in src/[location]/[file].py
 
 **Checkpoint**: All user stories should now be independently functional
 
 ---
 
 [Add more user story phases as needed, following the same pattern]
+
+---
+
+## Phase N-1: Comprehensive Test Coverage
+
+**Purpose**: Ensure all functionality is covered by automated tests
+
+### Unit Tests
+- [ ] TXXX [P] API route handler tests in tests/api/
+- [ ] TXXX [P] Service layer tests in tests/services/
+- [ ] TXXX [P] Frontend component tests in tests/components/
+- [ ] TXXX [P] Worker processing tests in tests/workers/
+
+### Integration Tests
+- [ ] TXXX [P] API → Database integration tests in tests/integration/test_api_db.py
+- [ ] TXXX [P] API endpoint integration tests (all routes) in tests/integration/
+- [ ] TXXX [P] Worker → Queue integration tests in tests/integration/test_worker_queue.py
+
+### Message Contract Tests (for multi-service systems)
+- [ ] TXXX [P] Message dataclass required field validation in tests/contracts/test_message_fields.py
+- [ ] TXXX [P] Message propagation tests (data flows between services) in tests/contracts/test_propagation.py
+- [ ] TXXX [P] Enum/status consistency tests in tests/contracts/test_enums.py
+- [ ] TXXX [P] Full pipeline message flow tests in tests/contracts/test_pipeline.py
+
+### E2E Tests
+- [ ] TXXX [P] User Story 1 E2E tests in tests/e2e/test_us1_*.spec.ts
+- [ ] TXXX [P] User Story 2 E2E tests in tests/e2e/test_us2_*.spec.ts
+- [ ] TXXX [P] User Story 3 E2E tests in tests/e2e/test_us3_*.spec.ts
+- [ ] TXXX [P] Error handling E2E tests in tests/e2e/test_errors.spec.ts
+- [ ] TXXX [P] Edge case E2E tests in tests/e2e/test_edge_cases.spec.ts
+
+**Checkpoint**: All automated tests pass (100% pass rate required)
 
 ---
 
@@ -153,9 +174,9 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Documentation updates in docs/
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
-- [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
+- [ ] TXXX Verify all tests pass: API, Workers, Frontend, E2E
 
 ---
 
@@ -168,7 +189,8 @@ Examples of foundational tasks (adjust based on your project):
 - **User Stories (Phase 3+)**: All depend on Foundational phase completion
   - User stories can then proceed in parallel (if staffed)
   - Or sequentially in priority order (P1 → P2 → P3)
-- **Polish (Final Phase)**: Depends on all desired user stories being complete
+- **Test Coverage (Phase N-1)**: Depends on all user stories being complete
+- **Polish (Final Phase)**: Depends on all tests passing
 
 ### User Story Dependencies
 

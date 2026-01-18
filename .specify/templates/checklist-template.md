@@ -38,3 +38,108 @@
 - Add comments or findings inline
 - Link to relevant resources or documentation
 - Items are numbered sequentially for easy reference
+
+---
+
+# Verification Checklist Template
+
+**Use this structure for implementation verification checklists.**
+
+## ⚠️ CRITICAL: All verification MUST be automated
+
+**No manual testing items allowed.** Every verification item must be runnable via automated tests.
+
+---
+
+## Test Suite Gates (ALL MUST PASS: 100%)
+
+### API Tests
+- [ ] CHK-V010: Run `cd services/api && python -m pytest tests/ -v`
+- [ ] CHK-V011: All API tests pass (0 failures)
+- [ ] CHK-V012: Test count documented: **[X] tests passed**
+
+### Worker Tests
+- [ ] CHK-V015: Run `cd services/workers && python -m pytest tests/ -v`
+- [ ] CHK-V016: All worker tests pass (0 failures)
+- [ ] CHK-V017: Test count documented: **[X] tests passed**
+
+### Frontend Unit Tests
+- [ ] CHK-V020: Run `cd apps/web && npm run test:run`
+- [ ] CHK-V021: All frontend tests pass (0 failures)
+- [ ] CHK-V022: Test count documented: **[X] tests passed**
+
+### E2E Tests (Integration)
+- [ ] CHK-V030: Run E2E test command
+- [ ] CHK-V031: All E2E tests pass (0 failures)
+- [ ] CHK-V032: Test count documented: **[X] tests passed**
+
+---
+
+## Test Coverage Categories
+
+### Unit Tests
+- [ ] CHK-V040: Route handlers tested
+- [ ] CHK-V041: Service layer business logic tested
+- [ ] CHK-V042: Frontend components tested
+- [ ] CHK-V043: Worker processing logic tested
+
+### Integration Tests
+- [ ] CHK-V050: API → Database integration tested
+- [ ] CHK-V051: Worker → Queue integration tested
+- [ ] CHK-V052: Cross-service communication tested
+
+### Message Contract Tests (for multi-service systems)
+- [ ] CHK-V060: Message dataclass required fields validated
+- [ ] CHK-V061: Message propagation through pipeline tested
+- [ ] CHK-V062: Enum consistency between services tested
+- [ ] CHK-V063: Full pipeline message flow tested
+
+### E2E Tests (User Stories)
+- [ ] CHK-V070: User Story 1 flow automated
+- [ ] CHK-V071: User Story 2 flow automated
+- [ ] CHK-V072: User Story 3 flow automated
+- [ ] CHK-V073: Error handling and edge cases automated
+
+---
+
+## Verification Commands Template
+
+```powershell
+# 1. Start services (background - REQUIRED for E2E tests)
+# [Add project-specific startup command]
+
+# 2. Run ALL backend tests
+# [Add backend test commands]
+
+# 3. Run frontend unit tests
+# [Add frontend test command]
+
+# 4. Run E2E tests
+# [Add E2E test command]
+```
+
+---
+
+## Sign-Off
+
+| Test Suite | Result | Count | Date |
+|------------|--------|-------|------|
+| API Tests | ⬜ | | |
+| Worker Tests | ⬜ | | |
+| Frontend Tests | ⬜ | | |
+| E2E Tests | ⬜ | | |
+
+**Total Automated Tests**: 0  
+**Manual Tests Required**: 0 (ALL automated)  
+**Verified By**: Automated CI  
+**Date**: [DATE]
+
+---
+
+## Notes
+
+- ALL verification is automated - no manual smoke tests
+- If ANY test fails, the implementation is NOT complete
+- Do NOT mark tasks [X] until all automated tests pass
+- Re-run verification after any code changes
+- E2E tests cover all user story acceptance criteria
