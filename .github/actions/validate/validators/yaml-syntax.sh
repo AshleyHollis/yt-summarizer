@@ -40,6 +40,9 @@ echo -e "${BLUE}ℹ️  Found $FILE_COUNT YAML file(s)${NC}"
 echo ""
 
 # Validate all files
+FAILED_FILE="/tmp/yaml_failed_$$.txt"
+: > "$FAILED_FILE"
+
 find "$K8S_DIR" -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | sort | while read -r file; do
   # Check if file is empty
   if [[ ! -s "$file" ]]; then
@@ -67,6 +70,7 @@ except Exception as e:
     echo "  Error details:"
     python -c "import yaml; list(yaml.safe_load_all(open('$file', encoding='utf-8-sig')))" 2>&1 | head -3 | sed 's/^/    /'
     echo ""
+    echo "$file" >> "$FAILED_FILE"
   fi
 done
 
@@ -74,21 +78,8 @@ done
 echo ""
 echo -e "${BLUE}ℹ️  Validation complete${NC}"
 
-# Count failures
-FAILURES=$(find "$K8S_DIR" -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | while read -r file; do
-  if [[ -s "$file" ]]; then
-    if ! python -c "
-import yaml, sys
-try:
-  with open('$file', encoding='utf-8-sig') as f:
-    list(yaml.safe_load_all(f))
-except:
-  sys.exit(1)
-" 2>/dev/null; then
-      echo "FAIL"
-    fi
-  fi
-done | wc -l)
+FAILURES=$(wc -l < "$FAILED_FILE" | awk '{print $1}')
+rm -f "$FAILED_FILE"
 
 if [[ $FAILURES -gt 0 ]]; then
   echo -e "${RED}❌ Failed: $FAILURES file(s)${NC}"
