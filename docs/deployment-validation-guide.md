@@ -47,12 +47,12 @@ Runs BEFORE Argo CD sync to detect configuration errors early.
   Repository: https://github.com/AshleyHollis/yt-summarizer.git
   Path: k8s/overlays/prod
   Destination Namespace: yt-summarizer
-  
+
 ✅ Check 3: Manifest generation
 ✅ Check 4: Sync conditions
   Health Status: Progressing
   Sync Status: OutOfSync
-  
+
 ✅ Check 5: Sync operation status
 ✅ Check 6: Resource validation
   Resource kinds found: Namespace, ConfigMap, ServiceAccount, Service, Deployment, ExternalSecret
@@ -99,10 +99,10 @@ Monitors Argo CD for errors during the sync operation. Fails immediately when er
   🔍 Checking for manifest generation errors...
   ❌ MANIFEST GENERATION ERROR DETECTED (fail-fast):
     kustomize build failed - invalid YAML syntax
-  
+
   This means the YAML/Kustomize overlay has invalid syntax.
   Argo CD cannot sync until this is fixed.
-  
+
   Exit code: 1
 ```
 
@@ -287,13 +287,13 @@ kubectl get pod -n yt-summarizer -l app=database
 ```
 ❌ SYNC LOOP DETECTED (fail-fast at 3/36):
   Argo CD is repeatedly syncing successfully but immediately returning to OutOfSync.
-  
+
   Pattern detected:
     - Operation completes successfully (Succeeded)
     - Sync status briefly becomes 'Synced'
     - Immediately flips back to 'OutOfSync'
     - This has repeated 3 times
-  
+
   Common causes:
     1. Resource has fields that are modified by controllers/admission webhooks
     2. Spec in git doesn't match actual desired state

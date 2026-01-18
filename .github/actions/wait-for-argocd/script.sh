@@ -135,12 +135,12 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
     CURRENT_SYNCED_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.revision}' 2>/dev/null || echo "")
     CURRENT_TARGET_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "")
     CURRENT_OPERATION_PHASE=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "")
-    
+
     # CRITICAL: Detect sync loop (Synced -> OutOfSync -> Synced -> OutOfSync repeatedly)
     # This indicates a configuration issue where resources keep being modified after sync
     if [ "$CURRENT_OPERATION_PHASE" = "Succeeded" ] && [ "$CURRENT_SYNC_STATUS" = "OutOfSync" ]; then
       SYNC_FLIP_COUNT=$((SYNC_FLIP_COUNT + 1))
-      
+
       if [ $SYNC_FLIP_COUNT -ge 3 ]; then
         echo "::error::❌ SYNC LOOP DETECTED (fail-fast at ${i}/${MAX_ATTEMPTS})!"
         echo ""
@@ -227,7 +227,7 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
     # These indicate the overlay/manifest is invalid and sync will never succeed
     echo ""
     echo "  🔍 Checking for manifest generation errors..."
-    
+
     # Check if Argo CD comparison phase failed (invalid manifest)
     COMPARISON_ERROR=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.conditions[?(@.type=="ComparisonError")].message}' 2>/dev/null || echo "")
     if [ -n "$COMPARISON_ERROR" ]; then
@@ -238,7 +238,7 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
       echo "Argo CD cannot sync until this is fixed."
       exit 1
     fi
-    
+
     # Check for resource creation errors in the status
     RESOURCE_ERRORS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.conditions[?(@.type=="InvalidResourcePath")].message}' 2>/dev/null || echo "")
     if [ -n "$RESOURCE_ERRORS" ]; then
@@ -246,26 +246,26 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
       echo "  ${RESOURCE_ERRORS}"
       exit 1
     fi
-    
+
     # Check if operational state indicates sync error
     OPERATION_STATE=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "")
     OPERATION_MSG=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.message}' 2>/dev/null || echo "")
-    
+
     if [ "$OPERATION_STATE" = "Failed" ]; then
       echo "::error::❌ SYNC OPERATION FAILED (fail-fast):"
       echo "  Message: ${OPERATION_MSG}"
       echo ""
-      
+
       # Try to extract the actual error
       SYNC_RESULT=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.syncResult}' 2>/dev/null || echo "")
       if [ -n "$SYNC_RESULT" ]; then
         echo "Sync result details:"
         echo "$SYNC_RESULT" | jq . 2>/dev/null || echo "$SYNC_RESULT"
       fi
-      
+
       exit 1
     fi
-    
+
     # Check for any hook job failures
     if [[ "$OPERATION_MSG" == *"hook"* ]]; then
       HOOK_JOB=$(echo "$OPERATION_MSG" | grep -oP '(?<=hook batch/Job/)[^ ]+' || echo "")
@@ -275,7 +275,7 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
           if kubectl get job ${HOOK_JOB} -n ${NAMESPACE} &>/dev/null; then
             JOB_FAILED=$(kubectl get job ${HOOK_JOB} -n ${NAMESPACE} -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
             JOB_ACTIVE=$(kubectl get job ${HOOK_JOB} -n ${NAMESPACE} -o jsonpath='{.status.active}' 2>/dev/null || echo "0")
-            
+
             if [ "$JOB_FAILED" -gt 0 ]; then
               echo "::error::❌ HOOK JOB FAILED (fail-fast):"
               # Get pod logs
@@ -291,7 +291,7 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
         fi
       fi
     fi
-    
+
     echo "  ✅ No manifest errors detected"
 
     # EARLY FAILURE DETECTION: Check for common issues in the namespace

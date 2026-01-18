@@ -24,9 +24,6 @@ inputs:
   validate-terraform-result:
     description: 'Result of validate-terraform job'
     required: true
-  validate-kustomize-result:
-    description: 'Result of validate-kustomize job'
-    required: true
   kubernetes-validate-result:
     description: 'Result of kubernetes-validate job'
     required: true
@@ -61,7 +58,6 @@ runs:
         TEST_WORKERS_RESULT: ${{ inputs.test-workers-result }}
         TEST_FRONTEND_RESULT: ${{ inputs.test-frontend-result }}
         VALIDATE_TERRAFORM_RESULT: ${{ inputs.validate-terraform-result }}
-        VALIDATE_KUSTOMIZE_RESULT: ${{ inputs.validate-kustomize-result }}
         KUBERNETES_VALIDATE_RESULT: ${{ inputs.kubernetes-validate-result }}
         SECRET_SCANNING_RESULT: ${{ inputs.secret-scanning-result }}
         SECRET_SCANNING_SHOULD_RUN: ${{ inputs.secret-scanning-should-run }}

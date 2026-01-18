@@ -1,5 +1,6 @@
-name: Wait for Argo CD Sync
+name: Wait for Argo CD
 description: Wait for Argo CD to sync and create/update the environment
+# Renamed from: wait-for-argocd-sync (for naming consistency)
 
 inputs:
   app-name:

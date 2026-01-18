@@ -269,10 +269,12 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Validate Terraform configuration
-        uses: ./.github/actions/validate-terraform-config
+        uses: ./.github/actions/validate
         with:
-          working-directory: infra/terraform/environments/prod
-          backend-config: 'true'
+          validators: terraform-config
+          terraform-directory: infra/terraform/environments/prod
+          fail-fast: 'true'
+          timeout-seconds: '60'
 
       - name: Terraform Plan
         id: plan
@@ -361,10 +363,12 @@ jobs:
           path: infra/terraform/environments/prod
 
       - name: Validate Terraform configuration
-        uses: ./.github/actions/validate-terraform-config
+        uses: ./.github/actions/validate
         with:
-          working-directory: infra/terraform/environments/prod
-          backend-config: 'true'
+          validators: terraform-config
+          terraform-directory: infra/terraform/environments/prod
+          fail-fast: 'true'
+          timeout-seconds: '60'
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
@@ -658,10 +662,12 @@ jobs:
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
 
       - name: Validate generated overlay (kustomize + dry-run)
-        uses: ./.github/actions/kustomize-validate
+        uses: ./.github/actions/validate
         with:
-          overlay-path: k8s/overlays/preview
-          overlay-name: preview
+          validators: kustomize-build
+          overlay-paths: k8s/overlays/preview
+          fail-fast: 'true'
+          timeout-seconds: '30'
 
       - name: Commit and push overlay update
         uses: ./.github/actions/commit-overlay-changes
@@ -716,8 +722,23 @@ jobs:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
+      - name: Setup Kustomize
+        uses: ./.github/actions/setup-kustomize
+        with:
+          kustomize-version: '5.8.0'
+
+      - name: Pre-deployment validation
+        uses: ./.github/actions/validate
+        with:
+          validators: kustomize-build,argocd-manifest
+          overlay-paths: k8s/overlays/preview
+          argocd-app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          argocd-namespace: argocd
+          target-namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          timeout-seconds: '60'
+
       - name: Wait for Argo CD to sync
-        uses: ./.github/actions/wait-for-argocd-sync
+        uses: ./.github/actions/wait-for-argocd
         with:
           app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
@@ -725,15 +746,16 @@ jobs:
           timeout-seconds: '180'
 
       - name: Verify API deployment image
-        uses: ./.github/actions/verify-deployment-image
+        uses: ./.github/actions/verify-deployment
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           deployment-name: api
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           image-name: yt-summarizer-api
+
       - name: Verify workers deployment image
-        uses: ./.github/actions/verify-worker-deployments
+        uses: ./.github/actions/verify-workers
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
@@ -752,7 +774,7 @@ jobs:
           interval-seconds: '10'
 
       - name: Verify API Certificate
-        uses: ./.github/actions/verify-tls-certificate
+        uses: ./.github/actions/verify-certificate
         with:
           host: ${{ needs.get-ingress.outputs.preview_host }}
 

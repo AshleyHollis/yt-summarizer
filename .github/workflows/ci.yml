@@ -428,6 +428,8 @@ jobs:
   #   2. Kustomize builds (base + overlays)
   #   3. ArgoCD Application paths exist
   # Catches k8s config errors before they reach cluster
+  #
+  # Uses consolidated validate action for all checks
   # ===========================================================================
   kubernetes-validate:
     name: Kubernetes Validation
@@ -446,42 +448,15 @@ jobs:
         with:
           kustomize-version: '5.8.0'
 
-      # -----------------------------------------------------------------------
-      # Step 1: YAML Syntax Validation
-      # -----------------------------------------------------------------------
-      - name: Validate YAML syntax (all K8s manifests)
-        uses: ./.github/actions/validate-k8s-yaml
+      - name: Validate Kubernetes manifests
+        uses: ./.github/actions/validate
         with:
-          directory: k8s
-
-      # -----------------------------------------------------------------------
-      # Step 2: Kustomize Build Validation (using composite action)
-      # -----------------------------------------------------------------------
-      - name: Validate preview overlay
-        uses: ./.github/actions/kustomize-validate
-        with:
-          overlay-path: k8s/overlays/preview
-          overlay-name: preview
-          max-cpu: '1500'
-          output-file: /tmp/preview.yaml
-
-      - name: Validate prod overlay
-        uses: ./.github/actions/kustomize-validate
-        with:
-          overlay-path: k8s/overlays/prod
-          overlay-name: prod
-
-      - name: Validate prod-secretstore overlay
-        uses: ./.github/actions/kustomize-validate
-        with:
-          overlay-path: k8s/overlays/prod-secretstore
-          overlay-name: prod-secretstore
-
-      # -----------------------------------------------------------------------
-      # Step 3: ArgoCD Application Path Validation
-      # -----------------------------------------------------------------------
-      - name: Validate ArgoCD Application paths exist
-        uses: ./.github/actions/validate-argocd-paths
+          validators: yaml-syntax,kustomize-build,argocd-paths
+          k8s-directory: k8s
+          overlay-paths: k8s/overlays/preview,k8s/overlays/prod,k8s/overlays/prod-secretstore
+          base-paths: k8s/base
+          fail-fast: 'true'
+          timeout-seconds: '90'
 
 
   # ===========================================================================
@@ -672,7 +647,7 @@ jobs:
   # PHASE 6: INFRASTRUCTURE VALIDATION
   # ===========================================================================
   # Terraform: Validates HCL syntax and plan (when infra/terraform/ changes)
-  # Kustomize: Validates base and overlays build correctly (always runs)
+  # Note: Kustomize validation moved to Phase 5 (kubernetes-validate)
   # ===========================================================================
   validate-terraform:
     name: Validate Terraform
@@ -702,39 +677,15 @@ jobs:
           terraform_version: "1.5"
 
       - name: Validate Terraform configuration
-        uses: ./.github/actions/validate-terraform-config
+        uses: ./.github/actions/validate
         with:
-          working-directory: infra/terraform/environments/prod
-
-  validate-kustomize:
-    name: Validate Kustomize
-    runs-on: ubuntu-latest
-    needs: [detect-changes]
-    # Main branch: Always run | PR: Run if k8s changed
-    if: |
-      needs.detect-changes.outputs.is_main_branch == 'true' ||
-      contains(needs.detect-changes.outputs.changed_areas, 'k8s')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Kustomize
-        uses: imranismail/setup-kustomize@v2
-
-      - name: Validate base manifests
-        uses: ./.github/actions/kustomize-validate
-        with:
-          overlay-path: k8s/base
-          overlay-name: base
-
-      - name: Validate prod overlay
-        uses: ./.github/actions/kustomize-validate
-        with:
-          overlay-path: k8s/overlays/prod
-          overlay-name: prod
+          validators: terraform-config
+          terraform-directory: infra/terraform/environments/prod
+          fail-fast: 'true'
+          timeout-seconds: '60'
 
   # ===========================================================================
-  # PHASE 7: SECURITY SCANNING
+  # PHASE 7: SECRET SCANNING
   # ===========================================================================
   # Runs gitleaks to detect secrets in code
   # Only runs when has_code_changes == true (skips for pure k8s/docs changes)
@@ -830,7 +781,6 @@ jobs:
       - build-images-meta
       - build-images-validate
       - validate-terraform
-      - validate-kustomize
       - kubernetes-validate
       - secret-scanning
       - validate-workflows
@@ -878,7 +828,6 @@ jobs:
           test-workers-duration: ${{ needs.test-workers.outputs.test_duration }}
           test-frontend-result: ${{ needs.test-frontend.result }}
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
-          validate-kustomize-result: ${{ needs.validate-kustomize.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           build-images-result: ${{ needs.build-images.result }}
           image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
@@ -896,7 +845,6 @@ jobs:
           test-workers-result: ${{ needs.test-workers.result }}
           test-frontend-result: ${{ needs.test-frontend.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
-          validate-kustomize-result: ${{ needs.validate-kustomize.result }}
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
           secret-scanning-result: ${{ needs.secret-scanning.result }}
           secret-scanning-should-run: ${{ needs.detect-changes.outputs.has_code_changes }}
