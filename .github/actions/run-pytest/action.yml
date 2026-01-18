@@ -6,9 +6,13 @@ inputs:
     description: Directory containing tests to run
     required: true
   pytest-args:
-    description: Additional pytest arguments
+    description: Additional pytest arguments (excluding -m marker expression)
     required: false
     default: '-v --tb=short'
+  markers:
+    description: Marker expression for -m option (e.g., "not integration and not live")
+    required: false
+    default: ''
   parallel:
     description: Run tests in parallel with pytest-xdist
     required: false
@@ -21,6 +25,8 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        PARALLEL: ${{ inputs.parallel }}
         PYTEST_ARGS: ${{ inputs.pytest-args }}
+        MARKERS: ${{ inputs.markers }}
+        PARALLEL: ${{ inputs.parallel }}
       run: bash ${{ github.action_path }}/script.sh
+
