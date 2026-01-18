@@ -42,8 +42,14 @@
 #   - NEW: Production waits for CI and uses CI-built images
 #   - BENEFIT: 5-10 minutes faster, no ACR storage waste
 #
+# EXTRACTED SCRIPTS:
+#   - scripts/workflows/prod-extract-ci-image-tag.sh: Get image tag from CI workflow
+#   - scripts/workflows/prod-find-last-image.sh: Get last deployed production image
+#   - scripts/workflows/prod-determine-image-tag.sh: Decide which image to use
+#
 # See also: preview.yml for PR-scoped image strategy
 #           ci.yml for image building logic
+#           REFACTORING.md for adding new workflow scripts
 
 name: Deploy to Production
 
@@ -354,10 +360,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-       - name: Extract image tag from CI
-         id: extract
-         shell: bash
-         run: scripts/workflows/prod-extract-ci-image-tag.sh
+      - name: Extract image tag from CI
+        id: extract
+        shell: bash
+        run: scripts/workflows/prod-extract-ci-image-tag.sh
 
       - name: Azure Login
         uses: azure/login@v2
@@ -412,10 +418,10 @@ jobs:
         with:
           ref: main
 
-       - name: Read current production image tag
-         id: find-tag
-         shell: bash
-         run: scripts/workflows/prod-find-last-image.sh
+      - name: Read current production image tag
+        id: find-tag
+        shell: bash
+        run: scripts/workflows/prod-find-last-image.sh
 
       - name: Azure Login
         uses: azure/login@v2
@@ -465,10 +471,10 @@ jobs:
         with:
           install-python: 'true'
 
-       - name: Determine image tag
-         id: determine-tag
-         shell: bash
-         run: scripts/workflows/prod-determine-image-tag.sh
+      - name: Determine image tag
+        id: determine-tag
+        shell: bash
+        run: scripts/workflows/prod-determine-image-tag.sh
 
       - name: Update production kustomization
         uses: ./.github/actions/update-prod-kustomization

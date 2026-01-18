@@ -25,6 +25,12 @@
 #   Used when job needs to evaluate complex conditions based on multiple dependency results
 #   Downstream jobs depending on always() jobs must also use always() + check result
 #
+# EXTRACTED SCRIPTS:
+#   - scripts/workflows/ci-check-branch.sh: Detect if main branch or PR
+#   - scripts/workflows/ci-detect-changes.sh: Detect what areas changed
+#   - scripts/workflows/ci-write-rationale.sh: Write job execution summary
+#
+# For details on adding new workflow scripts, see: REFACTORING.md
 # =============================================================================
 
 name: CI
@@ -786,8 +792,8 @@ jobs:
       - name: Install pre-commit
         run: pip install pre-commit
 
-       - name: Run pre-commit on workflow files
-         run: scripts/workflows/ci-run-precommit-workflows.sh
+      - name: Run pre-commit on workflow files
+        run: scripts/workflows/ci-run-precommit-workflows.sh
 
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK

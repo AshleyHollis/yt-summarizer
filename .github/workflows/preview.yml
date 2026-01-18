@@ -62,8 +62,14 @@
 #   - Isolated: Each PR gets its own namespace + image tags
 #   - Fast: CI builds in parallel, preview waits and deploys
 #
+# EXTRACTED SCRIPTS:
+#   - scripts/workflows/preview-finalize-flags.sh: Finalize deployment decision
+#   - scripts/workflows/preview-detect-infra.sh: Detect infrastructure changes
+#   - scripts/workflows/preview-find-pr-image-tag.sh: Find most recent code-building commit
+#
 # See also: deploy-prod.yml for production image strategy
 #           docs/preview-image-build-strategy.md for full details
+#           REFACTORING.md for adding new workflow scripts
 #
 # =============================================================================
 
@@ -179,15 +185,15 @@ jobs:
           pr-number: ${{ steps.set-pr.outputs.pr_number }}
           force-deploy: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_deploy }}
 
-       - name: Finalize deployment flags
-         id: finalize
-         shell: bash
-         run: scripts/workflows/preview-finalize-flags.sh
+      - name: Finalize deployment flags
+        id: finalize
+        shell: bash
+        run: scripts/workflows/preview-finalize-flags.sh
 
-       - name: Detect infra changes
-         id: infra
-         shell: bash
-         run: scripts/workflows/preview-detect-infra.sh
+      - name: Detect infra changes
+        id: infra
+        shell: bash
+        run: scripts/workflows/preview-detect-infra.sh
 
   # ===========================================================================
   # PHASE 1B: TERRAFORM PLAN/APPLY
@@ -380,10 +386,10 @@ jobs:
           ref: ${{ needs.detect-changes.outputs.pr_head_ref }}
           fetch-depth: 0  # Need full history to walk commits
 
-       - name: Find most recent image-building commit in PR
-         id: find-tag
-         shell: bash
-         run: scripts/workflows/preview-find-pr-image-tag.sh
+      - name: Find most recent image-building commit in PR
+        id: find-tag
+        shell: bash
+        run: scripts/workflows/preview-find-pr-image-tag.sh
 
       - name: Azure Login
         uses: azure/login@v2
