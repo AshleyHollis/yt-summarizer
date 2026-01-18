@@ -57,7 +57,7 @@ The production API is **fully functional** and accessible via HTTPS at `https://
    # HTTPS works perfectly
    curl https://api.yt-summarizer.apps.ashleyhollis.com/health/ready
    → 200 OK: {"ready":true,"timestamp":"...","checks":{"api":true,...}}
-   
+
    # HTTP port 80 returns 404 (expected - Gateway only routes HTTPS)
    curl http://20.187.186.135/health/ready -H "Host: ..."
    → 404 Not Found
@@ -386,12 +386,12 @@ env:
 env:
   # CI/CD timeouts
   CI_WAIT_TIMEOUT_SECONDS: '1800'  # 30 minutes
-  
+
   # Argo CD timeouts
   ARGOCD_SYNC_TIMEOUT_PREVIEW: '180'   # 3 minutes
   ARGOCD_SYNC_TIMEOUT_PROD: '360'      # 6 minutes
   ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'  # 5 minutes
-  
+
   # Health check parameters
   HEALTH_CHECK_MAX_ATTEMPTS: '10'
   HEALTH_CHECK_INTERVAL_SECONDS: '15'

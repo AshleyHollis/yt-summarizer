@@ -94,35 +94,35 @@ env:
   # Container Registry
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-  
+
   # Application Names
   APP_NAME: 'yt-summarizer'
   API_IMAGE_NAME: 'yt-summarizer-api'
   WORKERS_IMAGE_NAME: 'yt-summarizer-workers'
   ARGOCD_APP_NAME_PROD: 'yt-summarizer-prod'
-  
+
   # Namespaces
   NAMESPACE_PROD: 'yt-summarizer'
   NAMESPACE_ARGOCD: 'argocd'
-  
+
   # Worker List
   WORKER_DEPLOYMENTS: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
-  
+
   # URLs
   PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
   HEALTH_CHECK_PATH: '/health/ready'
-  
+
   # Timeouts (seconds)
   ARGOCD_SYNC_TIMEOUT: '360'
   ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'
   HEALTH_CHECK_MAX_ATTEMPTS: '10'
   HEALTH_CHECK_INTERVAL: '15'
   HEALTH_CHECK_TIMEOUT: '30'
-  
+
   # Paths
   KUSTOMIZE_OVERLAY_PROD: 'k8s/overlays/prod'
   ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
-  
+
   # Tool Versions
   TERRAFORM_VERSION: '1.5.7'
   KUSTOMIZE_VERSION: '5.8.0'
