@@ -51,8 +51,8 @@ while IFS= read -r file; do
     continue
   fi
 
-  # Validate with kubectl (best validator for K8s YAML)
-  if kubectl apply --dry-run=client --validate=true -f "$file" &>/dev/null; then
+  # Validate with Python YAML parser (works without live cluster)
+  if python3 -c "import yaml; yaml.safe_load(open('$file', 'r'))" &>/dev/null; then
     ((PASSED_COUNT++))
     log_verbose "  ✓ Valid"
   else
@@ -61,7 +61,7 @@ while IFS= read -r file; do
 
     # Show detailed error
     echo "  Error details:"
-    kubectl apply --dry-run=client --validate=true -f "$file" 2>&1 | sed 's/^/    /'
+    python3 -c "import yaml; yaml.safe_load(open('$file', 'r'))" 2>&1 | sed 's/^/    /'
     echo ""
   fi
 done <<< "$YAML_FILES"
