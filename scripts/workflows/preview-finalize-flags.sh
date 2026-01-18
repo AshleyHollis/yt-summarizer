@@ -8,7 +8,7 @@
 #
 # Inputs (via GitHub Actions step context):
 #   - needs_image_build: Initial value from detect-pr-code-changes action
-#   - needs_deployment: Initial value from detect-pr-code-changes action  
+#   - needs_deployment: Initial value from detect-pr-code-changes action
 #   - github.event_name: 'pull_request' or 'workflow_dispatch'
 #   - inputs.run_preview: boolean from workflow_dispatch (if applicable)
 #

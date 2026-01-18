@@ -3,7 +3,7 @@
 # CI: Run Pre-commit on Workflow Files
 # =============================================================================
 # Validates GitHub Actions workflow YAML files with pre-commit hooks
-# 
+#
 # BEHAVIOR:
 #   - Runs pre-commit on all .yml and .yaml files in .github/workflows/
 #   - Does NOT fail the workflow if pre-commit fails (|| true)

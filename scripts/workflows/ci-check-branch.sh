@@ -3,7 +3,7 @@
 # CI: Check if Main Branch
 # =============================================================================
 # Determines if the current event is from the main branch
-# 
+#
 # OUTPUT: Sets GITHUB_OUTPUT with:
 #   - is_main_branch: true if main branch, false otherwise
 #

@@ -14,7 +14,7 @@ UTILITY FILES CREATED
 
 1. scripts/workflows/lib/github-utils.sh (183 lines, 10 functions)
    Purpose: GitHub Actions integration utilities
-   
+
    Functions:
    - output_var(name, value)         Write variable to $GITHUB_OUTPUT
    - set_output(name, value)         Alias for output_var()
@@ -29,7 +29,7 @@ UTILITY FILES CREATED
 
 2. scripts/workflows/lib/git-utils.sh (167 lines, 8 functions)
    Purpose: Git operations utilities
-   
+
    Functions:
    - get_short_sha(sha)              Get 7-character commit SHA
    - get_commit_message(sha)         Get commit message/title
@@ -44,7 +44,7 @@ UTILITY FILES CREATED
    Purpose: Image tag resolution (consolidates 3+ existing scripts)
    Consolidates: prod-extract-ci-image-tag.sh, prod-find-last-image.sh,
                  prod-determine-image-tag.sh
-   
+
    Functions:
    - generate_image_tag(sha)         Create sha-{short_sha} tag format
    - extract_tag_from_kustomize()   Read tag from kustomization.yaml
@@ -55,7 +55,7 @@ UTILITY FILES CREATED
 
 4. scripts/workflows/lib/k8s-utils.sh (244 lines, 7 functions)
    Purpose: Kubernetes operations utilities
-   
+
    Functions:
    - kubectl_wait_ready(...)        Wait for deployment/pod to be ready
    - kubectl_check_image(...)       Verify image deployed correctly
@@ -67,7 +67,7 @@ UTILITY FILES CREATED
 
 5. scripts/workflows/lib/health-utils.sh (275 lines, 5 functions)
    Purpose: Health check and readiness probe utilities
-   
+
    Functions:
    - http_health_check(url, timeout)        Single HTTP health check
    - wait_for_health(url, timeout, ...)     Poll until endpoint healthy
@@ -86,7 +86,7 @@ HIGH-PRIORITY CONSOLIDATIONS (Already captured in utilities):
    - prod-find-last-image.sh (42 lines)
    - prod-determine-image-tag.sh (57 lines)
    TOTAL: 132 lines → image-utils.sh functions
-   
+
    REFACTOR OPPORTUNITY: Replace these 3 scripts with:
    - source ./lib/image-utils.sh
    - get_ci_image_tag "$GITHUB_SHA"

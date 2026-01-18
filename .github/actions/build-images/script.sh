@@ -63,7 +63,7 @@ if [ "$push_flag" = "true" ]; then
     echo "::error::ACR_LOGIN_SERVER is required for pushing"
     exit 1
   fi
-  
+
   build_cmd="$build_cmd --tag \"$ACR_LOGIN_SERVER/$image_name:$image_tag\""
   build_cmd="$build_cmd --cache-from \"type=registry,ref=$ACR_LOGIN_SERVER/$image_name:cache-$service\""
   # build_cmd="$build_cmd --cache-to \"type=registry,ref=$ACR_LOGIN_SERVER/$image_name:cache-$service,mode=max\""
