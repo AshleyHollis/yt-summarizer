@@ -72,9 +72,6 @@ runs:
     - name: Record build finish
       id: finish
       shell: bash
-      run: |
-        END=$(date +%s)
-        START=${{ steps.start.outputs.started_at }}
-        DURATION=$((END - START))
-        echo "build_duration=${DURATION}" >> $GITHUB_OUTPUT
-        echo "Build duration: ${DURATION}s"
+      env:
+        BUILD_START_TIME: ${{ steps.start.outputs.started_at }}
+      run: bash ${{ github.action_path }}/script.sh

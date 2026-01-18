@@ -15,18 +15,8 @@ runs:
   steps:
     - name: Verify Azure credentials
       shell: bash
-      run: |
-        if [ -z "${{ inputs.client-id }}" ] || \
-           [ -z "${{ inputs.tenant-id }}" ] || \
-           [ -z "${{ inputs.subscription-id }}" ]; then
-          echo "::error::Azure OIDC credentials not configured."
-          echo ""
-          echo "Required secrets:"
-          echo "  - AZURE_CLIENT_ID: App registration client ID"
-          echo "  - AZURE_TENANT_ID: Azure AD tenant ID"
-          echo "  - AZURE_SUBSCRIPTION_ID: Target subscription ID"
-          echo ""
-          echo "See docs/runbooks/ci-cd-troubleshooting.md for setup instructions."
-          exit 1
-        fi
-        echo "✅ Azure OIDC credentials verified"
+      env:
+        CLIENT_ID: ${{ inputs.client-id }}
+        TENANT_ID: ${{ inputs.tenant-id }}
+        SUBSCRIPTION_ID: ${{ inputs.subscription-id }}
+      run: bash ${{ github.action_path }}/script.sh

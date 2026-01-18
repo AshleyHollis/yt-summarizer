@@ -11,10 +11,9 @@ runs:
   steps:
     - name: Write image tag to file
       shell: bash
-      run: |
-        echo "${{ inputs.image-tag }}" > image-tag.txt
-        echo "Wrote image tag to image-tag.txt"
-        cat image-tag.txt
+      env:
+        IMAGE_TAG: ${{ inputs.image-tag }}
+      run: bash ${{ github.action_path }}/script.sh
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4

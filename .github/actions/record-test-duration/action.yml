@@ -25,16 +25,7 @@ runs:
     - name: Record test timing
       id: record
       shell: bash
-      run: |
-        if [ -z "${{ inputs.start-time }}" ]; then
-          # Record start time
-          echo "started_at=$(date +%s)" >> $GITHUB_OUTPUT
-          echo "📊 Starting ${{ inputs.test-name }}..."
-        else
-          # Record finish time and calculate duration
-          END=$(date +%s)
-          START=${{ inputs.start-time }}
-          DURATION=$((END - START))
-          echo "test_duration=${DURATION}" >> $GITHUB_OUTPUT
-          echo "✅ ${{ inputs.test-name }} completed in ${DURATION}s"
-        fi
+      env:
+        START_TIME: ${{ inputs.start-time }}
+        TEST_NAME: ${{ inputs.test-name }}
+      run: bash ${{ github.action_path }}/script.sh

@@ -40,14 +40,16 @@ runs:
   steps:
     - name: Validate inputs
       shell: bash
+      env:
+        IMAGE_TAG: ${{ inputs.image-tag }}
       run: |
-        if [ -z "${{ inputs.image-tag }}" ]; then
+        if [ -z "${IMAGE_TAG}" ]; then
           echo "::error::IMAGE_TAG is empty. Aborting to avoid committing empty tags."
           exit 1
         fi
 
         OVERLAY_FILE="k8s/overlays/preview/kustomization.yaml"
-        if [ ! -f "$OVERLAY_FILE" ]; then
+        if [ ! -f "${OVERLAY_FILE}" ]; then
           echo "::error::Preview overlay not found at ${OVERLAY_FILE}"
           echo "::error::Ensure k8s/overlays/preview/ exists in your PR branch"
           exit 1
@@ -56,28 +58,12 @@ runs:
     - name: Generate preview overlay
       id: generate
       shell: bash
-      run: |
-        OVERLAY_FILE="k8s/overlays/preview/kustomization.yaml"
-
-        echo "Using IMAGE_TAG=${{ inputs.image-tag }}"
-
-        # Update image tags in kustomization.yaml using Python script
-        python scripts/ci/generate_preview_kustomization.py \
-          --template scripts/ci/templates/preview-kustomization-template.yaml \
-          --output "$OVERLAY_FILE" \
-          --pr-number "${{ inputs.pr-number }}" \
-          --image-tag "${{ inputs.image-tag }}" \
-          --acr-server "${{ inputs.acr-server }}" \
-          --preview-host "${{ inputs.preview-host }}" \
-          --tls-secret "${{ inputs.tls-secret }}" \
-          --commit-sha "${{ inputs.commit-sha }}"
-
-        echo "✅ Updated preview overlay at ${OVERLAY_FILE}"
-
-        # Output values for downstream jobs
-        echo "preview_url=${{ inputs.preview-url }}" >> $GITHUB_OUTPUT
-        echo "preview_host=${{ inputs.preview-host }}" >> $GITHUB_OUTPUT
-        echo "tls_secret=${{ inputs.tls-secret }}" >> $GITHUB_OUTPUT
-
-        # Display generated overlay for verification
-        cat "$OVERLAY_FILE"
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        ACR_SERVER: ${{ inputs.acr-server }}
+        PREVIEW_HOST: ${{ inputs.preview-host }}
+        TLS_SECRET: ${{ inputs.tls-secret }}
+        PREVIEW_URL: ${{ inputs.preview-url }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+      run: bash ${{ github.action_path }}/script.sh

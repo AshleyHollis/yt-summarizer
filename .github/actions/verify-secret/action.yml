@@ -18,13 +18,6 @@ runs:
       shell: bash
       env:
         SECRET_VALUE: ${{ inputs.secret-value }}
-      run: |
-        if [ -z "$SECRET_VALUE" ]; then
-          if [ -n "${{ inputs.error-message }}" ]; then
-            echo "::error::${{ inputs.error-message }}"
-          else
-            echo "::error::${{ inputs.secret-name }} is not configured. Please add it to repository secrets."
-          fi
-          exit 1
-        fi
-        echo "✅ ${{ inputs.secret-name }} is configured"
+        SECRET_NAME: ${{ inputs.secret-name }}
+        ERROR_MESSAGE: ${{ inputs.error-message }}
+      run: bash ${{ github.action_path }}/script.sh

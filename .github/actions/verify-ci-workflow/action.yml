@@ -12,10 +12,7 @@ runs:
   steps:
     - name: Verify workflow passed
       shell: bash
-      run: |
-        echo "Triggered by workflow_run for workflow: ${{ inputs.workflow-name }}"
-        if [ "${{ inputs.workflow-conclusion }}" != "success" ]; then
-          echo "::error::CI workflow did not pass. Preview deployment blocked."
-          exit 1
-        fi
-        echo "✅ CI workflow passed successfully"
+      env:
+        WORKFLOW_CONCLUSION: ${{ inputs.workflow-conclusion }}
+        WORKFLOW_NAME: ${{ inputs.workflow-name }}
+      run: bash ${{ github.action_path }}/script.sh
