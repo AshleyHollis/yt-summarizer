@@ -35,6 +35,21 @@ PASSED_COUNT=0
 while IFS= read -r file; do
   log_info "Checking: $file"
 
+  # Extract repoURL to determine if this is a local or external repo
+  REPO_URL=$(grep -E '^\s+repoURL:' "$file" | head -1 | sed 's/.*repoURL: *//' | sed 's/"//g' | sed "s/'//g" || true)
+  
+  # Get current repository URL from git
+  CURRENT_REPO=$(git config --get remote.origin.url 2>/dev/null || echo "")
+  
+  # Check if this is an external repository
+  if [[ -n "$REPO_URL" ]] && [[ "$REPO_URL" != "$CURRENT_REPO" ]]; then
+    # External repository - skip path validation
+    log_verbose "  Skipping path validation for external repo: $REPO_URL"
+    ((PASSED_COUNT++))
+    echo ""
+    continue
+  fi
+
   # Extract spec.source.path from YAML (handles both Application and ApplicationSet templates)
   PATHS=$(grep -E '^\s+path:' "$file" | sed 's/.*path: *//' | sed 's/"//g' || true)
 
