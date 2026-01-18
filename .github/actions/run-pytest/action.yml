@@ -29,4 +29,3 @@ runs:
         MARKERS: ${{ inputs.markers }}
         PARALLEL: ${{ inputs.parallel }}
       run: bash ${{ github.action_path }}/script.sh
-
