@@ -44,7 +44,7 @@ runs:
       env:
         EXTERNAL_URL: ${{ inputs.external-url }}
         NAMESPACE: ${{ inputs.namespace }}
-      run: ${{ github.action_path }}/check-dns-and-tls.sh
+      run: ${{ github.action_path }}/check-dns-resolution.sh
 
     - name: Check Gateway API HTTPRoute configuration
       shell: bash
