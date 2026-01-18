@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: Auth0 Next.js SDK API Contracts
+  description: |
+    API endpoints exposed by @auth0/nextjs-auth0 SDK for authentication flows.
+    These are built-in routes provided by the SDK, not custom application endpoints.
+  version: 1.0.0
+  contact:
+    name: YT Summarizer Team
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://yt-summarizer-preview.azurestaticapps.net
+    description: Preview environment
+  - url: https://yt-summarizer.com
+    description: Production
+
+paths:
+  /api/auth/login:
+    get:
+      summary: Initiate login flow
+      description: |
+        Redirects user to Auth0 Universal Login page. Supports both social login and username/password.
+        Query parameters can specify a specific connection (provider).
+      operationId: initiateLogin
+      tags:
+        - Authentication
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+          description: URL to redirect to after successful login
+          example: "/dashboard"
+        - name: connection
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [google-oauth2, github, Username-Password-Authentication]
+          description: Specific Auth0 connection to use (bypasses Universal Login)
+          example: "google-oauth2"
+      responses:
+        '302':
+          description: Redirect to Auth0 login page
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Auth0 authorization URL
+              example: "https://yt-summarizer.us.auth0.com/authorize?client_id=..."
+
+  /api/auth/logout:
+    get:
+      summary: Logout user
+      description: |
+        Clears the application session and redirects to Auth0 logout endpoint.
+        Auth0 will then redirect back to the configured logout URL.
+      operationId: logout
+      tags:
+        - Authentication
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+          description: URL to redirect to after logout (must be in allowed logout URLs)
+          example: "/"
+      responses:
+        '302':
+          description: Redirect to Auth0 logout endpoint
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Auth0 logout URL
+              example: "https://yt-summarizer.us.auth0.com/v2/logout?client_id=..."
+            Set-Cookie:
+              schema:
+                type: string
+              description: Clears session cookie
+              example: "appSession=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+
+  /api/auth/callback:
+    get:
+      summary: OAuth callback handler
+      description: |
+        Auth0 redirects here after successful authentication.
+        Exchanges authorization code for tokens and establishes session.
+      operationId: handleCallback
+      tags:
+        - Authentication
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization code from Auth0
+          example: "abc123def456"
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: CSRF protection state parameter
+          example: "xyz789"
+      responses:
+        '302':
+          description: Redirect to application after session established
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Application URL (default or returnTo value)
+              example: "/dashboard"
+            Set-Cookie:
+              schema:
+                type: string
+              description: Encrypted session cookie
+              example: "appSession=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Lax"
+        '400':
+          description: Invalid authorization code or state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "invalid_request"
+                error_description: "Invalid authorization code"
+
+  /api/auth/me:
+    get:
+      summary: Get current user session
+      description: |
+        Returns the current user's profile and session information.
+        Requires valid session cookie.
+      operationId: getMe
+      tags:
+        - Authentication
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: User session information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "unauthorized"
+                error_description: "No active session"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: appSession
+      description: Encrypted session cookie set by Auth0 SDK
+
+  schemas:
+    UserSession:
+      type: object
+      required:
+        - sub
+        - email
+        - email_verified
+        - updated_at
+      properties:
+        sub:
+          type: string
+          description: Unique user identifier
+          example: "google-oauth2|123456789"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "user@example.com"
+        email_verified:
+          type: boolean
+          description: Whether email has been verified
+          example: true
+        name:
+          type: string
+          description: User's display name
+          example: "John Doe"
+        picture:
+          type: string
+          format: uri
+          description: Profile picture URL (social providers only)
+          example: "https://lh3.googleusercontent.com/..."
+        username:
+          type: string
+          description: Username (database connection only)
+          example: "johndoe123"
+        https://yt-summarizer.com/role:
+          type: string
+          enum: [admin, normal]
+          description: User role (custom claim)
+          example: "admin"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last profile update timestamp
+          example: "2026-01-19T10:30:00.000Z"
+
+    Error:
+      type: object
+      required:
+        - error
+        - error_description
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "unauthorized"
+        error_description:
+          type: string
+          description: Human-readable error message
+          example: "No active session"
+
+tags:
+  - name: Authentication
+    description: Auth0 authentication endpoints

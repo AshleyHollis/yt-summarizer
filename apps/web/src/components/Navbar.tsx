@@ -3,14 +3,25 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/common';
+import { useAuth } from '@/hooks/useAuth';
+import { hasRole } from '@/lib/auth-utils';
+import { UserProfile } from '@/components/auth/UserProfile';
 
 /**
  * Main navigation bar component
+ *
+ * Features:
+ * - Shows different navigation items based on user authentication
+ * - Displays admin link only for users with admin role
+ * - Shows user profile and logout button when authenticated
+ * - Shows login button when not authenticated
  */
 export function Navbar() {
   const pathname = usePathname();
+  const { user, isAuthenticated } = useAuth();
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
+  const isAdmin = user && hasRole(user, 'admin');
 
   return (
     <nav className="sticky top-0 z-40 border-b border-gray-200/80 dark:border-gray-800/80 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md">
@@ -59,11 +70,35 @@ export function Navbar() {
               >
                 Jobs
               </Link>
+              {/* Admin link - only visible to users with admin role */}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    isActive('/admin')
+                      ? 'bg-purple-500 text-white'
+                      : 'text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 hover:text-purple-500 dark:hover:text-purple-400'
+                  }`}
+                  data-testid="admin-nav-link"
+                >
+                  Admin
+                </Link>
+              )}
             </div>
           </div>
 
-          {/* Right section: Theme toggle */}
-          <div className="flex items-center">
+          {/* Right section: User profile and theme toggle */}
+          <div className="flex items-center gap-3">
+            {isAuthenticated && user ? (
+              <UserProfile />
+            ) : (
+              <Link
+                href="/login"
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
             <ThemeToggle />
           </div>
         </div>

@@ -20,6 +20,25 @@ resource "random_password" "auth0_preview_session_secret" {
 }
 
 # -----------------------------------------------------------------------------
+# T044-T045: Generate random passwords for test users
+# -----------------------------------------------------------------------------
+resource "random_password" "admin_test_password" {
+  length  = 24
+  special = true
+  lower   = true
+  upper   = true
+  numeric = true
+}
+
+resource "random_password" "normal_test_password" {
+  length  = 24
+  special = true
+  lower   = true
+  upper   = true
+  numeric = true
+}
+
+# -----------------------------------------------------------------------------
 # Create Auth0 Application and API (Production)
 # -----------------------------------------------------------------------------
 module "auth0" {
@@ -33,6 +52,32 @@ module "auth0" {
   allowed_callback_urls = var.auth0_allowed_callback_urls
   allowed_logout_urls   = var.auth0_allowed_logout_urls
   allowed_web_origins   = var.auth0_allowed_web_origins
+
+  # T012: Connection configuration
+  enable_database_connection = var.enable_auth0_database_connection
+  enable_google_connection   = var.enable_auth0_google_connection
+  google_client_id           = var.auth0_google_client_id
+  google_client_secret       = var.auth0_google_client_secret
+  enable_github_connection   = var.enable_auth0_github_connection
+  github_client_id           = var.auth0_github_client_id
+  github_client_secret       = var.auth0_github_client_secret
+
+  # T012: User and role configuration (T044-T045: Use generated passwords)
+  test_users = [
+    {
+      email          = "admin@test.yt-summarizer.internal"
+      password       = random_password.admin_test_password.result
+      email_verified = true
+      role           = "admin"
+    },
+    {
+      email          = "user@test.yt-summarizer.internal"
+      password       = random_password.normal_test_password.result
+      email_verified = true
+      role           = "user"
+    }
+  ]
+  enable_role_action = var.enable_auth0_role_action
 }
 
 # -----------------------------------------------------------------------------
@@ -49,6 +94,16 @@ module "auth0_preview" {
   allowed_callback_urls = var.auth0_preview_allowed_callback_urls
   allowed_logout_urls   = var.auth0_preview_allowed_logout_urls
   allowed_web_origins   = var.auth0_preview_allowed_web_origins
+
+  # T012: Share connections with production (don't create duplicates)
+  # Connections are tenant-level resources, so we only create them once in prod module
+  enable_database_connection = false
+  enable_google_connection   = false
+  enable_github_connection   = false
+
+  # T012: No test users or actions for preview app (share with prod)
+  test_users         = []
+  enable_role_action = false
 }
 
 # -----------------------------------------------------------------------------
@@ -130,6 +185,48 @@ resource "azurerm_key_vault_secret" "auth0_preview_session_secret" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-preview-session-secret"
   value        = random_password.auth0_preview_session_secret.result
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+# -----------------------------------------------------------------------------
+# T046-T047: Store Test User Credentials in Azure Key Vault
+# -----------------------------------------------------------------------------
+# These credentials are used by E2E tests for programmatic authentication
+# IMPORTANT: Test user emails use .internal domain to avoid conflicts
+
+resource "azurerm_key_vault_secret" "auth0_admin_test_email" {
+  count        = var.enable_auth0 ? 1 : 0
+  name         = "auth0-admin-test-email"
+  value        = "admin@test.yt-summarizer.internal"
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+resource "azurerm_key_vault_secret" "auth0_admin_test_password" {
+  count        = var.enable_auth0 ? 1 : 0
+  name         = "auth0-admin-test-password"
+  value        = random_password.admin_test_password.result
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+resource "azurerm_key_vault_secret" "auth0_user_test_email" {
+  count        = var.enable_auth0 ? 1 : 0
+  name         = "auth0-user-test-email"
+  value        = "user@test.yt-summarizer.internal"
+  key_vault_id = module.key_vault.id
+
+  depends_on = [module.key_vault]
+}
+
+resource "azurerm_key_vault_secret" "auth0_user_test_password" {
+  count        = var.enable_auth0 ? 1 : 0
+  name         = "auth0-user-test-password"
+  value        = random_password.normal_test_password.result
   key_vault_id = module.key_vault.id
 
   depends_on = [module.key_vault]

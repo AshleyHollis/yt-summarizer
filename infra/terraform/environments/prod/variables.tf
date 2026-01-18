@@ -185,3 +185,71 @@ variable "auth0_preview_allowed_web_origins" {
     "https://*.azurestaticapps.net",
   ]
 }
+
+# -----------------------------------------------------------------------------
+# T012: Auth0 Connections and Test Users
+# -----------------------------------------------------------------------------
+
+variable "enable_auth0_database_connection" {
+  description = "Enable Auth0 database connection for username/password auth"
+  type        = bool
+  default     = true
+}
+
+variable "enable_auth0_google_connection" {
+  description = "Enable Google OAuth connection"
+  type        = bool
+  default     = true
+}
+
+variable "auth0_google_client_id" {
+  description = "Google OAuth client ID (from Azure Key Vault)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "auth0_google_client_secret" {
+  description = "Google OAuth client secret (from Azure Key Vault)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "enable_auth0_github_connection" {
+  description = "Enable GitHub OAuth connection"
+  type        = bool
+  default     = true
+}
+
+variable "auth0_github_client_id" {
+  description = "GitHub OAuth client ID (from Azure Key Vault)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "auth0_github_client_secret" {
+  description = "GitHub OAuth client secret (from Azure Key Vault)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "enable_auth0_role_action" {
+  description = "Enable Auth0 Action to add role claims to tokens"
+  type        = bool
+  default     = true
+}
+
+variable "auth0_test_users" {
+  description = "List of test users to create in Auth0"
+  type = list(object({
+    email          = string
+    password       = string
+    email_verified = bool
+    role           = string # 'admin' or 'normal'
+  }))
+  sensitive = true
+  default   = []
+}

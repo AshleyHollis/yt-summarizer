@@ -57,9 +57,153 @@ variable "allowed_web_origins" {
   default     = []
 }
 
+# T009: Connection support
+variable "enable_database_connection" {
+  description = "Enable Auth0 database connection for username/password auth"
+  type        = bool
+  default     = false
+}
+
+variable "enable_google_connection" {
+  description = "Enable Google OAuth connection"
+  type        = bool
+  default     = false
+}
+
+variable "google_client_id" {
+  description = "Google OAuth client ID"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth client secret"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "enable_github_connection" {
+  description = "Enable GitHub OAuth connection"
+  type        = bool
+  default     = false
+}
+
+variable "github_client_id" {
+  description = "GitHub OAuth client ID"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_client_secret" {
+  description = "GitHub OAuth client secret"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# T010: User support
+variable "test_users" {
+  description = "List of test users to create"
+  type = list(object({
+    email          = string
+    password       = string
+    email_verified = bool
+    role           = string # 'admin' or 'normal'
+  }))
+  default = []
+  # Note: Not marked sensitive here to allow for_each iteration
+  # Individual resource attributes (password) are marked sensitive instead
+}
+
+# T011: Action support
+variable "enable_role_action" {
+  description = "Enable Auth0 Action to add role claims to tokens"
+  type        = bool
+  default     = false
+}
+
 # -----------------------------------------------------------------------------
 # Resources
 # -----------------------------------------------------------------------------
+
+# T009: Database connection (username/password)
+resource "auth0_connection" "database" {
+  count = var.enable_database_connection ? 1 : 0
+
+  name     = "Username-Password-Authentication"
+  strategy = "auth0"
+
+  options {
+    password_policy = "good"
+    password_history {
+      enable = true
+      size   = 5
+    }
+    password_no_personal_info {
+      enable = true
+    }
+    password_dictionary {
+      enable = true
+    }
+    brute_force_protection         = true
+    enabled_database_customization = false
+  }
+}
+
+# T009: Enable database connection for BFF client
+resource "auth0_connection_clients" "database_clients" {
+  count = var.enable_database_connection ? 1 : 0
+
+  connection_id   = auth0_connection.database[0].id
+  enabled_clients = [auth0_client.bff.id]
+}
+
+# T009: Google OAuth connection
+resource "auth0_connection" "google" {
+  count = var.enable_google_connection ? 1 : 0
+
+  name     = "google-oauth2"
+  strategy = "google-oauth2"
+
+  options {
+    client_id     = var.google_client_id
+    client_secret = var.google_client_secret
+    scopes        = ["email", "profile"]
+  }
+}
+
+# T009: Enable Google connection for BFF client
+resource "auth0_connection_clients" "google_clients" {
+  count = var.enable_google_connection ? 1 : 0
+
+  connection_id   = auth0_connection.google[0].id
+  enabled_clients = [auth0_client.bff.id]
+}
+
+# T009: GitHub OAuth connection
+resource "auth0_connection" "github" {
+  count = var.enable_github_connection ? 1 : 0
+
+  name     = "github"
+  strategy = "github"
+
+  options {
+    client_id     = var.github_client_id
+    client_secret = var.github_client_secret
+    scopes        = ["user:email", "read:user"]
+  }
+}
+
+# T009: Enable GitHub connection for BFF client
+resource "auth0_connection_clients" "github_clients" {
+  count = var.enable_github_connection ? 1 : 0
+
+  connection_id   = auth0_connection.github[0].id
+  enabled_clients = [auth0_client.bff.id]
+}
 
 resource "auth0_client" "bff" {
   name     = var.application_name
@@ -92,6 +236,68 @@ resource "auth0_resource_server" "api" {
   identifier           = var.api_identifier
   signing_alg          = "RS256"
   allow_offline_access = true
+}
+
+# T010: Test users
+resource "auth0_user" "test_user" {
+  for_each = { for idx, user in var.test_users : idx => user }
+
+  connection_name = var.enable_database_connection ? auth0_connection.database[0].name : null
+  email           = each.value.email
+  password        = each.value.password
+  email_verified  = each.value.email_verified
+
+  app_metadata = jsonencode({
+    role = each.value.role
+  })
+
+  # Ensure database connection is created first
+  depends_on = [auth0_connection.database]
+}
+
+# T011: Action to add role claims to tokens
+resource "auth0_action" "add_role_claims" {
+  count = var.enable_role_action ? 1 : 0
+
+  name    = "Add Role Claims to Tokens"
+  runtime = "node18"
+  deploy  = true
+
+  supported_triggers {
+    id      = "post-login"
+    version = "v3"
+  }
+
+  code = <<-EOT
+    /**
+     * Handler that will be called during the execution of a PostLogin flow.
+     *
+     * @param {Event} event - Details about the user and the context in which they are logging in.
+     * @param {PostLoginAPI} api - Interface whose methods can be used to change the behavior of the login.
+     */
+    exports.onExecutePostLogin = async (event, api) => {
+      const namespace = 'https://yt-summarizer.com/';
+      
+      if (event.user.app_metadata && event.user.app_metadata.role) {
+        const role = event.user.app_metadata.role;
+        
+        // Add role to ID token
+        api.idToken.setCustomClaim(`$${namespace}role`, role);
+        
+        // Add role to access token
+        api.accessToken.setCustomClaim(`$${namespace}role`, role);
+      }
+    };
+  EOT
+}
+
+# T011: Bind action to post-login trigger
+resource "auth0_trigger_action" "add_role_claims_binding" {
+  count = var.enable_role_action ? 1 : 0
+
+  trigger      = "post-login"
+  action_id    = auth0_action.add_role_claims[0].id
+  display_name = "Add Role Claims to Tokens"
 }
 
 # -----------------------------------------------------------------------------
