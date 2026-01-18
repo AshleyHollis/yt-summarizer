@@ -154,7 +154,7 @@ jobs:
     needs: [detect-changes, wait-for-ci]
     if: |
       needs.wait-for-ci.result == 'success' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == true) ||
+      ((github.event_name == 'workflow_dispatch' && (inputs.run_terraform == true || inputs.run_terraform == null)) ||
        (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
     outputs:
       plan_summary: ${{ steps.plan.outputs.plan_summary }}
@@ -345,7 +345,7 @@ jobs:
       needs.wait-for-ci.result == 'success' &&
       needs.terraform-apply.result != 'failure' &&
       (
-        (github.event_name == 'workflow_dispatch' && inputs.run_deploy == true) ||
+        (github.event_name == 'workflow_dispatch' && (inputs.run_deploy == true || inputs.run_deploy == null)) ||
         (github.event_name != 'workflow_dispatch' && (
           contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
           contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
@@ -587,7 +587,7 @@ jobs:
     if: |
       needs.update-overlay.result == 'success' &&
       needs.verify-deployment.result == 'success' &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_frontend == true)
+      (github.event_name != 'workflow_dispatch' || inputs.run_frontend == true || inputs.run_frontend == null)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
