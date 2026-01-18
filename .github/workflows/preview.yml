@@ -780,6 +780,13 @@ jobs:
           target-namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           timeout-seconds: '60'
 
+      - name: Check Argo CD application readiness
+        uses: ./.github/actions/check-argocd-readiness
+        with:
+          app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
+          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          timeout-seconds: '60'
+
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
         with:
@@ -806,6 +813,19 @@ jobs:
           image-name: ${{ env.WORKERS_IMAGE_NAME }}
           workers: ${{ env.WORKER_DEPLOYMENTS }}
           fail-on-mismatch: 'true'
+
+      - name: Collect deployment diagnostics on failure
+        if: failure()
+        shell: bash
+        run: ./scripts/diagnose-argocd-deployment.sh ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }} ./diagnostics
+
+      - name: Upload diagnostics artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+           name: deployment-diagnostics-pr-${{ needs.detect-changes.outputs.pr_number }}
+           path: diagnostics/
+           retention-days: 7
 
       - name: Run API health checks
         if: needs.get-ingress.outputs.preview_url != ''
