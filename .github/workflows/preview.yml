@@ -784,8 +784,8 @@ jobs:
         uses: ./.github/actions/check-argocd-readiness
         with:
           app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout-seconds: '60'
+          namespace: ${{ env.NAMESPACE_ARGOCD }}
+          timeout: '60'
 
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
