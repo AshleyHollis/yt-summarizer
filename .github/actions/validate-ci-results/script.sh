@@ -19,7 +19,6 @@
 #   TEST_WORKERS_RESULT - Result of test-workers job
 #   TEST_FRONTEND_RESULT- Result of test-frontend job
 #   VALIDATE_TERRAFORM_RESULT  - Result of validate-terraform job
-#   VALIDATE_KUSTOMIZE_RESULT  - Result of validate-kustomize job
 #   KUBERNETES_VALIDATE_RESULT - Result of kubernetes-validate job
 #   SECRET_SCANNING_RESULT     - Result of secret-scanning job
 #   SECRET_SCANNING_SHOULD_RUN - Whether secret-scanning should have run
@@ -60,9 +59,6 @@ should_run_job() {
       ;;
     "validate-terraform")
       [[ "$CHANGED_AREAS" =~ infra/terraform ]]
-      ;;
-    "validate-kustomize")
-      [[ "$CHANGED_AREAS" =~ k8s ]]
       ;;
     "kubernetes-validate")
       [[ "$CHANGED_AREAS" =~ k8s ]]
@@ -125,7 +121,6 @@ check_job "test-frontend" "${TEST_FRONTEND_RESULT}" || EXIT_CODE=1
 
 # Check validation jobs
 check_job "validate-terraform" "${VALIDATE_TERRAFORM_RESULT}" || EXIT_CODE=1
-check_job "validate-kustomize" "${VALIDATE_KUSTOMIZE_RESULT}" || EXIT_CODE=1
 check_job "kubernetes-validate" "${KUBERNETES_VALIDATE_RESULT}" || EXIT_CODE=1
 
 # Check secret scanning

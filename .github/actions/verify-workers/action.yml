@@ -1,5 +1,6 @@
-name: Verify Worker Deployments
+name: Verify Workers
 description: Verifies that all worker deployments are using the expected image tag
+# Renamed from: verify-worker-deployments (for naming consistency)
 
 inputs:
   namespace:

@@ -109,6 +109,9 @@ echo ""
 echo "⏳ Waiting for namespace creation and Argo CD sync..."
 NAMESPACE_CREATED=false
 ARGOCD_SYNCED=false
+SYNC_LOOP_DETECTED=0
+LAST_OPERATION_PHASE=""
+SYNC_FLIP_COUNT=0
 
 for i in $(seq 1 $MAX_ATTEMPTS); do
   # Step 1: Check if namespace exists
@@ -131,6 +134,50 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
     CURRENT_SYNC_STATUS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
     CURRENT_SYNCED_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.sync.revision}' 2>/dev/null || echo "")
     CURRENT_TARGET_REV=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "")
+    CURRENT_OPERATION_PHASE=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "")
+
+    # CRITICAL: Detect sync loop (Synced -> OutOfSync -> Synced -> OutOfSync repeatedly)
+    # This indicates a configuration issue where resources keep being modified after sync
+    if [ "$CURRENT_OPERATION_PHASE" = "Succeeded" ] && [ "$CURRENT_SYNC_STATUS" = "OutOfSync" ]; then
+      SYNC_FLIP_COUNT=$((SYNC_FLIP_COUNT + 1))
+
+      if [ $SYNC_FLIP_COUNT -ge 3 ]; then
+        echo "::error::❌ SYNC LOOP DETECTED (fail-fast at ${i}/${MAX_ATTEMPTS})!"
+        echo ""
+        echo "Argo CD is repeatedly syncing successfully but immediately returning to OutOfSync."
+        echo "This indicates a configuration issue where resources are being modified after sync."
+        echo ""
+        echo "Pattern detected:"
+        echo "  - Operation completes successfully (Succeeded)"
+        echo "  - Sync status briefly becomes 'Synced'"
+        echo "  - Immediately flips back to 'OutOfSync'"
+        echo "  - This has repeated ${SYNC_FLIP_COUNT} times"
+        echo ""
+        echo "Common causes:"
+        echo "  1. Resource has fields that are modified by controllers/admission webhooks"
+        echo "  2. Spec in git doesn't match actual desired state"
+        echo "  3. ignoreDifferences configuration needed for certain fields"
+        echo "  4. Resource is managed by multiple controllers (conflict)"
+        echo ""
+        echo "::group::🔍 Application Events (last 10)"
+        kubectl describe application ${APP_NAME} -n argocd | grep -A 20 "Events:" | tail -20 || echo "Cannot get events"
+        echo "::endgroup::"
+        echo ""
+        echo "::group::🔍 Full Application Status"
+        kubectl get application ${APP_NAME} -n argocd -o yaml | grep -A 100 "status:" || echo "Cannot get status"
+        echo "::endgroup::"
+        echo ""
+        echo "::group::🔍 Resource Health Details"
+        kubectl get application ${APP_NAME} -n argocd -o jsonpath='{.status.resources}' | jq . 2>/dev/null || \
+          kubectl get application ${APP_NAME} -n argocd -o jsonpath='{.status.resources}' || \
+          echo "Cannot get resource details"
+        echo "::endgroup::"
+        exit 1
+      fi
+    else
+      # Reset counter if we're not in the problematic state
+      SYNC_FLIP_COUNT=0
+    fi
 
     if [ "$CURRENT_SYNC_STATUS" = "Synced" ]; then
       echo "✅ Argo CD sync complete"
@@ -175,6 +222,77 @@ for i in $(seq 1 $MAX_ATTEMPTS); do
     echo "  Current Sync Status: ${SYNC_STATUS}"
     echo "  Target Branch/Revision: ${TARGET_REV}"
     echo "  Synced to Commit: ${SYNCED_REV:0:8}..."
+
+    # CRITICAL: Check for Argo CD manifest/comparison errors EARLY
+    # These indicate the overlay/manifest is invalid and sync will never succeed
+    echo ""
+    echo "  🔍 Checking for manifest generation errors..."
+
+    # Check if Argo CD comparison phase failed (invalid manifest)
+    COMPARISON_ERROR=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.conditions[?(@.type=="ComparisonError")].message}' 2>/dev/null || echo "")
+    if [ -n "$COMPARISON_ERROR" ]; then
+      echo "::error::❌ MANIFEST GENERATION ERROR DETECTED (fail-fast):"
+      echo "  ${COMPARISON_ERROR}"
+      echo ""
+      echo "This means the YAML/Kustomize overlay has invalid syntax."
+      echo "Argo CD cannot sync until this is fixed."
+      exit 1
+    fi
+
+    # Check for resource creation errors in the status
+    RESOURCE_ERRORS=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.conditions[?(@.type=="InvalidResourcePath")].message}' 2>/dev/null || echo "")
+    if [ -n "$RESOURCE_ERRORS" ]; then
+      echo "::error::❌ INVALID RESOURCE PATH (fail-fast):"
+      echo "  ${RESOURCE_ERRORS}"
+      exit 1
+    fi
+
+    # Check if operational state indicates sync error
+    OPERATION_STATE=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "")
+    OPERATION_MSG=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.message}' 2>/dev/null || echo "")
+
+    if [ "$OPERATION_STATE" = "Failed" ]; then
+      echo "::error::❌ SYNC OPERATION FAILED (fail-fast):"
+      echo "  Message: ${OPERATION_MSG}"
+      echo ""
+
+      # Try to extract the actual error
+      SYNC_RESULT=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.operationState.syncResult}' 2>/dev/null || echo "")
+      if [ -n "$SYNC_RESULT" ]; then
+        echo "Sync result details:"
+        echo "$SYNC_RESULT" | jq . 2>/dev/null || echo "$SYNC_RESULT"
+      fi
+
+      exit 1
+    fi
+
+    # Check for any hook job failures
+    if [[ "$OPERATION_MSG" == *"hook"* ]]; then
+      HOOK_JOB=$(echo "$OPERATION_MSG" | grep -oP '(?<=hook batch/Job/)[^ ]+' || echo "")
+      if [ -n "$HOOK_JOB" ]; then
+        # If namespace exists, check hook job status
+        if kubectl get namespace ${NAMESPACE} &>/dev/null; then
+          if kubectl get job ${HOOK_JOB} -n ${NAMESPACE} &>/dev/null; then
+            JOB_FAILED=$(kubectl get job ${HOOK_JOB} -n ${NAMESPACE} -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+            JOB_ACTIVE=$(kubectl get job ${HOOK_JOB} -n ${NAMESPACE} -o jsonpath='{.status.active}' 2>/dev/null || echo "0")
+
+            if [ "$JOB_FAILED" -gt 0 ]; then
+              echo "::error::❌ HOOK JOB FAILED (fail-fast):"
+              # Get pod logs
+              POD_NAME=$(kubectl get pods -n ${NAMESPACE} -l job-name=${HOOK_JOB} --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+              if [ -n "$POD_NAME" ]; then
+                echo ""
+                echo "Pod logs:"
+                kubectl logs ${POD_NAME} -n ${NAMESPACE} --all-containers=true --tail=30 2>/dev/null || echo "Cannot get logs"
+              fi
+              exit 1
+            fi
+          fi
+        fi
+      fi
+    fi
+
+    echo "  ✅ No manifest errors detected"
 
     # EARLY FAILURE DETECTION: Check for common issues in the namespace
     if kubectl get namespace ${NAMESPACE} &>/dev/null; then

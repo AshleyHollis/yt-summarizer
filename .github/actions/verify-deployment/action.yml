@@ -1,5 +1,6 @@
-name: Verify Deployment Image
+name: Verify Deployment
 description: Verify that a Kubernetes deployment is using the expected image tag
+# Renamed from: verify-deployment-image (for naming consistency)
 
 inputs:
   namespace:

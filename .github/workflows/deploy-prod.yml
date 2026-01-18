@@ -219,10 +219,12 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Validate Terraform configuration
-        uses: ./.github/actions/validate-terraform-config
+        uses: ./.github/actions/validate
         with:
-          working-directory: infra/terraform/environments/prod
-          backend-config: 'true'
+          validators: terraform-config
+          terraform-directory: infra/terraform/environments/prod
+          fail-fast: 'true'
+          timeout-seconds: '60'
 
       - name: Terraform Plan
         id: plan
@@ -319,10 +321,12 @@ jobs:
           path: infra/terraform/environments/prod
 
       - name: Validate Terraform configuration
-        uses: ./.github/actions/validate-terraform-config
+        uses: ./.github/actions/validate
         with:
-          working-directory: infra/terraform/environments/prod
-          backend-config: 'true'
+          validators: terraform-config
+          terraform-directory: infra/terraform/environments/prod
+          fail-fast: 'true'
+          timeout-seconds: '60'
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
@@ -472,17 +476,17 @@ jobs:
         with:
           install-python: 'true'
 
-      - name: Validate current kustomization baseline
-        shell: bash
-        run: |
-          echo "🔍 Validating current production kustomization (baseline check)..."
-          if ! kubectl kustomize k8s/overlays/prod > /dev/null 2>&1; then
-            echo "::error::Current production kustomization has syntax errors!"
-            echo "Please fix kustomization errors before deploying:"
-            kubectl kustomize k8s/overlays/prod
-            exit 1
-          fi
-          echo "✅ Current kustomization is valid"
+       # NOTE: CI has already validated prod overlay before this branch was created.
+       # This baseline check is kept as a safety net in case kustomization.yaml was
+       # modified after merge, though merge commits cannot modify files without
+       # triggering a new CI validation. Kept for defensive robustness.
+      - name: Validate current production overlay (baseline)
+        uses: ./.github/actions/validate
+        with:
+          validators: kustomize-build
+          overlay-paths: k8s/overlays/prod
+          fail-fast: 'true'
+          timeout-seconds: '30'
 
       - name: Determine image tag
         id: determine-tag
@@ -499,17 +503,16 @@ jobs:
         with:
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
 
-      - name: Validate kustomization builds successfully
-        shell: bash
-        run: |
-          echo "🔍 Validating production kustomization..."
-          if ! kubectl kustomize k8s/overlays/prod > /dev/null 2>&1; then
-            echo "::error::Production kustomization failed to build!"
-            echo "This indicates a YAML syntax error or missing patch file."
-            kubectl kustomize k8s/overlays/prod
-            exit 1
-          fi
-          echo "✅ Kustomization builds successfully"
+       # This validation is critical - it runs AFTER update-prod-kustomization
+       # inserts image tags. Ensures the modified manifest is still valid.
+       # This is where we catch errors introduced by the kustomization update action.
+      - name: Validate updated production overlay
+        uses: ./.github/actions/validate
+        with:
+          validators: kustomize-build
+          overlay-paths: k8s/overlays/prod
+          fail-fast: 'true'
+          timeout-seconds: '30'
 
       - name: Commit and push changes
         uses: ./.github/actions/commit-kustomization
@@ -532,7 +535,8 @@ jobs:
   # Verify Deployment
   # ---------------------------------------------------------------------------
   # Comprehensive deployment verification after overlay update
-  # - Wait for ArgoCD sync
+  # - Validate Argo CD manifest before sync (early error detection)
+  # - Wait for ArgoCD sync with fail-fast manifest error detection
   # - Verify API and worker deployment images
   # - Run health checks
   # - Verify TLS certificate
@@ -561,13 +565,28 @@ jobs:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
+      - name: Setup Kustomize
+        uses: ./.github/actions/setup-kustomize
+        with:
+          kustomize-version: '5.8.0'
+
+      - name: Pre-deployment validation
+        uses: ./.github/actions/validate
+        with:
+          validators: kustomize-build,argocd-manifest
+          overlay-paths: k8s/overlays/prod
+          argocd-app-name: yt-summarizer-prod
+          argocd-namespace: argocd
+          target-namespace: yt-summarizer
+          timeout-seconds: '60'
+
       - name: Wait for Argo CD to sync
-        uses: ./.github/actions/wait-for-argocd-sync
+        uses: ./.github/actions/wait-for-argocd
         with:
           app-name: yt-summarizer-prod
           namespace: yt-summarizer
           pr-number: '0'
-          timeout-seconds: '180'
+          timeout-seconds: '360'
 
       - name: Determine expected image tag
         id: expected-tag
@@ -580,7 +599,7 @@ jobs:
           fi
 
       - name: Verify API deployment image
-        uses: ./.github/actions/verify-deployment-image
+        uses: ./.github/actions/verify-deployment
         with:
           namespace: prod
           deployment-name: api
@@ -590,7 +609,7 @@ jobs:
           app-name: yt-summarizer-prod
 
       - name: Verify workers deployment image
-        uses: ./.github/actions/verify-worker-deployments
+        uses: ./.github/actions/verify-workers
         with:
           namespace: prod
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
