@@ -146,11 +146,35 @@ if [[ "$OPERATION_STATE" == "Running" ]]; then
       if [[ $ELAPSED -gt 300 ]]; then
         log_error "Operation has been running for ${ELAPSED}s (>5 minutes) - likely stuck!"
         echo ""
-        log_info "Recommended actions:"
-        echo "  1. Check Argo CD controller logs"
-        echo "  2. Check for stuck hook jobs: kubectl get jobs -n ${TARGET_NS:-$DEST_NAMESPACE}"
-        echo "  3. Force sync abort: kubectl patch application ${APP_NAME} -n $ARGOCD_NS --type merge -p '{\"operation\":null}'"
-        exit 1
+        
+        # Auto-cleanup in CI/CD environments
+        if [[ "${AUTO_CLEANUP_STUCK_OPS:-false}" == "true" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+          log_warning "Automatically aborting stuck operation..."
+          if kubectl patch application "${APP_NAME}" -n "$ARGOCD_NS" --type merge -p '{"operation":null}' 2>/dev/null; then
+            log_success "Stuck operation aborted successfully"
+            sleep 2  # Give Argo CD time to process
+            
+            # Re-check operation state
+            NEW_STATE=$(kubectl get application "${APP_NAME}" -n "$ARGOCD_NS" -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
+            if [[ "$NEW_STATE" == "None" ]] || [[ -z "$NEW_STATE" ]]; then
+              log_success "Application is now ready for sync"
+              echo ""
+              log_info "Continuing validation after cleanup..."
+            else
+              log_error "Failed to clear operation state (still: ${NEW_STATE})"
+              exit 1
+            fi
+          else
+            log_error "Failed to abort stuck operation"
+            exit 1
+          fi
+        else
+          log_info "Recommended actions:"
+          echo "  1. Check Argo CD controller logs"
+          echo "  2. Check for stuck hook jobs: kubectl get jobs -n ${TARGET_NS:-$DEST_NAMESPACE}"
+          echo "  3. Force sync abort: kubectl patch application ${APP_NAME} -n $ARGOCD_NS --type merge -p '{\"operation\":null}'"
+          exit 1
+        fi
       fi
     fi
   fi
