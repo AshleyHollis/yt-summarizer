@@ -18,6 +18,8 @@ Previously, production deployments would wait up to 180 seconds before timing ou
 
 The solution implements three layers of validation and error detection:
 
+## Validation & Error Detection Flow
+
 ### Layer 1: Pre-Deployment Manifest Validation (60 seconds)
 
 **Action:** `validate-argocd-manifest`
@@ -314,9 +316,27 @@ echo $DB_HOST $DB_USER
 
 ## Monitoring & Observability
 
-### Deployment Logs
+### Validation Consolidation Strategy
 
-Check GitHub Actions logs for deployment details:
+**Overview:** We have validation at multiple stages - here's when and why each runs:
+
+| Stage | Where | Tool | Purpose | Runs On |
+|-------|-------|------|---------|---------|
+| **Pre-commit** | Developer machine | `pre-commit`, linters | Basic syntax | Local |
+| **PR Validation** | CI on all branches | `kustomize-validate` action | Build + validate + CPU checks | All branches |
+| **Prod Overlay Validation** | CI before merge | `kustomize-validate` action | Prod-specific validation | Main branch |
+| **Pre-deployment (new)** | Deploy-prod workflow | `validate-argocd-manifest` action | Argo CD CRD configuration | Production deploy |
+| **Post-update (safety)** | Deploy-prod workflow | Inline `kubectl kustomize` | Validate after image tag update | Production deploy |
+| **During sync (new)** | Deploy-prod workflow | `wait-for-argocd-sync` script | Early error detection every 30s | Production deploy |
+
+**Consolidation Notes:**
+- The first inline validation in `deploy-prod.yml` ("Validate current kustomization baseline") is redundant since CI has already validated the prod overlay before the branch was merged to main. It's kept as a defensive safety net.
+- The second inline validation ("Validate kustomization builds successfully") is critical - it runs AFTER `update-prod-kustomization` inserts image tags. This catches errors introduced by the kustomization update action.
+- The new `validate-argocd-manifest` action is **not a duplicate** - it validates Argo CD Application CRD configuration, sync conditions, and manifest generation from Argo CD's perspective, which local kustomize validation doesn't check.
+
+**Future Optimization:** Replace both inline `kubectl kustomize` calls with calls to the `kustomize-validate` action for consistency, once all edge cases are understood.
+
+### Deployment Logs
 
 1. **Navigate to workflow run**
    ```

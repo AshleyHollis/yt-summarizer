@@ -472,6 +472,10 @@ jobs:
         with:
           install-python: 'true'
 
+       # NOTE: CI has already validated prod overlay before this branch was created.
+       # This baseline check is kept as a safety net in case kustomization.yaml was
+       # modified after merge, though merge commits cannot modify files without
+       # triggering a new CI validation. Kept for defensive robustness.
       - name: Validate current kustomization baseline
         shell: bash
         run: |
@@ -499,6 +503,9 @@ jobs:
         with:
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
 
+       # This validation is critical - it runs AFTER update-prod-kustomization
+       # inserts image tags. Ensures the modified manifest is still valid.
+       # This is where we catch errors introduced by the kustomization update action.
       - name: Validate kustomization builds successfully
         shell: bash
         run: |
