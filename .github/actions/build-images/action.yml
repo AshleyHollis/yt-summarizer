@@ -26,41 +26,8 @@ runs:
 
     - name: Build image
       shell: bash
-      run: |
-        service='${{ inputs.service }}'
-        image_tag='${{ inputs.image-tag }}'
-        push_flag='${{ inputs.push }}'
-
-        case $service in
-          api)
-            dockerfile="services/api/Dockerfile"
-            image_name="yt-summarizer-api"
-            ;;
-          workers)
-            dockerfile="services/workers/Dockerfile"
-            image_name="yt-summarizer-workers"
-            ;;
-          *)
-            echo "Unknown service: $service"
-            exit 1
-            ;;
-        esac
-
-        echo "Building $service image..."
-        echo "::group::Build $service image"
-
-        # Build command
-        build_cmd="docker buildx build --file \"$dockerfile\""
-
-        if [ "$push_flag" = "true" ]; then
-          build_cmd="$build_cmd --tag \"${{ env.ACR_LOGIN_SERVER }}/$image_name:$image_tag\""
-          build_cmd="$build_cmd --cache-from \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service\""
-          # build_cmd="$build_cmd --cache-to \"type=registry,ref=${{ env.ACR_LOGIN_SERVER }}/$image_name:cache-$service,mode=max\""
-          build_cmd="$build_cmd --push"
-        else
-          # For validation, just build without pushing
-          build_cmd="$build_cmd --tag \"local/$image_name:validate\""
-        fi
-
-        eval "$build_cmd ."
-        echo "::endgroup::"
+      env:
+        SERVICE: ${{ inputs.service }}
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        PUSH_FLAG: ${{ inputs.push }}
+      run: bash ${{ github.action_path }}/script.sh

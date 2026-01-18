@@ -23,19 +23,5 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
-      run: |
-        # Count open PRs (each gets a preview via ApplicationSet PR Generator)
-        OPEN_PRS=$(gh api repos/$GITHUB_REPOSITORY/pulls --jq 'length')
-
-        echo "Open PRs: ${OPEN_PRS}"
-        echo "Max previews: ${{ inputs.max-previews }}"
-
-        # This PR is already counted in open PRs, so we compare with <=
-        if [ "$OPEN_PRS" -le "${{ inputs.max-previews }}" ]; then
-          echo "Preview slot available (${OPEN_PRS}/${{ inputs.max-previews }})"
-          echo "can_deploy=true" >> $GITHUB_OUTPUT
-        else
-          echo "::warning::Preview limit reached (${OPEN_PRS}/${{ inputs.max-previews }})"
-          echo "::warning::This PR will not get a preview environment"
-          echo "can_deploy=false" >> $GITHUB_OUTPUT
-        fi
+        MAX_PREVIEWS: ${{ inputs.max-previews }}
+      run: bash ${{ github.action_path }}/script.sh
