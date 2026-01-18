@@ -33,19 +33,28 @@
 
 set -euo pipefail
 
+APP_NAME="${APP_NAME:-}"
 NAMESPACE="${NAMESPACE:-}"
 PR_NUMBER="${PR_NUMBER:-}"
 TIMEOUT="${TIMEOUT_SECONDS:-180}"
 INTERVAL="${INTERVAL:-5}"
 MAX_ATTEMPTS=$((TIMEOUT / INTERVAL))
-APP_NAME="preview-pr-${PR_NUMBER}"
 
-if [[ -z "$NAMESPACE" ]] || [[ -z "$PR_NUMBER" ]]; then
-  echo "::error::NAMESPACE and PR_NUMBER are required"
+if [[ -z "$APP_NAME" ]] || [[ -z "$NAMESPACE" ]] || [[ -z "$PR_NUMBER" ]]; then
+  echo "::error::APP_NAME, NAMESPACE, and PR_NUMBER are required"
   exit 1
 fi
 
-echo "🔄 Waiting for Argo CD to sync preview environment..."
+# Determine environment type based on app name
+if [[ "$APP_NAME" == "preview-pr-"* ]]; then
+  ENV_TYPE="preview"
+elif [[ "$APP_NAME" == *"-prod"* ]]; then
+  ENV_TYPE="production"
+else
+  ENV_TYPE="unknown"
+fi
+
+echo "🔄 Waiting for Argo CD to sync ${ENV_TYPE} environment..."
 echo "  Namespace: ${NAMESPACE}"
 echo "  Application: ${APP_NAME}"
 echo "  Timeout: ${TIMEOUT}s (${MAX_ATTEMPTS} attempts)"

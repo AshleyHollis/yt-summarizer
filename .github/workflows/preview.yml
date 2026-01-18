@@ -719,6 +719,7 @@ jobs:
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd-sync
         with:
+          app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           timeout-seconds: '180'

@@ -50,13 +50,13 @@ patches:
           spec:
             containers:
               - name: worker
-                  resources:
-                    requests:
-                      cpu: 25m
-                      memory: 128Mi
-                    limits:
-                      cpu: 500m
-                      memory: 512Mi
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
   - target:
       group: apps
       version: v1
@@ -123,13 +123,12 @@ patches:
                   limits:
                     cpu: 500m
                     memory: 512Mi
-  - path: patches/priority-class-patch.yaml
 images:
-  - 
+  -
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
     newTag: sha-50f9bf5
-  - 
+  -
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
     newTag: sha-50f9bf5

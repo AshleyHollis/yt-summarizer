@@ -1,12 +1,15 @@
 name: Wait for Argo CD Sync
-description: Wait for Argo CD to sync and create the preview namespace
+description: Wait for Argo CD to sync and create/update the environment
 
 inputs:
+  app-name:
+    description: Argo CD application name (e.g., "yt-summarizer-prod" or "preview-pr-123")
+    required: true
   namespace:
     description: Kubernetes namespace to wait for
     required: true
   pr-number:
-    description: Pull request number (for diagnostics)
+    description: Pull request number (for diagnostics, use "0" for production)
     required: true
   timeout-seconds:
     description: Maximum time to wait in seconds
@@ -19,6 +22,7 @@ runs:
     - name: Wait for Argo CD sync and gather diagnostics
       shell: bash
       env:
+        APP_NAME: ${{ inputs.app-name }}
         NAMESPACE: ${{ inputs.namespace }}
         PR_NUMBER: ${{ inputs.pr-number }}
         TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
