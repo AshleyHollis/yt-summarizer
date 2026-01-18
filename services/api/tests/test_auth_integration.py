@@ -20,10 +20,11 @@ Implementation: T056 (Create integration test for API auth token validation)
 
 from __future__ import annotations
 
-import pytest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from api.main import create_app
 from api.routes.auth import SessionData, session_store
