@@ -342,6 +342,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, wait-for-ci, terraform-apply]
     if: |
+      !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
       needs.terraform-apply.result != 'failure' &&
       (
