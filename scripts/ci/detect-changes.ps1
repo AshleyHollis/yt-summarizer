@@ -70,6 +70,7 @@ $areaPatterns = @{
     'services/shared'     = @('services/shared/**')
     'services/aspire'     = @('services/aspire/**')
     'apps/web'            = @('apps/web/**')
+    'k8s/argocd'          = @('k8s/argocd/**')
     'k8s'                 = @('k8s/**')
     'infra/terraform'     = @('infra/terraform/**')
     'docker'              = @('**/Dockerfile*', 'docker-compose*.yml', '.dockerignore')
@@ -202,7 +203,7 @@ foreach ($area in $imageAreas) {
 }
 
 # Determine if changes require deployment
-$deploymentAreas = @('services/api', 'services/workers', 'services/shared', 'apps/web', 'docker', 'k8s', 'infra/terraform')
+$deploymentAreas = @('services/api', 'services/workers', 'services/shared', 'apps/web', 'docker', 'k8s/argocd', 'k8s', 'infra/terraform')
 $needsDeployment = $false
 foreach ($area in $deploymentAreas) {
     if ($changedAreasArray -contains $area) {

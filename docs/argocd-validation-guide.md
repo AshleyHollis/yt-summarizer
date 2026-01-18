@@ -429,6 +429,244 @@ kubectl patch application <app-name> -n argocd --type merge \
 argocd app sync <app-name> --resource group:kind:name
 ```
 
+## Automated Manifest Management
+
+### Overview
+
+Argo CD application manifests (`k8s/argocd/*.yaml`) define which applications and infrastructure components are deployed to the cluster. These manifests are now automatically applied when changed, eliminating the need for manual `kubectl apply` commands.
+
+### Key Manifest Files
+
+| File | Purpose | Managed By |
+|------|---------|-----------|
+| `k8s/argocd/infra-apps.yaml` | Infrastructure applications (nginx, cert-manager, external-secrets, etc.) | Production workflow |
+| `k8s/argocd/prod-app.yaml` | Production application definition | Production workflow |
+| `k8s/argocd/preview-appset.yaml` | Preview ApplicationSet for PR environments | Production workflow |
+
+### How It Works
+
+1. **Change Detection**: When a PR modifies files in `k8s/argocd/`, the change is detected by the pipeline
+2. **CI Validation**: YAML syntax and manifest structure are validated in CI
+3. **Production Sync**: After merge to main, the production workflow automatically applies changed manifests
+4. **Verification**: Post-apply verification ensures applications are created/updated successfully
+
+### CI Validation (Automatic)
+
+When you modify Argo CD manifests, CI automatically validates:
+
+```yaml
+# .github/workflows/ci.yml
+- name: Validate Argo CD manifest syntax
+  if: contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
+  run: |
+    # Validates YAML syntax
+    # Checks kind is Application or ApplicationSet
+    # Ensures manifests are well-formed
+```
+
+**Validation checks:**
+- ✓ Valid YAML syntax
+- ✓ Kind is Application or ApplicationSet
+- ✓ Required fields are present
+- ✓ No syntax errors
+
+### Production Deployment (Automatic)
+
+After merging to main, manifests are automatically applied:
+
+```yaml
+# .github/workflows/deploy-prod.yml
+sync-argocd-manifests:
+  name: Sync Argo CD Manifests
+  runs-on: ubuntu-latest
+  needs: [detect-changes, terraform-apply]
+  if: contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
+  steps:
+    - name: Sync Argo CD manifests
+      uses: ./.github/actions/sync-argocd-manifests
+      with:
+        mode: all
+        namespace: argocd
+```
+
+**Sync process:**
+1. Runs after `terraform-apply` (infrastructure may create resources Argo CD needs)
+2. Runs before `update-overlay` (applications need to exist before we try to sync them)
+3. Applies all changed manifests to the cluster
+4. Verifies applications were created/updated successfully
+
+### Manual Sync (When Needed)
+
+In rare cases, you may need to manually sync manifests:
+
+```bash
+# Sync all Argo CD manifests
+./scripts/sync-argocd-manifests.sh
+
+# Dry-run to preview changes
+./scripts/sync-argocd-manifests.sh --dry-run
+
+# Sync only infrastructure apps
+./scripts/sync-argocd-manifests.sh --infra-only
+
+# Sync only main applications
+./scripts/sync-argocd-manifests.sh --apps-only
+
+# Skip validation (not recommended)
+./scripts/sync-argocd-manifests.sh --skip-validation
+```
+
+### Troubleshooting Manifest Sync
+
+#### Application Not Found After Sync
+
+**Symptoms:**
+```
+✗ Application 'my-app' not found in argocd namespace
+```
+
+**Causes:**
+- ApplicationSet hasn't generated the application yet (expected delay)
+- Manifest references wrong namespace
+- Application creation failed due to permissions
+
+**Remediation:**
+```bash
+# Check if ApplicationSet exists
+kubectl get applicationsets -n argocd
+
+# Check ApplicationSet status
+kubectl describe applicationset preview-apps -n argocd
+
+# View ApplicationSet-generated applications
+kubectl get applications -n argocd -l app.kubernetes.io/managed-by=applicationset-controller
+```
+
+#### Manifest Validation Fails in CI
+
+**Symptoms:**
+```
+::error::Invalid YAML syntax in k8s/argocd/prod-app.yaml
+```
+
+**Causes:**
+- YAML indentation errors
+- Missing required fields
+- Invalid references
+
+**Remediation:**
+```bash
+# Validate YAML locally
+yq eval '.' k8s/argocd/prod-app.yaml
+
+# Check for required fields
+kubectl apply -f k8s/argocd/prod-app.yaml --dry-run=client
+
+# Use validation script
+./scripts/sync-argocd-manifests.sh --dry-run -v
+```
+
+#### Sync Succeeds But Application Doesn't Deploy
+
+**Symptoms:**
+- Manifest sync reports success
+- Application CRD exists
+- But workloads aren't deploying
+
+**Causes:**
+- Application is configured but has ComparisonError
+- Repository is not accessible
+- Target revision doesn't exist
+
+**Remediation:**
+```bash
+# Check application status
+kubectl describe application <app-name> -n argocd
+
+# Look for errors
+kubectl get application <app-name> -n argocd -o jsonpath='{.status.conditions[*]}'
+
+# Validate application can pull manifests
+./scripts/validate-argocd-deployment.sh <app-name> -v
+```
+
+### Deployment Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Developer modifies k8s/argocd/prod-app.yaml                    │
+└────────────────────┬────────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ PR → CI validates YAML syntax                                   │
+│ ✓ YAML is well-formed                                           │
+│ ✓ Kind is Application/ApplicationSet                            │
+└────────────────────┬────────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ PR merged → Production workflow detects k8s/argocd/ change     │
+└────────────────────┬────────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ sync-argocd-manifests job runs                                  │
+│ 1. Azure Login                                                  │
+│ 2. Set AKS Context                                              │
+│ 3. Apply changed manifests                                      │
+│ 4. Verify applications exist                                    │
+└────────────────────┬────────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Argo CD detects new/updated applications                       │
+│ Auto-sync kicks in (if enabled)                                 │
+│ Workloads deploy to cluster                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### When to Update Argo CD Manifests
+
+**Update `infra-apps.yaml` when:**
+- Adding new infrastructure components (new cert-manager config, etc.)
+- Changing sync policies for infrastructure apps
+- Updating version pins or source repositories
+
+**Update `prod-app.yaml` when:**
+- Changing production application configuration
+- Updating sync policies or health checks
+- Modifying ignoreDifferences patterns
+
+**Update `preview-appset.yaml` when:**
+- Changing preview environment generation logic
+- Updating preview sync policies
+- Modifying preview resource constraints
+
+### Best Practices for Manifest Changes
+
+1. **Test locally before pushing:**
+   ```bash
+   ./scripts/sync-argocd-manifests.sh --dry-run -v
+   ```
+
+2. **Use small, focused changes:**
+   - One logical change per PR
+   - Don't mix infra and app changes
+
+3. **Verify in PR preview:**
+   - CI validation passes
+   - YAML syntax is correct
+
+4. **Monitor after merge:**
+   ```bash
+   kubectl get applications -n argocd -w
+   ```
+
+5. **Check workflow logs:**
+   - Verify sync-argocd-manifests job succeeded
+   - Look for application creation/update confirmation
+
 ## Best Practices
 
 1. **Always validate before deploying:**
