@@ -532,7 +532,8 @@ jobs:
   # Verify Deployment
   # ---------------------------------------------------------------------------
   # Comprehensive deployment verification after overlay update
-  # - Wait for ArgoCD sync
+  # - Validate Argo CD manifest before sync (early error detection)
+  # - Wait for ArgoCD sync with fail-fast manifest error detection
   # - Verify API and worker deployment images
   # - Run health checks
   # - Verify TLS certificate
@@ -561,13 +562,20 @@ jobs:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
+       - name: Pre-deployment validation (manifest generation check)
+         uses: ./.github/actions/validate-argocd-manifest
+         with:
+           app-name: yt-summarizer-prod
+           namespace: yt-summarizer
+           timeout-seconds: '60'
+
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd-sync
         with:
           app-name: yt-summarizer-prod
           namespace: yt-summarizer
           pr-number: '0'
-          timeout-seconds: '180'
+          timeout-seconds: '360'
 
       - name: Determine expected image tag
         id: expected-tag

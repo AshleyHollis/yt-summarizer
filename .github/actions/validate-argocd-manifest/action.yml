@@ -1,0 +1,33 @@
+name: Validate Argo CD Manifest
+description: |
+  Pre-deployment validation of Argo CD manifest generation and health before syncing.
+  Detects manifest errors early to avoid long timeout waits.
+  
+  Validates:
+  - Manifest generates without errors in Argo CD
+  - Application CRD is properly configured
+  - No sync errors pre-exist
+  - Resources can be parsed and validated
+
+inputs:
+  app-name:
+    description: Argo CD Application name (e.g., yt-summarizer-prod)
+    required: true
+  namespace:
+    description: Target Kubernetes namespace
+    required: true
+  timeout-seconds:
+    description: Maximum time to wait for validation
+    required: false
+    default: '60'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate Argo CD manifest
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app-name }}
+        NAMESPACE: ${{ inputs.namespace }}
+        TIMEOUT: ${{ inputs.timeout-seconds }}
+      run: ${{ github.action_path }}/script.sh
