@@ -28,9 +28,9 @@
 
 set -euo pipefail
 
-service='${SERVICE:-}'
-image_tag='${IMAGE_TAG:-}'
-push_flag='${PUSH_FLAG:-true}'
+service="${SERVICE:-}"
+image_tag="${IMAGE_TAG:-}"
+push_flag="${PUSH_FLAG:-true}"
 
 if [[ -z "$service" ]] || [[ -z "$image_tag" ]]; then
   echo "::error::SERVICE and IMAGE_TAG are required"
