@@ -21,33 +21,10 @@ runs:
   steps:
     - name: Generate summary
       shell: bash
-      run: |
-        echo "# 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "## Deployment Details" >> $GITHUB_STEP_SUMMARY
-        echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-        echo "| **Image Tag** | \`${{ inputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| **Commit** | \`${{ inputs.commit-sha }}\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| **Timestamp** | $(date -u +"%Y-%m-%d %H:%M:%S UTC") |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        echo "## Job Status" >> $GITHUB_STEP_SUMMARY
-        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Update Overlay | ${{ inputs.update-overlay-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Deploy Frontend | ${{ inputs.deploy-frontend-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Health Check | ${{ inputs.health-check-result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        if [ "${{ inputs.update-overlay-result }}" = "success" ] && \
-           [ "${{ inputs.deploy-frontend-result }}" = "success" ] && \
-           [ "${{ inputs.health-check-result }}" = "success" ]; then
-          echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Production environment updated successfully." >> $GITHUB_STEP_SUMMARY
-        else
-          echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "One or more deployment steps failed. Check job logs for details." >> $GITHUB_STEP_SUMMARY
-        fi
+      env:
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+        UPDATE_OVERLAY_RESULT: ${{ inputs.update-overlay-result }}
+        DEPLOY_FRONTEND_RESULT: ${{ inputs.deploy-frontend-result }}
+        HEALTH_CHECK_RESULT: ${{ inputs.health-check-result }}
+      run: ${{ github.action_path }}/create-prod-summary.sh

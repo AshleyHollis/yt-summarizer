@@ -12,10 +12,6 @@ runs:
   steps:
     - name: Assert downloaded image tag
       shell: bash
-      run: |
-        if [ ! -f ${{ inputs.artifact_path }} ]; then
-          echo "::error::${{ inputs.artifact_path }} not found in artifact"
-          exit 1
-        fi
-        echo "Verified image tag artifact:"
-        cat ${{ inputs.artifact_path }}
+      env:
+        ARTIFACT_PATH: ${{ inputs.artifact_path }}
+      run: bash ${{ github.action_path }}/script.sh

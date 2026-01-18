@@ -73,51 +73,26 @@ runs:
     - name: Check all jobs passed
       shell: bash
       run: |
-        # Helper to check if job passed or was appropriately skipped
-        check_job() {
-          local name=$1
-          local result=$2
-          local should_run=$3
-
-          if [ "$should_run" = "true" ]; then
-            if [ "$result" != "success" ]; then
-              echo "❌ $name failed (result: $result)"
-              return 1
-            fi
-            echo "✅ $name passed"
-          else
-            echo "⏭️  $name skipped (not required)"
-          fi
-          return 0
-        }
-
-        EXIT_CODE=0
-
-        echo "Checking CI results..."
-        echo ""
-
-        # Check test jobs
-        check_job "test-shared" "${{ inputs.test-shared-result }}" "${{ inputs.test-shared-should-run }}" || EXIT_CODE=1
-        check_job "test-api" "${{ inputs.test-api-result }}" "${{ inputs.test-api-should-run }}" || EXIT_CODE=1
-        check_job "test-workers" "${{ inputs.test-workers-result }}" "${{ inputs.test-workers-should-run }}" || EXIT_CODE=1
-        check_job "test-frontend" "${{ inputs.test-frontend-result }}" "${{ inputs.test-frontend-should-run }}" || EXIT_CODE=1
-
-        # Check lint jobs
-        check_job "lint-python" "${{ inputs.lint-python-result }}" "${{ inputs.lint-python-should-run }}" || EXIT_CODE=1
-        check_job "lint-frontend" "${{ inputs.lint-frontend-result }}" "${{ inputs.lint-frontend-should-run }}" || EXIT_CODE=1
-
-        # Check build/validation jobs
-        check_job "build-images-validate" "${{ inputs.build-images-validate-result }}" "${{ inputs.build-images-validate-should-run }}" || EXIT_CODE=1
-        check_job "validate-terraform" "${{ inputs.validate-terraform-result }}" "${{ inputs.validate-terraform-should-run }}" || EXIT_CODE=1
-        check_job "validate-kustomize" "${{ inputs.validate-kustomize-result }}" "${{ inputs.validate-kustomize-should-run }}" || EXIT_CODE=1
-        check_job "kubernetes-validate" "${{ inputs.kubernetes-validate-result }}" "${{ inputs.kubernetes-validate-should-run }}" || EXIT_CODE=1
-        check_job "secret-scanning" "${{ inputs.secret-scanning-result }}" "${{ inputs.secret-scanning-should-run }}" || EXIT_CODE=1
-
-        echo ""
-        if [ $EXIT_CODE -eq 0 ]; then
-          echo "✅ All required CI checks passed"
-        else
-          echo "❌ Some CI checks failed"
-        fi
-
-        exit $EXIT_CODE
+        ${{ github.action_path }}/check-ci-results.sh \
+          "${{ inputs.test-shared-result }}" \
+          "${{ inputs.test-shared-should-run }}" \
+          "${{ inputs.test-api-result }}" \
+          "${{ inputs.test-api-should-run }}" \
+          "${{ inputs.test-workers-result }}" \
+          "${{ inputs.test-workers-should-run }}" \
+          "${{ inputs.test-frontend-result }}" \
+          "${{ inputs.test-frontend-should-run }}" \
+          "${{ inputs.lint-python-result }}" \
+          "${{ inputs.lint-python-should-run }}" \
+          "${{ inputs.lint-frontend-result }}" \
+          "${{ inputs.lint-frontend-should-run }}" \
+          "${{ inputs.build-images-validate-result }}" \
+          "${{ inputs.build-images-validate-should-run }}" \
+          "${{ inputs.validate-terraform-result }}" \
+          "${{ inputs.validate-terraform-should-run }}" \
+          "${{ inputs.validate-kustomize-result }}" \
+          "${{ inputs.validate-kustomize-should-run }}" \
+          "${{ inputs.kubernetes-validate-result }}" \
+          "${{ inputs.kubernetes-validate-should-run }}" \
+          "${{ inputs.secret-scanning-result }}" \
+          "${{ inputs.secret-scanning-should-run }}"

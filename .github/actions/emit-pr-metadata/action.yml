@@ -18,7 +18,8 @@ runs:
     - name: Emit PR metadata
       id: emit
       shell: bash
-      run: |
-        echo "pr_number=${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}" >> $GITHUB_OUTPUT
-        echo "pr_head_ref=${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}" >> $GITHUB_OUTPUT
-        echo "pr_head_sha=${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}" >> $GITHUB_OUTPUT
+      env:
+        PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+        PR_HEAD_REF: ${{ github.event.pull_request.head.ref || github.event.workflow_run.pull_requests[0].head.ref }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+      run: bash ${{ github.action_path }}/script.sh

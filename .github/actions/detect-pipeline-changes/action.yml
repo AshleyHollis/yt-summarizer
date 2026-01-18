@@ -50,7 +50,4 @@ runs:
         BASE_SHA_INPUT: ${{ inputs.base-sha }}
         HEAD_SHA_INPUT: ${{ inputs.head-sha }}
       run: |
-        $params = @{ OutputFormat = 'github-actions' }
-        if ($env:BASE_SHA_INPUT) { $params['BaseSha'] = $env:BASE_SHA_INPUT }
-        if ($env:HEAD_SHA_INPUT) { $params['HeadSha'] = $env:HEAD_SHA_INPUT }
-        & .\scripts\ci\detect-changes.ps1 @params
+        & ${{ github.action_path }}/detect-changes.ps1 -OutputFormat 'github-actions'

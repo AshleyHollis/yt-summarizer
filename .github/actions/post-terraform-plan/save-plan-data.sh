@@ -1,0 +1,40 @@
+#!/bin/bash
+
+################################################################################
+# Action: post-terraform-plan / save-plan-data.sh
+#
+# Purpose: Save plan data from inputs to temporary files for safer handling.
+#          Avoids passing large JSON through environment variables.
+#
+# Inputs (Environment Variables):
+#   PLAN_SUMMARY    - JSON summary of plan changes
+#   FORMATTED_PLAN  - Formatted terraform plan output (JSON)
+#   PLAN_OUTCOME    - Plan outcome (success/failure)
+#
+# Outputs:
+#   Creates: plan-summary.json, formatted-plan.json, plan-outcome.txt
+#
+# Logic Flow:
+#   1. Write PLAN_SUMMARY to plan-summary.json
+#   2. Write FORMATTED_PLAN to formatted-plan.json
+#   3. Write PLAN_OUTCOME to plan-outcome.txt
+#   4. Files used by subsequent steps
+#
+################################################################################
+
+set -euo pipefail
+
+# Write data to files (safer than passing large JSON through env vars)
+cat > plan-summary.json <<'PLAN_SUMMARY_EOF'
+$PLAN_SUMMARY
+PLAN_SUMMARY_EOF
+
+cat > formatted-plan.json <<'FORMATTED_PLAN_EOF'
+$FORMATTED_PLAN
+FORMATTED_PLAN_EOF
+
+cat > plan-outcome.txt <<'PLAN_OUTCOME_EOF'
+$PLAN_OUTCOME
+PLAN_OUTCOME_EOF
+
+echo "✅ Plan data files created"

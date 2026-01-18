@@ -117,25 +117,10 @@ runs:
 
     - name: Create deployment summary
       shell: bash
-      run: |
-        echo "## 🚀 Preview Deployment Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🌐 Environment URLs" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Environment | URL |" >> $GITHUB_STEP_SUMMARY
-        echo "|-------------|-----|" >> $GITHUB_STEP_SUMMARY
-        echo "| **Backend API** | [${{ inputs.preview-url }}](${{ inputs.preview-url }}) |" >> $GITHUB_STEP_SUMMARY
-        if [ -n "${{ inputs.frontend-url }}" ]; then
-          echo "| **Frontend** | [${{ inputs.frontend-url }}](${{ inputs.frontend-url }}) |" >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "| **Health Check** | [${{ inputs.preview-url }}/health/live](${{ inputs.preview-url }}/health/live) |" >> $GITHUB_STEP_SUMMARY
-        echo "| **API Docs** | [${{ inputs.preview-url }}/docs](${{ inputs.preview-url }}/docs) |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📦 Deployment Details" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-        echo "| **PR** | #${{ inputs.pr-number }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| **Image Tag** | \`${{ inputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| **Commit** | \`${{ inputs.commit-sha }}\` |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        PREVIEW_URL: ${{ inputs.preview-url }}
+        FRONTEND_URL: ${{ inputs.frontend-url }}
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+      run: ${{ github.action_path }}/post-preview-comment.sh

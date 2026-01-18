@@ -26,14 +26,7 @@ runs:
     - name: Validate image tag is available
       id: validate
       shell: bash
-      run: |
-        IMAGE_TAG="${{ inputs.image_tag }}"
-        CONCURRENCY_RESULT="${{ inputs.concurrency_check_result }}"
-
-        if [ -z "$IMAGE_TAG" ]; then
-          echo "::error::No image tag available from CI. This may indicate CI did not build images for this PR."
-          echo "can_deploy=false" >> $GITHUB_OUTPUT
-        else
-          echo "✅ Image tag available: $IMAGE_TAG"
-          echo "can_deploy=$CONCURRENCY_RESULT" >> $GITHUB_OUTPUT
-        fi
+      env:
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        CONCURRENCY_CHECK_RESULT: ${{ inputs.concurrency_check_result }}
+      run: bash ${{ github.action_path }}/script.sh

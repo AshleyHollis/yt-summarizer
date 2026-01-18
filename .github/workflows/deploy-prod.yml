@@ -42,8 +42,14 @@
 #   - NEW: Production waits for CI and uses CI-built images
 #   - BENEFIT: 5-10 minutes faster, no ACR storage waste
 #
+# EXTRACTED SCRIPTS:
+#   - scripts/workflows/prod-extract-ci-image-tag.sh: Get image tag from CI workflow
+#   - scripts/workflows/prod-find-last-image.sh: Get last deployed production image
+#   - scripts/workflows/prod-determine-image-tag.sh: Decide which image to use
+#
 # See also: preview.yml for PR-scoped image strategy
 #           ci.yml for image building logic
+#           REFACTORING.md for adding new workflow scripts
 
 name: Deploy to Production
 
@@ -357,14 +363,7 @@ jobs:
       - name: Extract image tag from CI
         id: extract
         shell: bash
-        run: |
-          # CI has already built images with sha-{commit} tag
-          # Extract that tag (wait-for-ci ensures CI completed successfully)
-          SHORT_SHA=$(git rev-parse --short=7 ${{ github.sha }})
-          IMAGE_TAG="sha-${SHORT_SHA}"
-
-          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-          echo "✅ Using CI-built image tag: $IMAGE_TAG"
+        run: scripts/workflows/prod-extract-ci-image-tag.sh
 
       - name: Azure Login
         uses: azure/login@v2
@@ -422,23 +421,7 @@ jobs:
       - name: Read current production image tag
         id: find-tag
         shell: bash
-        run: |
-          echo "📋 Reading current production image tag from kustomization..."
-          PROD_TAG=$(grep -oP 'newTag: \K.*' k8s/overlays/prod/kustomization.yaml | head -1)
-
-          if [ -z "$PROD_TAG" ]; then
-            echo "::error::Could not find image tag in production kustomization.yaml"
-            exit 1
-          fi
-
-          if [ "$PROD_TAG" = "latest" ]; then
-            echo "::warning::Production is using 'latest' tag - not deterministic!"
-            echo "::warning::This should be fixed to use SHA-based tags (e.g., sha-abc1234)"
-            echo "::warning::Continuing with 'latest' for now..."
-          fi
-
-          echo "image_tag=$PROD_TAG" >> $GITHUB_OUTPUT
-          echo "✅ Using existing production image tag: $PROD_TAG"
+        run: scripts/workflows/prod-find-last-image.sh
 
       - name: Azure Login
         uses: azure/login@v2
@@ -491,28 +474,7 @@ jobs:
       - name: Determine image tag
         id: determine-tag
         shell: bash
-        run: |
-          # Path 1: Code changes (get-ci-image-tag succeeded - uses CI-built images)
-          if [ "${{ needs.get-ci-image-tag.result }}" = "success" ]; then
-            IMAGE_TAG="${{ needs.get-ci-image-tag.outputs.image_tag }}"
-            DEPLOYMENT_TYPE="ci-build"
-            echo "📦 Using CI-built image: $IMAGE_TAG"
-
-          # Path 2: K8s/infra only (get-last-prod-image succeeded - reuses existing prod image)
-          elif [ "${{ needs.get-last-prod-image.result }}" = "success" ]; then
-            IMAGE_TAG="${{ needs.get-last-prod-image.outputs.image_tag }}"
-            DEPLOYMENT_TYPE="existing-image"
-            echo "📦 Using existing production image: $IMAGE_TAG"
-            echo "ℹ️  Deploying K8s/infra changes only (no code changes)"
-
-          else
-            echo "::error::Neither get-ci-image-tag nor get-last-prod-image succeeded"
-            echo "::error::This should not happen - check job dependencies"
-            exit 1
-          fi
-
-          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-          echo "deployment_type=$DEPLOYMENT_TYPE" >> $GITHUB_OUTPUT
+        run: scripts/workflows/prod-determine-image-tag.sh
 
       - name: Update production kustomization
         uses: ./.github/actions/update-prod-kustomization

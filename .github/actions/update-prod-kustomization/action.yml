@@ -17,16 +17,8 @@ runs:
   steps:
     - name: Update kustomization file
       shell: bash
-      working-directory: ${{ inputs.kustomization-path }}
-      run: |
-        IMAGE_TAG="${{ inputs.image-tag }}"
-
-        python ../../../scripts/ci/update_prod_kustomization.py \
-          --template ../../../${{ inputs.template-path }} \
-          --output kustomization.yaml \
-          --image-tag "${IMAGE_TAG}"
-
-        echo "✅ Updated production kustomization with tag: ${IMAGE_TAG}"
-        echo ""
-        echo "--- kustomization.yaml ---"
-        cat kustomization.yaml
+      env:
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        KUSTOMIZATION_PATH: ${{ inputs.kustomization-path }}
+        TEMPLATE_PATH: ${{ inputs.template-path }}
+      run: bash ${{ github.action_path }}/script.sh

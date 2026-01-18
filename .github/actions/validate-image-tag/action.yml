@@ -27,24 +27,7 @@ runs:
 
     - name: Compare tags and validate
       shell: bash
-      run: |
-        CI_TAG="${{ inputs.ci-image-tag }}"
-        EXPECTED_TAG="${{ steps.compute.outputs.image-tag }}"
-
-        if [ -z "$CI_TAG" ]; then
-          echo "::error::Canonical image_tag from CI is empty. Aborting."
-          exit 1
-        fi
-
-        # Allow 'latest' for K8s-only changes (production image reuse)
-        if [ "$CI_TAG" = "latest" ]; then
-          echo "✅ Using production image tag: latest (K8s-only changes)"
-          exit 0
-        fi
-
-        if [ "$CI_TAG" != "$EXPECTED_TAG" ]; then
-          echo "::error::Image tag mismatch: CI='$CI_TAG' expected='$EXPECTED_TAG'. Aborting to avoid inconsistent preview."
-          exit 1
-        fi
-
-        echo "✅ Image tag validated: $CI_TAG"
+      env:
+        CI_TAG: ${{ inputs.ci-image-tag }}
+        EXPECTED_TAG: ${{ steps.compute.outputs.image-tag }}
+      run: ${{ github.action_path }}/validate-image-tag.sh

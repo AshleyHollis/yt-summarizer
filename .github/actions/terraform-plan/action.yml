@@ -36,51 +36,17 @@ runs:
       id: plan
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: |
-        set -o pipefail
-        terraform plan -no-color -input=false -out=tfplan \
-          -var="subscription_id=${{ inputs.subscription-id }}" \
-          -var="sql_admin_password=${{ inputs.sql-admin-password }}" \
-          -var="openai_api_key=${{ inputs.openai-api-key }}" \
-          -var="cloudflare_api_token=${{ inputs.cloudflare-api-token }}" \
-          -var="auth0_domain=${AUTH0_DOMAIN:-}" \
-          2>&1 | tee plan_output.txt
-        PLAN_EXIT_CODE=$?
-        echo "plan_output<<EOF" >> "$GITHUB_OUTPUT"
-        cat plan_output.txt >> "$GITHUB_OUTPUT"
-        echo "EOF" >> "$GITHUB_OUTPUT"
-        exit $PLAN_EXIT_CODE
+      env:
+        SUBSCRIPTION_ID: ${{ inputs.subscription-id }}
+        SQL_ADMIN_PASSWORD: ${{ inputs.sql-admin-password }}
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        AUTH0_DOMAIN: ${{ env.AUTH0_DOMAIN }}
+      run: ${{ github.action_path }}/run-terraform-plan.sh
       continue-on-error: true
 
     - name: Get JSON plan
       id: format
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: |
-        # Get structured JSON output from terraform
-        terraform show -json tfplan > plan.json
-
-        # Parse plan summary from JSON
-        ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"]))) | length' plan.json)
-        CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | contains(["update"]))) | length' plan.json)
-        DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | contains(["delete"]))) | length' plan.json)
-
-        # Create JSON summary
-        SUMMARY=$(cat <<EOF
-        {
-          "add": $ADD,
-          "change": $CHANGE,
-          "destroy": $DESTROY,
-          "has_changes": $([ $ADD -gt 0 ] || [ $CHANGE -gt 0 ] || [ $DESTROY -gt 0 ] && echo "true" || echo "false")
-        }
-        EOF
-        )
-
-        echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
-        echo "$SUMMARY" >> "$GITHUB_OUTPUT"
-        echo "EOF" >> "$GITHUB_OUTPUT"
-
-        # Output the full JSON plan for parsing
-        echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
-        cat plan.json >> "$GITHUB_OUTPUT"
-        echo "EOF" >> "$GITHUB_OUTPUT"
+      run: ${{ github.action_path }}/parse-terraform-plan.sh

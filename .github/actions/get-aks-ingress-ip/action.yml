@@ -52,13 +52,7 @@ runs:
     - name: Get Ingress IP
       id: get-ip
       shell: bash
-      run: |
-        INGRESS_IP=$(kubectl get svc -n ${{ inputs.ingress-namespace }} ${{ inputs.ingress-service }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-
-        if [ -z "$INGRESS_IP" ]; then
-          echo "::warning::Ingress IP not found"
-          echo "ip=" >> $GITHUB_OUTPUT
-        else
-          echo "Found Ingress IP: $INGRESS_IP"
-          echo "ip=$INGRESS_IP" >> $GITHUB_OUTPUT
-        fi
+      env:
+        INGRESS_NAMESPACE: ${{ inputs.ingress-namespace }}
+        INGRESS_SERVICE: ${{ inputs.ingress-service }}
+      run: bash ${{ github.action_path }}/script.sh

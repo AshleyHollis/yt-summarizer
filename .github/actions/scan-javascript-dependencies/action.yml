@@ -25,87 +25,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Install scanning tools
+    - name: Scan JavaScript dependencies
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: |
-        npm install -g depcheck
-
-    - name: Check for missing dependencies with depcheck
-      if: inputs.check-missing-deps == 'true'
-      shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: |
-        echo "════════════════════════════════════════════════════════════════"
-        echo "🔍 JavaScript Dependency Scan (depcheck)"
-        echo "════════════════════════════════════════════════════════════════"
-        echo ""
-        echo "ℹ️  Using .depcheckrc configuration file"
-        echo "   See .depcheckrc.md for documentation on ignored packages"
-        echo ""
-
-        # Run depcheck (automatically uses .depcheckrc config file)
-        if depcheck; then
-          echo ""
-          echo "✅ No dependency issues detected"
-        else
-          echo ""
-          echo "════════════════════════════════════════════════════════════════"
-          echo "❌ DEPENDENCY ISSUES DETECTED"
-          echo "════════════════════════════════════════════════════════════════"
-          echo ""
-          echo "📋 Action Required:"
-          echo "   1. Review the packages listed above"
-          echo "   2. Run 'npx depcheck' locally to verify"
-          echo "   3. If genuinely unused, remove from package.json"
-          echo "   4. If used but undetectable (config files, CSS), add to .depcheckrc"
-          echo "      and document in .depcheckrc.md"
-          echo ""
-          echo "════════════════════════════════════════════════════════════════"
-          exit 1
-        fi
-
-    - name: Run npm audit for security vulnerabilities
-      if: inputs.check-security == 'true'
-      shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: |
-        echo ""
-        echo "════════════════════════════════════════════════════════════════"
-        echo "🔒 Security Vulnerability Scan (npm audit)"
-        echo "════════════════════════════════════════════════════════════════"
-        echo ""
-
-        if npm audit --audit-level=${{ inputs.audit-level }}; then
-          echo ""
-          echo "✅ No security vulnerabilities detected"
-        else
-          echo ""
-          echo "════════════════════════════════════════════════════════════════"
-          echo "⚠️  SECURITY VULNERABILITIES FOUND"
-          echo "════════════════════════════════════════════════════════════════"
-          echo ""
-          echo "📋 Action Required:"
-          echo "   1. Review the vulnerability report above"
-          echo "   2. Run 'npm audit fix' to auto-fix where possible"
-          echo "   3. For breaking changes, use 'npm audit fix --force'"
-          echo "   4. Update package.json for manual updates"
-          echo ""
-          echo "════════════════════════════════════════════════════════════════"
-          exit 1
-        fi
-
-    - name: Verify no missing peer dependencies
-      shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: |
-        echo "🔍 Checking peer dependencies..."
-        npm ls --depth=0 || {
-          echo "⚠️  Peer dependency issues detected"
-          exit 1
-        }
-
-    - name: Summary
-      shell: bash
-      run: |
-        echo "✅ JavaScript dependency scan complete"
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        CHECK_MISSING_DEPS: ${{ inputs.check-missing-deps }}
+        CHECK_SECURITY: ${{ inputs.check-security }}
+        AUDIT_LEVEL: ${{ inputs.audit-level }}
+      run: ${{ github.action_path }}/script.sh

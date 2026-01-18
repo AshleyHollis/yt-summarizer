@@ -24,19 +24,12 @@ runs:
     - name: Save plan data to files
       id: save-data
       shell: bash
-      run: |
-        # Write data to files (safer than passing large JSON through env vars)
-        cat << 'PLAN_SUMMARY_EOF' > ${{ github.action_path }}/plan-summary.json
-        ${{ inputs.plan-summary }}
-        PLAN_SUMMARY_EOF
-
-        cat << 'FORMATTED_PLAN_EOF' > ${{ github.action_path }}/formatted-plan.json
-        ${{ inputs.formatted-plan }}
-        FORMATTED_PLAN_EOF
-
-        cat << 'PLAN_OUTCOME_EOF' > ${{ github.action_path }}/plan-outcome.txt
-        ${{ inputs.plan-outcome }}
-        PLAN_OUTCOME_EOF
+      env:
+        PLAN_SUMMARY: ${{ inputs.plan-summary }}
+        FORMATTED_PLAN: ${{ inputs.formatted-plan }}
+        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
+      working-directory: ${{ github.action_path }}
+      run: ${{ github.action_path }}/save-plan-data.sh
 
     - name: Generate PR Comment
       id: generate-comment
@@ -47,9 +40,8 @@ runs:
         FORMATTED_PLAN_PATH: ${{ github.action_path }}/formatted-plan.json
         PLAN_OUTCOME_PATH: ${{ github.action_path }}/plan-outcome.txt
         PLAN_OUTCOME: ${{ inputs.plan-outcome }}
-      run: |
-        cd ${{ github.action_path }}
-        node src/action-main.js pr-comment > pr-comment.md
+      working-directory: ${{ github.action_path }}
+      run: ${{ github.action_path }}/generate-pr-comment.sh
 
     - name: Post to PR
       id: post-pr
@@ -120,9 +112,8 @@ runs:
         FORMATTED_PLAN_PATH: ${{ github.action_path }}/formatted-plan.json
         PLAN_OUTCOME_PATH: ${{ github.action_path }}/plan-outcome.txt
         PLAN_OUTCOME: ${{ inputs.plan-outcome }}
-      run: |
-        cd ${{ github.action_path }}
-        node src/action-main.js pipeline-summary > pipeline-summary.md
+      working-directory: ${{ github.action_path }}
+      run: ${{ github.action_path }}/generate-pipeline-summary.sh
 
     - name: Update pipeline summary
       uses: actions/github-script@v7
@@ -141,8 +132,6 @@ runs:
     - name: Store outputs
       id: outputs
       shell: bash
-      run: |
-        # Store comment-id if available (from PR post step)
-        if [ -n "${{ steps.post-pr.outputs.comment-id }}" ]; then
-          echo "comment-id=${{ steps.post-pr.outputs.comment-id }}" >> $GITHUB_OUTPUT
-        fi
+      env:
+        POST_PR_COMMENT_ID: ${{ steps.post-pr.outputs.comment-id }}
+      run: bash ${{ github.action_path }}/store-outputs.sh

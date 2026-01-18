@@ -35,21 +35,9 @@ jobs:
 
       - name: Report SWA cleanup status
         if: always()
-        run: |
-          if [[ "${{ steps.swa-cleanup.outcome }}" == "success" ]]; then
-            echo "✅ SWA staging environment successfully deleted"
-          else
-            echo "⚠️  SWA cleanup completed with warnings (environment may not have existed)"
-          fi
-
-          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
-          ## 🗑️ Azure Static Web Apps Cleanup
-
-          **Status:** ${{ steps.swa-cleanup.outcome == 'success' && '✅ Success' || '⚠️  Completed with warnings' }}
-          **PR Number:** #${{ github.event.pull_request.number }}
-
-          The staging environment for this PR has been processed for deletion.
-          EOF
+        run: scripts/workflows/preview-cleanup-swa-status.sh
+        env:
+          SWA_CLEANUP_OUTCOME: ${{ steps.swa-cleanup.outcome }}
 
       - name: Post cleanup status
         uses: actions/github-script@v7

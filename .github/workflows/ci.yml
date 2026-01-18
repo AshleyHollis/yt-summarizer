@@ -25,6 +25,12 @@
 #   Used when job needs to evaluate complex conditions based on multiple dependency results
 #   Downstream jobs depending on always() jobs must also use always() + check result
 #
+# EXTRACTED SCRIPTS:
+#   - scripts/workflows/ci-check-branch.sh: Detect if main branch or PR
+#   - scripts/workflows/ci-detect-changes.sh: Detect what areas changed
+#   - scripts/workflows/ci-write-rationale.sh: Write job execution summary
+#
+# For details on adding new workflow scripts, see: REFACTORING.md
 # =============================================================================
 
 name: CI
@@ -68,46 +74,33 @@ jobs:
   # Used by all subsequent jobs to decide if they should run
   # ===========================================================================
   detect-changes:
-    name: Detect Changes
-    runs-on: ubuntu-latest
-    outputs:
-      changed_areas: ${{ steps.changes.outputs.changed_areas }}
-      has_code_changes: ${{ steps.changes.outputs.has_code_changes }}
-      is_main_branch: ${{ steps.check-branch.outputs.is_main_branch }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      name: Detect Changes
+      runs-on: ubuntu-latest
+      outputs:
+        changed_areas: ${{ steps.changes.outputs.changed_areas }}
+        has_code_changes: ${{ steps.changes.outputs.has_code_changes }}
+        is_main_branch: ${{ steps.check-branch.outputs.is_main_branch }}
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
 
-      - name: Check if main branch
-        id: check-branch
-        shell: bash
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
-            echo "is_main_branch=true" >> $GITHUB_OUTPUT
-            echo "✓ Main branch detected - FULL validation mode"
-          else
-            echo "is_main_branch=false" >> $GITHUB_OUTPUT
-            echo "✓ PR/branch detected - Smart change detection mode"
-          fi
+        - name: Check if main branch
+          id: check-branch
+          shell: bash
+          env:
+            GITHUB_REF: ${{ github.ref }}
+            GITHUB_REF_NAME: ${{ github.ref_name }}
+            GITHUB_EVENT_NAME: ${{ github.event_name }}
+          run: scripts/workflows/ci-check-branch.sh
 
-      - name: Detect changes
-        id: changes
-        shell: bash
-        run: |
-          if [[ "${{ steps.check-branch.outputs.is_main_branch }}" == "true" ]]; then
-            # Main branch: Force ALL areas to run full validation
-            echo "changed_areas=services/api services/workers services/shared apps/web k8s infra/terraform docker" >> $GITHUB_OUTPUT
-            echo "has_code_changes=true" >> $GITHUB_OUTPUT
-            echo "✓ Main branch: All validation jobs will run"
-          else
-            # PR branch: Use actual change detection
-            echo "✓ PR branch: Running change detection"
-            # Run the actual change detection action
-            cd ${{ github.workspace }}
-            pwsh -File ./scripts/ci/detect-changes.ps1 -OutputFormat github-actions
-          fi
+        - name: Detect changes
+          id: changes
+          shell: bash
+          env:
+            IS_MAIN_BRANCH: ${{ steps.check-branch.outputs.is_main_branch }}
+          run: scripts/workflows/ci-detect-changes.sh
 
   # ===========================================================================
   # PHASE 2: LINTING
@@ -804,9 +797,7 @@ jobs:
         run: pip install pre-commit
 
       - name: Run pre-commit on workflow files
-        run: |
-          pre-commit run --files .github/workflows/*.yml || true
-          pre-commit run --files .github/workflows/*.yaml || true
+        run: scripts/workflows/ci-run-precommit-workflows.sh
 
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK

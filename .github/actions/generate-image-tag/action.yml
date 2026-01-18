@@ -39,49 +39,9 @@ runs:
     - name: Generate image tag
       id: generate
       shell: bash
-      run: |
-        PR_NUMBER="${{ inputs.pr-number }}"
-        COMMIT_SHA="${{ inputs.commit-sha }}"
-        BRANCH_NAME="${{ inputs.branch-name }}"
-        TAG_PREFIX="${{ inputs.tag-prefix }}"
-
-        # Derive short SHA from provided commit-sha if given, otherwise fall back to HEAD
-        if [ -n "$COMMIT_SHA" ] && [ "$COMMIT_SHA" != "null" ]; then
-          SHORT_SHA=$(git rev-parse --short=7 "$COMMIT_SHA")
-        else
-          SHORT_SHA=$(git rev-parse --short=7 HEAD)
-        fi
-
-        # Determine tag type and generate tag
-        if [ "$TAG_PREFIX" = "auto" ]; then
-          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
-            IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
-            TAG_TYPE="pr"
-          elif [ -n "$BRANCH_NAME" ] && [ "$BRANCH_NAME" != "main" ] && [ "$BRANCH_NAME" != "master" ]; then
-            # Sanitize branch name for Docker tag
-            CLEAN_BRANCH=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g' | cut -c1-128)
-            IMAGE_TAG="branch-${CLEAN_BRANCH}-${SHORT_SHA}"
-            TAG_TYPE="branch"
-          else
-            IMAGE_TAG="sha-${SHORT_SHA}"
-            TAG_TYPE="sha"
-          fi
-        else
-          # Use explicit prefix
-          if [ "$TAG_PREFIX" = "pr" ] && [ -n "$PR_NUMBER" ]; then
-            IMAGE_TAG="pr-${PR_NUMBER}-${SHORT_SHA}"
-            TAG_TYPE="pr"
-          elif [ "$TAG_PREFIX" = "branch" ] && [ -n "$BRANCH_NAME" ]; then
-            CLEAN_BRANCH=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g' | cut -c1-128)
-            IMAGE_TAG="branch-${CLEAN_BRANCH}-${SHORT_SHA}"
-            TAG_TYPE="branch"
-          else
-            IMAGE_TAG="sha-${SHORT_SHA}"
-            TAG_TYPE="sha"
-          fi
-        fi
-
-        echo "Generated image tag: $IMAGE_TAG (type: $TAG_TYPE)"
-        echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-        echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-        echo "tag_type=$TAG_TYPE" >> $GITHUB_OUTPUT
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+        BRANCH_NAME: ${{ inputs.branch-name }}
+        TAG_PREFIX: ${{ inputs.tag-prefix }}
+      run: ${{ github.action_path }}/generate-image-tag.sh

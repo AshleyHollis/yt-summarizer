@@ -10,22 +10,8 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install ruff
+    - name: Run ruff checks
       shell: bash
-      run: pip install ruff
-
-    - name: Run ruff linter
-      shell: bash
-      working-directory: ${{ inputs.target-path }}
-      run: |
-        echo "🔍 Running ruff linter in ${{ inputs.target-path }}..."
-        # Ruff auto-discovers configuration from pyproject.toml or ruff.toml
-        # in the current directory or parent directories
-        ruff check .
-
-    - name: Run ruff formatter check
-      shell: bash
-      working-directory: ${{ inputs.target-path }}
-      run: |
-        echo "✨ Checking ruff formatting in ${{ inputs.target-path }}..."
-        ruff format --check .
+      env:
+        TARGET_PATH: ${{ inputs.target-path }}
+      run: bash ${{ github.action_path }}/script.sh

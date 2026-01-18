@@ -31,13 +31,12 @@ runs:
   steps:
     - name: Verify deployment image
       shell: bash
-      run: |
-        export INPUT_NAMESPACE="${{ inputs.namespace }}"
-        export INPUT_DEPLOYMENT_NAME="${{ inputs.deployment-name }}"
-        export INPUT_EXPECTED_TAG="${{ inputs.expected-tag }}"
-        export INPUT_REGISTRY="${{ inputs.registry }}"
-        export INPUT_IMAGE_NAME="${{ inputs.image-name }}"
-        export INPUT_TIMEOUT_SECONDS="${{ inputs.timeout-seconds }}"
-        export INPUT_WAIT_FOR_READY="${{ inputs.wait-for-ready }}"
-
-        cd "${{ github.action_path }}" && bash script.sh
+      env:
+        INPUT_NAMESPACE: ${{ inputs.namespace }}
+        INPUT_DEPLOYMENT_NAME: ${{ inputs.deployment-name }}
+        INPUT_EXPECTED_TAG: ${{ inputs.expected-tag }}
+        INPUT_REGISTRY: ${{ inputs.registry }}
+        INPUT_IMAGE_NAME: ${{ inputs.image-name }}
+        INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+        INPUT_WAIT_FOR_READY: ${{ inputs.wait-for-ready }}
+      run: bash ${{ github.action_path }}/script.sh
