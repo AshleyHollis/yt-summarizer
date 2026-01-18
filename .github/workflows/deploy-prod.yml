@@ -587,6 +587,7 @@ jobs:
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           image-name: yt-summarizer-api
+          app-name: yt-summarizer-prod
 
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-worker-deployments

@@ -17,6 +17,9 @@ inputs:
   image-name:
     description: Image name (without registry prefix)
     required: true
+  app-name:
+    description: Argo CD application name (for pre-sync validation)
+    required: false
   timeout-seconds:
     description: Maximum time to wait in seconds
     required: false
@@ -37,6 +40,7 @@ runs:
         INPUT_EXPECTED_TAG: ${{ inputs.expected-tag }}
         INPUT_REGISTRY: ${{ inputs.registry }}
         INPUT_IMAGE_NAME: ${{ inputs.image-name }}
+        INPUT_APP_NAME: ${{ inputs.app-name }}
         INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
         INPUT_WAIT_FOR_READY: ${{ inputs.wait-for-ready }}
       run: bash ${{ github.action_path }}/script.sh
