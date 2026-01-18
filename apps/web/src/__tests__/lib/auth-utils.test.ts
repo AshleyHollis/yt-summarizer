@@ -1,6 +1,6 @@
 /**
  * Unit tests for auth utility functions
- * 
+ *
  * @module auth-utils.test
  */
 

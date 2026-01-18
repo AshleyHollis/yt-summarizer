@@ -41,7 +41,7 @@ fi
 # Get structured JSON output from terraform
 if ! terraform show -json tfplan > plan.json 2>&1; then
   echo "::error::Failed to convert tfplan to JSON"
-  
+
   SUMMARY=$(cat <<EOF
 {
   "add": 0,
@@ -52,15 +52,15 @@ if ! terraform show -json tfplan > plan.json 2>&1; then
 }
 EOF
 )
-  
+
   echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
   echo "$SUMMARY" >> "$GITHUB_OUTPUT"
   echo "EOF" >> "$GITHUB_OUTPUT"
-  
+
   echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
   echo "{}" >> "$GITHUB_OUTPUT"
   echo "EOF" >> "$GITHUB_OUTPUT"
-  
+
   exit 1
 fi
 
@@ -76,7 +76,7 @@ DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | \
 if [ -z "$ADD" ] || [ -z "$CHANGE" ] || [ -z "$DESTROY" ]; then
   echo "::error::Failed to parse plan.json with jq"
   echo "::error::ADD=$ADD, CHANGE=$CHANGE, DESTROY=$DESTROY"
-  
+
   # Default to 0 if parsing failed
   ADD=${ADD:-0}
   CHANGE=${CHANGE:-0}
