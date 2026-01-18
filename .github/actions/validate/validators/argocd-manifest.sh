@@ -6,7 +6,7 @@
 # Detects manifest errors BEFORE sync operation to avoid timeouts
 # Replaces: validate-argocd-manifest action
 
-set -euo pipefail
+set -uo pipefail
 
 # Load common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -4,7 +4,7 @@
 # =============================================================================
 # Shared functions used by all validator scripts
 
-set -euo pipefail
+set -uo pipefail
 
 # Colors for output
 RED='\033[0;31m'

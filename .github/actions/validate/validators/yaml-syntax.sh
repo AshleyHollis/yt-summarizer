@@ -5,7 +5,7 @@
 # Validates YAML syntax for all K8s manifests in the specified directory
 # Replaces: validate-k8s-yaml action
 
-set -euo pipefail
+set -uo pipefail
 
 # Configuration
 K8S_DIR="${K8S_DIRECTORY:-k8s}"

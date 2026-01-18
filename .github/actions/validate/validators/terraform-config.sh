@@ -5,7 +5,7 @@
 # Validates Terraform configuration syntax and formatting
 # Replaces: validate-terraform-config action (partially)
 
-set -euo pipefail
+set -uo pipefail
 
 # Load common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -5,7 +5,7 @@
 # Validates that Argo CD Application CRDs reference valid paths
 # Replaces: validate-argocd-paths action
 
-set -euo pipefail
+set -uo pipefail
 
 # Load common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
