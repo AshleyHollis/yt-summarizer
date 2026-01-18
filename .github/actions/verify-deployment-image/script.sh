@@ -10,6 +10,7 @@ DEPLOYMENT="${INPUT_DEPLOYMENT_NAME}"
 EXPECTED_TAG="${INPUT_EXPECTED_TAG}"
 REGISTRY="${INPUT_REGISTRY}"
 IMAGE_NAME="${INPUT_IMAGE_NAME}"
+APP_NAME="${INPUT_APP_NAME:-}"
 TIMEOUT=${INPUT_TIMEOUT_SECONDS:-300}
 INTERVAL=5
 MAX_ATTEMPTS=$((TIMEOUT / INTERVAL))
@@ -23,7 +24,19 @@ echo "  Timeout: ${TIMEOUT}s"
 echo ""
 
 # CRITICAL PRE-CHECK: Verify overlay actually contains expected image tag
-APP_NAME=$(echo ${NAMESPACE} | sed 's/preview-/preview-pr-/')
+# If APP_NAME not provided, derive it from namespace
+if [ -z "$APP_NAME" ]; then
+  if [[ "${NAMESPACE}" == "preview-"* ]]; then
+    APP_NAME=$(echo ${NAMESPACE} | sed 's/^preview-/preview-pr-/')
+  elif [[ "${NAMESPACE}" == "prod" ]]; then
+    APP_NAME="yt-summarizer-prod"
+  elif [[ "${NAMESPACE}" == "yt-summarizer" ]]; then
+    APP_NAME="yt-summarizer-prod"
+  else
+    # Fallback for unknown namespaces
+    echo "::warning::Cannot derive APP_NAME from namespace ${NAMESPACE}, skipping pre-check"
+  fi
+fi
 echo "::group::📋 Pre-check: Verify Argo CD has correct image tag in manifest"
 if kubectl get applications.argoproj.io ${APP_NAME} -n argocd &>/dev/null; then
   MANIFEST=$(kubectl get applications.argoproj.io ${APP_NAME} -n argocd -o jsonpath='{.status.summary.images}' 2>/dev/null || echo "")
