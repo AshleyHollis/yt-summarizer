@@ -167,8 +167,10 @@ def _sanitize_return_to(return_to: str, settings: Any) -> str:
 
 
 def _build_callback_url(request: Request) -> str:
-    base_url = str(request.base_url).rstrip("/")
-    return f"{base_url}/api/auth/callback/auth0"
+    # Check for X-Forwarded-Proto header to handle reverse proxy HTTPS
+    proto = request.headers.get("X-Forwarded-Proto", "http")
+    host = request.headers.get("Host", str(request.base_url.netloc))
+    return f"{proto}://{host}/api/auth/callback/auth0"
 
 
 def _ensure_auth_settings(settings: Any) -> Any:
