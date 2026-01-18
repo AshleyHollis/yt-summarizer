@@ -37,10 +37,10 @@ while IFS= read -r file; do
 
   # Extract repoURL to determine if this is a local or external repo
   REPO_URL=$(grep -E '^\s+repoURL:' "$file" | head -1 | sed 's/.*repoURL: *//' | sed 's/"//g' | sed "s/'//g" || true)
-  
+
   # Get current repository URL from git
   CURRENT_REPO=$(git config --get remote.origin.url 2>/dev/null || echo "")
-  
+
   # Check if this is an external repository
   if [[ -n "$REPO_URL" ]] && [[ "$REPO_URL" != "$CURRENT_REPO" ]]; then
     # External repository - skip path validation
