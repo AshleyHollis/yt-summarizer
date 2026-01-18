@@ -161,20 +161,20 @@ check_pod_issues() {
 
   # Try multiple label selectors to find pods
   local pods=""
-  
+
   # Try app.kubernetes.io/name label first (new standard)
   pods=$(kubectl get pods -n ${namespace} -l app.kubernetes.io/name=${deployment} -o name 2>/dev/null)
-  
+
   # Fallback to app label (legacy)
   if [ -z "$pods" ]; then
     pods=$(kubectl get pods -n ${namespace} -l app=${deployment} -o name 2>/dev/null)
   fi
-  
+
   # Fallback to deployment owner reference
   if [ -z "$pods" ]; then
     pods=$(kubectl get pods -n ${namespace} --field-selector=metadata.ownerReferences[*].name=${deployment} -o name 2>/dev/null)
   fi
-  
+
   if [ -z "$pods" ]; then
     return 0
   fi
