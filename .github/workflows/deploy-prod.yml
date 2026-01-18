@@ -91,9 +91,42 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # Container Registry
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+
+  # Application Names
+  APP_NAME: 'yt-summarizer'
+  API_IMAGE_NAME: 'yt-summarizer-api'
+  WORKERS_IMAGE_NAME: 'yt-summarizer-workers'
+  ARGOCD_APP_NAME_PROD: 'yt-summarizer-prod'
+
+  # Namespaces
+  NAMESPACE_PROD: 'yt-summarizer'
+  NAMESPACE_ARGOCD: 'argocd'
+
+  # Worker List
+  WORKER_DEPLOYMENTS: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+
+  # URLs
   PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
+  HEALTH_CHECK_PATH: '/health/ready'
+
+  # Timeouts (seconds)
+  ARGOCD_SYNC_TIMEOUT: '360'
+  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'
+  HEALTH_CHECK_MAX_ATTEMPTS: '10'
+  HEALTH_CHECK_INTERVAL: '15'
+  HEALTH_CHECK_TIMEOUT: '30'
+
+  # Paths
+  KUSTOMIZE_OVERLAY_PROD: 'k8s/overlays/prod'
+  ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
+
+  # Tool Versions
+  TERRAFORM_VERSION: '1.5.7'
+  KUSTOMIZE_VERSION: '5.8.0'
+  NODE_VERSION: '20'
 
 permissions:
   id-token: write
@@ -209,7 +242,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '1.5.7'
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Azure Login via OIDC
         uses: azure/login@v2
@@ -305,7 +338,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '1.5.7'
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Azure Login via OIDC
         uses: azure/login@v2
@@ -373,7 +406,7 @@ jobs:
         uses: ./.github/actions/sync-argocd-manifests
         with:
           mode: all
-          namespace: argocd
+          namespace: ${{ env.NAMESPACE_ARGOCD }}
           verbose: 'true'
 
 
@@ -427,7 +460,7 @@ jobs:
         uses: ./.github/actions/validate-acr-image
         with:
           registry: ${{ env.ACR_NAME }}
-          repository: yt-summarizer-api
+          repository: ${{ env.API_IMAGE_NAME }}
           tag: ${{ steps.extract.outputs.image_tag }}
           fail-if-missing: 'true'
 
@@ -486,7 +519,7 @@ jobs:
         uses: ./.github/actions/validate-acr-image
         with:
           registry: ${{ env.ACR_NAME }}
-          repository: yt-summarizer-api
+          repository: ${{ env.API_IMAGE_NAME }}
           tag: ${{ steps.find-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
@@ -532,7 +565,7 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
-          overlay-paths: k8s/overlays/prod
+          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
           fail-fast: 'true'
           timeout-seconds: '30'
 
@@ -558,19 +591,47 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
-          overlay-paths: k8s/overlays/prod
+          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
           fail-fast: 'true'
           timeout-seconds: '30'
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
+      - name: Verify cluster can pull image
+        uses: ./.github/actions/validate-acr-image
+        with:
+          registry: ${{ env.ACR_NAME }}
+          repository: ${{ env.API_IMAGE_NAME }}
+          tag: ${{ steps.determine-tag.outputs.image_tag }}
+          run-k8s-pull-test: 'true'
+
+      - name: Validate image tag format
+        if: needs.get-ci-image-tag.result == 'success'
+        uses: ./.github/actions/validate-image-tag
+        with:
+          ci-image-tag: ${{ steps.determine-tag.outputs.image_tag }}
+          commit-sha: ${{ github.sha }}
 
       - name: Commit and push changes
         uses: ./.github/actions/commit-kustomization
         with:
-          file-path: 'k8s/overlays/prod/kustomization.yaml'
+          file-path: '${{ env.KUSTOMIZE_OVERLAY_PROD }}/kustomization.yaml'
           commit-message: |
             chore(prod): deploy ${{ steps.determine-tag.outputs.image_tag }} to production
 
-            API Image: ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-api:${{ steps.determine-tag.outputs.image_tag }}
-            Workers Image: ${{ env.ACR_LOGIN_SERVER }}/yt-summarizer-workers:${{ steps.determine-tag.outputs.image_tag }}
+            API Image: ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ steps.determine-tag.outputs.image_tag }}
+            Workers Image: ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKERS_IMAGE_NAME }}:${{ steps.determine-tag.outputs.image_tag }}
 
             Commit: ${{ github.sha }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -616,41 +677,41 @@ jobs:
       - name: Setup Kustomize
         uses: ./.github/actions/setup-kustomize
         with:
-          kustomize-version: '5.8.0'
+          kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
       - name: Cleanup stuck Argo CD operations
         uses: ./.github/actions/cleanup-argocd-operation
         with:
-          app-name: yt-summarizer-prod
-          namespace: argocd
-          timeout-threshold: '300'
+          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
+          namespace: ${{ env.NAMESPACE_ARGOCD }}
+          timeout-threshold: ${{ env.ARGOCD_OPERATION_TIMEOUT_THRESHOLD }}
         continue-on-error: false
 
       - name: Pre-deployment validation
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build,argocd-manifest
-          overlay-paths: k8s/overlays/prod
-          argocd-app-name: yt-summarizer-prod
-          argocd-namespace: argocd
-          target-namespace: yt-summarizer
+          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
+          argocd-app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
+          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          target-namespace: ${{ env.NAMESPACE_PROD }}
           timeout-seconds: '60'
 
       - name: Validate Argo CD readiness (fail-fast)
         uses: ./.github/actions/check-argocd-readiness
         with:
-          app-name: yt-summarizer-prod
-          namespace: argocd
+          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
+          namespace: ${{ env.NAMESPACE_ARGOCD }}
           timeout: '60'
           verbose: 'true'
         continue-on-error: false
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
         with:
-          app-name: yt-summarizer-prod
-          namespace: yt-summarizer
+          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
+          namespace: ${{ env.NAMESPACE_PROD }}
           pr-number: '0'
-          timeout-seconds: '360'
+          timeout-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
 
       - name: Determine expected image tag
         id: expected-tag
@@ -665,27 +726,27 @@ jobs:
       - name: Verify API deployment image
         uses: ./.github/actions/verify-deployment
         with:
-          namespace: yt-summarizer
+          namespace: ${{ env.NAMESPACE_PROD }}
           deployment-name: api
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: yt-summarizer-api
-          app-name: yt-summarizer-prod
+          image-name: ${{ env.API_IMAGE_NAME }}
+          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
 
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-workers
         with:
-          namespace: yt-summarizer
+          namespace: ${{ env.NAMESPACE_PROD }}
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: yt-summarizer-workers
-          workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+          image-name: ${{ env.WORKERS_IMAGE_NAME }}
+          workers: ${{ env.WORKER_DEPLOYMENTS }}
           fail-on-mismatch: 'true'
 
       - name: Collect deployment diagnostics on failure
         if: failure()
         shell: bash
-        run: ./scripts/diagnose-argocd-deployment.sh yt-summarizer-prod ./diagnostics
+        run: ./scripts/diagnose-argocd-deployment.sh ${{ env.ARGOCD_APP_NAME_PROD }} ./diagnostics
 
       - name: Upload diagnostics artifact
         if: failure()
@@ -695,13 +756,28 @@ jobs:
            path: diagnostics/
            retention-days: 7
 
+      - name: Verify TLS certificate
+        uses: ./.github/actions/verify-certificate
+        with:
+          host: api.yt-summarizer.apps.ashleyhollis.com
+
+      - name: Run external API health check
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ env.PRODUCTION_URL }}${{ env.HEALTH_CHECK_PATH }}
+          max-attempts: '20'
+          interval-seconds: '10'
+          timeout-seconds: '5'
+          expected-status: '200'
+          service-name: 'Production API (External)'
+
       - name: Run API health checks
         uses: ./.github/actions/health-check
         with:
           url: ${{ env.PRODUCTION_URL }}/health
-          max-attempts: '10'
-          interval-seconds: '15'
-          timeout-seconds: '30'
+          max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
+          interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
+          timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
           expected-status: '200'
           service-name: 'Production API'
 
@@ -724,7 +800,7 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           working-directory: apps/web
 
       - name: Build frontend

@@ -23,6 +23,9 @@ outputs:
   internal-healthy:
     description: 'Whether internal health check passed'
     value: ${{ steps.internal-check.outputs.healthy }}
+  external-attempts:
+    description: 'Number of attempts made for external health check'
+    value: ${{ steps.external-check.outputs.attempts }}
 
 runs:
   using: 'composite'
@@ -41,7 +44,7 @@ runs:
       env:
         EXTERNAL_URL: ${{ inputs.external-url }}
         NAMESPACE: ${{ inputs.namespace }}
-      run: ${{ github.action_path }}/check-dns-and-tls.sh
+      run: ${{ github.action_path }}/check-dns-resolution.sh
 
     - name: Check Gateway API HTTPRoute configuration
       shell: bash
@@ -55,12 +58,31 @@ runs:
         NAMESPACE: ${{ inputs.namespace }}
       run: ${{ github.action_path }}/check-service-endpoints.sh
 
+    - name: Check gateway certificate readiness
+      shell: bash
+      run: ${{ github.action_path }}/check-gateway-cert.sh
+
+    - name: Wait for DNS propagation
+      shell: bash
+      run: |
+        echo "::notice::Waiting 30 seconds for DNS propagation..."
+        sleep 30
+
     - name: Check external ingress health
       id: external-check
+      uses: ./.github/actions/health-check
+      with:
+        url: ${{ inputs.external-url }}/health/live
+        max-attempts: ${{ inputs.max-attempts }}
+        interval-seconds: ${{ inputs.interval-seconds }}
+        timeout-seconds: '5'
+        expected-status: '200'
+        service-name: 'Preview API (External)'
+
+    - name: Run diagnostics on external health failure
+      if: failure() && steps.external-check.outcome == 'failure'
       shell: bash
       env:
         EXTERNAL_URL: ${{ inputs.external-url }}
-        MAX_ATTEMPTS: ${{ inputs.max-attempts }}
-        INTERVAL: ${{ inputs.interval-seconds }}
         NAMESPACE: ${{ inputs.namespace }}
-      run: ${{ github.action_path }}/check-external-health.sh
+      run: ${{ github.action_path }}/check-external-diagnostics.sh

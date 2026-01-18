@@ -121,8 +121,43 @@ concurrency:
 
 
 env:
+  # Container Registry
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+
+  # Application Names
+  APP_NAME: 'yt-summarizer'
+  API_IMAGE_NAME: 'yt-summarizer-api'
+  WORKERS_IMAGE_NAME: 'yt-summarizer-workers'
+
+  # Namespaces
+  NAMESPACE_ARGOCD: 'argocd'
+  PREVIEW_NAMESPACE_PREFIX: 'preview-pr-'
+
+  # Worker List
+  WORKER_DEPLOYMENTS: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+
+  # URLs
+  APPS_BASE_DOMAIN: 'yt-summarizer.apps.ashleyhollis.com'
+  HEALTH_CHECK_PATH: '/health/ready'
+
+  # Timeouts (seconds)
+  ARGOCD_SYNC_TIMEOUT: '180'
+  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'
+  HEALTH_CHECK_MAX_ATTEMPTS: '10'
+  HEALTH_CHECK_INTERVAL: '15'
+  HEALTH_CHECK_TIMEOUT: '30'
+
+  # Paths
+  KUSTOMIZE_OVERLAY_PREVIEW: 'k8s/overlays/preview'
+  ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
+
+  # Tool Versions
+  TERRAFORM_VERSION: '1.5.7'
+  KUSTOMIZE_VERSION: '5.8.0'
+  NODE_VERSION: '20'
+
+  # Preview Limits
   MAX_PREVIEWS: 3
 
 permissions:
@@ -421,7 +456,7 @@ jobs:
         uses: ./.github/actions/validate-acr-image
         with:
           registry: ${{ env.ACR_NAME }}
-          repository: yt-summarizer-api
+          repository: ${{ env.API_IMAGE_NAME }}
           tag: ${{ steps.wait.outputs.image_tag }}
           fail-if-missing: 'true'
 
@@ -470,7 +505,7 @@ jobs:
         uses: ./.github/actions/validate-acr-image
         with:
           registry: ${{ env.ACR_NAME }}
-          repository: yt-summarizer-api
+          repository: ${{ env.API_IMAGE_NAME }}
           tag: ${{ steps.find-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
@@ -570,8 +605,8 @@ jobs:
         uses: ./.github/actions/compute-preview-urls
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          app-name: 'yt-summarizer'
-          base-domain: 'yt-summarizer.apps.ashleyhollis.com'
+          app-name: ${{ env.APP_NAME }}
+          base-domain: ${{ env.APPS_BASE_DOMAIN }}
 
   # ===========================================================================
   # PHASE 5: UPDATE KUBERNETES OVERLAY
@@ -637,7 +672,7 @@ jobs:
         uses: ./.github/actions/validate-acr-image
         with:
           registry: ${{ env.ACR_NAME }}
-          repository: yt-summarizer-api
+          repository: ${{ env.API_IMAGE_NAME }}
           tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           run-k8s-pull-test: 'true'
 
@@ -665,7 +700,7 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
-          overlay-paths: k8s/overlays/preview
+          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PREVIEW }}
           fail-fast: 'true'
           timeout-seconds: '30'
 
@@ -739,11 +774,18 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build,argocd-manifest
-          overlay-paths: k8s/overlays/preview
-          argocd-app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          argocd-namespace: argocd
-          target-namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PREVIEW }}
+          argocd-app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
+          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          target-namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           timeout-seconds: '60'
+
+      - name: Check Argo CD application readiness
+        uses: ./.github/actions/check-argocd-readiness
+        with:
+          app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
+          namespace: ${{ env.NAMESPACE_ARGOCD }}
+          timeout: '60'
 
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
@@ -760,7 +802,7 @@ jobs:
           deployment-name: api
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: yt-summarizer-api
+          image-name: ${{ env.API_IMAGE_NAME }}
 
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-workers
@@ -768,9 +810,22 @@ jobs:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: yt-summarizer-workers
-          workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
-          fail-on-mismatch: 'false'
+          image-name: ${{ env.WORKERS_IMAGE_NAME }}
+          workers: ${{ env.WORKER_DEPLOYMENTS }}
+          fail-on-mismatch: 'true'
+
+      - name: Collect deployment diagnostics on failure
+        if: failure()
+        shell: bash
+        run: ./scripts/diagnose-argocd-deployment.sh ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }} ./diagnostics
+
+      - name: Upload diagnostics artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+           name: deployment-diagnostics-pr-${{ needs.detect-changes.outputs.pr_number }}
+           path: diagnostics/
+           retention-days: 7
 
       - name: Run API health checks
         if: needs.get-ingress.outputs.preview_url != ''
