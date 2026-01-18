@@ -158,7 +158,7 @@ log_info "=== Collecting Git Repository Information ==="
     APP_REPO=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.repoURL}')
     APP_TARGET=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.targetRevision}')
     APP_PATH=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.path}')
-    
+
     echo "Repository URL: $APP_REPO"
     echo "Target Revision: $APP_TARGET"
     echo "Path: $APP_PATH"
@@ -197,7 +197,7 @@ log_info "=== Generating Summary Report ==="
     echo "  Argo CD Namespace: $ARGOCD_NAMESPACE"
     echo "  Target Namespace: $APP_NAMESPACE"
     echo ""
-    
+
     echo "Application Status:"
     kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{
         "  Sync Status: " .status.sync.status "\n"
@@ -206,16 +206,16 @@ log_info "=== Generating Summary Report ==="
         "  Last Sync Time: " .status.reconciledAt "\n"
     }'
     echo ""
-    
+
     echo "Resource Summary:"
     kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{
         "  Total Resources: " (.status.resources | length) "\n"
     }'
     echo ""
-    
+
     echo "Key Issues to Check:"
     echo ""
-    
+
     # Check for ComparisonError
     if kubectl describe application "$APP_NAME" -n "$ARGOCD_NAMESPACE" 2>/dev/null | grep -q "ComparisonError"; then
         echo "  ✗ ComparisonError Detected:"
@@ -223,7 +223,7 @@ log_info "=== Generating Summary Report ==="
         echo "    - Check: kustomization.yaml syntax, patch references, resource files"
         echo ""
     fi
-    
+
     # Check for missing resources
     if kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.health.status}' | grep -q "Missing"; then
         echo "  ✗ Missing Resources:"
@@ -231,7 +231,7 @@ log_info "=== Generating Summary Report ==="
         echo "    - Check: Resource definitions, health assessment logic"
         echo ""
     fi
-    
+
     # Check for stuck operations
     {
         OP_START=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.operationState.startedAt}' 2>/dev/null)
@@ -248,22 +248,22 @@ log_info "=== Generating Summary Report ==="
             fi
         fi
     }
-    
+
     # Check for pod issues
     POD_COUNT=$(kubectl get pods -n "$APP_NAMESPACE" 2>/dev/null | tail -n +2 | wc -l)
     RUNNING=$(kubectl get pods -n "$APP_NAMESPACE" --field-selector=status.phase=Running 2>/dev/null | tail -n +2 | wc -l)
     FAILED=$(kubectl get pods -n "$APP_NAMESPACE" --field-selector=status.phase=Failed 2>/dev/null | tail -n +2 | wc -l)
-    
+
     echo "  Pod Status Summary:"
     echo "    - Total Pods: $POD_COUNT"
     echo "    - Running: $RUNNING"
     echo "    - Failed: $FAILED"
-    
+
     if [[ $FAILED -gt 0 ]]; then
         echo "    ✗ Failed pods detected - check pod logs for details"
     fi
     echo ""
-    
+
     echo "Troubleshooting Steps:"
     echo "  1. Review Argo CD Application controller logs:"
     echo "     kubectl logs -n $ARGOCD_NAMESPACE -l app.kubernetes.io/name=argocd-application-controller -f"
@@ -280,7 +280,7 @@ log_info "=== Generating Summary Report ==="
     echo "  5. Check for kustomize build errors:"
     echo "     kubectl get application $APP_NAME -n $ARGOCD_NAMESPACE -o yaml | grep -A 20 'comparisonResult'"
     echo ""
-    
+
 } > "$DIAG_DIR/99-summary-report.txt"
 
 # =============================================================================

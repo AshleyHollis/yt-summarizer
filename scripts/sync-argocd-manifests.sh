@@ -86,68 +86,68 @@ done
 
 validate_prerequisites() {
     log_info "=== Validating Prerequisites ==="
-    
+
     # Check kubectl
     if ! command -v kubectl &> /dev/null; then
         log_error "kubectl not found. Install kubectl or add it to PATH."
         exit 1
     fi
     log_success "kubectl is available"
-    
+
     # Check Argo CD namespace
     if ! kubectl get namespace "$ARGOCD_NAMESPACE" &>/dev/null; then
         log_error "Argo CD namespace '$ARGOCD_NAMESPACE' does not exist"
         exit 1
     fi
     log_success "Argo CD namespace '$ARGOCD_NAMESPACE' exists"
-    
+
     # Check Argo CD CRDs
     if ! kubectl get crd applications.argoproj.io &>/dev/null; then
         log_error "Argo CD CRDs not found. Is Argo CD installed?"
         exit 1
     fi
     log_success "Argo CD CRDs are available"
-    
+
     # Check if k8s/argocd directory exists
     if [[ ! -d "$K8S_ARGOCD_DIR" ]]; then
         log_error "Argo CD manifests directory not found: $K8S_ARGOCD_DIR"
         exit 1
     fi
     log_success "Argo CD manifests directory found"
-    
+
     echo ""
 }
 
 validate_manifests() {
     log_info "=== Validating Manifest Syntax ==="
-    
+
     local files=()
-    
+
     if [[ "$MODE" == "infra" ]] || [[ "$MODE" == "all" ]]; then
         files+=("$K8S_ARGOCD_DIR/infra-apps.yaml")
     fi
-    
+
     if [[ "$MODE" == "apps" ]] || [[ "$MODE" == "all" ]]; then
         files+=("$K8S_ARGOCD_DIR/prod-app.yaml")
         files+=("$K8S_ARGOCD_DIR/preview-appset.yaml")
     fi
-    
+
     for file in "${files[@]}"; do
         if [[ ! -f "$file" ]]; then
             log_error "Manifest file not found: $file"
             exit 1
         fi
-        
+
         # Validate YAML syntax
         if ! kubectl apply -f "$file" --dry-run=client &>/dev/null; then
             log_error "Invalid YAML syntax in $file"
             kubectl apply -f "$file" --dry-run=client 2>&1 | tail -5
             exit 1
         fi
-        
+
         log_success "Valid manifest: $file"
     done
-    
+
     echo ""
 }
 
@@ -158,15 +158,15 @@ validate_manifests() {
 apply_manifests() {
     log_info "=== Applying Argo CD Manifests ==="
     echo ""
-    
+
     local files=()
-    
+
     # Determine which files to apply
     if [[ "$MODE" == "infra" ]] || [[ "$MODE" == "all" ]]; then
         log_info "Mode: Infrastructure applications"
         files+=("$K8S_ARGOCD_DIR/infra-apps.yaml")
     fi
-    
+
     if [[ "$MODE" == "apps" ]] || [[ "$MODE" == "all" ]]; then
         if [[ "$MODE" == "apps" ]]; then
             log_info "Mode: Main applications only"
@@ -174,13 +174,13 @@ apply_manifests() {
         files+=("$K8S_ARGOCD_DIR/prod-app.yaml")
         files+=("$K8S_ARGOCD_DIR/preview-appset.yaml")
     fi
-    
+
     echo ""
-    
+
     # Apply each manifest
     for file in "${files[@]}"; do
         log_info "Processing: $file"
-        
+
         if [[ "$DRY_RUN" == "true" ]]; then
             log_warning "DRY-RUN: Would apply the following changes:"
             kubectl apply -f "$file" --dry-run=client -o diff 2>&1 | head -50
@@ -195,7 +195,7 @@ apply_manifests() {
                     status=$(echo "$line" | awk '{print $NF}')
                     resource=$(echo "$line" | awk '{print $1}')
                     name=$(echo "$line" | awk '{print $2}' | sed 's/\.argoproj\.io.*//')
-                    
+
                     case "$status" in
                         "created")
                             log_success "$resource created: $name"
@@ -216,10 +216,10 @@ apply_manifests() {
                 exit 1
             fi
         fi
-        
+
         echo ""
     done
-    
+
     if [[ "$DRY_RUN" == "true" ]]; then
         log_warning "DRY-RUN mode: No changes were applied"
     fi
@@ -234,33 +234,33 @@ verify_applications() {
         log_info "Skipping verification (dry-run mode)"
         return 0
     fi
-    
+
     log_info "=== Verifying Applied Applications ==="
-    
+
     sleep 2
-    
+
     local apps=()
-    
+
     if [[ "$MODE" == "infra" ]] || [[ "$MODE" == "all" ]]; then
         apps+=("eso-secretstore")
         apps+=("eso-cluster-secretstore")
         apps+=("external-secrets")
         apps+=("cert-manager")
     fi
-    
+
     if [[ "$MODE" == "apps" ]] || [[ "$MODE" == "all" ]]; then
         apps+=("yt-summarizer-prod")
         apps+=("yt-summarizer-previews")
     fi
-    
+
     echo ""
-    
+
     for app in "${apps[@]}"; do
         if kubectl get application "$app" -n "$ARGOCD_NAMESPACE" &>/dev/null; then
             local sync_status health_status
             sync_status=$(kubectl get application "$app" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
             health_status=$(kubectl get application "$app" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
-            
+
             log_success "Application '$app' exists"
             echo "  Sync Status:   $sync_status"
             echo "  Health Status: $health_status"
@@ -268,7 +268,7 @@ verify_applications() {
             log_warning "Application '$app' not found (may still be creating)"
         fi
     done
-    
+
     echo ""
     log_info "Application verification complete"
 }
@@ -291,7 +291,7 @@ main() {
     echo ""
     echo "================================================================"
     echo ""
-    
+
     # Run validations
     if [[ "$SKIP_VALIDATION" != "true" ]]; then
         validate_prerequisites
@@ -300,13 +300,13 @@ main() {
         log_warning "Validation skipped"
         echo ""
     fi
-    
+
     # Apply manifests
     apply_manifests
-    
+
     # Verify
     verify_applications
-    
+
     echo "================================================================"
     log_success "Argo CD manifest synchronization completed!"
     echo "================================================================"

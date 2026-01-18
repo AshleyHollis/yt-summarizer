@@ -115,7 +115,7 @@ check_argocd_api() {
         log_error "Cannot access Kubernetes API"
         exit 1
     fi
-    
+
     if ! kubectl get crd applications.argoproj.io &>/dev/null; then
         log_error "Argo CD CRDs not found. Is Argo CD installed?"
         exit 1
@@ -136,27 +136,27 @@ check_application_exists() {
 
 check_application_configuration() {
     log_info "Validating Application configuration..."
-    
+
     local repo_url target_revision path
     repo_url=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.repoURL}')
     target_revision=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.targetRevision}')
     path=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.path}')
-    
+
     log_verbose "Repository URL: $repo_url"
     log_verbose "Target Revision: $target_revision"
     log_verbose "Path: $path"
-    
+
     if [[ -z "$repo_url" ]] || [[ -z "$target_revision" ]] || [[ -z "$path" ]]; then
         log_error "Application is missing required configuration"
         exit 1
     fi
-    
+
     # Check if target revision is valid (not a commit SHA for production)
     if [[ "$target_revision" =~ ^[0-9a-f]{40}$ ]]; then
         log_warning "Application targets a commit SHA instead of a branch/tag"
         log_warning "This may prevent Argo CD from detecting future changes"
     fi
-    
+
     log_success "Application configuration is valid"
 }
 
@@ -172,32 +172,32 @@ check_namespace_exists() {
 
 check_sync_status() {
     log_info "Checking Application sync status..."
-    
+
     local sync_status health_status conditions
     sync_status=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.sync.status}')
     health_status=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.health.status}')
-    
+
     log_verbose "Sync Status: $sync_status"
     log_verbose "Health Status: $health_status"
-    
+
     # Check for sync errors
     if [[ "$sync_status" == "Unknown" ]]; then
         log_warning "Sync status is Unknown. Argo CD may still be reconciling."
     fi
-    
+
     if [[ "$health_status" == "Missing" ]]; then
         log_warning "Health status is Missing. Application resources may not exist yet."
     fi
-    
+
     log_success "Sync and health status checked"
 }
 
 check_for_errors() {
     log_info "Checking for Argo CD errors..."
-    
+
     local conditions error_count
     conditions=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.conditions}' 2>/dev/null)
-    
+
     # Check for ComparisonError (manifest generation failed)
     if kubectl describe application "$APP_NAME" -n "$ARGOCD_NAMESPACE" 2>/dev/null | grep -q "ComparisonError"; then
         log_error "ComparisonError detected: Manifest generation failed"
@@ -208,76 +208,76 @@ check_for_errors() {
         kubectl describe application "$APP_NAME" -n "$ARGOCD_NAMESPACE" | grep -A 5 "ComparisonError"
         exit 1
     fi
-    
+
     # Check for other error conditions
     error_count=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
         -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{"\n"}{end}' \
         | grep -i error | wc -l)
-    
+
     if [[ $error_count -gt 0 ]]; then
         log_error "Found $error_count error condition(s):"
         kubectl describe application "$APP_NAME" -n "$ARGOCD_NAMESPACE" | grep -A 2 "Conditions:"
         exit 1
     fi
-    
+
     log_success "No errors detected"
 }
 
 check_git_connectivity() {
     log_info "Checking git repository connectivity..."
-    
+
     local repo_url
     repo_url=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.repoURL}')
-    
+
     # Simple connectivity check (could be enhanced with actual git access)
     if [[ ! "$repo_url" =~ ^https?:// ]]; then
         log_error "Invalid repository URL format: $repo_url"
         exit 1
     fi
-    
+
     log_success "Git repository URL is valid"
 }
 
 check_resource_diff() {
     log_info "Checking for unsynced resources..."
-    
+
     local out_of_sync_count
     out_of_sync_count=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
         -o jsonpath='{.status.resources[?(@.health.status!="Healthy")]}' | wc -l)
-    
+
     if [[ $out_of_sync_count -gt 0 ]]; then
         log_warning "Found $out_of_sync_count unhealthy resource(s)"
         log_info "Argo CD will sync these during deployment"
     else
         log_verbose "All resources are in sync"
     fi
-    
+
     log_success "Resource status checked"
 }
 
 check_no_long_running_operations() {
     log_info "Checking for long-running operations..."
-    
+
     local operation_start_time current_time elapsed_seconds
     operation_start_time=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
         -o jsonpath='{.status.operationState.startedAt}' 2>/dev/null)
-    
+
     if [[ -n "$operation_start_time" ]] && [[ "$operation_start_time" != "null" ]]; then
         current_time=$(date -u +%s)
         operation_timestamp=$(date -d "$operation_start_time" +%s 2>/dev/null || echo "$current_time")
         elapsed_seconds=$((current_time - operation_timestamp))
-        
+
         if [[ $elapsed_seconds -gt 300 ]]; then
             log_error "Operation has been running for ${elapsed_seconds}s (>5 minutes)"
             log_error "This may indicate a stuck sync operation"
             exit 1
         fi
-        
+
         if [[ $elapsed_seconds -gt 60 ]]; then
             log_warning "Operation has been running for ${elapsed_seconds}s"
         fi
     fi
-    
+
     log_success "No long-running operations detected"
 }
 
@@ -298,7 +298,7 @@ main() {
     echo ""
     echo "================================================================"
     echo ""
-    
+
     # Run all validations
     check_kubectl
     check_argocd_api
@@ -310,7 +310,7 @@ main() {
     check_no_long_running_operations
     check_sync_status
     check_resource_diff
-    
+
     echo ""
     echo "================================================================"
     log_success "All pre-deployment validations passed!"
@@ -321,7 +321,7 @@ main() {
     echo "  2. Monitor sync: kubectl describe application $APP_NAME -n $ARGOCD_NAMESPACE"
     echo "  3. Check resources: kubectl get all -n $APP_NAMESPACE"
     echo ""
-    
+
     exit 0
 }
 
