@@ -124,14 +124,14 @@ patches:
                     cpu: 500m
                     memory: 512Mi
 images:
-  -
-    name: yt-summarizer-api
-    newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: sha-7120713
-  -
-    name: yt-summarizer-workers
-    newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: sha-7120713
+   -
+     name: yt-summarizer-api
+     newName: acrytsummprd.azurecr.io/yt-summarizer-api
+     newTag: sha-046b957
+   -
+     name: yt-summarizer-workers
+     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
+     newTag: sha-046b957
 labels:
 - pairs:
     environment: "production"
