@@ -73,8 +73,8 @@ markers = [
     "e2e: End-to-end tests requiring running API and database",
     "live: Live tests against running infrastructure (requires E2E_TESTS_ENABLED=true)",
 ]
-# By default, run all tests except live E2E tests (which require infrastructure)
-addopts = "-m 'not live'"
+# Note: Do not use addopts with -m here as it conflicts with command-line marker expressions
+# The CI workflow specifies marker expressions via pytest-args instead
 
 [tool.deptry]
 # Dependency checker configuration - catches missing/unused dependencies

@@ -346,8 +346,9 @@ jobs:
         uses: ./.github/actions/run-pytest
         with:
           working-directory: services/api
-          parallel: 'true'
-          pytest-args: '-v --tb=short -m "not integration and not live"'
+          parallel: 'false'
+          pytest-args: '-v --tb=short'
+          markers: 'not integration and not live'
 
       - name: Record tests finish
         id: finish

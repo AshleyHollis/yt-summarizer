@@ -6,9 +6,13 @@ inputs:
     description: Directory containing tests to run
     required: true
   pytest-args:
-    description: Additional pytest arguments
+    description: Additional pytest arguments (excluding -m marker expression)
     required: false
     default: '-v --tb=short'
+  markers:
+    description: Marker expression for -m option (e.g., "not integration and not live")
+    required: false
+    default: ''
   parallel:
     description: Run tests in parallel with pytest-xdist
     required: false
@@ -20,10 +24,23 @@ runs:
     - name: Run pytest
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      env:
+        PYTEST_ARGS: ${{ inputs.pytest-args }}
+        MARKERS: ${{ inputs.markers }}
+        PARALLEL: ${{ inputs.parallel }}
       run: |
-        # Use eval to properly handle quoted arguments in pytest-args
-        if [ "${{ inputs.parallel }}" = "true" ]; then
-          eval 'python -m pytest -n auto tests/ ${{ inputs.pytest-args }}'
-        else
-          eval 'python -m pytest tests/ ${{ inputs.pytest-args }}'
+        # Build pytest command
+        CMD="python -m pytest"
+        if [ "$PARALLEL" = "true" ]; then
+          CMD="$CMD -n auto"
         fi
+        CMD="$CMD tests/"
+        if [ -n "$PYTEST_ARGS" ]; then
+          CMD="$CMD $PYTEST_ARGS"
+        fi
+        if [ -n "$MARKERS" ]; then
+          CMD="$CMD -m \"$MARKERS\""
+        fi
+        
+        echo "Running: $CMD"
+        eval "$CMD"
