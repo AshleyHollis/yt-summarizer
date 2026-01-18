@@ -1,0 +1,158 @@
+name: Check Argo CD Readiness
+description: Pre-deployment checks to ensure Argo CD Application is ready for sync
+
+inputs:
+  app-name:
+    description: Application name to check
+    required: true
+  namespace:
+    description: Argo CD namespace
+    required: false
+    default: argocd
+  timeout:
+    description: Overall check timeout in seconds
+    required: false
+    default: '60'
+  verbose:
+    description: Enable verbose output
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Check kubectl availability
+      shell: bash
+      run: |
+        if ! command -v kubectl &>/dev/null; then
+          echo "::error::kubectl is not installed or not in PATH"
+          echo "Please ensure azure/aks-set-context or equivalent is run before this step"
+          exit 1
+        fi
+        echo "✓ kubectl is available: $(kubectl version --client --short 2>/dev/null || kubectl version --client 2>&1 | head -1)"
+
+    - name: Run readiness checks
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app-name }}
+        ARGOCD_NAMESPACE: ${{ inputs.namespace }}
+        CHECK_TIMEOUT: ${{ inputs.timeout }}
+        VERBOSE: ${{ inputs.verbose }}
+      run: |
+        set -euo pipefail
+
+        echo "Checking Argo CD Application readiness..."
+        echo "  App: $APP_NAME"
+        echo "  Namespace: $ARGOCD_NAMESPACE"
+        echo "  Timeout: ${CHECK_TIMEOUT}s"
+        echo ""
+
+        # =============================================================================
+        # Check 1: Application exists
+        # =============================================================================
+
+        if ! kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" &>/dev/null; then
+            echo "::error::Application '$APP_NAME' not found in namespace '$ARGOCD_NAMESPACE'"
+            echo ""
+            echo "Available applications:"
+            kubectl get applications -n "$ARGOCD_NAMESPACE" -o name | sed 's/^/  /'
+            exit 2
+        fi
+
+        echo "✓ Application exists: $APP_NAME"
+
+        # =============================================================================
+        # Check 2: Validate application configuration
+        # =============================================================================
+
+        REPO_URL=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.repoURL}')
+        TARGET_REV=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.targetRevision}')
+        PATH=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.source.path}')
+        DEST_NS=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.destination.namespace}')
+
+        if [[ -z "$REPO_URL" ]] || [[ -z "$TARGET_REV" ]] || [[ -z "$PATH" ]]; then
+            echo "::error::Application has incomplete configuration"
+            echo "  Repository: $REPO_URL"
+            echo "  Target Revision: $TARGET_REV"
+            echo "  Path: $PATH"
+            exit 1
+        fi
+
+        echo "✓ Configuration valid"
+        echo "  Repo: $REPO_URL"
+        echo "  Target: $TARGET_REV"
+        echo "  Path: $PATH"
+        echo "  Dest Namespace: $DEST_NS"
+
+        # =============================================================================
+        # Check 3: Detect sync errors
+        # =============================================================================
+
+        # Check for ComparisonError (manifest generation failed)
+        if kubectl describe application "$APP_NAME" -n "$ARGOCD_NAMESPACE" 2>/dev/null | grep -q "ComparisonError"; then
+            echo "::error::Manifest generation error (ComparisonError)"
+            echo ""
+            echo "This usually indicates:"
+            echo "  • Invalid kustomization.yaml syntax"
+            echo "  • Missing or invalid patch references"
+            echo "  • Non-existent resource files"
+            echo ""
+            kubectl describe application "$APP_NAME" -n "$ARGOCD_NAMESPACE" | grep -B 2 -A 10 "ComparisonError" || true
+            exit 1
+        fi
+
+        echo "✓ No manifest generation errors"
+
+        # =============================================================================
+        # Check 4: Verify no stale operations
+        # =============================================================================
+
+        OP_STATE=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.operationState.finishedAt}' 2>/dev/null || echo "")
+
+        if [[ -z "$OP_STATE" ]] || [[ "$OP_STATE" == "null" ]]; then
+            OP_START=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.operationState.startedAt}' 2>/dev/null || echo "")
+            if [[ -n "$OP_START" ]] && [[ "$OP_START" != "null" ]]; then
+                echo "::warning::Operation is still running"
+                PHASE=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "Unknown")
+                echo "  Phase: $PHASE"
+            fi
+        fi
+
+        echo "✓ No stale operations"
+
+        # =============================================================================
+        # Check 5: Verify target revision format
+        # =============================================================================
+
+        if [[ "$TARGET_REV" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::warning::Application targets a commit SHA instead of branch"
+            echo "  Target: $TARGET_REV"
+            echo "  This may prevent Argo CD from detecting future changes"
+        else
+            echo "✓ Target revision format is valid: $TARGET_REV"
+        fi
+
+        # =============================================================================
+        # Check 6: Verify sync policy is configured
+        # =============================================================================
+
+        AUTO_SYNC=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.spec.syncPolicy.automated}' 2>/dev/null || echo "")
+
+        if [[ -z "$AUTO_SYNC" ]] || [[ "$AUTO_SYNC" == "{}" ]] || [[ "$AUTO_SYNC" == "null" ]]; then
+            echo "::warning::Application does not have automated sync enabled"
+            echo "  You may need to manually sync the application"
+            echo "  Note: This may be expected if the manifest hasn't been applied yet"
+        else
+            echo "✓ Automated sync is enabled"
+        fi
+
+        echo "✓ Sync policy is configured"
+
+        # =============================================================================
+        # Summary
+        # =============================================================================
+
+        echo ""
+        echo "================================================================"
+        echo "✓ Application is ready for sync: $APP_NAME"
+        echo "================================================================"
