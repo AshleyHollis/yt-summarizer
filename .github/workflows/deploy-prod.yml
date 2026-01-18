@@ -475,7 +475,12 @@ jobs:
       - name: Determine image tag
         id: determine-tag
         shell: bash
-        run: scripts/workflows/prod-determine-image-tag.sh
+        run: |
+          scripts/workflows/prod-determine-image-tag.sh \
+            "${{ needs.get-ci-image-tag.result }}" \
+            "${{ needs.get-last-prod-image.result }}" \
+            "${{ needs.get-ci-image-tag.outputs.image_tag }}" \
+            "${{ needs.get-last-prod-image.outputs.image_tag }}"
 
       - name: Update production kustomization
         uses: ./.github/actions/update-prod-kustomization
