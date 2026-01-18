@@ -70,18 +70,37 @@ runs:
           echo "⚠️  Force cleanup enabled"
           SHOULD_CLEANUP=true
         elif [[ -n "$STARTED_AT" ]]; then
-          # Try to calculate elapsed time
+          # Parse RFC3339 timestamp - try multiple methods for cross-platform compatibility
+          # Argo CD returns format like: 2026-01-18T10:59:37Z
+          
+          # Method 1: Try GNU date with -d (Linux)
           if START_TIME=$(date -d "$STARTED_AT" +%s 2>/dev/null); then
             CURRENT_TIME=$(date +%s)
             ELAPSED=$((CURRENT_TIME - START_TIME))
             echo "  Operation Duration: ${ELAPSED}s"
-            
-            if [[ $ELAPSED -gt $THRESHOLD ]]; then
-              echo "⚠️  Operation has been running for ${ELAPSED}s (threshold: ${THRESHOLD}s)"
+          # Method 2: Try BSD date with -j (macOS)
+          elif START_TIME=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$STARTED_AT" +%s 2>/dev/null); then
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            echo "  Operation Duration: ${ELAPSED}s"
+          # Method 3: Use Python as fallback (most portable)
+          elif command -v python3 &>/dev/null; then
+            ELAPSED=$(python3 -c "from datetime import datetime, timezone; import sys; started = datetime.fromisoformat('$STARTED_AT'.replace('Z', '+00:00')); now = datetime.now(timezone.utc); print(int((now - started).total_seconds()))" 2>/dev/null || echo "-1")
+            if [[ $ELAPSED -ge 0 ]]; then
+              echo "  Operation Duration: ${ELAPSED}s"
+            else
+              echo "⚠️  Cannot parse timestamp, assuming operation is stuck"
               SHOULD_CLEANUP=true
+              ELAPSED=9999  # Force cleanup
             fi
           else
-            echo "⚠️  Cannot parse timestamp, assuming operation is stuck"
+            echo "⚠️  Cannot parse timestamp (no date/python available), assuming operation is stuck"
+            SHOULD_CLEANUP=true
+            ELAPSED=9999  # Force cleanup
+          fi
+          
+          if [[ $ELAPSED -gt $THRESHOLD ]]; then
+            echo "⚠️  Operation has been running for ${ELAPSED}s (threshold: ${THRESHOLD}s)"
             SHOULD_CLEANUP=true
           fi
         fi
