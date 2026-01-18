@@ -27,8 +27,8 @@ runs:
   steps:
     - name: Scan JavaScript dependencies
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
-        WORKING_DIRECTORY: ${{ inputs.working-directory }}
         CHECK_MISSING_DEPS: ${{ inputs.check-missing-deps }}
         CHECK_SECURITY: ${{ inputs.check-security }}
         AUDIT_LEVEL: ${{ inputs.audit-level }}

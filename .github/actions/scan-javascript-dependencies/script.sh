@@ -7,7 +7,6 @@
 #          packages, and security vulnerabilities (npm audit, depcheck).
 #
 # Inputs (Environment Variables):
-#   WORKING_DIRECTORY   - Directory containing package.json (e.g., apps/web)
 #   CHECK_MISSING_DEPS  - Check for missing dependencies (default: true)
 #   CHECK_SECURITY      - Run npm audit for security vulnerabilities
 #   AUDIT_LEVEL         - Minimum severity level (low, moderate, high, critical)
@@ -22,17 +21,15 @@
 #   3. Run npm audit for security vulnerabilities (if enabled)
 #   4. Check peer dependencies tree
 #   5. Report summary of checks performed
+#   (Note: GitHub Actions sets working-directory via action.yml)
 #
-################################################################################
+# ################################################################################
 
 set -euo pipefail
 
-WORKING_DIR="${WORKING_DIRECTORY:-.}"
 CHECK_MISSING="${CHECK_MISSING_DEPS:-true}"
 CHECK_SECURITY="${CHECK_SECURITY:-true}"
 AUDIT_LEVEL="${AUDIT_LEVEL:-high}"
-
-cd "$WORKING_DIR"
 
 # Install scanning tools
 echo "Installing scanning tools..."

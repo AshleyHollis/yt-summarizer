@@ -8,7 +8,6 @@
 # INPUTS (via environment variables):
 #   NEXT_PUBLIC_API_URL       Backend API URL
 #   NEXT_PUBLIC_ENVIRONMENT   Environment name (preview/production)
-#   WORKING_DIRECTORY         Working directory for the frontend
 #
 # OUTPUTS:
 #   Built frontend artifacts in dist/ directory
@@ -17,11 +16,10 @@
 #   1. Check if API URL is provided
 #   2. Log warning if API URL is missing
 #   3. Run npm build with environment variables
+#   (Note: GitHub Actions sets working-directory via action.yml)
 #
 # =============================================================================
 set -euo pipefail
-
-cd "${WORKING_DIRECTORY}"
 
 if [ -z "${NEXT_PUBLIC_API_URL}" ]; then
   echo "::warning::Building frontend without backend API URL"
