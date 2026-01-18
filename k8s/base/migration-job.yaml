@@ -12,10 +12,10 @@ metadata:
     app.kubernetes.io/component: migration
     app.kubernetes.io/part-of: yt-summarizer
   annotations:
-    # Temporarily disabled hook to unblock Argo CD during Gateway API migration
-    # Re-enable after migration is complete: argocd.argoproj.io/hook: Sync
-    # argocd.argoproj.io/sync-wave: "1"
-    # argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    # Argo CD sync hook - runs before deployments and auto-deletes old jobs
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 3
   activeDeadlineSeconds: 300

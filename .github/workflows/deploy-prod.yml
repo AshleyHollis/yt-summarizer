@@ -472,6 +472,18 @@ jobs:
         with:
           install-python: 'true'
 
+      - name: Validate current kustomization baseline
+        shell: bash
+        run: |
+          echo "🔍 Validating current production kustomization (baseline check)..."
+          if ! kubectl kustomize k8s/overlays/prod > /dev/null 2>&1; then
+            echo "::error::Current production kustomization has syntax errors!"
+            echo "Please fix kustomization errors before deploying:"
+            kubectl kustomize k8s/overlays/prod
+            exit 1
+          fi
+          echo "✅ Current kustomization is valid"
+
       - name: Determine image tag
         id: determine-tag
         shell: bash
@@ -487,6 +499,17 @@ jobs:
         with:
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
 
+      - name: Validate kustomization builds successfully
+        shell: bash
+        run: |
+          echo "🔍 Validating production kustomization..."
+          if ! kubectl kustomize k8s/overlays/prod > /dev/null 2>&1; then
+            echo "::error::Production kustomization failed to build!"
+            echo "This indicates a YAML syntax error or missing patch file."
+            kubectl kustomize k8s/overlays/prod
+            exit 1
+          fi
+          echo "✅ Kustomization builds successfully"
 
       - name: Commit and push changes
         uses: ./.github/actions/commit-kustomization
@@ -541,7 +564,8 @@ jobs:
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd-sync
         with:
-          namespace: prod
+          app-name: yt-summarizer-prod
+          namespace: yt-summarizer
           pr-number: '0'
           timeout-seconds: '180'
 

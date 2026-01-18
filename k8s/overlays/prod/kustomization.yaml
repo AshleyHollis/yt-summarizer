@@ -50,13 +50,13 @@ patches:
           spec:
             containers:
               - name: worker
-                  resources:
-                    requests:
-                      cpu: 25m
-                      memory: 128Mi
-                    limits:
-                      cpu: 500m
-                      memory: 512Mi
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
   - target:
       group: apps
       version: v1
@@ -123,7 +123,6 @@ patches:
                   limits:
                     cpu: 500m
                     memory: 512Mi
-  - path: patches/priority-class-patch.yaml
 images:
   - 
     name: yt-summarizer-api
