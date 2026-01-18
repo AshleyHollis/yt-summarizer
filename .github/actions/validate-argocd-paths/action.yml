@@ -10,8 +10,6 @@ runs:
   steps:
     - name: Validate Application paths
       shell: bash
-      run: |
-        python3 ${{ github.action_path }}/validate-argocd-paths.py \
-          --manifests-path '${{ inputs.argocd-manifests-path }}'
       env:
         ARGOCD_MANIFESTS_PATH: ${{ inputs.argocd-manifests-path }}
+      run: python3 ${{ github.action_path }}/validate-argocd-paths.py --manifests-path "${ARGOCD_MANIFESTS_PATH}"

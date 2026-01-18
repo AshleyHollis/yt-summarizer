@@ -42,18 +42,7 @@ runs:
       shell: bash
       env:
         IMAGE_TAG: ${{ inputs.image-tag }}
-      run: |
-        if [ -z "${IMAGE_TAG}" ]; then
-          echo "::error::IMAGE_TAG is empty. Aborting to avoid committing empty tags."
-          exit 1
-        fi
-
-        OVERLAY_FILE="k8s/overlays/preview/kustomization.yaml"
-        if [ ! -f "${OVERLAY_FILE}" ]; then
-          echo "::error::Preview overlay not found at ${OVERLAY_FILE}"
-          echo "::error::Ensure k8s/overlays/preview/ exists in your PR branch"
-          exit 1
-        fi
+      run: bash ${{ github.action_path }}/validate-inputs.sh
 
     - name: Generate preview overlay
       id: generate

@@ -132,8 +132,6 @@ runs:
     - name: Store outputs
       id: outputs
       shell: bash
-      run: |
-        # Store comment-id if available (from PR post step)
-        if [ -n "${{ steps.post-pr.outputs.comment-id }}" ]; then
-          echo "comment-id=${{ steps.post-pr.outputs.comment-id }}" >> $GITHUB_OUTPUT
-        fi
+      env:
+        POST_PR_COMMENT_ID: ${{ steps.post-pr.outputs.comment-id }}
+      run: bash ${{ github.action_path }}/store-outputs.sh
