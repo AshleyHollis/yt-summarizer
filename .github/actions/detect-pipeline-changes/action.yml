@@ -6,6 +6,8 @@
 # This action outputs RAW change data, not execution decisions:
 #   - changed_areas: space-separated list of changed paths
 #   - has_code_changes: boolean flag (excludes docs)
+#   - needs_image_build: whether code changes require new images
+#   - needs_deployment: whether any deployment is needed
 #
 # Jobs use contains() to check if their area changed:
 #   if: contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
@@ -39,6 +41,12 @@ outputs:
   has_code_changes:
     description: Whether code changes exist (excludes docs-only changes)
     value: ${{ steps.detect.outputs.has_code_changes }}
+  needs_image_build:
+    description: Whether changes require building new Docker images
+    value: ${{ steps.detect.outputs.needs_image_build }}
+  needs_deployment:
+    description: Whether changes require deployment (includes k8s-only changes)
+    value: ${{ steps.detect.outputs.needs_deployment }}
 
 runs:
   using: composite

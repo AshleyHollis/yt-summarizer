@@ -172,9 +172,11 @@ else {
 # =============================================================================
 # IMPORTANT: Output Strategy
 # =============================================================================
-# This script outputs ONLY:
+# This script outputs:
 #   1. changed_areas - space-separated list of changed areas
 #   2. has_code_changes - boolean flag (excludes docs-only changes)
+#   3. needs_image_build - whether changes require new Docker images
+#   4. needs_deployment - whether any deployment is needed
 #
 # WHY NOT stage_* OUTPUTS?
 # - Too brittle: every new job requires script changes
@@ -183,7 +185,31 @@ else {
 #
 # BEST PRACTICE: Let jobs decide for themselves using contains() checks
 # Example: if: contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
+#
+# IMAGE BUILD vs DEPLOYMENT:
+# - needs_image_build=true: Changes in services/api, services/workers, services/shared, apps/web, or docker
+# - needs_deployment=true: Any changes that affect deployment (includes k8s-only changes)
 # =============================================================================
+
+# Determine if changes require image building
+$imageAreas = @('services/api', 'services/workers', 'services/shared', 'apps/web', 'docker')
+$needsImageBuild = $false
+foreach ($area in $imageAreas) {
+    if ($changedAreasArray -contains $area) {
+        $needsImageBuild = $true
+        break
+    }
+}
+
+# Determine if changes require deployment
+$deploymentAreas = @('services/api', 'services/workers', 'services/shared', 'apps/web', 'docker', 'k8s', 'infra/terraform')
+$needsDeployment = $false
+foreach ($area in $deploymentAreas) {
+    if ($changedAreasArray -contains $area) {
+        $needsDeployment = $true
+        break
+    }
+}
 
 # Output in requested format
 switch ($OutputFormat) {
@@ -212,12 +238,27 @@ switch ($OutputFormat) {
         }
 
         Write-Host "  has_code_changes=$($hasCodeChanges.ToString().ToLower())"
+
+        # Image build and deployment flags
+        if ($env:GITHUB_OUTPUT) {
+            Add-Content -Path $env:GITHUB_OUTPUT -Value "needs_image_build=$($needsImageBuild.ToString().ToLower())"
+            Add-Content -Path $env:GITHUB_OUTPUT -Value "needs_deployment=$($needsDeployment.ToString().ToLower())"
+        }
+        else {
+            Write-Host "::set-output name=needs_image_build::$($needsImageBuild.ToString().ToLower())"
+            Write-Host "::set-output name=needs_deployment::$($needsDeployment.ToString().ToLower())"
+        }
+
+        Write-Host "  needs_image_build=$($needsImageBuild.ToString().ToLower())"
+        Write-Host "  needs_deployment=$($needsDeployment.ToString().ToLower())"
     }
 
     'json' {
         $output = @{
             changed_areas = $changedAreasArray
             has_code_changes = ($changedAreasArray | Where-Object { $_ -ne 'docs' }).Count -gt 0
+            needs_image_build = $needsImageBuild
+            needs_deployment = $needsDeployment
             total_files = $changedFiles.Count
         }
 
@@ -231,5 +272,7 @@ switch ($OutputFormat) {
 
         $hasCodeChanges = ($changedAreasArray | Where-Object { $_ -ne 'docs' }).Count -gt 0
         Write-Host "  Has code changes: $hasCodeChanges"
+        Write-Host "  Needs image build: $needsImageBuild"
+        Write-Host "  Needs deployment: $needsDeployment"
     }
 }

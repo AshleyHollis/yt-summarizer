@@ -5,7 +5,7 @@
 #   COMMIT_SHA: Git commit SHA
 #   UPDATE_OVERLAY_RESULT: Result of update-overlay job
 #   DEPLOY_FRONTEND_RESULT: Result of deploy-frontend job
-#   HEALTH_CHECK_RESULT: Result of health-check job
+#   VERIFY_DEPLOYMENT_RESULT: Result of verify-deployment job
 # Outputs: None (writes to $GITHUB_STEP_SUMMARY)
 # Logic:
 #   1. Write header and deployment details table
@@ -19,7 +19,7 @@ IMAGE_TAG="${IMAGE_TAG:-}"
 COMMIT_SHA="${COMMIT_SHA:-}"
 UPDATE_OVERLAY_RESULT="${UPDATE_OVERLAY_RESULT:-}"
 DEPLOY_FRONTEND_RESULT="${DEPLOY_FRONTEND_RESULT:-}"
-HEALTH_CHECK_RESULT="${HEALTH_CHECK_RESULT:-}"
+VERIFY_DEPLOYMENT_RESULT="${VERIFY_DEPLOYMENT_RESULT:-}"
 
 echo "# 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
 echo "" >> $GITHUB_STEP_SUMMARY
@@ -45,16 +45,16 @@ if [ "$DEPLOY_FRONTEND_RESULT" = "success" ]; then
 else
   echo "| Deploy Frontend | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
 fi
-if [ "$HEALTH_CHECK_RESULT" = "success" ]; then
-  echo "| Health Check | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+if [ "$VERIFY_DEPLOYMENT_RESULT" = "success" ]; then
+  echo "| Verify Deployment | ✅ Success |" >> $GITHUB_STEP_SUMMARY
 else
-  echo "| Health Check | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+  echo "| Verify Deployment | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
 fi
 echo "" >> $GITHUB_STEP_SUMMARY
 
 if [ "$UPDATE_OVERLAY_RESULT" = "success" ] && \
    [ "$DEPLOY_FRONTEND_RESULT" = "success" ] && \
-   [ "$HEALTH_CHECK_RESULT" = "success" ]; then
+   [ "$VERIFY_DEPLOYMENT_RESULT" = "success" ]; then
   echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
   echo "" >> $GITHUB_STEP_SUMMARY
   echo "Production environment updated successfully." >> $GITHUB_STEP_SUMMARY

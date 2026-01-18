@@ -500,14 +500,93 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
+  # Verify Deployment
+  # ---------------------------------------------------------------------------
+  # Comprehensive deployment verification after overlay update
+  # - Wait for ArgoCD sync
+  # - Verify API and worker deployment images
+  # - Run health checks
+  # - Verify TLS certificate
+  # ---------------------------------------------------------------------------
+  verify-deployment:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: [update-overlay, get-ci-image-tag, get-last-prod-image]
+    if: |
+      needs.update-overlay.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
+      - name: Wait for Argo CD to sync
+        uses: ./.github/actions/wait-for-argocd-sync
+        with:
+          namespace: prod
+          pr-number: '0'
+          timeout-seconds: '180'
+
+      - name: Determine expected image tag
+        id: expected-tag
+        shell: bash
+        run: |
+          if [[ -n "${{ needs.get-ci-image-tag.outputs.image_tag }}" ]]; then
+            echo "image_tag=${{ needs.get-ci-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_tag=${{ needs.get-last-prod-image.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify API deployment image
+        uses: ./.github/actions/verify-deployment-image
+        with:
+          namespace: prod
+          deployment-name: api
+          expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
+          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          image-name: yt-summarizer-api
+
+      - name: Verify workers deployment image
+        uses: ./.github/actions/verify-worker-deployments
+        with:
+          namespace: prod
+          expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
+          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          image-name: yt-summarizer-workers
+          workers: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+          fail-on-mismatch: 'true'
+
+      - name: Run API health checks
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ env.PRODUCTION_URL }}/health
+          max-attempts: '10'
+          interval-seconds: '15'
+          timeout-seconds: '30'
+          expected-status: '200'
+          service-name: 'Production API'
+
+  # ---------------------------------------------------------------------------
   # Deploy Frontend to SWA
   # ---------------------------------------------------------------------------
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    needs: [update-overlay]
+    needs: [update-overlay, verify-deployment]
     if: |
       needs.update-overlay.result == 'success' &&
+      needs.verify-deployment.result == 'success' &&
       (github.event_name != 'workflow_dispatch' || inputs.run_frontend == true)
     steps:
       - name: Checkout code
@@ -542,41 +621,12 @@ jobs:
           production_branch: main
 
   # ---------------------------------------------------------------------------
-  # Post-Deployment Health Check
-  # ---------------------------------------------------------------------------
-  health-check:
-    name: Health Check
-    runs-on: ubuntu-latest
-    needs: [update-overlay, deploy-frontend]
-    if: github.event_name != 'workflow_dispatch' || inputs.run_health_check == true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Wait for ArgoCD sync
-        uses: ./.github/actions/wait-for-argocd-sync
-        with:
-          namespace: prod
-          pr-number: '0'
-          timeout-seconds: '90'
-
-      - name: Check API health
-        uses: ./.github/actions/health-check
-        with:
-          url: ${{ env.PRODUCTION_URL }}/health
-          max-attempts: '10'
-          interval-seconds: '15'
-          timeout-seconds: '30'
-          expected-status: '200'
-          service-name: 'Production API'
-
-  # ---------------------------------------------------------------------------
   # Deployment Summary
   # ---------------------------------------------------------------------------
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [get-ci-image-tag, get-last-prod-image, update-overlay, deploy-frontend, health-check, detect-changes, wait-for-ci, terraform-plan, terraform-apply]
+    needs: [get-ci-image-tag, get-last-prod-image, update-overlay, verify-deployment, deploy-frontend, detect-changes, wait-for-ci, terraform-plan, terraform-apply]
     if: always()
     steps:
       - name: Checkout code
@@ -593,8 +643,8 @@ jobs:
             echo "- Terraform apply: ${{ needs.terraform-apply.result }} (reason: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true && 'plan has changes' || 'no changes' }})"
             echo "- Backend deploy tag: ${{ needs.get-ci-image-tag.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
+            echo "- Deployment verification: ${{ needs.verify-deployment.result }}"
             echo "- Frontend deploy: ${{ needs.deploy-frontend.result }}"
-            echo "- Health check: ${{ needs.health-check.result }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate summary
@@ -603,5 +653,5 @@ jobs:
           image-tag: ${{ needs.get-ci-image-tag.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag }}
           commit-sha: ${{ github.sha }}
           update-overlay-result: ${{ needs.update-overlay.result }}
+          verify-deployment-result: ${{ needs.verify-deployment.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend.result }}
-          health-check-result: ${{ needs.health-check.result }}
