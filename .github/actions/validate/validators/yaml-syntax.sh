@@ -7,78 +7,93 @@
 
 set -euo pipefail
 
-# Load common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./common.sh
-source "$SCRIPT_DIR/common.sh"
-
 # Configuration
 K8S_DIR="${K8S_DIRECTORY:-k8s}"
+VERBOSE="${VERBOSE:-false}"
 
-log_info "YAML Syntax Validator"
-log_info "Directory: $K8S_DIR"
+# Colors
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${BLUE}ℹ️  YAML Syntax Validator${NC}"
+echo -e "${BLUE}ℹ️  Directory: $K8S_DIR${NC}"
 echo ""
 
 # Validate directory exists
-if ! require_directory "$K8S_DIR"; then
-  log_error "K8s directory not found: $K8S_DIR"
+if [[ ! -d "$K8S_DIR" ]]; then
+  echo -e "${RED}❌ K8s directory not found: $K8S_DIR${NC}"
   exit 1
 fi
 
 # Find all YAML files
-log_info "Finding YAML files in $K8S_DIR..."
-YAML_FILES=$(find "$K8S_DIR" -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null || true)
+echo -e "${BLUE}ℹ️  Finding YAML files in $K8S_DIR...${NC}"
+FILE_COUNT=$(find "$K8S_DIR" -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | wc -l)
 
-if [[ -z "$YAML_FILES" ]]; then
-  log_warning "No YAML files found in $K8S_DIR"
+if [[ $FILE_COUNT -eq 0 ]]; then
+  echo -e "${BLUE}ℹ️  No YAML files found in $K8S_DIR${NC}"
   exit 0
 fi
 
-FILE_COUNT=$(echo "$YAML_FILES" | wc -l)
-log_info "Found $FILE_COUNT YAML file(s)"
+echo -e "${BLUE}ℹ️  Found $FILE_COUNT YAML file(s)${NC}"
 echo ""
 
-# Validate each file
-FAILED_FILES=()
-PASSED_COUNT=0
-
-while IFS= read -r file; do
-  log_verbose "Validating: $file"
-
+# Validate all files
+find "$K8S_DIR" -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | sort | while read -r file; do
   # Check if file is empty
   if [[ ! -s "$file" ]]; then
-    log_warning "Skipping empty file: $file"
+    if [[ "$VERBOSE" == "true" ]]; then
+      echo -e "${BLUE}ℹ️  Skipping empty file: $file${NC}"
+    fi
     continue
   fi
 
-  # Validate with Python YAML parser (works without live cluster)
-  if python3 -c "import yaml; yaml.safe_load(open('$file', 'r'))" &>/dev/null; then
-    ((PASSED_COUNT++))
-    log_verbose "  ✓ Valid"
+  # Validate with Python YAML parser (handles BOM and line endings)
+  if python -c "
+import yaml
+try:
+  with open('$file', encoding='utf-8-sig') as f:
+    list(yaml.safe_load_all(f))
+except Exception as e:
+  import sys
+  sys.exit(1)
+" 2>/dev/null; then
+    if [[ "$VERBOSE" == "true" ]]; then
+      echo -e "${GREEN}  ✓ $file${NC}"
+    fi
   else
-    FAILED_FILES+=("$file")
-    log_error "Invalid YAML syntax: $file"
-
-    # Show detailed error
+    echo -e "${RED}❌ Invalid YAML syntax: $file${NC}"
     echo "  Error details:"
-    python3 -c "import yaml; yaml.safe_load(open('$file', 'r'))" 2>&1 | sed 's/^/    /'
+    python -c "import yaml; list(yaml.safe_load_all(open('$file', encoding='utf-8-sig')))" 2>&1 | head -3 | sed 's/^/    /'
     echo ""
   fi
-done <<< "$YAML_FILES"
+done
 
-# Summary
+# Check final result
 echo ""
-log_info "Validation complete"
-log_info "Passed: $PASSED_COUNT / $FILE_COUNT files"
+echo -e "${BLUE}ℹ️  Validation complete${NC}"
 
-if [[ ${#FAILED_FILES[@]} -gt 0 ]]; then
-  log_error "Failed: ${#FAILED_FILES[@]} file(s)"
-  log_error "Files with errors:"
-  for file in "${FAILED_FILES[@]}"; do
-    echo "  - $file"
-  done
+# Count failures
+FAILURES=$(find "$K8S_DIR" -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | while read -r file; do
+  if [[ -s "$file" ]]; then
+    if ! python -c "
+import yaml, sys
+try:
+  with open('$file', encoding='utf-8-sig') as f:
+    list(yaml.safe_load_all(f))
+except:
+  sys.exit(1)
+" 2>/dev/null; then
+      echo "FAIL"
+    fi
+  fi
+done | wc -l)
+
+if [[ $FAILURES -gt 0 ]]; then
+  echo -e "${RED}❌ Failed: $FAILURES file(s)${NC}"
   exit 1
 fi
 
-log_success "All YAML files have valid syntax"
+echo -e "${GREEN}✅ All YAML files have valid syntax${NC}"
 exit 0
