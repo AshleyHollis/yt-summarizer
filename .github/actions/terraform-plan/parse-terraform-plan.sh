@@ -65,12 +65,9 @@ EOF
 fi
 
 # Parse plan summary from JSON
-ADD=$(jq -r '.resource_changes | map(select(.change.actions | \
-  contains(["create"]))) | length' plan.json)
-CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | \
-  contains(["update"]))) | length' plan.json)
-DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | \
-  contains(["delete"]))) | length' plan.json)
+ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"]))) | length' plan.json)
+CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | contains(["update"]))) | length' plan.json)
+DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | contains(["delete"]))) | length' plan.json)
 
 # Validate jq outputs
 if [ -z "$ADD" ] || [ -z "$CHANGE" ] || [ -z "$DESTROY" ]; then
