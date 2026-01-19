@@ -34,7 +34,8 @@ inputs:
   validators:
     description: |
       Comma-separated list of validators to run.
-      Options: yaml-syntax, kustomize-build, argocd-paths, argocd-manifest, terraform-config, all
+      Options: yaml-syntax, kustomize-build, argocd-paths, argocd-manifest, terraform-config,
+               workflow-env-consistency, workflow-composite-actions, all
       Example: yaml-syntax,kustomize-build,argocd-paths
     required: true
 
@@ -153,7 +154,7 @@ runs:
 
         # Expand "all" to all available validators
         if [[ " ${VALIDATOR_LIST[@]} " =~ " all " ]]; then
-          VALIDATOR_LIST=("yaml-syntax" "kustomize-build" "argocd-paths" "argocd-manifest" "terraform-config")
+          VALIDATOR_LIST=("yaml-syntax" "kustomize-build" "argocd-paths" "argocd-manifest" "terraform-config" "workflow-env-consistency" "workflow-composite-actions")
         fi
 
         echo "::group::📋 Validation Plan"

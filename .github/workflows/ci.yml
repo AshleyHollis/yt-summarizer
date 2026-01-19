@@ -818,11 +818,11 @@ jobs:
       - name: Run pre-commit on workflow files
         run: scripts/workflows/ci-run-precommit-workflows.sh
 
-      - name: Validate workflow env var consistency
-        run: bash scripts/ci/validate-workflow-env-consistency.sh
-
-      - name: Validate composite actions usage
-        run: bash scripts/ci/validate-composite-actions.sh
+      - name: Validate workflows (env vars & composite actions)
+        uses: ./.github/actions/validate
+        with:
+          validators: workflow-env-consistency,workflow-composite-actions
+          verbose: 'false'
 
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK
