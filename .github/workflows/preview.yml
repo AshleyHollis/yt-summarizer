@@ -83,32 +83,32 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to deploy preview for (optional - will use latest commit)'
+        description: "PR number to deploy preview for (optional - will use latest commit)"
         required: false
         type: string
       force_deploy:
-        description: 'Force deployment even without code changes'
+        description: "Force deployment even without code changes"
         required: false
         type: boolean
         default: false
       run_preview:
-        description: 'Run preview deployment jobs'
+        description: "Run preview deployment jobs"
         required: false
         type: boolean
         default: true
       run_terraform:
-        description: 'Run terraform plan (workflow_dispatch only)'
+        description: "Run terraform plan (workflow_dispatch only)"
         required: false
         type: boolean
         default: true
       apply_terraform:
-        description: 'Apply terraform changes (workflow_dispatch only)'
+        description: "Apply terraform changes (workflow_dispatch only)"
         required: false
         type: boolean
         default: true
 
       run_e2e:
-        description: 'Run E2E tests'
+        description: "Run E2E tests"
         required: false
         type: boolean
         default: true
@@ -118,7 +118,6 @@ concurrency:
   # Cancels in-progress runs when new commits pushed
   group: preview-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
-
 
 env:
   # =============================================================================
@@ -146,37 +145,37 @@ env:
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
 
   # Application Names
-  APP_NAME: 'yt-summarizer'
-  API_IMAGE_NAME: 'yt-summarizer-api'
-  WORKERS_IMAGE_NAME: 'yt-summarizer-workers'
+  APP_NAME: "yt-summarizer"
+  API_IMAGE_NAME: "yt-summarizer-api"
+  WORKERS_IMAGE_NAME: "yt-summarizer-workers"
 
   # Namespaces
-  NAMESPACE_ARGOCD: 'argocd'
-  PREVIEW_NAMESPACE_PREFIX: 'preview-pr-'
+  NAMESPACE_ARGOCD: "argocd"
+  PREVIEW_NAMESPACE_PREFIX: "preview-pr-"
 
   # Worker List
-  WORKER_DEPLOYMENTS: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+  WORKER_DEPLOYMENTS: "transcribe-worker,summarize-worker,embed-worker,relationships-worker"
 
   # URLs
-  APPS_BASE_DOMAIN: 'yt-summarizer.apps.ashleyhollis.com'
-  HEALTH_CHECK_PATH: '/health/ready'
+  APPS_BASE_DOMAIN: "yt-summarizer.apps.ashleyhollis.com"
+  HEALTH_CHECK_PATH: "/health/ready"
 
   # Timeouts (seconds)
-  ARGOCD_SYNC_TIMEOUT: '180'
-  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'
-  HEALTH_CHECK_MAX_ATTEMPTS: '10'
-  HEALTH_CHECK_INTERVAL: '15'
-  HEALTH_CHECK_TIMEOUT: '30'
+  ARGOCD_SYNC_TIMEOUT: "180"
+  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: "300"
+  HEALTH_CHECK_MAX_ATTEMPTS: "10"
+  HEALTH_CHECK_INTERVAL: "15"
+  HEALTH_CHECK_TIMEOUT: "30"
 
   # Paths
-  KUSTOMIZE_OVERLAY_PREVIEW: 'k8s/overlays/preview'
-  ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
-  TERRAFORM_WORKING_DIR: 'infra/terraform/environments/prod'
+  KUSTOMIZE_OVERLAY_PREVIEW: "k8s/overlays/preview"
+  ARGOCD_MANIFESTS_PATH: "k8s/argocd"
+  TERRAFORM_WORKING_DIR: "infra/terraform/environments/prod"
 
   # Tool Versions
-  TERRAFORM_VERSION: '1.5.7'
-  KUSTOMIZE_VERSION: '5.8.0'
-  NODE_VERSION: '20'
+  TERRAFORM_VERSION: "1.5.7"
+  KUSTOMIZE_VERSION: "5.8.0"
+  NODE_VERSION: "20"
 
   # Preview Limits
   MAX_PREVIEWS: 3
@@ -218,7 +217,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for git diff
+          fetch-depth: 0 # Full history for git diff
 
       - name: Get PR metadata
         id: set-pr
@@ -281,7 +280,7 @@ jobs:
       terraform-version: ${{ needs.tf-config.outputs.terraform_version }}
       run-plan: true
       run-apply: ${{ github.event_name != 'workflow_dispatch' || inputs.apply_terraform == true }}
-      environment-name: ''  # No environment protection for preview
+      environment-name: "" # No environment protection for preview
       post-plan-to-pr: ${{ github.event_name == 'pull_request' }}
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -293,7 +292,6 @@ jobs:
       SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
 
   # ===========================================================================
   # PHASE 2: WAIT FOR CI COMPLETION
@@ -327,7 +325,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-          timeout-seconds: '1800'
+          timeout-seconds: "1800"
 
       - name: Setup Azure and validate ACR image
         if: steps.wait.outputs.image_tag != ''
@@ -339,7 +337,7 @@ jobs:
           acr-registry: ${{ env.ACR_NAME }}
           acr-repository: ${{ env.API_IMAGE_NAME }}
           image-tag: ${{ steps.wait.outputs.image_tag }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ===========================================================================
   # PHASE 2B: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
@@ -368,7 +366,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.detect-changes.outputs.pr_head_ref }}
-          fetch-depth: 0  # Need full history to walk commits
+          fetch-depth: 0 # Need full history to walk commits
 
       - name: Find most recent image-building commit in PR
         id: find-tag
@@ -384,7 +382,7 @@ jobs:
           acr-registry: ${{ env.ACR_NAME }}
           acr-repository: ${{ env.API_IMAGE_NAME }}
           image-tag: ${{ steps.find-tag.outputs.image_tag }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ===========================================================================
   # PHASE 3: CONCURRENCY LIMIT CHECK
@@ -517,7 +515,8 @@ jobs:
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success' &&
       (needs.terraform.result != 'failure')
-    needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform]
+    needs:
+      [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform]
     outputs:
       image_tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
     steps:
@@ -530,7 +529,7 @@ jobs:
       - name: Setup Kustomize
         uses: ./.github/actions/setup-kustomize
         with:
-          install-python: 'true'
+          install-python: "true"
 
       - name: Azure ACR Login
         uses: ./.github/actions/azure-acr-login
@@ -549,10 +548,10 @@ jobs:
           acr-registry: ${{ env.ACR_NAME }}
           acr-repository: ${{ env.API_IMAGE_NAME }}
           image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          setup-aks: 'true'
+          setup-aks: "true"
           aks-resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           aks-cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-          verify-k8s-pull: 'true'
+          verify-k8s-pull: "true"
           k8s-namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
 
       - name: Validate CI image tag for PR
@@ -580,8 +579,8 @@ jobs:
         with:
           validators: kustomize-build
           overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PREVIEW }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Commit and push overlay update
         uses: ./.github/actions/commit-overlay-changes
@@ -619,7 +618,14 @@ jobs:
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.update-overlay.result == 'success'
-    needs: [update-overlay, check-concurrency, wait-for-ci, get-ingress, detect-changes]
+    needs:
+      [
+        update-overlay,
+        check-concurrency,
+        wait-for-ci,
+        get-ingress,
+        detect-changes,
+      ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -650,14 +656,14 @@ jobs:
           argocd-app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
           target-namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          timeout-seconds: '60'
+          timeout-seconds: "60"
 
       - name: Check Argo CD application readiness
         uses: ./.github/actions/check-argocd-readiness
         with:
           app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout: '60'
+          timeout: "60"
 
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
@@ -665,7 +671,7 @@ jobs:
           app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          timeout-seconds: '180'
+          timeout-seconds: "180"
 
       - name: Verify API deployment image
         uses: ./.github/actions/verify-deployment
@@ -684,7 +690,7 @@ jobs:
           registry: ${{ env.ACR_LOGIN_SERVER }}
           image-name: ${{ env.WORKERS_IMAGE_NAME }}
           workers: ${{ env.WORKER_DEPLOYMENTS }}
-          fail-on-mismatch: 'true'
+          fail-on-mismatch: "true"
 
       - name: Collect deployment diagnostics on failure
         if: failure()
@@ -695,9 +701,9 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-           name: deployment-diagnostics-pr-${{ needs.detect-changes.outputs.pr_number }}
-           path: diagnostics/
-           retention-days: 7
+          name: deployment-diagnostics-pr-${{ needs.detect-changes.outputs.pr_number }}
+          path: diagnostics/
+          retention-days: 7
 
       - name: Run API health checks
         if: needs.get-ingress.outputs.preview_url != ''
@@ -705,8 +711,8 @@ jobs:
         with:
           namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           external-url: ${{ needs.get-ingress.outputs.preview_url }}
-          max-attempts: '10'
-          interval-seconds: '10'
+          max-attempts: "10"
+          interval-seconds: "10"
 
       - name: Verify API Certificate
         uses: ./.github/actions/verify-certificate
@@ -751,7 +757,7 @@ jobs:
       - name: Verify SWA token is configured
         uses: ./.github/actions/verify-secret
         with:
-          secret-name: 'SWA_DEPLOYMENT_TOKEN'
+          secret-name: "SWA_DEPLOYMENT_TOKEN"
           secret-value: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
 
       - name: Setup Node.js
@@ -764,8 +770,8 @@ jobs:
         uses: ./.github/actions/build-frontend
         with:
           api-url: ${{ needs.get-ingress.outputs.preview_url }}
-          environment: 'preview'
-          working-directory: 'apps/web'
+          environment: "preview"
+          working-directory: "apps/web"
 
       - name: Azure Login for SWA cleanup
         uses: azure/login@v2
@@ -783,9 +789,9 @@ jobs:
           swa-name: ${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          dry-run: 'false'
-          min-age-hours: '1'
-          max-prs-to-check: '50'
+          dry-run: "false"
+          min-age-hours: "1"
+          max-prs-to-check: "50"
 
       - name: Report cleanup results
         if: steps.cleanup-stale.outputs.deleted-count != '0'
@@ -805,8 +811,9 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
 
           action: upload
-          # For Next.js hybrid, app_location is the Next.js app root
-          app_location: apps/web
+          # For Next.js hybrid, app_location points to the standalone output
+          # This reduces deployment size from ~300MB to ~79MB (4x smaller!)
+          app_location: apps/web/.next/standalone
           # For Next.js hybrid, output_location MUST be empty
           # SWA handles the .next folder internally
           output_location: ""
@@ -912,7 +919,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: 'npm'
+          cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
@@ -926,11 +933,11 @@ jobs:
         uses: ./.github/actions/health-check
         with:
           url: ${{ needs.get-ingress.outputs.preview_url }}/health/live
-          max-attempts: '20'
-          interval-seconds: '15'
-          timeout-seconds: '5'
-          expected-status: '200'
-          service-name: 'Preview API (E2E)'
+          max-attempts: "20"
+          interval-seconds: "15"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Preview API (E2E)"
 
       - name: Run E2E tests
         id: run-tests
@@ -981,10 +988,20 @@ jobs:
   preview-status-check:
     name: Preview Status Check
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, update-overlay, verify-deployment, deploy-frontend-preview, e2e-tests, get-ingress, terraform, check-concurrency]
+    needs:
+      [
+        detect-changes,
+        wait-for-ci,
+        update-overlay,
+        verify-deployment,
+        deploy-frontend-preview,
+        e2e-tests,
+        get-ingress,
+        terraform,
+        check-concurrency,
+      ]
     if: always()
     steps:
-
       - name: Checkout code
         uses: actions/checkout@v4
 
