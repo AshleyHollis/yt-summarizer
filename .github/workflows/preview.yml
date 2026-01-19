@@ -248,7 +248,6 @@ jobs:
       (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.infra_changed == 'true')
     outputs:
       plan_summary: ${{ steps.plan.outputs.plan_summary }}
-      plan_outcome: ${{ steps.plan.outcome }}
     permissions:
       id-token: write
       contents: read
@@ -327,7 +326,8 @@ jobs:
           sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        continue-on-error: true
+        # DO NOT use continue-on-error - we want this step to show as FAILED when plan fails
+        # Post-plan steps use 'if: always()' to run even on failure
 
       - name: Post Plan to PR and Summary
         if: always() && github.event_name == 'pull_request'
@@ -337,13 +337,8 @@ jobs:
           formatted-plan: 'unused'
           plan-outcome: ${{ steps.plan.outcome }}
 
-      - name: Check Plan Status
-        if: steps.plan.outcome == 'failure'
-        run: |
-          echo "::error::Terraform plan failed. Review the plan output above for detailed error messages."
-          exit 1
-
       - name: Upload Terraform plan artifact
+        if: always() && steps.plan.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
@@ -360,7 +355,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: terraform-plan
     if: |
-      needs.terraform-plan.outputs.plan_outcome == 'success' &&
+      needs.terraform-plan.result == 'success' &&
       fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true &&
       (github.event_name != 'workflow_dispatch' || inputs.apply_terraform == true)
     permissions:
