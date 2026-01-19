@@ -65,26 +65,25 @@ on:
   workflow_dispatch:
     inputs:
       run_terraform:
-        description: 'Run terraform plan/apply'
+        description: "Run terraform plan/apply"
         required: false
         type: boolean
         default: true
       run_deploy:
-        description: 'Build and deploy backend'
+        description: "Build and deploy backend"
         required: false
         type: boolean
         default: true
       run_frontend:
-        description: 'Deploy frontend'
+        description: "Deploy frontend"
         required: false
         type: boolean
         default: true
       run_health_check:
-        description: 'Run post-deploy health checks'
+        description: "Run post-deploy health checks"
         required: false
         type: boolean
         default: true
-
 
 concurrency:
   group: deploy-prod
@@ -116,44 +115,43 @@ env:
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
 
   # Application Names
-  APP_NAME: 'yt-summarizer'
-  API_IMAGE_NAME: 'yt-summarizer-api'
-  WORKERS_IMAGE_NAME: 'yt-summarizer-workers'
-  ARGOCD_APP_NAME_PROD: 'yt-summarizer-prod'
+  APP_NAME: "yt-summarizer"
+  API_IMAGE_NAME: "yt-summarizer-api"
+  WORKERS_IMAGE_NAME: "yt-summarizer-workers"
+  ARGOCD_APP_NAME_PROD: "yt-summarizer-prod"
 
   # Namespaces
-  NAMESPACE_PROD: 'yt-summarizer'
-  NAMESPACE_ARGOCD: 'argocd'
+  NAMESPACE_PROD: "yt-summarizer"
+  NAMESPACE_ARGOCD: "argocd"
 
   # Worker List
-  WORKER_DEPLOYMENTS: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+  WORKER_DEPLOYMENTS: "transcribe-worker,summarize-worker,embed-worker,relationships-worker"
 
   # URLs
-  PRODUCTION_HOST: 'api.yt-summarizer.apps.ashleyhollis.com'
+  PRODUCTION_HOST: "api.yt-summarizer.apps.ashleyhollis.com"
   PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
-  HEALTH_CHECK_PATH: '/health/ready'
+  HEALTH_CHECK_PATH: "/health/ready"
 
   # Timeouts (seconds)
-  ARGOCD_SYNC_TIMEOUT: '360'
-  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'
-  HEALTH_CHECK_MAX_ATTEMPTS: '10'
-  HEALTH_CHECK_INTERVAL: '15'
-  HEALTH_CHECK_TIMEOUT: '30'
+  ARGOCD_SYNC_TIMEOUT: "360"
+  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: "300"
+  HEALTH_CHECK_MAX_ATTEMPTS: "10"
+  HEALTH_CHECK_INTERVAL: "15"
+  HEALTH_CHECK_TIMEOUT: "30"
 
   # Paths
-  KUSTOMIZE_OVERLAY_PROD: 'k8s/overlays/prod'
-  ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
-  TERRAFORM_WORKING_DIR: 'infra/terraform/environments/prod'
+  KUSTOMIZE_OVERLAY_PROD: "k8s/overlays/prod"
+  ARGOCD_MANIFESTS_PATH: "k8s/argocd"
+  TERRAFORM_WORKING_DIR: "infra/terraform/environments/prod"
 
   # Tool Versions
-  TERRAFORM_VERSION: '1.5.7'
-  KUSTOMIZE_VERSION: '5.8.0'
-  NODE_VERSION: '20'
+  TERRAFORM_VERSION: "1.5.7"
+  KUSTOMIZE_VERSION: "5.8.0"
+  NODE_VERSION: "20"
 
 permissions:
   id-token: write
   contents: write
-
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -198,7 +196,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ github.sha }}
-          timeout-seconds: '1800'
+          timeout-seconds: "1800"
 
   # ---------------------------------------------------------------------------
   # Resolve Terraform Configuration
@@ -224,7 +222,7 @@ jobs:
       terraform-version: ${{ needs.tf-config.outputs.terraform_version }}
       run-plan: true
       run-apply: true
-      environment-name: 'production'
+      environment-name: "production"
       post-plan-to-pr: false
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -236,7 +234,6 @@ jobs:
       SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
 
   # ---------------------------------------------------------------------------
   # Sync Argo CD Manifests
@@ -276,8 +273,7 @@ jobs:
         with:
           mode: all
           namespace: ${{ env.NAMESPACE_ARGOCD }}
-          verbose: 'true'
-
+          verbose: "true"
 
   # ---------------------------------------------------------------------------
   # Get CI Image Tag (Code Changes)
@@ -327,7 +323,7 @@ jobs:
           acr-registry: ${{ env.ACR_NAME }}
           acr-repository: ${{ env.API_IMAGE_NAME }}
           image-tag: ${{ steps.extract.outputs.image_tag }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ---------------------------------------------------------------------------
   # Get Last Production Image (for K8s-only or infra-only changes)
@@ -382,7 +378,7 @@ jobs:
           acr-registry: ${{ env.ACR_NAME }}
           acr-repository: ${{ env.API_IMAGE_NAME }}
           image-tag: ${{ steps.find-tag.outputs.image_tag }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ---------------------------------------------------------------------------
   # Update Production Overlay
@@ -390,7 +386,15 @@ jobs:
   update-overlay:
     name: Update Production Overlay
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform, sync-argocd-manifests, get-ci-image-tag, get-last-prod-image]
+    needs:
+      [
+        detect-changes,
+        wait-for-ci,
+        terraform,
+        sync-argocd-manifests,
+        get-ci-image-tag,
+        get-last-prod-image,
+      ]
     if: |
       always() && !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
@@ -416,19 +420,19 @@ jobs:
       - name: Setup Python with dependencies
         uses: ./.github/actions/setup-kustomize
         with:
-          install-python: 'true'
+          install-python: "true"
 
-       # NOTE: CI has already validated prod overlay before this branch was created.
-       # This baseline check is kept as a safety net in case kustomization.yaml was
-       # modified after merge, though merge commits cannot modify files without
-       # triggering a new CI validation. Kept for defensive robustness.
+        # NOTE: CI has already validated prod overlay before this branch was created.
+        # This baseline check is kept as a safety net in case kustomization.yaml was
+        # modified after merge, though merge commits cannot modify files without
+        # triggering a new CI validation. Kept for defensive robustness.
       - name: Validate current production overlay (baseline)
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
           overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Determine image tag
         id: determine-tag
@@ -445,16 +449,16 @@ jobs:
         with:
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
 
-       # This validation is critical - it runs AFTER update-prod-kustomization
-       # inserts image tags. Ensures the modified manifest is still valid.
-       # This is where we catch errors introduced by the kustomization update action.
+        # This validation is critical - it runs AFTER update-prod-kustomization
+        # inserts image tags. Ensures the modified manifest is still valid.
+        # This is where we catch errors introduced by the kustomization update action.
       - name: Validate updated production overlay
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
           overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Setup Azure, AKS and validate image
         uses: ./.github/actions/setup-azure-acr
@@ -465,10 +469,10 @@ jobs:
           acr-registry: ${{ env.ACR_NAME }}
           acr-repository: ${{ env.API_IMAGE_NAME }}
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
-          setup-aks: 'true'
+          setup-aks: "true"
           aks-resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           aks-cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-          verify-k8s-pull: 'true'
+          verify-k8s-pull: "true"
           k8s-namespace: ${{ env.NAMESPACE_PROD }}
 
       - name: Validate image tag format
@@ -481,7 +485,7 @@ jobs:
       - name: Commit and push changes
         uses: ./.github/actions/commit-kustomization
         with:
-          file-path: '${{ env.KUSTOMIZE_OVERLAY_PROD }}/kustomization.yaml'
+          file-path: "${{ env.KUSTOMIZE_OVERLAY_PROD }}/kustomization.yaml"
           commit-message: |
             chore(prod): deploy ${{ steps.determine-tag.outputs.image_tag }} to production
 
@@ -492,8 +496,7 @@ jobs:
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             [skip ci]
-          git-branch: 'main'
-
+          git-branch: "main"
 
   # ---------------------------------------------------------------------------
   # Verify Deployment
@@ -542,22 +545,22 @@ jobs:
           argocd-app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
           target-namespace: ${{ env.NAMESPACE_PROD }}
-          timeout-seconds: '60'
+          timeout-seconds: "60"
 
       - name: Validate Argo CD readiness (fail-fast)
         uses: ./.github/actions/check-argocd-readiness
         with:
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout: '60'
-          verbose: 'true'
+          timeout: "60"
+          verbose: "true"
         continue-on-error: false
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
         with:
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           namespace: ${{ env.NAMESPACE_PROD }}
-          pr-number: '0'
+          pr-number: "0"
           timeout-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
 
       - name: Determine expected image tag
@@ -588,7 +591,7 @@ jobs:
           registry: ${{ env.ACR_LOGIN_SERVER }}
           image-name: ${{ env.WORKERS_IMAGE_NAME }}
           workers: ${{ env.WORKER_DEPLOYMENTS }}
-          fail-on-mismatch: 'true'
+          fail-on-mismatch: "true"
 
       - name: Collect deployment diagnostics on failure
         if: failure()
@@ -599,9 +602,9 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-           name: deployment-diagnostics-prod
-           path: diagnostics/
-           retention-days: 7
+          name: deployment-diagnostics-prod
+          path: diagnostics/
+          retention-days: 7
 
       - name: Verify TLS certificate
         uses: ./.github/actions/verify-certificate
@@ -612,11 +615,11 @@ jobs:
         uses: ./.github/actions/health-check
         with:
           url: ${{ env.PRODUCTION_URL }}${{ env.HEALTH_CHECK_PATH }}
-          max-attempts: '20'
-          interval-seconds: '10'
-          timeout-seconds: '5'
-          expected-status: '200'
-          service-name: 'Production API (External)'
+          max-attempts: "20"
+          interval-seconds: "10"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Production API (External)"
 
       - name: Run API health checks
         uses: ./.github/actions/health-check
@@ -625,8 +628,8 @@ jobs:
           max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
           interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
           timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
-          expected-status: '200'
-          service-name: 'Production API'
+          expected-status: "200"
+          service-name: "Production API"
 
   # ---------------------------------------------------------------------------
   # Deploy Frontend to SWA
@@ -682,7 +685,18 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [get-ci-image-tag, get-last-prod-image, sync-argocd-manifests, update-overlay, verify-deployment, deploy-frontend, detect-changes, wait-for-ci, terraform]
+    needs:
+      [
+        get-ci-image-tag,
+        get-last-prod-image,
+        sync-argocd-manifests,
+        update-overlay,
+        verify-deployment,
+        deploy-frontend,
+        detect-changes,
+        wait-for-ci,
+        terraform,
+      ]
     if: always()
     steps:
       - name: Checkout code
