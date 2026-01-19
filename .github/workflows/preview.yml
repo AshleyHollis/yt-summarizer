@@ -240,30 +240,10 @@ jobs:
   # ===========================================================================
   # PHASE 1A: RESOLVE TERRAFORM CONFIGURATION
   # ===========================================================================
-  # Resolves Terraform configuration from repo/org Actions Variables
-  # This allows centralizing configuration without hardcoding it in workflows
-  #
-  # To set the variables:
-  #   Repo level: Settings → Secrets and variables → Actions → Variables → New repository variable
-  #   Org level: Organization Settings → Secrets and variables → Actions → Variables → New organization variable
-  #
-  # Variables:
-  #   - TERRAFORM_VERSION: Terraform version (default: '1.5.7')
-  #   - TERRAFORM_WORKING_DIR: Terraform working directory (default: 'infra/terraform/environments/prod')
-  #
-  # Fallback: If variables not set, uses defaults matching current hardcoded values
+  # Calls reusable workflow to resolve Terraform configuration from Actions Variables
+  # See .github/workflows/resolve-terraform-config.yml for details
   tf-config:
-    name: Resolve Terraform Config
-    runs-on: ubuntu-latest
-    outputs:
-      terraform_version: ${{ steps.resolve.outputs.terraform_version }}
-      terraform_working_dir: ${{ steps.resolve.outputs.terraform_working_dir }}
-    steps:
-      - name: Resolve Terraform configuration from Actions Variables
-        id: resolve
-        run: |
-          echo "terraform_version=${{ vars.TERRAFORM_VERSION || '1.5.7' }}" >> "$GITHUB_OUTPUT"
-          echo "terraform_working_dir=${{ vars.TERRAFORM_WORKING_DIR || 'infra/terraform/environments/prod' }}" >> "$GITHUB_OUTPUT"
+    uses: ./.github/workflows/resolve-terraform-config.yml
 
   # ===========================================================================
   # PHASE 1B & 1C: TERRAFORM PLAN AND APPLY
