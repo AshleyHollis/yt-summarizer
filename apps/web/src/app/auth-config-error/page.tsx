@@ -6,6 +6,8 @@
  * that authentication is currently unavailable.
  */
 
+'use client';
+
 import { Suspense } from 'react';
 import Link from 'next/link';
 
@@ -115,15 +117,5 @@ export default function AuthConfigErrorPage({
 }: {
   searchParams: { error?: string };
 }) {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-gray-500">Loading...</div>
-        </div>
-      }
-    >
-      <ErrorContent searchParams={searchParams} />
-    </Suspense>
-  );
+  return <ErrorContent searchParams={searchParams} />;
 }
