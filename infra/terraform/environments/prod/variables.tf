@@ -256,6 +256,8 @@ variable "auth0_test_users" {
     email_verified = bool
     role           = string # 'admin' or 'normal'
   }))
-  # NOTE: Cannot use sensitive = true - prevents use in for_each. Passwords protected by plan scrubbing.
-  default = {}
+  default   = {}
+  sensitive = true
+  # NOTE: Using sensitive = true with nonsensitive() in for_each allows proper protection
+  # Map keys (emails) are exposed as resource IDs, values (passwords) stay protected
 }

@@ -118,9 +118,10 @@ variable "test_users" {
     email_verified = bool
     role           = string # 'admin' or 'normal'
   }))
-  default = {}
-  # NOTE: Cannot use sensitive = true because Terraform doesn't allow sensitive values in for_each
-  # Password protection is handled by plan output scrubbing in CI/CD pipeline
+  default   = {}
+  sensitive = true
+  # NOTE: Using sensitive = true is safe with nonsensitive() in for_each
+  # Map keys (emails) are exposed as resource IDs, values (passwords) stay protected
 }
 
 # T011: Action support
@@ -249,11 +250,11 @@ resource "auth0_resource_server" "api" {
 
 # T010: Test users
 resource "auth0_user" "test_user" {
-  for_each = var.test_users
+  for_each = nonsensitive(var.test_users)
 
   connection_name = var.enable_database_connection ? auth0_connection.database[0].name : null
-  email           = each.key # email is now the map key
-  password        = each.value.password
+  email           = each.key                       # email is the map key (exposed as resource ID)
+  password        = sensitive(each.value.password) # re-mark password as sensitive
   email_verified  = each.value.email_verified
 
   app_metadata = jsonencode({
