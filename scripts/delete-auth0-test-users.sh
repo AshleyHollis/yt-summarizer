@@ -68,7 +68,7 @@ get_user_id() {
     local response=$(curl -s --request GET \
       --url "https://${AUTH0_DOMAIN}/api/v2/users-by-email?email=${email}" \
       --header "authorization: Bearer ${ACCESS_TOKEN}")
-    
+
     local user_id=$(echo "$response" | jq -r '.[0].user_id // empty')
     echo "$user_id"
 }
@@ -77,19 +77,19 @@ get_user_id() {
 delete_user() {
     local email=$1
     local user_id=$(get_user_id "$email")
-    
+
     if [[ -z "$user_id" ]]; then
         echo -e "${YELLOW}⚠ User $email not found in Auth0 (already deleted or never existed)${NC}"
         return 0
     fi
-    
+
     echo "Found user: $email (ID: $user_id)"
     echo "Deleting..."
-    
+
     local response=$(curl -s --request DELETE \
       --url "https://${AUTH0_DOMAIN}/api/v2/users/${user_id}" \
       --header "authorization: Bearer ${ACCESS_TOKEN}")
-    
+
     # Check if delete was successful (empty response = success)
     if [[ -z "$response" ]]; then
         echo -e "${GREEN}✓ Successfully deleted $email${NC}"
