@@ -774,7 +774,7 @@ jobs:
       - name: Cleanup stuck Argo CD operations
         uses: ./.github/actions/cleanup-argocd-operation
         with:
-          app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           namespace: argocd
           timeout-threshold: '300'
         continue-on-error: false
@@ -799,15 +799,15 @@ jobs:
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
         with:
-          app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
+          namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           timeout-seconds: '180'
 
       - name: Verify API deployment image
         uses: ./.github/actions/verify-deployment
         with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           deployment-name: api
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
@@ -816,7 +816,7 @@ jobs:
       - name: Verify workers deployment image
         uses: ./.github/actions/verify-workers
         with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           image-name: ${{ env.WORKERS_IMAGE_NAME }}
@@ -840,7 +840,7 @@ jobs:
         if: needs.get-ingress.outputs.preview_url != ''
         uses: ./.github/actions/health-check-preview
         with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+          namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           external-url: ${{ needs.get-ingress.outputs.preview_url }}
           max-attempts: '10'
           interval-seconds: '10'
