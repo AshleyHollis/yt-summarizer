@@ -1,7 +1,7 @@
 /**
- * Next.js Middleware for Route Protection (Auth0 v4 SDK)
+ * Next.js 16 Proxy for Route Protection (Auth0 v4 SDK)
  *
- * This middleware handles authentication at the network boundary using the Auth0 SDK.
+ * This proxy handles authentication at the network boundary using the Auth0 SDK.
  * It automatically:
  * - Manages authentication cookies
  * - Handles auth redirects
@@ -10,7 +10,7 @@
  * Public Routes (always accessible):
  * - /login
  * - /access-denied
- * - /api/auth/*
+ * - /auth/*
  *
  * Protected Routes:
  * - /admin/* - Requires authentication AND admin role (handled by custom RBAC logic)
@@ -20,7 +20,6 @@
  */
 
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 import { auth0 } from './lib/auth0';
 
 /**
@@ -36,7 +35,7 @@ function shouldProtectRoute(pathname: string): boolean {
  * Public routes that should never be protected
  */
 function isPublicRoute(pathname: string): boolean {
-  const publicRoutes = ['/login', '/access-denied', '/api/auth'];
+  const publicRoutes = ['/login', '/access-denied', '/auth'];
   return publicRoutes.some((route) => pathname.startsWith(route));
 }
 
@@ -54,16 +53,19 @@ function hasAdminRole(session: any): boolean {
 }
 
 /**
- * Middleware function
+ * Proxy function (Next.js 16+)
  *
  * Runs on every request to protected routes.
  * - Checks authentication status
  * - Checks user roles for admin routes
- * - Redirects to /login if unauthenticated
+ * - Redirects to /auth/login if unauthenticated
  * - Redirects to /access-denied if unauthorized
+ *
+ * Note: Uses standard Request type (not NextRequest) for Next.js 16 compatibility
  */
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export async function proxy(request: Request) {
+  const url = new URL(request.url);
+  const { pathname } = url;
 
   // First, let Auth0 SDK handle its own routes
   const auth0Response = await auth0.middleware(request);
@@ -82,11 +84,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // Get session for protected routes
-  const session = await auth0.getSession(request);
+  const session = await auth0.getSession();
 
   // If no session, redirect to login
   if (!session) {
-    const loginUrl = new URL('/api/auth/login', request.url);
+    const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('returnTo', pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -103,7 +105,7 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * Configure which routes run this middleware
+ * Configure which routes run this proxy
  *
  * This matcher excludes:
  * - Static files (_next/static)
