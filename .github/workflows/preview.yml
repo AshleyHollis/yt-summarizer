@@ -707,21 +707,14 @@ jobs:
       needs.update-overlay.result == 'success'
     needs: [update-overlay, check-concurrency, wait-for-ci, get-ingress, detect-changes]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup AKS
-        uses: ./.github/actions/setup-aks
+      - name: Setup deployment environment
+        uses: ./.github/actions/setup-deployment-env
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Setup Kustomize
-        uses: ./.github/actions/setup-kustomize
-        with:
           kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
       - name: Cleanup stuck Argo CD operations

@@ -1,0 +1,64 @@
+# Reusable deployment preparation action
+# Sets up the environment for Kubernetes deployment operations:
+# - Checks out code
+# - Authenticates to Azure and sets AKS cluster context
+# - Installs Kustomize
+
+name: 'Setup Deployment Environment'
+description: 'Prepare environment for Kubernetes deployments (checkout, AKS, kustomize)'
+
+inputs:
+  # Azure/AKS inputs
+  azure-client-id:
+    description: 'Azure Client ID for OIDC authentication'
+    required: true
+  azure-tenant-id:
+    description: 'Azure Tenant ID for OIDC authentication'
+    required: true
+  azure-subscription-id:
+    description: 'Azure Subscription ID'
+    required: true
+  resource-group:
+    description: 'Azure Resource Group containing the AKS cluster'
+    required: true
+  cluster-name:
+    description: 'AKS cluster name'
+    required: true
+  
+  # Kustomize inputs
+  kustomize-version:
+    description: 'Kustomize version to install'
+    required: true
+  
+  # Checkout inputs (optional)
+  checkout-ref:
+    description: 'Git ref to checkout (branch, tag, or SHA). Defaults to workflow ref.'
+    required: false
+    default: ''
+  checkout-token:
+    description: 'GitHub token for checkout. Defaults to github.token.'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.checkout-ref }}
+        token: ${{ inputs.checkout-token }}
+
+    - name: Setup AKS
+      uses: ./.github/actions/setup-aks
+      with:
+        azure-client-id: ${{ inputs.azure-client-id }}
+        azure-tenant-id: ${{ inputs.azure-tenant-id }}
+        azure-subscription-id: ${{ inputs.azure-subscription-id }}
+        resource-group: ${{ inputs.resource-group }}
+        cluster-name: ${{ inputs.cluster-name }}
+
+    - name: Setup Kustomize
+      uses: ./.github/actions/setup-kustomize
+      with:
+        kustomize-version: ${{ inputs.kustomize-version }}
