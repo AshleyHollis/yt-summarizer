@@ -336,6 +336,7 @@ jobs:
           plan-summary: ${{ steps.plan.outputs.plan_summary }}
           formatted-plan: 'unused'
           plan-outcome: ${{ steps.plan.outcome }}
+          plan-output: ${{ steps.plan.outputs.plan_output }}
 
       - name: Upload Terraform plan artifact
         if: always() && steps.plan.outcome == 'success'

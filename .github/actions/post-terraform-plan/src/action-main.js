@@ -28,8 +28,9 @@ function main() {
   const planSummaryPath = process.env.PLAN_SUMMARY_PATH || args[1];
   const formattedPlanPath = process.env.FORMATTED_PLAN_PATH || args[2];
   const planOutcomePath = process.env.PLAN_OUTCOME_PATH || args[3];
+  const planOutputPath = process.env.PLAN_OUTPUT_PATH || args[4];
 
-  let summary, planJson, planOutcome;
+  let summary, planJson, planOutcome, planOutput;
 
   // Read plan summary
   try {
@@ -70,6 +71,18 @@ function main() {
     planOutcome = process.env.PLAN_OUTCOME || 'unknown';
   }
 
+  // Read plan output (raw terraform output with errors)
+  try {
+    if (planOutputPath && fs.existsSync(planOutputPath)) {
+      planOutput = fs.readFileSync(planOutputPath, 'utf8');
+    } else {
+      planOutput = '';
+    }
+  } catch (error) {
+    console.error(`Warning: Failed to read plan output file: ${error.message}`);
+    planOutput = '';
+  }
+
   // Parse resources from JSON plan
   const resources = parseJsonPlan(planJson);
 
@@ -90,6 +103,7 @@ function main() {
     resources,
     summary: finalSummary,
     planOutcome,
+    planOutput,
     runNumber: parseInt(runNumber),
     runUrl,
     actor,
