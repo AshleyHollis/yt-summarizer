@@ -23,13 +23,37 @@ runs:
   steps:
     - name: Save plan data to files
       id: save-data
-      shell: bash
-      env:
-        PLAN_SUMMARY: ${{ inputs.plan-summary }}
-        FORMATTED_PLAN: ${{ inputs.formatted-plan }}
-        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
-      working-directory: ${{ github.action_path }}
-      run: ${{ github.action_path }}/save-plan-data.sh
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Get inputs
+          const planSummary = `${{ inputs.plan-summary }}`;
+          const formattedPlan = `${{ inputs.formatted-plan }}`;
+          const planOutcome = `${{ inputs.plan-outcome }}`;
+          
+          // Define file paths
+          const actionPath = '${{ github.action_path }}';
+          const summaryPath = path.join(actionPath, 'plan-summary.json');
+          const planPath = path.join(actionPath, 'formatted-plan.json');
+          const outcomePath = path.join(actionPath, 'plan-outcome.txt');
+          
+          // Write files
+          fs.writeFileSync(summaryPath, planSummary);
+          fs.writeFileSync(planPath, formattedPlan);
+          fs.writeFileSync(outcomePath, planOutcome);
+          
+          // Log file sizes
+          const summarySize = fs.statSync(summaryPath).size;
+          const planSize = fs.statSync(planPath).size;
+          const outcomeSize = fs.statSync(outcomePath).size;
+          
+          core.info(`✅ Plan data files created`);
+          core.info(`  - plan-summary.json: ${summarySize} bytes`);
+          core.info(`  - formatted-plan.json: ${planSize} bytes`);
+          core.info(`  - plan-outcome.txt: ${outcomeSize} bytes`);
 
     - name: Generate PR Comment
       id: generate-comment
