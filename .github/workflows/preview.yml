@@ -309,21 +309,16 @@ jobs:
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           timeout-seconds: '1800'
 
-      - name: Azure Login
+      - name: Setup Azure and validate ACR image
         if: steps.wait.outputs.image_tag != ''
-        uses: azure/login@v2
+        uses: ./.github/actions/setup-azure-acr
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate image exists in ACR
-        if: steps.wait.outputs.image_tag != ''
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.wait.outputs.image_tag }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ steps.wait.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ===========================================================================
@@ -360,19 +355,15 @@ jobs:
         shell: bash
         run: scripts/workflows/preview-find-pr-image-tag.sh
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Setup Azure and validate ACR image
+        uses: ./.github/actions/setup-azure-acr
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate image exists in ACR
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.find-tag.outputs.image_tag }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ steps.find-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ===========================================================================
@@ -529,20 +520,20 @@ jobs:
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           acr-name: ${{ env.ACR_NAME }}
 
-      - name: Set AKS Context
-        uses: azure/aks-set-context@v4
+      - name: Setup AKS and validate image
+        uses: ./.github/actions/setup-azure-acr
         with:
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Verify cluster can pull image
-        # Runs after AKS context + ACR login are configured
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          run-k8s-pull-test: 'true'
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
+          setup-aks: 'true'
+          aks-resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          aks-cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+          verify-k8s-pull: 'true'
+          k8s-namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
 
       - name: Validate CI image tag for PR
         if: needs.detect-changes.outputs.needs_image_build == 'true'

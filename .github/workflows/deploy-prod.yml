@@ -298,19 +298,15 @@ jobs:
         shell: bash
         run: scripts/workflows/prod-extract-ci-image-tag.sh
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Setup Azure and validate ACR image
+        uses: ./.github/actions/setup-azure-acr
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate CI image exists in ACR
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.extract.outputs.image_tag }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ steps.extract.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ---------------------------------------------------------------------------
@@ -357,19 +353,15 @@ jobs:
         shell: bash
         run: scripts/workflows/prod-find-last-image.sh
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Setup Azure and validate ACR image
+        uses: ./.github/actions/setup-azure-acr
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate image exists in ACR
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.find-tag.outputs.image_tag }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ steps.find-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ---------------------------------------------------------------------------
@@ -444,22 +436,20 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '30'
 
-      - name: Setup AKS
-        uses: ./.github/actions/setup-aks
+      - name: Setup Azure, AKS and validate image
+        uses: ./.github/actions/setup-azure-acr
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Verify cluster can pull image
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.determine-tag.outputs.image_tag }}
-          run-k8s-pull-test: 'true'
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
+          setup-aks: 'true'
+          aks-resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          aks-cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+          verify-k8s-pull: 'true'
+          k8s-namespace: ${{ env.NAMESPACE_PROD }}
 
       - name: Validate image tag format
         if: needs.get-ci-image-tag.result == 'success'
