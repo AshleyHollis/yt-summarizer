@@ -238,19 +238,43 @@ jobs:
         run: scripts/workflows/preview-detect-infra.sh "${{ steps.set-pr.outputs.base_sha }}" "${{ steps.set-pr.outputs.pr_head_sha }}"
 
   # ===========================================================================
+  # PHASE 1A: RESOLVE TERRAFORM CONFIGURATION
+  # ===========================================================================
+  # Resolves Terraform version from repo/org Actions Variable (TERRAFORM_VERSION)
+  # This allows centralizing the version without hardcoding it in workflows
+  #
+  # To set the version:
+  #   Repo level: Settings → Secrets and variables → Actions → Variables → New repository variable
+  #   Org level: Organization Settings → Secrets and variables → Actions → Variables → New organization variable
+  #   Name: TERRAFORM_VERSION
+  #   Value: 1.5.7 (or desired version)
+  #
+  # Fallback: If variable not set, defaults to '1.5.7'
+  tf-config:
+    name: Resolve Terraform Config
+    runs-on: ubuntu-latest
+    outputs:
+      terraform_version: ${{ steps.resolve.outputs.terraform_version }}
+    steps:
+      - name: Resolve Terraform version from Actions Variable
+        id: resolve
+        run: |
+          echo "terraform_version=${{ vars.TERRAFORM_VERSION || '1.5.7' }}" >> "$GITHUB_OUTPUT"
+
+  # ===========================================================================
   # PHASE 1B & 1C: TERRAFORM PLAN AND APPLY
   # ===========================================================================
   # Uses reusable terraform workflow for both plan and apply operations
   terraform:
     name: Terraform
-    needs: detect-changes
+    needs: [detect-changes, tf-config]
     if: |
       (github.event_name == 'workflow_dispatch' && inputs.run_terraform == true) ||
       (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.infra_changed == 'true')
     uses: ./.github/workflows/terraform-reusable.yml
     with:
       terraform-working-dir: 'infra/terraform/environments/prod'
-      terraform-version: '1.5.7'
+      terraform-version: ${{ needs.tf-config.outputs.terraform_version }}
       run-plan: true
       run-apply: ${{ github.event_name != 'workflow_dispatch' || inputs.apply_terraform == true }}
       environment-name: ''  # No environment protection for preview
