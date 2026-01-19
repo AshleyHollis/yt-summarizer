@@ -183,26 +183,30 @@ jobs:
   # ---------------------------------------------------------------------------
   # Resolve Terraform Configuration
   # ---------------------------------------------------------------------------
-  # Resolves Terraform version from repo/org Actions Variable (TERRAFORM_VERSION)
-  # This allows centralizing the version without hardcoding it in workflows
+  # Resolves Terraform configuration from repo/org Actions Variables
+  # This allows centralizing configuration without hardcoding it in workflows
   #
-  # To set the version:
+  # To set the variables:
   #   Repo level: Settings → Secrets and variables → Actions → Variables → New repository variable
   #   Org level: Organization Settings → Secrets and variables → Actions → Variables → New organization variable
-  #   Name: TERRAFORM_VERSION
-  #   Value: 1.5.7 (or desired version)
   #
-  # Fallback: If variable not set, defaults to '1.5.7'
+  # Variables:
+  #   - TERRAFORM_VERSION: Terraform version (default: '1.5.7')
+  #   - TERRAFORM_WORKING_DIR: Terraform working directory (default: 'infra/terraform/environments/prod')
+  #
+  # Fallback: If variables not set, uses defaults matching current hardcoded values
   tf-config:
     name: Resolve Terraform Config
     runs-on: ubuntu-latest
     outputs:
       terraform_version: ${{ steps.resolve.outputs.terraform_version }}
+      terraform_working_dir: ${{ steps.resolve.outputs.terraform_working_dir }}
     steps:
-      - name: Resolve Terraform version from Actions Variable
+      - name: Resolve Terraform configuration from Actions Variables
         id: resolve
         run: |
           echo "terraform_version=${{ vars.TERRAFORM_VERSION || '1.5.7' }}" >> "$GITHUB_OUTPUT"
+          echo "terraform_working_dir=${{ vars.TERRAFORM_WORKING_DIR || 'infra/terraform/environments/prod' }}" >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------
   # Plan and apply infrastructure changes (auto-apply)
@@ -216,7 +220,7 @@ jobs:
        (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
     uses: ./.github/workflows/terraform-reusable.yml
     with:
-      terraform-working-dir: 'infra/terraform/environments/prod'
+      terraform-working-dir: ${{ needs.tf-config.outputs.terraform_working_dir }}
       terraform-version: ${{ needs.tf-config.outputs.terraform_version }}
       run-plan: true
       run-apply: true
