@@ -20,7 +20,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { auth0 } from './lib/auth0';
+import { getAuth0Client, getAuth0Error } from './lib/auth0';
 
 /**
  * Determines if a route requires protection
@@ -61,16 +61,51 @@ function hasAdminRole(session: any): boolean {
  * - Redirects to /auth/login if unauthenticated
  * - Redirects to /access-denied if unauthorized
  *
+ * Graceful Degradation:
+ * - If Auth0 is not configured, protected routes redirect to /auth-config-error
+ * - Public routes remain accessible
+ *
  * Note: Uses standard Request type (not NextRequest) for Next.js 16 compatibility
  */
 export async function proxy(request: Request) {
   const url = new URL(request.url);
   const { pathname } = url;
 
+  // Get Auth0 client (may be null if not configured)
+  const auth0 = getAuth0Client();
+
+  // If Auth0 is not configured and we're on a protected route, show error page
+  if (!auth0) {
+    // Allow public routes to work even without auth
+    if (isPublicRoute(pathname) || pathname === '/auth-config-error') {
+      return NextResponse.next();
+    }
+
+    // Protected routes redirect to config error page
+    if (shouldProtectRoute(pathname)) {
+      const errorUrl = new URL('/auth-config-error', request.url);
+      const error = getAuth0Error();
+      if (error) {
+        errorUrl.searchParams.set('error', error.message);
+      }
+      return NextResponse.redirect(errorUrl);
+    }
+
+    // Non-protected routes continue normally
+    return NextResponse.next();
+  }
+
+  // Auth0 is configured - proceed with normal authentication flow
+
   // First, let Auth0 SDK handle its own routes
-  const auth0Response = await auth0.middleware(request);
-  if (auth0Response) {
-    return auth0Response;
+  try {
+    const auth0Response = await auth0.middleware(request);
+    if (auth0Response) {
+      return auth0Response;
+    }
+  } catch (error) {
+    console.error('[Proxy] Auth0 middleware error:', error);
+    // If middleware fails, treat as unauthenticated but don't crash
   }
 
   // Skip protection for public routes
@@ -84,7 +119,14 @@ export async function proxy(request: Request) {
   }
 
   // Get session for protected routes
-  const session = await auth0.getSession();
+  let session;
+  try {
+    session = await auth0.getSession();
+  } catch (error) {
+    console.error('[Proxy] Failed to get session:', error);
+    // Treat as unauthenticated if session fetch fails
+    session = null;
+  }
 
   // If no session, redirect to login
   if (!session) {

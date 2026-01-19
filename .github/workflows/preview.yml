@@ -825,17 +825,9 @@ jobs:
         id: deploy
         uses: Azure/static-web-apps-deploy@v1
         env:
-          # Set the backend API URL for runtime
+          # Build-time environment variables (baked into the build)
           NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url || '' }}
           NEXT_PUBLIC_ENVIRONMENT: preview
-          # Auth0 configuration for Next.js runtime
-          # These variables are required for @auth0/nextjs-auth0 to initialize
-          # Note: AUTH0_BASE_URL is intentionally omitted - it will be inferred from the request
-          # by the Auth0 SDK using the Host header from incoming requests
-          AUTH0_SECRET: ${{ steps.fetch-auth0.outputs.auth0-session-secret }}
-          AUTH0_ISSUER_BASE_URL: https://${{ steps.fetch-auth0.outputs.auth0-domain }}
-          AUTH0_CLIENT_ID: ${{ steps.fetch-auth0.outputs.auth0-client-id }}
-          AUTH0_CLIENT_SECRET: ${{ steps.fetch-auth0.outputs.auth0-client-secret }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -850,6 +842,42 @@ jobs:
           skip_app_build: true
           # Deploying to a PR creates a staging environment automatically
           production_branch: main
+
+      - name: Configure SWA environment app settings (runtime)
+        id: configure-swa
+        run: |
+          # IMPORTANT: Runtime environment variables for Azure SWA must be configured
+          # via the Azure Static Web Apps API, NOT via the deployment action env vars.
+          # 
+          # The deployment action's env vars are only available during DEPLOYMENT,
+          # not when the Next.js server starts up in the Azure runtime.
+          #
+          # This step configures the preview environment's runtime app settings
+          # so that Auth0 and other runtime dependencies work correctly.
+
+          echo "Configuring SWA app settings for preview environment..."
+
+          # Extract the environment name from the deployment output
+          # Preview environments are named like "64" (PR number)
+          ENVIRONMENT_NAME="${{ needs.detect-changes.outputs.pr_number }}"
+
+          echo "Environment name: $ENVIRONMENT_NAME"
+
+          # Configure app settings using Azure CLI
+          # Format: key=value pairs separated by spaces
+          az staticwebapp appsettings set \
+            --name "swa-ytsumm-prd" \
+            --resource-group "rg-ytsumm-prd" \
+            --environment-name "$ENVIRONMENT_NAME" \
+            --setting-names \
+              "AUTH0_SECRET=${{ steps.fetch-auth0.outputs.auth0-session-secret }}" \
+              "AUTH0_ISSUER_BASE_URL=https://${{ steps.fetch-auth0.outputs.auth0-domain }}" \
+              "AUTH0_CLIENT_ID=${{ steps.fetch-auth0.outputs.auth0-client-id }}" \
+              "AUTH0_CLIENT_SECRET=${{ steps.fetch-auth0.outputs.auth0-client-secret }}" \
+              "NEXT_PUBLIC_API_URL=${{ needs.get-ingress.outputs.preview_url || '' }}" \
+              "NEXT_PUBLIC_ENVIRONMENT=preview"
+
+          echo "✅ SWA app settings configured for environment $ENVIRONMENT_NAME"
 
   # ===========================================================================
   # PHASE 8: POST PREVIEW COMMENT
