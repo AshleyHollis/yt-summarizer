@@ -256,6 +256,6 @@ variable "auth0_test_users" {
     email_verified = bool
     role           = string # 'admin' or 'normal'
   }))
-  sensitive = true
-  default   = {}
+  # NOTE: Cannot use sensitive = true - prevents use in for_each. Passwords protected by plan scrubbing.
+  default = {}
 }

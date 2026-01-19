@@ -118,8 +118,9 @@ variable "test_users" {
     email_verified = bool
     role           = string # 'admin' or 'normal'
   }))
-  default   = {}
-  sensitive = true # Now safe: email (key) is not sensitive, only password (value) is
+  default = {}
+  # NOTE: Cannot use sensitive = true because Terraform doesn't allow sensitive values in for_each
+  # Password protection is handled by plan output scrubbing in CI/CD pipeline
 }
 
 # T011: Action support
