@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { JobProgress } from '@/components/JobProgress';
-import { createMockVideoJobsProgress } from '../helpers/mockFactories';
+import { createMockVideoJobsProgress, createMockJobSummary } from '../helpers/mockFactories';
 
 // Mock the API module
 vi.mock('@/services/api', () => ({
@@ -39,9 +39,12 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        expect(screen.getByText('50%')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('50%')).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
     });
 
     it('displays stage labels after API response', async () => {
@@ -49,12 +52,15 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Extracting Transcript')).toBeInTheDocument();
-        expect(screen.getByText('Generating Summary')).toBeInTheDocument();
-        expect(screen.getByText('Creating Embeddings')).toBeInTheDocument();
-        expect(screen.getByText('Finding Related Videos')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('Extracting Transcript')).toBeInTheDocument();
+          expect(screen.getByText('Generating Summary')).toBeInTheDocument();
+          expect(screen.getByText('Creating Embeddings')).toBeInTheDocument();
+          expect(screen.getByText('Finding Related Videos')).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
     });
 
     it('shows Processing Progress heading', async () => {
@@ -62,9 +68,12 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Processing Progress')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('Processing Progress')).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
     });
   });
 
@@ -76,9 +85,12 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        expect(screen.getByText('0%')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('0%')).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
     });
 
     it('shows "In progress..." text for running stage', async () => {
@@ -86,9 +98,12 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        expect(screen.getByText('In progress...')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('In progress...')).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
     });
 
     it('shows Processing Complete! message when done', async () => {
@@ -101,9 +116,12 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Processing Complete!')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('Processing Complete!')).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
     });
 
     it('shows Processing Failed message when failed', async () => {
@@ -115,9 +133,12 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Processing Failed')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('Processing Failed')).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
     });
   });
 
@@ -130,9 +151,12 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" onComplete={onComplete} />);
 
-      await waitFor(() => {
-        expect(onComplete).toHaveBeenCalled();
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(onComplete).toHaveBeenCalled();
+        },
+        { timeout: 10000 }
+      );
     });
 
     it('calls onFailed callback when overall_status is failed', async () => {
@@ -140,14 +164,31 @@ describe('JobProgress', () => {
       vi.mocked(jobApi.getVideoProgress).mockResolvedValue(
         createMockVideoJobsProgress({
           overall_status: 'failed',
+          jobs: [
+            createMockJobSummary({
+              job_id: 'job-1',
+              job_type: 'transcribe',
+              stage: 'completed',
+              status: 'succeeded',
+            }),
+            createMockJobSummary({
+              job_id: 'job-2',
+              job_type: 'summarize',
+              stage: 'failed',
+              status: 'failed',
+            }),
+          ],
         })
       );
 
       render(<JobProgress videoId="123" onFailed={onFailed} />);
 
-      await waitFor(() => {
-        expect(onFailed).toHaveBeenCalledWith('summarize');
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(onFailed).toHaveBeenCalledWith('summarize');
+        },
+        { timeout: 10000 }
+      );
     });
   });
 
@@ -157,9 +198,12 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        expect(jobApi.getVideoProgress).toHaveBeenCalledWith('123');
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(jobApi.getVideoProgress).toHaveBeenCalledWith('123');
+        },
+        { timeout: 10000 }
+      );
     });
   });
 
@@ -169,13 +213,16 @@ describe('JobProgress', () => {
 
       render(<JobProgress videoId="123" />);
 
-      await waitFor(() => {
-        const progressBar = document.querySelector('[role="progressbar"]');
-        expect(progressBar).toBeInTheDocument();
-        expect(progressBar).toHaveAttribute('aria-valuenow', '50');
-        expect(progressBar).toHaveAttribute('aria-valuemin', '0');
-        expect(progressBar).toHaveAttribute('aria-valuemax', '100');
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          const progressBar = document.querySelector('[role="progressbar"]');
+          expect(progressBar).toBeInTheDocument();
+          expect(progressBar).toHaveAttribute('aria-valuenow', '50');
+          expect(progressBar).toHaveAttribute('aria-valuemin', '0');
+          expect(progressBar).toHaveAttribute('aria-valuemax', '100');
+        },
+        { timeout: 10000 }
+      );
     });
   });
 });

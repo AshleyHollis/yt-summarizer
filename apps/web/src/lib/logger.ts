@@ -90,8 +90,8 @@ export function generateCorrelationId(): string {
 
   // Fallback: Generate UUID v4 manually
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
@@ -177,7 +177,15 @@ function formatLogMessage(level: LogLevel, message: string, context?: LogContext
 
   // Add custom fields (exclude known fields)
   if (context) {
-    const knownFields = ['correlationId', 'userId', 'method', 'path', 'statusCode', 'duration', 'error'];
+    const knownFields = [
+      'correlationId',
+      'userId',
+      'method',
+      'path',
+      'statusCode',
+      'duration',
+      'error',
+    ];
     Object.entries(context).forEach(([key, value]) => {
       if (!knownFields.includes(key)) {
         contextParts.push(`${key}=${JSON.stringify(value)}`);

@@ -27,13 +27,10 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
   /**
    * Skip all tests if admin auth is not configured
    */
-  test.skip(
-    () => {
-      const authFile = path.join(__dirname, '../playwright/.auth/admin.json');
-      return !fs.existsSync(authFile);
-    },
-    'Auth0 admin credentials not configured - set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to run admin tests'
-  );
+  test.skip(() => {
+    const authFile = path.join(__dirname, '../playwright/.auth/admin.json');
+    return !fs.existsSync(authFile);
+  }, 'Auth0 admin credentials not configured - set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to run admin tests');
 
   test.describe('Admin Dashboard Access', () => {
     test('admin user can navigate to admin dashboard', async ({ page }) => {

@@ -176,7 +176,8 @@ test.describe('US6: Synthesis API Integration', () => {
       const response = await request.post(`${API_URL}/api/v1/copilot/synthesize`, {
         data: {
           synthesisType: 'learning_path',
-          query: 'Create a learning path for differential topology and algebraic K-theory in category theory',
+          query:
+            'Create a learning path for differential topology and algebraic K-theory in category theory',
           maxItems: 5,
         },
       });
@@ -282,7 +283,8 @@ test.describe('US6: Synthesis API Integration', () => {
       const response = await request.post(`${API_URL}/api/v1/copilot/synthesize`, {
         data: {
           synthesisType: 'learning_path',
-          query: 'Create a learning path for Python object-oriented programming from beginner to advanced',
+          query:
+            'Create a learning path for Python object-oriented programming from beginner to advanced',
           maxItems: 10,
         },
       });
@@ -292,7 +294,10 @@ test.describe('US6: Synthesis API Integration', () => {
 
       // Skip if insufficient content (test data may not have processed yet)
       if (data.insufficientContent) {
-        test.skip(true, 'Insufficient content for ordering verification - videos may not be processed yet');
+        test.skip(
+          true,
+          'Insufficient content for ordering verification - videos may not be processed yet'
+        );
         return;
       }
 
@@ -303,7 +308,9 @@ test.describe('US6: Synthesis API Integration', () => {
 
       // If we have fewer than 2 videos, skip ordering verification but pass the test
       if (data.learningPath.items.length < 2) {
-        console.log(`Only ${data.learningPath.items.length} video(s) returned - ordering test skipped`);
+        console.log(
+          `Only ${data.learningPath.items.length} video(s) returned - ordering test skipped`
+        );
         return;
       }
 
@@ -316,17 +323,24 @@ test.describe('US6: Synthesis API Integration', () => {
       const expectedOrder = ORDERED_TEST_VIDEOS.pythonOOP.expectedOrder;
 
       // Find which of our ordered test videos appear in the results
-      const foundVideos = expectedOrder.filter(expected =>
-        returnedVideoIds.some((returned: string) => returned.includes(expected.id) || expected.id.includes(returned))
+      const foundVideos = expectedOrder.filter((expected) =>
+        returnedVideoIds.some(
+          (returned: string) => returned.includes(expected.id) || expected.id.includes(returned)
+        )
       );
 
       // If we found at least 2 of our ordered videos, verify their relative order
       if (foundVideos.length >= 2) {
-        const returnedPositions = foundVideos.map(video => {
-          const idx = returnedVideoIds.findIndex((id: string) =>
-            id.includes(video.id) || video.id.includes(id)
+        const returnedPositions = foundVideos.map((video) => {
+          const idx = returnedVideoIds.findIndex(
+            (id: string) => id.includes(video.id) || video.id.includes(id)
           );
-          return { id: video.id, level: video.level, position: idx, expectedPos: expectedOrder.findIndex(e => e.id === video.id) };
+          return {
+            id: video.id,
+            level: video.level,
+            position: idx,
+            expectedPos: expectedOrder.findIndex((e) => e.id === video.id),
+          };
         });
 
         // Sort by their position in the returned results
@@ -352,7 +366,8 @@ test.describe('US6: Synthesis API Integration', () => {
       const response = await request.post(`${API_URL}/api/v1/copilot/synthesize`, {
         data: {
           synthesisType: 'learning_path',
-          query: 'Create a complete learning path for Python classes and object-oriented programming tutorials',
+          query:
+            'Create a complete learning path for Python classes and object-oriented programming tutorials',
           maxItems: 8,
         },
       });
@@ -374,13 +389,13 @@ test.describe('US6: Synthesis API Integration', () => {
 
         // Map returned videos to their tutorial numbers (from video titles)
         const tutorialNumbers = ORDERED_TEST_VIDEOS.pythonOOP.expectedOrder
-          .filter(v => returnedVideoIds.some((id: string) => id.includes(v.id)))
-          .map(v => ({
+          .filter((v) => returnedVideoIds.some((id: string) => id.includes(v.id)))
+          .map((v) => ({
             id: v.id,
             number: parseInt(v.title.match(/Tutorial (\d+)/)?.[1] || '0'),
-            returnedPosition: returnedVideoIds.findIndex((id: string) => id.includes(v.id))
+            returnedPosition: returnedVideoIds.findIndex((id: string) => id.includes(v.id)),
           }))
-          .filter(v => v.number > 0)
+          .filter((v) => v.number > 0)
           .sort((a, b) => a.returnedPosition - b.returnedPosition);
 
         // If we have multiple numbered tutorials, earlier numbers should come first
@@ -391,7 +406,9 @@ test.describe('US6: Synthesis API Integration', () => {
             const diff = tutorialNumbers[i + 1].number - tutorialNumbers[i].number;
             expect(diff).toBeGreaterThanOrEqual(0); // Next tutorial number should be >= current
           }
-          console.log(`Verified tutorial sequence: ${tutorialNumbers.map(t => `#${t.number}`).join(' → ')}`);
+          console.log(
+            `Verified tutorial sequence: ${tutorialNumbers.map((t) => `#${t.number}`).join(' → ')}`
+          );
         }
       }
     });
@@ -414,8 +431,8 @@ test.describe('US6: Synthesis API Integration', () => {
         // because shorts lack sufficient content for pedagogical ordering
         const shortVideoId = 'aSYap2yhW8s';
 
-        const hasShort = data.learningPath.items.some(
-          (item: { videoId: string }) => item.videoId.includes(shortVideoId)
+        const hasShort = data.learningPath.items.some((item: { videoId: string }) =>
+          item.videoId.includes(shortVideoId)
         );
 
         // Shorts should be excluded from learning paths (they lack captions and context)
@@ -424,7 +441,7 @@ test.describe('US6: Synthesis API Integration', () => {
         if (hasShort) {
           console.warn(
             'Warning: Short video appeared in learning path. ' +
-            'Consider filtering videos < 60 seconds during synthesis.'
+              'Consider filtering videos < 60 seconds during synthesis.'
           );
         }
       }
@@ -484,7 +501,10 @@ test.describe('US6: Synthesis API Integration', () => {
 
       // Skip if insufficient content (JS videos may not be processed yet)
       if (data.insufficientContent) {
-        test.skip(true, 'Insufficient content for implicit ordering - JS async videos may not be processed yet');
+        test.skip(
+          true,
+          'Insufficient content for implicit ordering - JS async videos may not be processed yet'
+        );
         return;
       }
 
@@ -492,7 +512,9 @@ test.describe('US6: Synthesis API Integration', () => {
       expect(data.learningPath.items.length).toBeGreaterThanOrEqual(1);
 
       if (data.learningPath.items.length < 2) {
-        console.log(`Only ${data.learningPath.items.length} video(s) returned - implicit ordering test skipped`);
+        console.log(
+          `Only ${data.learningPath.items.length} video(s) returned - implicit ordering test skipped`
+        );
         return;
       }
 
@@ -505,22 +527,26 @@ test.describe('US6: Synthesis API Integration', () => {
       const expectedOrder = IMPLICIT_ORDER_VIDEOS.javascriptAsync.expectedOrder;
 
       // Find which of our implicit-order test videos appear in the results
-      const foundVideos = expectedOrder.filter(expected =>
-        returnedVideoIds.some((returned: string) => returned.includes(expected.id) || expected.id.includes(returned))
+      const foundVideos = expectedOrder.filter((expected) =>
+        returnedVideoIds.some(
+          (returned: string) => returned.includes(expected.id) || expected.id.includes(returned)
+        )
       );
 
-      console.log(`Found ${foundVideos.length} of ${expectedOrder.length} implicit-order videos in results`);
+      console.log(
+        `Found ${foundVideos.length} of ${expectedOrder.length} implicit-order videos in results`
+      );
 
       // If we found at least 2 of our test videos, verify their relative order
       if (foundVideos.length >= 2) {
-        const returnedPositions = foundVideos.map(video => {
-          const idx = returnedVideoIds.findIndex((id: string) =>
-            id.includes(video.id) || video.id.includes(id)
+        const returnedPositions = foundVideos.map((video) => {
+          const idx = returnedVideoIds.findIndex(
+            (id: string) => id.includes(video.id) || video.id.includes(id)
           );
           return {
             id: video.id,
             title: video.title,
-            expectedPos: expectedOrder.findIndex(e => e.id === video.id),
+            expectedPos: expectedOrder.findIndex((e) => e.id === video.id),
             returnedPos: idx,
           };
         });
@@ -530,7 +556,9 @@ test.describe('US6: Synthesis API Integration', () => {
 
         console.log('Implicit order verification:');
         returnedPositions.forEach((v, i) => {
-          console.log(`  ${i + 1}. ${v.title} (expected: #${v.expectedPos + 1}, returned: #${v.returnedPos + 1})`);
+          console.log(
+            `  ${i + 1}. ${v.title} (expected: #${v.expectedPos + 1}, returned: #${v.returnedPos + 1})`
+          );
         });
 
         // Verify that foundational content comes before advanced content
@@ -539,10 +567,10 @@ test.describe('US6: Synthesis API Integration', () => {
         // - "What is a callback?" should come before "Promise" and "Async Await"
         // - "Promise" should come before "Async Await"
 
-        const jsOverview = returnedPositions.find(v => v.id === 'DHjqpvDnNGE');
-        const callback = returnedPositions.find(v => v.id === 'xHneyv38Jro');
-        const promise = returnedPositions.find(v => v.id === 'RvYYCGs45L4');
-        const asyncAwait = returnedPositions.find(v => v.id === 'V_Kr9OSfDeU');
+        const jsOverview = returnedPositions.find((v) => v.id === 'DHjqpvDnNGE');
+        const callback = returnedPositions.find((v) => v.id === 'xHneyv38Jro');
+        const promise = returnedPositions.find((v) => v.id === 'RvYYCGs45L4');
+        const asyncAwait = returnedPositions.find((v) => v.id === 'V_Kr9OSfDeU');
 
         // If JS overview is present, it should be first
         if (jsOverview && returnedPositions.length > 1) {
@@ -566,11 +594,14 @@ test.describe('US6: Synthesis API Integration', () => {
       }
     });
 
-    test('implicit ordering produces meaningful rationale based on content analysis', async ({ request }) => {
+    test('implicit ordering produces meaningful rationale based on content analysis', async ({
+      request,
+    }) => {
       const response = await request.post(`${API_URL}/api/v1/copilot/synthesize`, {
         data: {
           synthesisType: 'learning_path',
-          query: 'Create a learning path for understanding JavaScript callbacks, promises, and async/await',
+          query:
+            'Create a learning path for understanding JavaScript callbacks, promises, and async/await',
           maxItems: 5,
         },
       });
@@ -587,7 +618,9 @@ test.describe('US6: Synthesis API Integration', () => {
 
           // Rationale should contain content-based reasoning, not just generic text
           // We can't check exact wording but can verify it's substantive
-          console.log(`Rationale for ${item.title?.slice(0, 30) || item.videoId}: ${item.rationale.slice(0, 100)}...`);
+          console.log(
+            `Rationale for ${item.title?.slice(0, 30) || item.videoId}: ${item.rationale.slice(0, 100)}...`
+          );
         }
       }
     });
@@ -597,7 +630,8 @@ test.describe('US6: Synthesis API Integration', () => {
       const response = await request.post(`${API_URL}/api/v1/copilot/synthesize`, {
         data: {
           synthesisType: 'learning_path',
-          query: 'Create a learning path for programming concepts including both Python and JavaScript',
+          query:
+            'Create a learning path for programming concepts including both Python and JavaScript',
           maxItems: 10,
         },
       });
@@ -624,7 +658,9 @@ test.describe('US6: Synthesis API Integration', () => {
           expect(orders[i]).toBeLessThan(orders[i + 1]);
         }
 
-        console.log(`Mixed ordering test: ${data.learningPath.items.length} videos ordered successfully`);
+        console.log(
+          `Mixed ordering test: ${data.learningPath.items.length} videos ordered successfully`
+        );
       }
     });
   });

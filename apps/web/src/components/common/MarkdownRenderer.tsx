@@ -125,9 +125,7 @@ export function MarkdownRenderer({
 
   return (
     <article className={`${proseClasses} ${variantClass} ${className}`}>
-      <ReactMarkdown components={components}>
-        {content}
-      </ReactMarkdown>
+      <ReactMarkdown components={components}>{content}</ReactMarkdown>
     </article>
   );
 }

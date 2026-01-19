@@ -259,8 +259,8 @@ test.describe('Dual Login Methods UI @auth', () => {
     test('layout adapts gracefully to different screen sizes', async ({ page }) => {
       const viewports = [
         { width: 1920, height: 1080 }, // Desktop
-        { width: 768, height: 1024 },  // Tablet
-        { width: 375, height: 667 },   // Mobile
+        { width: 768, height: 1024 }, // Tablet
+        { width: 375, height: 667 }, // Mobile
       ];
 
       for (const viewport of viewports) {
@@ -304,7 +304,7 @@ test.describe('Dual Login Methods UI @auth', () => {
       // Social login buttons should have accessible names
       const googleButton = page.getByRole('button', { name: /google/i });
       const googleLabel = await googleButton.getAttribute('aria-label');
-      expect(googleLabel || await googleButton.textContent()).toBeTruthy();
+      expect(googleLabel || (await googleButton.textContent())).toBeTruthy();
 
       // Email/password inputs should have ARIA labels
       const emailInput = page.getByLabel(/email/i);

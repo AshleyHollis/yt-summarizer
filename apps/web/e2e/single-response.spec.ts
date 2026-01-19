@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from '@playwright/test';
 
 /**
  * E2E tests for Single Response Verification
@@ -12,22 +12,22 @@ import { test, expect, Page } from "@playwright/test";
 
 async function openChat(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto("/library");
-  await page.waitForLoadState("networkidle");
+  await page.goto('/library');
+  await page.waitForLoadState('networkidle');
 
   // Open the AI assistant sidebar
-  const openButton = page.getByRole("button", { name: "Open AI Assistant" });
+  const openButton = page.getByRole('button', { name: 'Open AI Assistant' });
   await expect(openButton).toBeVisible({ timeout: 10000 });
   await openButton.click();
 
   // Wait for chat to be ready
-  await expect(page.getByRole("textbox", { name: "Ask about your videos..." })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Ask about your videos...' })).toBeVisible();
 }
 
 async function sendMessage(page: Page, message: string): Promise<void> {
-  const input = page.getByRole("textbox", { name: "Ask about your videos..." });
+  const input = page.getByRole('textbox', { name: 'Ask about your videos...' });
   await input.fill(message);
-  await input.press("Enter");
+  await input.press('Enter');
 }
 
 async function waitForAssistantResponse(page: Page, timeout = 60000): Promise<void> {
@@ -36,7 +36,7 @@ async function waitForAssistantResponse(page: Page, timeout = 60000): Promise<vo
     () => {
       // Look for spinner/loading indicators to disappear
       const spinners = document.querySelectorAll('[class*="animate-spin"]');
-      const loadingText = document.body.textContent?.includes("Searching your video library...");
+      const loadingText = document.body.textContent?.includes('Searching your video library...');
       return spinners.length === 0 && !loadingText;
     },
     { timeout }
@@ -55,12 +55,12 @@ function countToolInProgressIndicators(page: Page) {
   return page.locator('text="Searching your video library..."').count();
 }
 
-test.describe("Single Response Per Message", () => {
-  test("simple greeting produces exactly one response", async ({ page }) => {
+test.describe('Single Response Per Message', () => {
+  test('simple greeting produces exactly one response', async ({ page }) => {
     await openChat(page);
 
     // Send a simple greeting that doesn't trigger tools
-    await sendMessage(page, "Hello, how are you?");
+    await sendMessage(page, 'Hello, how are you?');
 
     // Wait for response
     await page.waitForTimeout(3000);
@@ -79,11 +79,11 @@ test.describe("Single Response Per Message", () => {
     expect(responseMatches).toBeLessThanOrEqual(2); // Allow for greeting + response context
   });
 
-  test("library query produces exactly one tool response card", async ({ page }) => {
+  test('library query produces exactly one tool response card', async ({ page }) => {
     await openChat(page);
 
     // Send a query that triggers the queryLibrary tool
-    await sendMessage(page, "What videos do I have about exercise?");
+    await sendMessage(page, 'What videos do I have about exercise?');
 
     // Wait for response to complete
     await waitForAssistantResponse(page);
@@ -100,15 +100,15 @@ test.describe("Single Response Per Message", () => {
     expect(recommendedCount).toBeLessThanOrEqual(1);
   });
 
-  test("second query produces only one additional response", async ({ page }) => {
+  test('second query produces only one additional response', async ({ page }) => {
     await openChat(page);
 
     // First message
-    await sendMessage(page, "Hello!");
+    await sendMessage(page, 'Hello!');
     await page.waitForTimeout(2000);
 
     // Second message - triggers tool
-    await sendMessage(page, "What videos do I have?");
+    await sendMessage(page, 'What videos do I have?');
     await waitForAssistantResponse(page);
 
     // Count tool response indicators
@@ -123,11 +123,11 @@ test.describe("Single Response Per Message", () => {
     expect(spinnerCount).toBe(0);
   });
 
-  test("tool result renders exactly once with all components", async ({ page }) => {
+  test('tool result renders exactly once with all components', async ({ page }) => {
     await openChat(page);
 
     // Send query
-    await sendMessage(page, "Tell me about the videos in my library");
+    await sendMessage(page, 'Tell me about the videos in my library');
     await waitForAssistantResponse(page);
 
     // Verify the structure appears once:

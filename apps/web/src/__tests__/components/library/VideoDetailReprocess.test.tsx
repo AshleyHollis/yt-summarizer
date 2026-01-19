@@ -53,9 +53,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
     });
 
     it('shows reprocess button for completed videos with missing summary', async () => {
@@ -70,9 +73,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
     });
 
     it('shows reprocess button for completed videos with empty summary', async () => {
@@ -87,9 +93,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
     });
 
     it('does NOT show reprocess button for completed videos with valid summary', async () => {
@@ -105,9 +114,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       render(<VideoDetailPage />);
 
       // Wait for the page to load
-      await waitFor(() => {
-        expect(screen.getByText('Test Video')).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('Test Video')).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       // Reprocess button should NOT be visible
       expect(screen.queryByRole('button', { name: /Reprocess Video/i })).not.toBeInTheDocument();
@@ -125,9 +137,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Test Video')).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('Test Video')).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       // Should not show reprocess since it's still processing
       expect(screen.queryByRole('button', { name: /Reprocess Video/i })).not.toBeInTheDocument();
@@ -150,9 +165,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       const button = screen.getByRole('button', { name: /Reprocess Video/i });
       fireEvent.click(button);
@@ -185,9 +203,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       const button = screen.getByRole('button', { name: /Reprocess Video/i });
       fireEvent.click(button);
@@ -220,9 +241,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       const button = screen.getByRole('button', { name: /Reprocess Video/i });
       fireEvent.click(button);
@@ -248,9 +272,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       const button = screen.getByRole('button', { name: /Reprocess Video/i });
       fireEvent.click(button);
@@ -273,9 +300,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       const button = screen.getByRole('button', { name: /Reprocess Video/i });
       fireEvent.click(button);
@@ -304,9 +334,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText(/Processing failed for this video/i)).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText(/Processing failed for this video/i)).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
     });
 
     it('shows missing content message for completed videos without summary', async () => {
@@ -321,9 +354,12 @@ describe('Video Detail Page - Reprocess Button', () => {
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText(/Missing content detected/i)).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText(/Missing content detected/i)).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
     });
   });
 });

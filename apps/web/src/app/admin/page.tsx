@@ -39,9 +39,7 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">
-            Welcome, {user?.email || 'Administrator'}
-          </p>
+          <p className="text-gray-600">Welcome, {user?.email || 'Administrator'}</p>
           {user?.['https://yt-summarizer.com/role'] && (
             <span className="inline-block mt-2 px-3 py-1 text-sm font-semibold text-white bg-purple-600 rounded-full">
               {user['https://yt-summarizer.com/role'].toUpperCase()}
@@ -136,10 +134,22 @@ export default function AdminDashboard() {
         <div className="mt-8 bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Quick Actions</h2>
           <div className="flex flex-wrap gap-3">
-            <QuickActionButton label="Refresh Data" onClick={() => alert('Refresh functionality coming soon')} />
-            <QuickActionButton label="Clear Cache" onClick={() => alert('Clear cache functionality coming soon')} />
-            <QuickActionButton label="Run Diagnostics" onClick={() => alert('Diagnostics functionality coming soon')} />
-            <QuickActionButton label="Export Logs" onClick={() => alert('Export logs functionality coming soon')} />
+            <QuickActionButton
+              label="Refresh Data"
+              onClick={() => alert('Refresh functionality coming soon')}
+            />
+            <QuickActionButton
+              label="Clear Cache"
+              onClick={() => alert('Clear cache functionality coming soon')}
+            />
+            <QuickActionButton
+              label="Run Diagnostics"
+              onClick={() => alert('Diagnostics functionality coming soon')}
+            />
+            <QuickActionButton
+              label="Export Logs"
+              onClick={() => alert('Export logs functionality coming soon')}
+            />
           </div>
         </div>
 

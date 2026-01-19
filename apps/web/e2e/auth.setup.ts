@@ -44,7 +44,9 @@ setup('authenticate as admin', async ({ page }) => {
   // Skip if credentials not configured
   if (!email || !password) {
     console.warn('[auth-setup] ⚠ Admin test credentials not set. Skipping admin authentication.');
-    console.warn('[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.');
+    console.warn(
+      '[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.'
+    );
     return;
   }
 
@@ -80,7 +82,6 @@ setup('authenticate as admin', async ({ page }) => {
     // Save storage state
     await page.context().storageState({ path: adminAuthFile });
     console.log(`[auth-setup] ✓ Saved admin auth state to ${adminAuthFile}`);
-
   } catch (error) {
     console.error('[auth-setup] ✗ Admin authentication failed:', error);
     console.error('[auth-setup] Tests requiring admin authentication will be skipped.');
@@ -100,7 +101,9 @@ setup('authenticate as normal user', async ({ page }) => {
   // Skip if credentials not configured
   if (!email || !password) {
     console.warn('[auth-setup] ⚠ User test credentials not set. Skipping user authentication.');
-    console.warn('[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.');
+    console.warn(
+      '[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.'
+    );
     return;
   }
 
@@ -135,7 +138,6 @@ setup('authenticate as normal user', async ({ page }) => {
     // Save storage state
     await page.context().storageState({ path: userAuthFile });
     console.log(`[auth-setup] ✓ Saved user auth state to ${userAuthFile}`);
-
   } catch (error) {
     console.error('[auth-setup] ✗ User authentication failed:', error);
     console.error('[auth-setup] Tests requiring user authentication will be skipped.');

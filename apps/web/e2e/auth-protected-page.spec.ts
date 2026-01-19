@@ -27,13 +27,10 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
   /**
    * Skip all tests if auth is not configured
    */
-  test.skip(
-    () => {
-      const authFile = path.join(__dirname, '../playwright/.auth/user.json');
-      return !fs.existsSync(authFile);
-    },
-    'Auth0 not configured - set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to run user tests'
-  );
+  test.skip(() => {
+    const authFile = path.join(__dirname, '../playwright/.auth/user.json');
+    return !fs.existsSync(authFile);
+  }, 'Auth0 not configured - set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to run user tests');
 
   test.describe('Access to Protected Routes', () => {
     test('authenticated user can access home page', async ({ page }) => {
@@ -337,10 +334,9 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       const cookies = await page.context().cookies();
 
       // Should have auth-related cookies
-      const authCookies = cookies.filter(c =>
-        c.name.includes('auth') ||
-        c.name.includes('session') ||
-        c.name.startsWith('appSession')
+      const authCookies = cookies.filter(
+        (c) =>
+          c.name.includes('auth') || c.name.includes('session') || c.name.startsWith('appSession')
       );
 
       expect(authCookies.length).toBeGreaterThan(0);
@@ -406,10 +402,9 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       await logoutButton.click();
 
       // Should redirect to login or home page
-      await page.waitForURL(
-        (url) => url.pathname === '/' || url.pathname.includes('/login'),
-        { timeout: 10000 }
-      );
+      await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/login'), {
+        timeout: 10000,
+      });
 
       // User profile should no longer be visible
       const userProfileAfterLogout = page.getByTestId('user-profile');

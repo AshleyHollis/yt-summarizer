@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 interface CitationProps {
   videoId: string;
@@ -20,7 +20,7 @@ export function Citation({
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -61,12 +61,14 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
   const maxDisplay = 100;
 
   const clampedScore = Math.max(minScore, Math.min(confidence, maxScore));
-  const rescaledScore = minDisplay + ((clampedScore - minScore) / (maxScore - minScore)) * (maxDisplay - minDisplay);
+  const rescaledScore =
+    minDisplay + ((clampedScore - minScore) / (maxScore - minScore)) * (maxDisplay - minDisplay);
   const percentage = Math.round(rescaledScore);
 
   // Color based on display percentage
   const getColorClass = (): string => {
-    if (percentage >= 90) return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
+    if (percentage >= 90)
+      return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
     if (percentage >= 80) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
     return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300';
   };

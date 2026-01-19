@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * ToolResultContext - Frontend Tool Result Bridge
@@ -46,7 +46,7 @@
  * @see useThreadPersistence.ts - Where results are consumed during save
  */
 
-import { createContext, useContext, useCallback, useRef, ReactNode, useMemo } from "react";
+import { createContext, useContext, useCallback, useRef, ReactNode, useMemo } from 'react';
 
 export interface PendingToolResult {
   toolCallId: string;
@@ -80,24 +80,23 @@ export function ToolResultProvider({ children }: { children: ReactNode }) {
   const pendingResultsRef = useRef<PendingToolResult[]>([]);
   const subscribersRef = useRef<Set<(result: PendingToolResult) => void>>(new Set());
 
-  const registerToolResult = useCallback((
-    toolCallId: string,
-    toolName: string,
-    result: unknown
-  ) => {
-    const toolResult: PendingToolResult = {
-      toolCallId,
-      toolName,
-      result,
-      timestamp: Date.now(),
-    };
+  const registerToolResult = useCallback(
+    (toolCallId: string, toolName: string, result: unknown) => {
+      const toolResult: PendingToolResult = {
+        toolCallId,
+        toolName,
+        result,
+        timestamp: Date.now(),
+      };
 
-    // Add to pending results
-    pendingResultsRef.current.push(toolResult);
+      // Add to pending results
+      pendingResultsRef.current.push(toolResult);
 
-    // Notify subscribers immediately
-    subscribersRef.current.forEach(callback => callback(toolResult));
-  }, []);
+      // Notify subscribers immediately
+      subscribersRef.current.forEach((callback) => callback(toolResult));
+    },
+    []
+  );
 
   const consumePendingResults = useCallback(() => {
     const results = [...pendingResultsRef.current];
@@ -112,23 +111,22 @@ export function ToolResultProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const value = useMemo(() => ({
-    registerToolResult,
-    consumePendingResults,
-    subscribe,
-  }), [registerToolResult, consumePendingResults, subscribe]);
-
-  return (
-    <ToolResultContext.Provider value={value}>
-      {children}
-    </ToolResultContext.Provider>
+  const value = useMemo(
+    () => ({
+      registerToolResult,
+      consumePendingResults,
+      subscribe,
+    }),
+    [registerToolResult, consumePendingResults, subscribe]
   );
+
+  return <ToolResultContext.Provider value={value}>{children}</ToolResultContext.Provider>;
 }
 
 export function useToolResults() {
   const context = useContext(ToolResultContext);
   if (!context) {
-    throw new Error("useToolResults must be used within a ToolResultProvider");
+    throw new Error('useToolResults must be used within a ToolResultProvider');
   }
   return context;
 }

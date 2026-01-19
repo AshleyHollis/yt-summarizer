@@ -59,9 +59,12 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       await page.goto('/library');
 
       // Should redirect to login page
-      await page.waitForURL((url) => url.pathname === '/library' || url.pathname.includes('/login'), {
-        timeout: 10000,
-      });
+      await page.waitForURL(
+        (url) => url.pathname === '/library' || url.pathname.includes('/login'),
+        {
+          timeout: 10000,
+        }
+      );
 
       const currentUrl = page.url();
 

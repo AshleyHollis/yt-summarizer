@@ -30,7 +30,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
   test.describe('Complete Video Submission Journey', () => {
     // These tests require actual video processing to complete
-    test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
+    test.skip(
+      () => !LIVE_PROCESSING,
+      'Requires live AI processing - run with LIVE_PROCESSING=true'
+    );
 
     test('user can submit video and view completed result', async ({ page }) => {
       // Step 1: Navigate to submit page
@@ -123,7 +126,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
   test.describe('Video Detail Page Features', () => {
     // These tests require actual video processing to complete
-    test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
+    test.skip(
+      () => !LIVE_PROCESSING,
+      'Requires live AI processing - run with LIVE_PROCESSING=true'
+    );
 
     let existingVideoId: string | null = null;
 
@@ -192,10 +198,14 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await expect(page.locator('main')).toBeVisible();
 
       // Find transcript section
-      const transcriptSection = page.locator('[data-testid="transcript"], .transcript, section:has-text("Transcript")').first();
+      const transcriptSection = page
+        .locator('[data-testid="transcript"], .transcript, section:has-text("Transcript")')
+        .first();
 
       // Either find specific transcript section or general text content
-      const transcriptContent = transcriptSection.or(page.locator('pre, .prose, .markdown').first());
+      const transcriptContent = transcriptSection.or(
+        page.locator('pre, .prose, .markdown').first()
+      );
 
       if (await transcriptContent.isVisible()) {
         // Verify there's actual text content
@@ -214,7 +224,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await expect(page.locator('main')).toBeVisible();
 
       // Find summary section
-      const summarySection = page.locator('[data-testid="summary"], .summary, section:has-text("Summary")').first();
+      const summarySection = page
+        .locator('[data-testid="summary"], .summary, section:has-text("Summary")')
+        .first();
 
       // Either find specific summary section or general markdown content
       const summaryContent = summarySection.or(page.locator('.prose, .markdown, article').first());
@@ -338,9 +350,18 @@ async function waitForVideoCompletion(page: Page, timeout: number): Promise<void
 
     // Check if any completion indicator is visible
     const isCompleted = await Promise.race([
-      completedText.first().isVisible().catch(() => false),
-      summarySection.first().isVisible().catch(() => false),
-      transcriptSection.first().isVisible().catch(() => false),
+      completedText
+        .first()
+        .isVisible()
+        .catch(() => false),
+      summarySection
+        .first()
+        .isVisible()
+        .catch(() => false),
+      transcriptSection
+        .first()
+        .isVisible()
+        .catch(() => false),
     ]);
 
     if (isCompleted) {
@@ -349,7 +370,12 @@ async function waitForVideoCompletion(page: Page, timeout: number): Promise<void
 
     // Check for error state
     const errorText = page.getByText(/failed|error/i);
-    if (await errorText.first().isVisible().catch(() => false)) {
+    if (
+      await errorText
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       throw new Error('Video processing failed');
     }
 

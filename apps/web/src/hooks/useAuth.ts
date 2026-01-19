@@ -9,7 +9,12 @@
 
 'use client';
 
-import { useAuthContext, type User, type Role, type AuthContextValue } from '@/contexts/AuthContext';
+import {
+  useAuthContext,
+  type User,
+  type Role,
+  type AuthContextValue,
+} from '@/contexts/AuthContext';
 
 /**
  * Hook to access authentication context.

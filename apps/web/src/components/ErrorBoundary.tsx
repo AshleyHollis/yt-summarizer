@@ -194,9 +194,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             {process.env.NODE_ENV === 'development' && (
               <div className="mb-6 p-4 bg-gray-100 rounded-md overflow-auto">
                 <p className="text-sm font-semibold text-gray-700 mb-2">Error Details:</p>
-                <p className="text-xs text-red-600 font-mono break-words">
-                  {error.toString()}
-                </p>
+                <p className="text-xs text-red-600 font-mono break-words">{error.toString()}</p>
                 {errorInfo && (
                   <details className="mt-2">
                     <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-800">
@@ -219,7 +217,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 Try Again
               </button>
               <button
-                onClick={() => window.location.href = '/'}
+                onClick={() => (window.location.href = '/')}
                 className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
               >
                 Go Home

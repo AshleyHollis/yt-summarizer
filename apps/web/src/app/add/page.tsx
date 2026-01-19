@@ -124,9 +124,7 @@ export default function AddPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <section className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Add Content
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Add Content</h1>
           <p className="text-gray-700 dark:text-gray-300 max-w-xl mx-auto">
             Paste any YouTube URL — we&apos;ll detect whether it&apos;s a video or channel
           </p>
@@ -135,10 +133,7 @@ export default function AddPage() {
         {/* Smart URL Input */}
         {!channelData && (
           <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-6 md:p-8">
-            <SmartUrlInput
-              onChannelLoaded={handleChannelLoaded}
-              className="max-w-2xl mx-auto"
-            />
+            <SmartUrlInput onChannelLoaded={handleChannelLoaded} className="max-w-2xl mx-auto" />
           </section>
         )}
 
@@ -151,7 +146,13 @@ export default function AddPage() {
                 onClick={handleReset}
                 className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M19 12H5M12 19l-7-7 7-7" />
                 </svg>
                 Start over with new URL
@@ -163,7 +164,13 @@ export default function AddPage() {
                 {/* Channel header */}
                 <div className="flex items-center gap-3 pb-4 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/50">
-                    <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      className="w-5 h-5 text-purple-600 dark:text-purple-400"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                       <circle cx="9" cy="7" r="4" />
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -301,12 +308,12 @@ function FeatureCard({ icon, title, description, color }: FeatureCardProps) {
 
   return (
     <div className="p-6 rounded-xl bg-white dark:bg-gray-800/30 border border-gray-200 dark:border-gray-700/30 shadow-sm">
-      <div className={`inline-flex items-center justify-center w-12 h-12 rounded-lg ${colorClasses[color]} mb-4`}>
+      <div
+        className={`inline-flex items-center justify-center w-12 h-12 rounded-lg ${colorClasses[color]} mb-4`}
+      >
         {icon}
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {title}
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{title}</h3>
       <p className="text-sm text-gray-600 dark:text-gray-300">{description}</p>
     </div>
   );

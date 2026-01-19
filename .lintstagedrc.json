@@ -1,13 +1,9 @@
 {
   "apps/web/**/*.{ts,tsx,js,jsx}": [
-    "cd apps/web && npx eslint --fix",
-    "cd apps/web && npx prettier --write"
+    "npx prettier --write",
+    "npx eslint --config apps/web/eslint.config.mjs --fix"
   ],
-  "apps/web/**/*.{json,css,md}": [
-    "cd apps/web && npx prettier --write"
-  ],
-  "services/**/*.py": [
-    "pwsh -Command \"cd $($args[0] | Split-Path -Parent | Split-Path -Parent) && uv run ruff check --fix $($args[0] | Split-Path -Leaf)\"",
-    "pwsh -Command \"cd $($args[0] | Split-Path -Parent | Split-Path -Parent) && uv run ruff format $($args[0] | Split-Path -Leaf)\""
-  ]
+  "apps/web/**/*.{json,css,md,yml,yaml}": ["npx prettier --write"],
+  "**/*.{yml,yaml}": ["npx prettier --write"],
+  "services/**/*.py": ["ruff check --fix", "ruff format"]
 }

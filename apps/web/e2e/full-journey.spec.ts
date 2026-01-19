@@ -236,7 +236,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     ];
 
     const lowerResponse = responseContent.toLowerCase();
-    const askedForClarification = clarificationPhrases.some(phrase =>
+    const askedForClarification = clarificationPhrases.some((phrase) =>
       lowerResponse.includes(phrase)
     );
 
@@ -255,9 +255,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
       '404',
     ];
 
-    const hasBackendError = errorPhrases.some(phrase =>
-      lowerResponse.includes(phrase)
-    );
+    const hasBackendError = errorPhrases.some((phrase) => lowerResponse.includes(phrase));
 
     expect(hasBackendError).toBe(false);
   });
@@ -319,13 +317,13 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     // Should not be a generic "I don't know" without attempting search
     const unhelpfulPhrases = [
       'i cannot access',
-      'i don\'t have access',
+      "i don't have access",
       'i am unable to',
       'as an ai',
     ];
 
     const lowerResponse = responseContent.toLowerCase();
-    const isUnhelpful = unhelpfulPhrases.some(phrase => lowerResponse.includes(phrase));
+    const isUnhelpful = unhelpfulPhrases.some((phrase) => lowerResponse.includes(phrase));
 
     // If the response seems unhelpful, it should at least mention searching
     if (isUnhelpful) {
@@ -369,17 +367,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     const responseContent = await getCopilotResponseContent(page);
 
     // The agent should mention something about the search results
-    const searchRelatedPhrases = [
-      'found',
-      'search',
-      'video',
-      'library',
-      'result',
-      'segment',
-    ];
+    const searchRelatedPhrases = ['found', 'search', 'video', 'library', 'result', 'segment'];
 
     const lowerResponse = responseContent.toLowerCase();
-    const mentionsSearch = searchRelatedPhrases.some(phrase => lowerResponse.includes(phrase));
+    const mentionsSearch = searchRelatedPhrases.some((phrase) => lowerResponse.includes(phrase));
 
     expect(mentionsSearch).toBe(true);
     console.log('✅ Agent references search results in response');
@@ -429,7 +420,9 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     const responseText = await getCopilotResponseContent(page);
     const hasTimestamps = /\d{1,2}:\d{2}/.test(responseText);
 
-    console.log(`Links found: ${linksCount}, Citations found: ${citationsCount}, Has timestamps: ${hasTimestamps}`);
+    console.log(
+      `Links found: ${linksCount}, Citations found: ${citationsCount}, Has timestamps: ${hasTimestamps}`
+    );
     console.log(`Response text length: ${responseText.length}`);
 
     // At minimum, the response should exist (even short responses are valid)
@@ -452,13 +445,15 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     }
 
     // Send a query directly to the copilot API
-    const queryResponse = await request.post('/api/v1/copilot/search/segments', {
-      data: {
-        queryText: 'example search query',
-        limit: 5,
-      },
-      headers: { 'Content-Type': 'application/json' },
-    }).catch(() => null);
+    const queryResponse = await request
+      .post('/api/v1/copilot/search/segments', {
+        data: {
+          queryText: 'example search query',
+          limit: 5,
+        },
+        headers: { 'Content-Type': 'application/json' },
+      })
+      .catch(() => null);
 
     if (queryResponse) {
       // The search endpoint should work
@@ -569,7 +564,9 @@ async function waitForCopilotResponse(page: Page, timeout: number): Promise<bool
   const pollInterval = 1000;
 
   // First, wait for any loading indicator to appear
-  const loadingIndicator = page.locator('[class*="loading" i], [class*="spinner" i], [class*="typing" i]');
+  const loadingIndicator = page.locator(
+    '[class*="loading" i], [class*="spinner" i], [class*="typing" i]'
+  );
   await loadingIndicator.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
   // Then wait for response content
@@ -634,7 +631,7 @@ async function getCopilotResponseContent(page: Page): Promise<string> {
   // Fallback: get all visible text in the chat area
   const chatArea = page.locator('[class*="chat" i], [class*="copilot" i]').first();
   if (await chatArea.isVisible().catch(() => false)) {
-    return await chatArea.textContent().catch(() => '') || '';
+    return (await chatArea.textContent().catch(() => '')) || '';
   }
 
   return '';

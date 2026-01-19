@@ -25,13 +25,10 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
   /**
    * Skip all tests if auth is not configured
    */
-  test.skip(
-    () => {
-      const authFile = path.join(__dirname, '../playwright/.auth/user.json');
-      return !fs.existsSync(authFile);
-    },
-    'Auth0 not configured - set AUTH0_* environment variables to run auth tests'
-  );
+  test.skip(() => {
+    const authFile = path.join(__dirname, '../playwright/.auth/user.json');
+    return !fs.existsSync(authFile);
+  }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
   /**
    * NOTE: These tests assume the authenticated user does NOT have admin role.
@@ -42,7 +39,9 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
    */
 
   test.describe('Access Denial for Admin Routes', () => {
-    test('normal user attempting to access /admin is redirected to access-denied', async ({ browser }) => {
+    test('normal user attempting to access /admin is redirected to access-denied', async ({
+      browser,
+    }) => {
       // Create a new context without admin role (simulating normal user)
       // In real implementation, this would use playwright/.auth/normal-user.json
       const context = await browser.newContext({
@@ -236,7 +235,9 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
       }
     });
 
-    test('access-denied page shows sign in option for unauthenticated users', async ({ browser }) => {
+    test('access-denied page shows sign in option for unauthenticated users', async ({
+      browser,
+    }) => {
       const context = await browser.newContext({ storageState: undefined });
       const page = await context.newPage();
 
@@ -256,12 +257,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
   });
 
   test.describe('Multiple Admin Routes Protection', () => {
-    const adminRoutes = [
-      '/admin',
-      '/admin/users',
-      '/admin/settings',
-      '/admin/analytics',
-    ];
+    const adminRoutes = ['/admin', '/admin/users', '/admin/settings', '/admin/analytics'];
 
     adminRoutes.forEach((route) => {
       test(`normal user cannot access ${route}`, async ({ browser }) => {
@@ -290,9 +286,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
           }
 
           // Should be denied access
-          expect(
-            currentUrl.includes('/access-denied') || currentUrl.includes('/404')
-          ).toBeTruthy();
+          expect(currentUrl.includes('/access-denied') || currentUrl.includes('/404')).toBeTruthy();
         } finally {
           await context.close();
         }

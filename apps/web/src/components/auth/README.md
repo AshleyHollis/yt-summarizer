@@ -113,15 +113,12 @@ interface Session {
 ```
 
 **Usage**:
+
 ```tsx
 import { AuthProvider } from '@/contexts/AuthContext';
 
 export default function RootLayout({ children }) {
-  return (
-    <AuthProvider>
-      {children}
-    </AuthProvider>
-  );
+  return <AuthProvider>{children}</AuthProvider>;
 }
 ```
 
@@ -134,6 +131,7 @@ const { user, isLoading, isAuthenticated, login, logout } = useAuth();
 ```
 
 **Returns**:
+
 - `user`: Current user object or `null`
 - `isLoading`: Boolean indicating if auth state is loading
 - `isAuthenticated`: Boolean indicating if user is authenticated
@@ -194,13 +192,13 @@ Helper functions for working with authentication data.
 
 ```typescript
 // Check if user has specific role
-hasRole(user, 'admin') // => boolean
+hasRole(user, 'admin'); // => boolean
 
 // Get user display name
-getUserDisplayName(user) // => string
+getUserDisplayName(user); // => string
 
 // Check if session is expired
-isSessionExpired(session) // => boolean
+isSessionExpired(session); // => boolean
 ```
 
 ---
@@ -314,7 +312,7 @@ import { RoleBasedComponent } from '@/components/auth/RoleBasedComponent';
 
 <RoleBasedComponent requiredRole="admin">
   <AdminDashboard />
-</RoleBasedComponent>
+</RoleBasedComponent>;
 ```
 
 #### Programmatic Checks
@@ -353,8 +351,8 @@ The API uses session cookies for authentication (set by the Next.js frontend):
 ```typescript
 // In API request
 fetch('/api/auth/me', {
-  credentials: 'include' // Send session cookie
-})
+  credentials: 'include', // Send session cookie
+});
 ```
 
 ### FastAPI Integration
@@ -489,9 +487,9 @@ export default function ModeratorDashboard() {
 Update `apps/web/src/components/Navbar.tsx`:
 
 ```tsx
-{hasRole(user, 'moderator') && (
-  <Link href="/moderator">Moderator</Link>
-)}
+{
+  hasRole(user, 'moderator') && <Link href="/moderator">Moderator</Link>;
+}
 ```
 
 ### 6. Deploy Changes
@@ -630,6 +628,7 @@ AUTH0_CLIENT_SECRET=<your-client-secret>
 ```
 
 Generate `AUTH0_SECRET`:
+
 ```bash
 openssl rand -hex 32
 ```
@@ -653,6 +652,7 @@ AUTH0_BASE_URL=https://your-domain.com
 **Cause**: Session cookie not sent or expired
 
 **Solution**:
+
 1. Check if session cookie is present in browser DevTools
 2. Verify `credentials: 'include'` is set in fetch requests
 3. Check if session has expired (default: 7 days)
@@ -672,6 +672,7 @@ export AUTH0_USER_TEST_PASSWORD="<from-key-vault>"
 ```
 
 Retrieve from Key Vault:
+
 ```bash
 az keyvault secret show --vault-name yt-summarizer-kv --name auth0-admin-test-password --query value -o tsv
 ```
@@ -694,6 +695,7 @@ export const config = {
 **Cause**: Auth0 Action not triggered or misconfigured
 
 **Solution**:
+
 1. Verify Action is deployed in Auth0 Dashboard
 2. Check Action is bound to "post-login" trigger
 3. View Action logs in Auth0 Dashboard for errors

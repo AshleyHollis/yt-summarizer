@@ -25,13 +25,10 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
   /**
    * Skip all tests if auth is not configured
    */
-  test.skip(
-    () => {
-      const authFile = path.join(__dirname, '../playwright/.auth/user.json');
-      return !fs.existsSync(authFile);
-    },
-    'Auth0 not configured - set AUTH0_* environment variables to run auth tests'
-  );
+  test.skip(() => {
+    const authFile = path.join(__dirname, '../playwright/.auth/user.json');
+    return !fs.existsSync(authFile);
+  }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
   test.describe('Admin User Navigation', () => {
     /**

@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from '@playwright/test';
 
 /**
  * E2E tests for Chat Response Quality
@@ -25,10 +25,10 @@ import { test, expect, Page } from "@playwright/test";
  */
 
 async function submitQuery(page: Page, query: string): Promise<void> {
-  const input = page.getByPlaceholder("Ask about your videos...");
+  const input = page.getByPlaceholder('Ask about your videos...');
   await expect(input).toBeVisible({ timeout: 10000 });
   await input.fill(query);
-  await input.press("Enter");
+  await input.press('Enter');
 }
 
 async function waitForResponse(page: Page, timeout = 60000): Promise<void> {
@@ -58,16 +58,16 @@ async function getResponseText(page: Page): Promise<string> {
   return texts.join(' ');
 }
 
-test.describe("Chat Response Quality", () => {
+test.describe('Chat Response Quality', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // Navigate with chat=open to have the sidebar open by default
-    await page.goto("/library?chat=open");
-    await page.waitForLoadState("networkidle");
+    await page.goto('/library?chat=open');
+    await page.waitForLoadState('networkidle');
   });
 
-  test("push-up query returns accurate content with proper citations", async ({ page }) => {
-    await submitQuery(page, "How do I do a proper push-up with good form?");
+  test('push-up query returns accurate content with proper citations', async ({ page }) => {
+    await submitQuery(page, 'How do I do a proper push-up with good form?');
     await waitForResponse(page);
 
     // 1. Should show video cards (indicated by video links)
@@ -75,22 +75,22 @@ test.describe("Chat Response Quality", () => {
     await expect(videoLinks.first()).toBeVisible();
 
     // 2. Should have "Recommended Videos" section
-    await expect(page.getByText("Recommended Videos")).toBeVisible();
+    await expect(page.getByText('Recommended Videos')).toBeVisible();
 
     // 3. Response should mention key push-up concepts (form cues from the videos)
     const pageContent = await page.content();
     const lowerContent = pageContent.toLowerCase();
 
     // Should mention at least some of these push-up form cues
-    const formCues = ["plank", "elbow", "shoulder", "chest", "straight", "body", "core", "arms"];
-    const foundCues = formCues.filter(cue => lowerContent.includes(cue));
+    const formCues = ['plank', 'elbow', 'shoulder', 'chest', 'straight', 'body', 'core', 'arms'];
+    const foundCues = formCues.filter((cue) => lowerContent.includes(cue));
     expect(foundCues.length).toBeGreaterThan(2);
 
     // 4. Should cite the push-up videos (check for video titles)
     const hasPushUpVideo =
-      lowerContent.includes("perfect push up") ||
-      lowerContent.includes("the push-up") ||
-      lowerContent.includes("push up");
+      lowerContent.includes('perfect push up') ||
+      lowerContent.includes('the push-up') ||
+      lowerContent.includes('push up');
     expect(hasPushUpVideo).toBe(true);
 
     // 5. Video cards should link to video detail pages
@@ -98,8 +98,8 @@ test.describe("Chat Response Quality", () => {
     expect(linkCount).toBeGreaterThan(0);
   });
 
-  test("kettlebell query returns content from Pavel Tsatsouline video", async ({ page }) => {
-    await submitQuery(page, "Tell me about kettlebell training techniques");
+  test('kettlebell query returns content from Pavel Tsatsouline video', async ({ page }) => {
+    await submitQuery(page, 'Tell me about kettlebell training techniques');
     await waitForResponse(page);
 
     // 1. Should show video cards
@@ -112,10 +112,10 @@ test.describe("Chat Response Quality", () => {
 
     // Should mention kettlebell-related content
     const hasKettlebellContent =
-      lowerContent.includes("kettlebell") ||
-      lowerContent.includes("pavel") ||
-      lowerContent.includes("swing") ||
-      lowerContent.includes("cassiusk");
+      lowerContent.includes('kettlebell') ||
+      lowerContent.includes('pavel') ||
+      lowerContent.includes('swing') ||
+      lowerContent.includes('cassiusk');
     expect(hasKettlebellContent).toBe(true);
 
     // 3. Should have proper video card structure
@@ -124,8 +124,8 @@ test.describe("Chat Response Quality", () => {
 
   // Skip: Heavy clubs video is not in the seeded test data
   // To enable: Add Mark Wildman's heavy clubs video to global-setup.ts TEST_VIDEOS
-  test.skip("heavy clubs query returns Mark Wildman video content", async ({ page }) => {
-    await submitQuery(page, "What should beginners know about heavy clubs?");
+  test.skip('heavy clubs query returns Mark Wildman video content', async ({ page }) => {
+    await submitQuery(page, 'What should beginners know about heavy clubs?');
     await waitForResponse(page);
 
     // 1. Should show video cards
@@ -136,18 +136,18 @@ test.describe("Chat Response Quality", () => {
     const lowerContent = pageContent.toLowerCase();
 
     const hasHeavyClubsContent =
-      lowerContent.includes("heavy club") ||
-      lowerContent.includes("mark wildman") ||
-      lowerContent.includes("beginner") ||
-      lowerContent.includes("club");
+      lowerContent.includes('heavy club') ||
+      lowerContent.includes('mark wildman') ||
+      lowerContent.includes('beginner') ||
+      lowerContent.includes('club');
     expect(hasHeavyClubsContent).toBe(true);
 
     // 3. Should have video card linking to the heavy clubs video
-    await expect(page.getByText("The Key Part of Heavy Clubs").first()).toBeVisible();
+    await expect(page.getByText('The Key Part of Heavy Clubs').first()).toBeVisible();
   });
 
-  test("multi-topic query returns multiple relevant videos", async ({ page }) => {
-    await submitQuery(page, "What exercises can I do for a full body workout?");
+  test('multi-topic query returns multiple relevant videos', async ({ page }) => {
+    await submitQuery(page, 'What exercises can I do for a full body workout?');
     await waitForResponse(page, 60000);
 
     // Response should include citations - check for any of these indicators:
@@ -159,9 +159,9 @@ test.describe("Chat Response Quality", () => {
     const sourcesSection = page.getByText('Sources');
 
     // At least one of these should be present
-    const hasVideoLinks = await videoLinks.count() > 0;
-    const hasCitations = await citations.count() > 0;
-    const hasSources = await sourcesSection.count() > 0;
+    const hasVideoLinks = (await videoLinks.count()) > 0;
+    const hasCitations = (await citations.count()) > 0;
+    const hasSources = (await sourcesSection.count()) > 0;
 
     expect(hasVideoLinks || hasCitations || hasSources).toBe(true);
 
@@ -171,16 +171,16 @@ test.describe("Chat Response Quality", () => {
 
     // Should mention exercise-related content
     const hasExerciseContent =
-      lowerContent.includes("exercise") ||
-      lowerContent.includes("push") ||
-      lowerContent.includes("kettlebell") ||
-      lowerContent.includes("workout") ||
-      lowerContent.includes("training");
+      lowerContent.includes('exercise') ||
+      lowerContent.includes('push') ||
+      lowerContent.includes('kettlebell') ||
+      lowerContent.includes('workout') ||
+      lowerContent.includes('training');
     expect(hasExerciseContent).toBe(true);
   });
 
-  test("response includes synthesized answer not just raw transcript", async ({ page }) => {
-    await submitQuery(page, "What are the common mistakes when doing push-ups?");
+  test('response includes synthesized answer not just raw transcript', async ({ page }) => {
+    await submitQuery(page, 'What are the common mistakes when doing push-ups?');
     await waitForResponse(page);
 
     // 1. Should show video cards
@@ -191,19 +191,19 @@ test.describe("Chat Response Quality", () => {
 
     // Should have structured content - check for lists or paragraphs in HTML
     const hasStructuredContent =
-      pageContent.includes("<li") ||
-      pageContent.includes("<ul") ||
-      pageContent.includes("<ol") ||
-      pageContent.includes("<p") ||
-      pageContent.includes("list");
+      pageContent.includes('<li') ||
+      pageContent.includes('<ul') ||
+      pageContent.includes('<ol') ||
+      pageContent.includes('<p') ||
+      pageContent.includes('list');
     expect(hasStructuredContent).toBe(true);
 
     // 3. Should mention "mistakes" since that's what was asked
-    expect(pageContent.toLowerCase()).toContain("mistake");
+    expect(pageContent.toLowerCase()).toContain('mistake');
   });
 
-  test("irrelevant query shows Limited Information indicator", async ({ page }) => {
-    await submitQuery(page, "How do I bake a chocolate cake?");
+  test('irrelevant query shows Limited Information indicator', async ({ page }) => {
+    await submitQuery(page, 'How do I bake a chocolate cake?');
 
     // Wait for the "Limited Information" response
     await page.waitForSelector('text="Limited Information"', { timeout: 30000 });
@@ -213,10 +213,10 @@ test.describe("Chat Response Quality", () => {
     await expect(videoLinks).toHaveCount(0);
 
     // 2. Should show the "No relevant content" message
-    await expect(page.getByText("No relevant content found")).toBeVisible();
+    await expect(page.getByText('No relevant content found')).toBeVisible();
 
     // 3. Should NOT show "Recommended Videos" section
-    await expect(page.getByText("Recommended Videos")).not.toBeVisible();
+    await expect(page.getByText('Recommended Videos')).not.toBeVisible();
 
     // 4. The LLM might still provide helpful general info (that's fine)
     // but should acknowledge the library doesn't have this content
@@ -224,8 +224,8 @@ test.describe("Chat Response Quality", () => {
     expect(pageContent.toLowerCase()).toMatch(/don't have|didn't find|no.*video|not.*library/i);
   });
 
-  test("video card links navigate to correct video detail page", async ({ page }) => {
-    await submitQuery(page, "Show me push-up tutorials");
+  test('video card links navigate to correct video detail page', async ({ page }) => {
+    await submitQuery(page, 'Show me push-up tutorials');
     await waitForResponse(page);
 
     // Find a video link - could be in /videos/ or /library/ paths
@@ -234,14 +234,14 @@ test.describe("Chat Response Quality", () => {
     // If no links found, skip this test (citations may be text-only)
     const linkCount = await videoLink.count();
     if (linkCount === 0) {
-      console.log("No video links found in copilot response - citations may be text-only");
+      console.log('No video links found in copilot response - citations may be text-only');
       return;
     }
 
     await expect(videoLink).toBeVisible();
 
     // Get the href before clicking
-    const href = await videoLink.getAttribute("href");
+    const href = await videoLink.getAttribute('href');
     expect(href).toBeDefined();
 
     // Click the link using JavaScript to avoid viewport issues
@@ -257,68 +257,73 @@ test.describe("Chat Response Quality", () => {
     await page.waitForURL(/\/videos\/|\/library\//, { timeout: 10000 });
 
     // Video detail page should load with video info
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState('networkidle');
 
     // Should show video content - look for headings or article content
-    const hasHeading = await page.locator("h1, h2, h3").first().isVisible().catch(() => false);
-    const hasArticle = await page.locator("article").count() > 0;
-    const hasVideoPlayer = await page.locator("video, iframe, [class*='player']").count() > 0;
+    const hasHeading = await page
+      .locator('h1, h2, h3')
+      .first()
+      .isVisible()
+      .catch(() => false);
+    const hasArticle = (await page.locator('article').count()) > 0;
+    const hasVideoPlayer = (await page.locator("video, iframe, [class*='player']").count()) > 0;
 
     expect(hasHeading || hasArticle || hasVideoPlayer).toBe(true);
   });
 });
 
-test.describe("Chat Edge Cases", () => {
+test.describe('Chat Edge Cases', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // Navigate with chat=open to have the sidebar open by default
-    await page.goto("/library?chat=open");
-    await page.waitForLoadState("networkidle");
+    await page.goto('/library?chat=open');
+    await page.waitForLoadState('networkidle');
   });
 
-  test("handles empty and whitespace-only queries gracefully", async ({ page }) => {
-    const input = page.getByPlaceholder("Ask about your videos...");
+  test('handles empty and whitespace-only queries gracefully', async ({ page }) => {
+    const input = page.getByPlaceholder('Ask about your videos...');
     await expect(input).toBeVisible();
 
     // Try to submit empty query - send button should be disabled
-    const sendButton = page.getByRole("button", { name: /send/i });
+    const sendButton = page.getByRole('button', { name: /send/i });
 
     // With empty input, send should be disabled
     await expect(sendButton).toBeDisabled();
 
     // Try whitespace only
-    await input.fill("   ");
+    await input.fill('   ');
     // Send should still be disabled or the query should be trimmed
     const isDisabled = await sendButton.isDisabled();
 
     // Either button is disabled OR if we can submit, it handles gracefully
     if (!isDisabled) {
-      await input.press("Enter");
+      await input.press('Enter');
       // Should not crash - either shows error or ignores
       await page.waitForTimeout(2000);
       await expect(page).toHaveURL(/library/);
     }
   });
 
-  test("handles special characters in query", async ({ page }) => {
-    await submitQuery(page, "What about push-ups? (with good form) & proper technique!");
+  test('handles special characters in query', async ({ page }) => {
+    await submitQuery(page, 'What about push-ups? (with good form) & proper technique!');
 
     // Should still work and not crash
     await waitForResponse(page);
 
     // Should get a response (either video cards or "limited information")
     const hasResponse =
-      await page.locator('a[href*="/videos/"]').count() > 0 ||
-      await page.locator('text="Limited Information"').count() > 0;
+      (await page.locator('a[href*="/videos/"]').count()) > 0 ||
+      (await page.locator('text="Limited Information"').count()) > 0;
     expect(hasResponse).toBe(true);
   });
 
-  test("handles very long query", async ({ page }) => {
-    const longQuery = "I want to learn about push-ups, specifically the proper form, " +
-      "common mistakes, how to progress from beginner to advanced, " +
-      "what muscles are worked, how many reps and sets I should do, " +
-      "and any tips for people who have wrist problems. " +
-      "Also interested in variations like diamond push-ups, wide push-ups, and decline push-ups.";
+  test('handles very long query', async ({ page }) => {
+    const longQuery =
+      'I want to learn about push-ups, specifically the proper form, ' +
+      'common mistakes, how to progress from beginner to advanced, ' +
+      'what muscles are worked, how many reps and sets I should do, ' +
+      'and any tips for people who have wrist problems. ' +
+      'Also interested in variations like diamond push-ups, wide push-ups, and decline push-ups.';
 
     await submitQuery(page, longQuery);
     await waitForResponse(page);
@@ -328,18 +333,18 @@ test.describe("Chat Edge Cases", () => {
     await expect(videoLinks.first()).toBeVisible();
   });
 
-  test("subsequent queries work correctly", async ({ page }) => {
+  test('subsequent queries work correctly', async ({ page }) => {
     // First query
-    await submitQuery(page, "How do push-ups work?");
+    await submitQuery(page, 'How do push-ups work?');
     await waitForResponse(page);
     await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible();
 
     // Second query - different topic
-    await submitQuery(page, "What about kettlebells?");
+    await submitQuery(page, 'What about kettlebells?');
     await waitForResponse(page);
 
     // Should show new results
     const pageContent = await page.content();
-    expect(pageContent.toLowerCase()).toContain("kettlebell");
+    expect(pageContent.toLowerCase()).toContain('kettlebell');
   });
 });

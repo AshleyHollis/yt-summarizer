@@ -57,12 +57,9 @@ export function LogoutButton({ className = '', variant = 'primary' }: LogoutButt
 
   // Variant styles
   const variantStyles = {
-    primary:
-      'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-    secondary:
-      'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500',
-    text:
-      'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+    primary: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+    secondary: 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500',
+    text: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
   };
 
   return (

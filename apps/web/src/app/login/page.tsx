@@ -34,12 +34,8 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Logo/Branding */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              YT Summarizer
-            </h1>
-            <p className="text-gray-600">
-              Get instant AI-powered summaries of YouTube videos
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">YT Summarizer</h1>
+            <p className="text-gray-600">Get instant AI-powered summaries of YouTube videos</p>
           </div>
 
           {/* Login Form */}
@@ -62,9 +58,7 @@ export default function LoginPage() {
           <div className="mt-8 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-600 text-center">
               New to YT Summarizer?{' '}
-              <span className="text-blue-600 font-medium">
-                Create an account by signing in
-              </span>
+              <span className="text-blue-600 font-medium">Create an account by signing in</span>
             </p>
           </div>
         </div>

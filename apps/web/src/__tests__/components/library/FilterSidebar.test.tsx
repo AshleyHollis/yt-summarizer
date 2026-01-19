@@ -64,7 +64,7 @@ describe('FilterSidebar', () => {
       const options = statusSelect.querySelectorAll('option');
       const optionValues = Array.from(options).map((opt) => opt.value);
 
-      expect(optionValues).toContain('');  // All Status
+      expect(optionValues).toContain(''); // All Status
       expect(optionValues).toContain('completed');
       expect(optionValues).toContain('processing');
       expect(optionValues).toContain('pending');
@@ -130,24 +130,21 @@ describe('FilterSidebar', () => {
 
     const validApiStatuses = ['pending', 'processing', 'completed', 'failed'];
 
-    it.each(validApiStatuses)(
-      'status "%s" is a valid filter option',
-      (status) => {
-        render(
-          <FilterSidebar
-            filters={defaultFilters}
-            onFilterChange={mockOnFilterChange}
-            onClearFilters={mockOnClearFilters}
-          />
-        );
+    it.each(validApiStatuses)('status "%s" is a valid filter option', (status) => {
+      render(
+        <FilterSidebar
+          filters={defaultFilters}
+          onFilterChange={mockOnFilterChange}
+          onClearFilters={mockOnClearFilters}
+        />
+      );
 
-        const statusSelect = screen.getByRole('combobox', { name: /status/i });
-        const options = statusSelect.querySelectorAll('option');
-        const optionValues = Array.from(options).map((opt) => opt.value);
+      const statusSelect = screen.getByRole('combobox', { name: /status/i });
+      const options = statusSelect.querySelectorAll('option');
+      const optionValues = Array.from(options).map((opt) => opt.value);
 
-        expect(optionValues).toContain(status);
-      }
-    );
+      expect(optionValues).toContain(status);
+    });
 
     it('does not include invalid status values like "ready"', () => {
       render(

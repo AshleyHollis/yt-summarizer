@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * CustomHeader - CopilotKit Custom Sub-Component
@@ -16,12 +16,23 @@
  * @see https://docs.copilotkit.ai/custom-look-and-feel/bring-your-own-components
  */
 
-import { MessageCircle, MessageSquare, ChevronDown, ChevronUp, Plus, X, Maximize2, Minimize2, Square, Columns2 } from "lucide-react";
-import { useRef, useEffect } from "react";
-import { ThreadList, Thread } from "../ThreadList";
-import { ScopeIndicator } from "./ScopeIndicator";
+import {
+  MessageCircle,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  X,
+  Maximize2,
+  Minimize2,
+  Square,
+  Columns2,
+} from 'lucide-react';
+import { useRef, useEffect } from 'react';
+import { ThreadList, Thread } from '../ThreadList';
+import { ScopeIndicator } from './ScopeIndicator';
 
-type SizeMode = "compact" | "default" | "half" | "full";
+type SizeMode = 'compact' | 'default' | 'half' | 'full';
 
 interface CustomHeaderProps {
   /** List of chat threads */
@@ -51,13 +62,13 @@ interface CustomHeaderProps {
 }
 
 const SIZE_CONFIG: Record<SizeMode, { label: string }> = {
-  compact: { label: "Compact (20%)" },
-  default: { label: "Default (30%)" },
-  half: { label: "Half screen (50%)" },
-  full: { label: "Full screen" },
+  compact: { label: 'Compact (20%)' },
+  default: { label: 'Default (30%)' },
+  half: { label: 'Half screen (50%)' },
+  full: { label: 'Full screen' },
 };
 
-const SIZE_MODES: SizeMode[] = ["compact", "default", "half", "full"];
+const SIZE_MODES: SizeMode[] = ['compact', 'default', 'half', 'full'];
 
 export function CustomHeader({
   threads,
@@ -80,27 +91,34 @@ export function CustomHeader({
     if (threadsCollapsed) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (threadsDropdownRef.current && !threadsDropdownRef.current.contains(event.target as Node)) {
+      if (
+        threadsDropdownRef.current &&
+        !threadsDropdownRef.current.contains(event.target as Node)
+      ) {
         onToggleThreads();
       }
     };
 
     const timeoutId = setTimeout(() => {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside);
     }, 0);
 
     return () => {
       clearTimeout(timeoutId);
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [threadsCollapsed, onToggleThreads]);
 
   const getSizeIcon = () => {
     switch (sizeMode) {
-      case "compact": return <Maximize2 className="w-4 h-4" />;
-      case "default": return <Columns2 className="w-4 h-4" />;
-      case "half": return <Square className="w-4 h-4" />;
-      case "full": return <Minimize2 className="w-4 h-4" />;
+      case 'compact':
+        return <Maximize2 className="w-4 h-4" />;
+      case 'default':
+        return <Columns2 className="w-4 h-4" />;
+      case 'half':
+        return <Square className="w-4 h-4" />;
+      case 'full':
+        return <Minimize2 className="w-4 h-4" />;
     }
   };
 
@@ -130,7 +148,7 @@ export function CustomHeader({
             <button
               onClick={onToggleThreads}
               className="group flex flex-1 items-center gap-1.5 min-w-0 w-full border border-transparent hover:border-[var(--copilot-kit-primary-color)] hover:bg-[var(--copilot-kit-secondary-color)] rounded-lg px-2 py-1.5 transition-all duration-150"
-              title={threadsCollapsed ? "Show all threads" : "Hide threads"}
+              title={threadsCollapsed ? 'Show all threads' : 'Hide threads'}
             >
               <MessageSquare className="w-3.5 h-3.5 text-[var(--copilot-kit-muted-color)] group-hover:text-[var(--copilot-kit-primary-color)] flex-shrink-0 transition-colors" />
               <span className="text-sm font-medium leading-none text-[var(--copilot-kit-secondary-contrast-color)] overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-left">

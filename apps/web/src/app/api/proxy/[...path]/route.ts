@@ -97,16 +97,12 @@ async function handler(req: NextRequest, props: { params: Promise<{ path: string
     return new NextResponse(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: responseHeaders
+      headers: responseHeaders,
     });
-
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Proxy Request Failed:', message);
-    return NextResponse.json(
-      { error: 'Proxy Request Failed', details: message },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: 'Proxy Request Failed', details: message }, { status: 502 });
   }
 }
 

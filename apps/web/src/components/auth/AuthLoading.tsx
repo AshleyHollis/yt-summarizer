@@ -51,14 +51,7 @@ function Spinner({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) {
       fill="none"
       viewBox="0 0 24 24"
     >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path
         className="opacity-75"
         fill="currentColor"
@@ -132,11 +125,7 @@ export function AuthLoading({
       <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
         <div className="flex flex-col items-center gap-4">
           <Spinner size={size} />
-          {message && (
-            <p className="text-gray-600 text-lg font-medium animate-pulse">
-              {message}
-            </p>
-          )}
+          {message && <p className="text-gray-600 text-lg font-medium animate-pulse">{message}</p>}
         </div>
       </div>
     );
@@ -146,11 +135,7 @@ export function AuthLoading({
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-8">
       <Spinner size={size} />
-      {message && (
-        <p className="text-gray-600 text-sm animate-pulse">
-          {message}
-        </p>
-      )}
+      {message && <p className="text-gray-600 text-sm animate-pulse">{message}</p>}
     </div>
   );
 }

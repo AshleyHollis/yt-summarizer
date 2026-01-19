@@ -27,13 +27,10 @@ test.describe('Sign Out Flow @auth', () => {
   /**
    * Skip all tests if auth is not configured
    */
-  test.skip(
-    () => {
-      const authFile = path.join(__dirname, '../playwright/.auth/user.json');
-      return !fs.existsSync(authFile);
-    },
-    'Auth0 not configured - set AUTH0_* environment variables to run auth tests'
-  );
+  test.skip(() => {
+    const authFile = path.join(__dirname, '../playwright/.auth/user.json');
+    return !fs.existsSync(authFile);
+  }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
   test.describe('Logout Button Interaction', () => {
     test('logout button is visible for authenticated users', async ({ page }) => {
@@ -67,9 +64,12 @@ test.describe('Sign Out Flow @auth', () => {
 
       // Should navigate to logout endpoint or login page
       // The URL will change as part of the logout process
-      await page.waitForURL((url) => {
-        return url.pathname.includes('/login') || url.pathname.includes('/auth/logout');
-      }, { timeout: 10000 });
+      await page.waitForURL(
+        (url) => {
+          return url.pathname.includes('/login') || url.pathname.includes('/auth/logout');
+        },
+        { timeout: 10000 }
+      );
     });
   });
 

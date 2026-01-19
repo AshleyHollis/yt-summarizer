@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { Clock, ExternalLink } from "lucide-react";
+import { Clock, ExternalLink } from 'lucide-react';
 
 /**
  * Known garbage text prefixes that occasionally appear in AI-generated descriptions
  * due to model hallucinations or parsing errors. These should be filtered out.
  */
-const GARBAGE_TEXT_PREFIXES = ["orm"] as const;
+const GARBAGE_TEXT_PREFIXES = ['orm'] as const;
 
 interface KeyMoment {
   timestamp: string;
@@ -25,14 +25,15 @@ interface KeyMomentsListProps {
  * Each moment includes a clickable timestamp link to YouTube.
  * US5 - Transparency feature.
  */
-export function KeyMomentsList({ moments, className = "" }: KeyMomentsListProps) {
+export function KeyMomentsList({ moments, className = '' }: KeyMomentsListProps) {
   // Filter out moments with empty/invalid timestamps or descriptions
-  const validMoments = moments.filter(m =>
-    m.timestamp &&
-    m.timestamp !== "0:00" &&
-    m.description &&
-    m.description.length > 5 &&
-    !GARBAGE_TEXT_PREFIXES.some(prefix => m.description.startsWith(prefix))
+  const validMoments = moments.filter(
+    (m) =>
+      m.timestamp &&
+      m.timestamp !== '0:00' &&
+      m.description &&
+      m.description.length > 5 &&
+      !GARBAGE_TEXT_PREFIXES.some((prefix) => m.description.startsWith(prefix))
   );
 
   if (validMoments.length === 0) {

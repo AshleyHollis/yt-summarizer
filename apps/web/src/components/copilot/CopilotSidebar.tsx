@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { Suspense } from "react";
+import { Suspense } from 'react';
 // Using CopilotKit Custom Sub-Components pattern
 // for proper header customization without CSS conflicts
-import { ThreadedCopilotSidebar } from "./ThreadedCopilotSidebar";
+import { ThreadedCopilotSidebar } from './ThreadedCopilotSidebar';
 
 // Wrap ThreadedCopilotSidebar in Suspense since it uses useSearchParams
 interface CopilotSidebarProps {

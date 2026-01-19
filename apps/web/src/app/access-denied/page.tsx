@@ -47,9 +47,7 @@ export default function AccessDenied() {
             </svg>
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-xl text-gray-600">
-            You don't have permission to access this resource
-          </p>
+          <p className="text-xl text-gray-600">You don't have permission to access this resource</p>
         </div>
 
         {/* Error Details Card */}

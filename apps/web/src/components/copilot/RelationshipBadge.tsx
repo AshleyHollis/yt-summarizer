@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { Link2, Layers } from "lucide-react";
+import { Link2, Layers } from 'lucide-react';
 
 interface RelationshipBadgeProps {
   relatedTo: string;
@@ -12,17 +12,14 @@ interface RelationshipBadgeProps {
  * Displays series/related info like "Part of the Kettlebell Fundamentals series".
  * US5 - Transparency feature.
  */
-export function RelationshipBadge({
-  relatedTo,
-  className = "",
-}: RelationshipBadgeProps) {
+export function RelationshipBadge({ relatedTo, className = '' }: RelationshipBadgeProps) {
   if (!relatedTo) {
     return null;
   }
 
   // Determine icon based on relationship content
-  const isSeries = relatedTo.toLowerCase().includes("series") ||
-                   relatedTo.toLowerCase().includes("part");
+  const isSeries =
+    relatedTo.toLowerCase().includes('series') || relatedTo.toLowerCase().includes('part');
   const Icon = isSeries ? Layers : Link2;
 
   return (

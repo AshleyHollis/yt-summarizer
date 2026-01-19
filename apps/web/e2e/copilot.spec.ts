@@ -25,16 +25,15 @@ test.describe('Copilot Feature', () => {
       await page.waitForLoadState('networkidle');
 
       // Check for copilot sidebar or toggle button
-      const sidebar = page.locator('[data-testid="copilot-sidebar"]').or(
-        page.locator('.copilot-sidebar')
-      ).or(
-        page.locator('[class*="CopilotSidebar"]')
-      );
+      const sidebar = page
+        .locator('[data-testid="copilot-sidebar"]')
+        .or(page.locator('.copilot-sidebar'))
+        .or(page.locator('[class*="CopilotSidebar"]'));
 
       // Either sidebar is visible or there's a toggle button (FAB)
-      const toggle = page.getByRole('button', { name: /copilot|chat|ask|assistant/i }).or(
-        page.locator('[data-testid="copilot-fab"]')
-      );
+      const toggle = page
+        .getByRole('button', { name: /copilot|chat|ask|assistant/i })
+        .or(page.locator('[data-testid="copilot-fab"]'));
 
       const sidebarVisible = await sidebar.isVisible().catch(() => false);
       const toggleVisible = await toggle.isVisible().catch(() => false);
@@ -48,7 +47,9 @@ test.describe('Copilot Feature', () => {
       await page.waitForLoadState('networkidle');
 
       // Look for copilot elements
-      const copilotElements = page.locator('[class*="copilot" i], [class*="Copilot" i], [data-copilot]');
+      const copilotElements = page.locator(
+        '[class*="copilot" i], [class*="Copilot" i], [data-copilot]'
+      );
 
       // May or may not be visible on submit page depending on implementation
       // Just verify page loads correctly
@@ -66,11 +67,10 @@ test.describe('Copilot Feature', () => {
     test('has query input field', async ({ page }) => {
       // The copilot chat input should be visible on the library page
       // When chat=open, the sidebar should show the chat input
-      const chatInput = page.getByPlaceholder('Ask about your videos...').or(
-        page.locator('[placeholder*="ask" i]')
-      ).or(
-        page.getByRole('textbox', { name: /ask|message/i })
-      );
+      const chatInput = page
+        .getByPlaceholder('Ask about your videos...')
+        .or(page.locator('[placeholder*="ask" i]'))
+        .or(page.getByRole('textbox', { name: /ask|message/i }));
 
       // Give the page time to fully render the chat interface
       await page.waitForTimeout(2000);
@@ -99,9 +99,9 @@ test.describe('Copilot Feature', () => {
     test('scope indicator is visible in copilot header', async ({ page }) => {
       // The scope indicator shows what knowledge sources are being searched
       // It should display "Your Videos", "AI Knowledge", etc.
-      const scopeIndicator = page.locator('[data-testid="scope-indicator"]').or(
-        page.getByText(/your videos|all videos|library/i)
-      );
+      const scopeIndicator = page
+        .locator('[data-testid="scope-indicator"]')
+        .or(page.getByText(/your videos|all videos|library/i));
 
       await expect(scopeIndicator.first()).toBeVisible({ timeout: 5000 });
     });
@@ -125,12 +125,14 @@ test.describe('Copilot Feature', () => {
       // Test that the API endpoints exist and return proper responses
       // These may fail without proper auth/setup, but we're testing route existence
 
-      const coverageResponse = await request.post('/api/v1/copilot/coverage', {
-        data: {},
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }).catch(e => null);
+      const coverageResponse = await request
+        .post('/api/v1/copilot/coverage', {
+          data: {},
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        .catch((e) => null);
 
       // API might not be running, but if it is, should not be 404
       if (coverageResponse) {
@@ -139,12 +141,14 @@ test.describe('Copilot Feature', () => {
     });
 
     test('copilot topics endpoint responds', async ({ request }) => {
-      const topicsResponse = await request.post('/api/v1/copilot/topics', {
-        data: {},
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }).catch(e => null);
+      const topicsResponse = await request
+        .post('/api/v1/copilot/topics', {
+          data: {},
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        .catch((e) => null);
 
       if (topicsResponse) {
         expect([200, 500, 503]).toContain(topicsResponse.status());
@@ -152,14 +156,16 @@ test.describe('Copilot Feature', () => {
     });
 
     test('copilot query endpoint accepts POST', async ({ request }) => {
-      const queryResponse = await request.post('/api/v1/copilot/query', {
-        data: {
-          query: 'Test query',
-        },
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }).catch(e => null);
+      const queryResponse = await request
+        .post('/api/v1/copilot/query', {
+          data: {
+            query: 'Test query',
+          },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        .catch((e) => null);
 
       if (queryResponse) {
         // Should not be 404 or 405
@@ -172,7 +178,7 @@ test.describe('Copilot Feature', () => {
     test('library page loads without errors', async ({ page }) => {
       // Start capturing console errors BEFORE navigating
       const errors: string[] = [];
-      page.on('console', msg => {
+      page.on('console', (msg) => {
         if (msg.type() === 'error') {
           errors.push(msg.text());
         }
@@ -182,7 +188,7 @@ test.describe('Copilot Feature', () => {
       await page.waitForLoadState('networkidle');
 
       // Filter out expected/non-critical errors (dev mode warnings, resource loads, etc.)
-      const criticalErrors = errors.filter(e => {
+      const criticalErrors = errors.filter((e) => {
         const lowerError = e.toLowerCase();
         return !(
           lowerError.includes('failed to fetch') ||
@@ -195,7 +201,7 @@ test.describe('Copilot Feature', () => {
           lowerError.includes('favicon') ||
           lowerError.includes('copilotkit') ||
           lowerError.includes('dev mode') ||
-          lowerError.includes('hydrat') ||  // hydration warnings
+          lowerError.includes('hydrat') || // hydration warnings
           lowerError.includes('warning') ||
           lowerError.includes('deprecated')
         );
@@ -230,14 +236,15 @@ test.describe('Copilot Feature', () => {
       // Get all text inputs
       const inputs = page.locator('input[type="text"], textarea');
 
-      for (let i = 0; i < await inputs.count(); i++) {
+      for (let i = 0; i < (await inputs.count()); i++) {
         const input = inputs.nth(i);
         if (await input.isVisible()) {
           // Should have either aria-label, aria-labelledby, or associated label
-          const hasLabel = await input.getAttribute('aria-label') ||
-                          await input.getAttribute('aria-labelledby') ||
-                          await input.getAttribute('placeholder') ||
-                          await input.getAttribute('id');
+          const hasLabel =
+            (await input.getAttribute('aria-label')) ||
+            (await input.getAttribute('aria-labelledby')) ||
+            (await input.getAttribute('placeholder')) ||
+            (await input.getAttribute('id'));
 
           // Inputs should have some form of labeling
           expect(hasLabel).toBeTruthy();
@@ -250,11 +257,14 @@ test.describe('Copilot Feature', () => {
     /**
      * Helper to submit a query to the copilot.
      */
-    async function submitCopilotQuery(page: import('@playwright/test').Page, query: string): Promise<void> {
-      const queryInput = page.getByPlaceholder("Ask about your videos...");
+    async function submitCopilotQuery(
+      page: import('@playwright/test').Page,
+      query: string
+    ): Promise<void> {
+      const queryInput = page.getByPlaceholder('Ask about your videos...');
       await expect(queryInput).toBeVisible({ timeout: 10000 });
       await queryInput.fill(query);
-      await queryInput.press("Enter");
+      await queryInput.press('Enter');
     }
 
     test.beforeEach(async ({ page }) => {
@@ -286,7 +296,9 @@ test.describe('Copilot Feature', () => {
       await expect(videoLinks.first()).toBeVisible();
     });
 
-    test('negative: returns no video cards for cooking pasta (uncovered topic)', async ({ page }) => {
+    test('negative: returns no video cards for cooking pasta (uncovered topic)', async ({
+      page,
+    }) => {
       await submitCopilotQuery(page, 'How do I cook pasta?');
 
       // Wait for response - look for the "Limited Information" indicator
@@ -300,7 +312,9 @@ test.describe('Copilot Feature', () => {
       await expect(page.getByText('No relevant content found in your library')).toBeVisible();
     });
 
-    test('negative: returns no video cards for quantum physics (uncovered topic)', async ({ page }) => {
+    test('negative: returns no video cards for quantum physics (uncovered topic)', async ({
+      page,
+    }) => {
       await submitCopilotQuery(page, 'Explain quantum entanglement');
 
       // Wait for response
@@ -313,7 +327,9 @@ test.describe('Copilot Feature', () => {
 
     // Skip: Heavy clubs video is not in the seeded test data
     // To enable: Add Mark Wildman's heavy clubs video to global-setup.ts TEST_VIDEOS
-    test.skip('positive: returns results for heavy clubs (specific video topic)', async ({ page }) => {
+    test.skip('positive: returns results for heavy clubs (specific video topic)', async ({
+      page,
+    }) => {
       await submitCopilotQuery(page, 'What are heavy clubs and how do beginners use them?');
 
       // Wait for video cards (allow more time for LLM rate limit retries)
@@ -339,7 +355,10 @@ test.describe('Copilot Feature', () => {
      * Tool results are re-executed when the thread is reloaded.
      */
 
-    test('creates thread with proper message structure when sending query', async ({ page, request }) => {
+    test('creates thread with proper message structure when sending query', async ({
+      page,
+      request,
+    }) => {
       // Navigate to add page with chat open
       await page.goto('/add?chat=open');
       await page.waitForLoadState('networkidle');
@@ -375,14 +394,13 @@ test.describe('Copilot Feature', () => {
       expect(threadData.messages.length).toBeGreaterThan(1);
 
       // Find user messages
-      const userMessages = threadData.messages.filter(
-        (m: { role: string }) => m.role === 'user'
-      );
+      const userMessages = threadData.messages.filter((m: { role: string }) => m.role === 'user');
       expect(userMessages.length).toBeGreaterThan(0);
 
       // Find assistant messages with toolCalls
       const assistantWithToolCalls = threadData.messages.filter(
-        (m: { role: string; toolCalls?: unknown[] }) => m.role === 'assistant' && (m.toolCalls?.length ?? 0) > 0
+        (m: { role: string; toolCalls?: unknown[] }) =>
+          m.role === 'assistant' && (m.toolCalls?.length ?? 0) > 0
       );
 
       // Assistant with tool calls should exist for proper rendering
@@ -430,11 +448,21 @@ test.describe('Copilot Feature', () => {
 
       // Verify the thread loads and shows proper tool UI (not placeholder)
       // Look for "Limited Information" card (tool result UI) or video cards
-      const hasToolUI = await page.locator('text="Limited Information"').isVisible().catch(() => false) ||
-                        await page.locator('a[href*="/videos/"]').isVisible().catch(() => false);
+      const hasToolUI =
+        (await page
+          .locator('text="Limited Information"')
+          .isVisible()
+          .catch(() => false)) ||
+        (await page
+          .locator('a[href*="/videos/"]')
+          .isVisible()
+          .catch(() => false));
 
       // Should NOT show the "interrupted" placeholder message
-      const hasPlaceholder = await page.locator('text="interrupted"').isVisible().catch(() => false);
+      const hasPlaceholder = await page
+        .locator('text="interrupted"')
+        .isVisible()
+        .catch(() => false);
 
       expect(hasToolUI || !hasPlaceholder).toBe(true);
     });
@@ -446,34 +474,36 @@ test.describe('Copilot Feature', () => {
         {
           id: 'user-test-1',
           role: 'user',
-          content: 'Test query for structure validation'
+          content: 'Test query for structure validation',
         },
         {
           id: 'call_test_structure',
           role: 'assistant',
-          toolCalls: [{
-            id: 'call_test_structure',
-            type: 'function',
-            function: {
-              name: 'queryLibrary',
-              arguments: '{"query":"Test query"}'
-            }
-          }]
+          toolCalls: [
+            {
+              id: 'call_test_structure',
+              type: 'function',
+              function: {
+                name: 'queryLibrary',
+                arguments: '{"query":"Test query"}',
+              },
+            },
+          ],
         },
         {
           id: 'tool-result-1',
           role: 'tool',
           content: '{"answer":"Test answer","videoCards":[],"evidence":[]}',
-          toolCallId: 'call_test_structure'
-        }
+          toolCallId: 'call_test_structure',
+        },
       ];
 
       // Create thread via API (uses /messages endpoint which auto-generates thread_id)
       const createResponse = await request.post('http://localhost:8000/api/v1/threads/messages', {
         data: {
           title: 'Structure Test Thread',
-          messages: testMessages
-        }
+          messages: testMessages,
+        },
       });
 
       expect(createResponse.status()).toBe(201);
@@ -489,7 +519,9 @@ test.describe('Copilot Feature', () => {
       // Verify structure preserved
       expect(threadData.messages).toHaveLength(3);
 
-      const assistantMsg = threadData.messages.find((m: { role: string }) => m.role === 'assistant');
+      const assistantMsg = threadData.messages.find(
+        (m: { role: string }) => m.role === 'assistant'
+      );
       expect(assistantMsg.toolCalls).toBeDefined();
       expect(assistantMsg.toolCalls[0].id).toBe('call_test_structure');
       expect(assistantMsg.toolCalls[0].function.name).toBe('queryLibrary');
@@ -508,31 +540,45 @@ test.describe('Copilot Feature', () => {
         {
           id: 'call_first',
           role: 'assistant',
-          toolCalls: [{
-            id: 'call_first',
-            type: 'function',
-            function: { name: 'queryLibrary', arguments: '{"query":"first"}' }
-          }]
+          toolCalls: [
+            {
+              id: 'call_first',
+              type: 'function',
+              function: { name: 'queryLibrary', arguments: '{"query":"first"}' },
+            },
+          ],
         },
-        { id: 'tool-1', role: 'tool', content: '{"answer":"first result"}', toolCallId: 'call_first' },
+        {
+          id: 'tool-1',
+          role: 'tool',
+          content: '{"answer":"first result"}',
+          toolCallId: 'call_first',
+        },
         { id: 'user-2', role: 'user', content: 'Follow up' },
         {
           id: 'call_second',
           role: 'assistant',
-          toolCalls: [{
-            id: 'call_second',
-            type: 'function',
-            function: { name: 'queryLibrary', arguments: '{"query":"second"}' }
-          }]
+          toolCalls: [
+            {
+              id: 'call_second',
+              type: 'function',
+              function: { name: 'queryLibrary', arguments: '{"query":"second"}' },
+            },
+          ],
         },
-        { id: 'tool-2', role: 'tool', content: '{"answer":"second result"}', toolCallId: 'call_second' },
+        {
+          id: 'tool-2',
+          role: 'tool',
+          content: '{"answer":"second result"}',
+          toolCallId: 'call_second',
+        },
       ];
 
       const createResponse = await request.post('http://localhost:8000/api/v1/threads/messages', {
         data: {
           title: 'Multi-Tool Thread Test',
-          messages: testMessages
-        }
+          messages: testMessages,
+        },
       });
 
       expect(createResponse.status()).toBe(201);
@@ -547,7 +593,9 @@ test.describe('Copilot Feature', () => {
       expect(threadData.messages).toHaveLength(6);
 
       // Verify both tool calls present
-      const assistantMsgs = threadData.messages.filter((m: { role: string }) => m.role === 'assistant');
+      const assistantMsgs = threadData.messages.filter(
+        (m: { role: string }) => m.role === 'assistant'
+      );
       expect(assistantMsgs).toHaveLength(2);
       expect(assistantMsgs[0].toolCalls[0].id).toBe('call_first');
       expect(assistantMsgs[1].toolCalls[0].id).toBe('call_second');
@@ -555,7 +603,9 @@ test.describe('Copilot Feature', () => {
       // Verify both tool results present
       const toolMsgs = threadData.messages.filter((m: { role: string }) => m.role === 'tool');
       expect(toolMsgs).toHaveLength(2);
-      expect(toolMsgs.map((m: { toolCallId: string }) => m.toolCallId).sort()).toEqual(['call_first', 'call_second'].sort());
+      expect(toolMsgs.map((m: { toolCallId: string }) => m.toolCallId).sort()).toEqual(
+        ['call_first', 'call_second'].sort()
+      );
 
       // Cleanup
       await request.delete(`http://localhost:8000/api/v1/threads/${threadId}`);

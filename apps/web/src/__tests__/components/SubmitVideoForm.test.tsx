@@ -113,7 +113,10 @@ describe('SubmitVideoForm', () => {
       // Create a deferred promise to control resolution
       let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
-        () => new Promise((resolve) => { resolveSubmit = resolve; })
+        () =>
+          new Promise((resolve) => {
+            resolveSubmit = resolve;
+          })
       );
 
       render(<SubmitVideoForm />);
@@ -130,11 +133,13 @@ describe('SubmitVideoForm', () => {
       });
 
       // Resolve the promise to clean up
-      resolveSubmit!(createMockSubmitVideoResponse({
-        video_id: '123',
-        youtube_video_id: 'dQw4w9WgXcQ',
-        title: 'Test',
-      }));
+      resolveSubmit!(
+        createMockSubmitVideoResponse({
+          video_id: '123',
+          youtube_video_id: 'dQw4w9WgXcQ',
+          title: 'Test',
+        })
+      );
     });
 
     it('shows success message after successful submission', async () => {
@@ -234,7 +239,10 @@ describe('SubmitVideoForm', () => {
       // Create a deferred promise to control resolution
       let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
-        () => new Promise((resolve) => { resolveSubmit = resolve; })
+        () =>
+          new Promise((resolve) => {
+            resolveSubmit = resolve;
+          })
       );
 
       render(<SubmitVideoForm />);
@@ -251,9 +259,11 @@ describe('SubmitVideoForm', () => {
       });
 
       // Resolve the promise to clean up
-      resolveSubmit!(createMockSubmitVideoResponse({
-        video_id: '123',
-      }));
+      resolveSubmit!(
+        createMockSubmitVideoResponse({
+          video_id: '123',
+        })
+      );
     });
   });
 });

@@ -33,7 +33,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
         // If we get here, banner is hidden - API is healthy
         test.info().annotations.push({
           type: 'pass',
-          description: 'Banner correctly hidden when API is healthy'
+          description: 'Banner correctly hidden when API is healthy',
         });
       } catch {
         // Banner is still visible - API may be degraded or unhealthy
@@ -41,7 +41,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
         const bannerText = await warmingIndicator.textContent();
         test.info().annotations.push({
           type: 'info',
-          description: `Banner visible with message: ${bannerText}`
+          description: `Banner visible with message: ${bannerText}`,
         });
 
         // Verify at least the banner has correct structure
@@ -58,9 +58,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
 
       // Verify core content is visible (page should work even with banner)
       // The library page should show video count or navigation
-      await expect(
-        page.getByRole('navigation').first()
-      ).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('navigation').first()).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -109,7 +107,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
         // API is healthy - banner correctly not shown
         test.info().annotations.push({
           type: 'pass',
-          description: 'API is healthy - banner correctly hidden'
+          description: 'API is healthy - banner correctly hidden',
         });
       }
     });
@@ -138,7 +136,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
         // No banner = healthy, which is correct
         test.info().annotations.push({
           type: 'pass',
-          description: 'No banner displayed - service is healthy'
+          description: 'No banner displayed - service is healthy',
         });
       }
     });

@@ -75,8 +75,7 @@ export function VideoCard({ video }: VideoCardProps) {
   const selected = isSelected(video.video_id);
 
   const thumbnailUrl =
-    video.thumbnail_url ||
-    `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`;
+    video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`;
 
   const handleClick = (e: React.MouseEvent) => {
     if (selectionMode) {
@@ -113,7 +112,12 @@ export function VideoCard({ video }: VideoCardProps) {
         >
           {selected && (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           )}
         </button>

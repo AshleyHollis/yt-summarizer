@@ -10,22 +10,19 @@ export const formatTime = formatDuration;
 /**
  * API base URL from environment
  */
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 /**
  * Default minimum relevance threshold for filtering results
  */
-export const MIN_RELEVANCE_THRESHOLD = 0.50;
+export const MIN_RELEVANCE_THRESHOLD = 0.5;
 
 /**
  * Make an API call with error handling
  */
-export async function apiCall<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+export async function apiCall<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
     ...options,
   });
 
@@ -41,7 +38,7 @@ export async function apiCall<T>(
  */
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return apiCall<T>(path, {
-    method: "POST",
+    method: 'POST',
     body: JSON.stringify(body),
   });
 }
@@ -50,5 +47,5 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
  * GET request helper
  */
 export async function apiGet<T>(path: string): Promise<T> {
-  return apiCall<T>(path, { method: "GET" });
+  return apiCall<T>(path, { method: 'GET' });
 }

@@ -1,14 +1,21 @@
-"use client";
+'use client';
 
-import { CopilotKit } from "@copilotkit/react-core";
-import "@copilotkit/react-ui/styles.css";
-import { ThemeProvider } from "next-themes";
-import React, { createContext, useContext, useState, useCallback, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { ToolResultProvider } from "@/contexts/ToolResultContext";
-import { HealthStatusProvider, useHealthStatus } from "@/contexts/HealthStatusContext";
-import { WarmingUpIndicator, CopilotErrorBoundary } from "@/components/common";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { CopilotKit } from '@copilotkit/react-core';
+import '@copilotkit/react-ui/styles.css';
+import { ThemeProvider } from 'next-themes';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  Suspense,
+} from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ToolResultProvider } from '@/contexts/ToolResultContext';
+import { HealthStatusProvider, useHealthStatus } from '@/contexts/HealthStatusContext';
+import { WarmingUpIndicator, CopilotErrorBoundary } from '@/components/common';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 // Types for scope management
 export interface DateRange {
@@ -21,14 +28,14 @@ export interface QueryScope {
   videoIds?: string[];
   dateRange?: DateRange;
   facets?: string[];
-  contentTypes?: ("summary" | "segment" | "relationship")[];
+  contentTypes?: ('summary' | 'segment' | 'relationship')[];
 }
 
 // Types for AI knowledge source settings
 export interface AIKnowledgeSettings {
-  useVideoContext: boolean;  // Search video library for context
-  useLLMKnowledge: boolean;  // Allow LLM to use its trained knowledge
-  useWebSearch: boolean;     // Enable web search for current information
+  useVideoContext: boolean; // Search video library for context
+  useLLMKnowledge: boolean; // Allow LLM to use its trained knowledge
+  useWebSearch: boolean; // Enable web search for current information
 }
 
 export interface AISettingsContextType {
@@ -42,7 +49,7 @@ const AISettingsContext = createContext<AISettingsContextType | undefined>(undef
 export function useAISettings(): AISettingsContextType {
   const context = useContext(AISettingsContext);
   if (!context) {
-    throw new Error("useAISettings must be used within an AISettingsProvider");
+    throw new Error('useAISettings must be used within an AISettingsProvider');
   }
   return context;
 }
@@ -88,7 +95,7 @@ const VideoContext = createContext<VideoContextType | undefined>(undefined);
 export function useVideoContext(): VideoContextType {
   const context = useContext(VideoContext);
   if (!context) {
-    throw new Error("useVideoContext must be used within a VideoContextProvider");
+    throw new Error('useVideoContext must be used within a VideoContextProvider');
   }
   return context;
 }
@@ -121,7 +128,7 @@ const ScopeContext = createContext<ScopeContextType | undefined>(undefined);
 export function useScope(): ScopeContextType {
   const context = useContext(ScopeContext);
   if (!context) {
-    throw new Error("useScope must be used within a ScopeProvider");
+    throw new Error('useScope must be used within a ScopeProvider');
   }
   return context;
 }
@@ -280,7 +287,7 @@ export function Providers({ children }: ProvidersProps) {
 function ProvidersInner({ children }: ProvidersProps) {
   // Self-hosted runtime using Microsoft Agent Framework
   // Configure NEXT_PUBLIC_API_URL to point to your backend
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const runtimeUrl = `${apiUrl}/api/copilotkit`;
 
   // Debug logging for production troubleshooting
@@ -299,7 +306,7 @@ function ProvidersInner({ children }: ProvidersProps) {
   // Thread ID flows: URL → CopilotKit → ThreadedCopilotSidebar
   // Changes flow: ThreadedCopilotSidebar → URL → re-render with new threadId
   const searchParams = useSearchParams();
-  const urlThreadId = searchParams.get("thread");
+  const urlThreadId = searchParams.get('thread');
 
   // Track mounted state for hydration
   const [mounted, setMounted] = useState(false);
@@ -349,9 +356,6 @@ function HealthStatusBanner() {
   }
 
   return (
-    <WarmingUpIndicator
-      status={health?.status || 'unhealthy'}
-      show={isDegraded || isUnhealthy}
-    />
+    <WarmingUpIndicator status={health?.status || 'unhealthy'} show={isDegraded || isUnhealthy} />
   );
 }

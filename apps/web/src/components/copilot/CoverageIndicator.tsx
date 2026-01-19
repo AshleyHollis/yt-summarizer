@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useCoverage } from "@/hooks/useCopilotActions";
+import { useState, useEffect } from 'react';
+import { useCoverage } from '@/hooks/useCopilotActions';
 
 interface CoverageData {
   videoCount: number;
@@ -25,7 +25,7 @@ export function CoverageIndicator() {
           channelCount: data.channelCount,
         });
       } catch (error) {
-        console.error("Failed to load coverage:", error);
+        console.error('Failed to load coverage:', error);
         setCoverage(null);
       } finally {
         setLoading(false);
@@ -49,12 +49,8 @@ export function CoverageIndicator() {
 
   return (
     <div className="flex items-center gap-2 text-xs text-gray-500">
-      <span title="Indexed videos">
-        📹 {coverage.videoCount}
-      </span>
-      <span title="Indexed segments">
-        📄 {coverage.segmentCount}
-      </span>
+      <span title="Indexed videos">📹 {coverage.videoCount}</span>
+      <span title="Indexed segments">📄 {coverage.segmentCount}</span>
     </div>
   );
 }

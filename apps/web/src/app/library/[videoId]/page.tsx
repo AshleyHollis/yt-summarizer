@@ -39,7 +39,7 @@ interface Tab {
 function TabButton({
   tab,
   isActive,
-  onClick
+  onClick,
 }: {
   tab: Tab;
   isActive: boolean;
@@ -92,9 +92,15 @@ function getStatusBadge(status: string): { className: string; label: string } {
         label: 'Rate Limited - Retrying...',
       };
     case 'failed':
-      return { className: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300', label: 'Failed' };
+      return {
+        className: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
+        label: 'Failed',
+      };
     default:
-      return { className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300', label: status };
+      return {
+        className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+        label: status,
+      };
   }
 }
 
@@ -102,7 +108,14 @@ function getStatusBadge(status: string): { className: string; label: string } {
  * Check if video is still processing
  */
 function isProcessing(status: string): boolean {
-  return ['pending', 'transcribing', 'summarizing', 'embedding', 'building_relationships', 'rate_limited'].includes(status);
+  return [
+    'pending',
+    'transcribing',
+    'summarizing',
+    'embedding',
+    'building_relationships',
+    'rate_limited',
+  ].includes(status);
 }
 
 /**
@@ -130,20 +143,20 @@ export default function VideoDetailPage() {
       const response = await libraryApi.getVideoDetail(videoId);
       setVideo(response);
 
-        // Set the video context for the copilot to use
-        setCurrentVideo({
-          videoId: response.video_id,
-          title: response.title,
-          channelName: response.channel?.name || "Unknown Channel",
-          youtubeVideoId: response.youtube_video_id,
-          summary: response.summary ?? undefined,
-        });
-      } catch (err) {
-        console.error('Failed to fetch video:', err);
-        setError('Failed to load video. Please try again.');
-      } finally {
-        setLoading(false);
-      }
+      // Set the video context for the copilot to use
+      setCurrentVideo({
+        videoId: response.video_id,
+        title: response.title,
+        channelName: response.channel?.name || 'Unknown Channel',
+        youtubeVideoId: response.youtube_video_id,
+        summary: response.summary ?? undefined,
+      });
+    } catch (err) {
+      console.error('Failed to fetch video:', err);
+      setError('Failed to load video. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }, [videoId, setCurrentVideo]);
 
   useEffect(() => {
@@ -241,8 +254,7 @@ export default function VideoDetailPage() {
 
   const statusBadge = getStatusBadge(video.processing_status);
   const thumbnailUrl =
-    video.thumbnail_url ||
-    `https://img.youtube.com/vi/${video.youtube_video_id}/maxresdefault.jpg`;
+    video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_video_id}/maxresdefault.jpg`;
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
@@ -339,7 +351,9 @@ export default function VideoDetailPage() {
                         : 'This video is missing a transcript or summary. Reprocessing will attempt to fetch and generate the missing content.'}
                     </p>
                     {reprocessError && (
-                      <p className="text-sm text-red-600 dark:text-red-400 mt-2">{reprocessError}</p>
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                        {reprocessError}
+                      </p>
                     )}
                     <button
                       onClick={handleReprocess}
@@ -365,66 +379,66 @@ export default function VideoDetailPage() {
 
         {/* Tab Navigation (only show when completed) */}
         {video.processing_status === 'completed' && (
-        <div className="mt-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 overflow-hidden">
-          {/* Tab Headers */}
-          <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
-            {([
-              { id: 'summary' as TabId, label: 'Summary', icon: SparklesIcon },
-              { id: 'description' as TabId, label: 'Description', icon: DocumentTextIcon },
-              { id: 'transcript' as TabId, label: 'Transcript', icon: DocumentTextIcon },
-              { id: 'history' as TabId, label: 'History', icon: ChartBarIcon },
-            ] as Tab[]).map((tab) => (
-              <TabButton
-                key={tab.id}
-                tab={tab}
-                isActive={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
-              />
-            ))}
+          <div className="mt-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 overflow-hidden">
+            {/* Tab Headers */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
+              {(
+                [
+                  { id: 'summary' as TabId, label: 'Summary', icon: SparklesIcon },
+                  { id: 'description' as TabId, label: 'Description', icon: DocumentTextIcon },
+                  { id: 'transcript' as TabId, label: 'Transcript', icon: DocumentTextIcon },
+                  { id: 'history' as TabId, label: 'History', icon: ChartBarIcon },
+                ] as Tab[]
+              ).map((tab) => (
+                <TabButton
+                  key={tab.id}
+                  tab={tab}
+                  isActive={activeTab === tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                />
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-6">
+              {/* Summary Tab */}
+              {activeTab === 'summary' && (
+                <div>
+                  {video.summary ? (
+                    <MarkdownRenderer content={video.summary} variant="summary" />
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400 italic">
+                      No AI summary available for this video.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Description Tab */}
+              {activeTab === 'description' && (
+                <div className="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+                  {video.description ? (
+                    <DescriptionRenderer content={video.description} />
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400 italic">
+                      No description available for this video.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Transcript Tab */}
+              {activeTab === 'transcript' && (
+                <TranscriptViewer
+                  transcriptUrl={`/api/v1/videos/${video.video_id}/transcript`}
+                  videoTitle={video.title}
+                />
+              )}
+
+              {/* History Tab */}
+              {activeTab === 'history' && <ProcessingHistory videoId={video.video_id} />}
+            </div>
           </div>
-
-          {/* Tab Content */}
-          <div className="p-6">
-            {/* Summary Tab */}
-            {activeTab === 'summary' && (
-              <div>
-                {video.summary ? (
-                  <MarkdownRenderer content={video.summary} variant="summary" />
-                ) : (
-                  <p className="text-gray-500 dark:text-gray-400 italic">
-                    No AI summary available for this video.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Description Tab */}
-            {activeTab === 'description' && (
-              <div className="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
-                {video.description ? (
-                  <DescriptionRenderer content={video.description} />
-                ) : (
-                  <p className="text-gray-500 dark:text-gray-400 italic">
-                    No description available for this video.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Transcript Tab */}
-            {activeTab === 'transcript' && (
-              <TranscriptViewer
-                transcriptUrl={`/api/v1/videos/${video.video_id}/transcript`}
-                videoTitle={video.title}
-              />
-            )}
-
-            {/* History Tab */}
-            {activeTab === 'history' && (
-              <ProcessingHistory videoId={video.video_id} />
-            )}
-          </div>
-        </div>
         )}
       </div>
     </div>

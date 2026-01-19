@@ -190,13 +190,10 @@ test.describe('Username/Password Authentication @auth', () => {
      * They will skip if test credentials are not configured.
      */
 
-    test.skip(
-      () => {
-        // Skip if test credentials are not set
-        return !process.env.AUTH0_ADMIN_TEST_EMAIL || !process.env.AUTH0_ADMIN_TEST_PASSWORD;
-      },
-      'Test credentials not configured - set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD'
-    );
+    test.skip(() => {
+      // Skip if test credentials are not set
+      return !process.env.AUTH0_ADMIN_TEST_EMAIL || !process.env.AUTH0_ADMIN_TEST_PASSWORD;
+    }, 'Test credentials not configured - set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD');
 
     test('successful login with admin test credentials', async ({ browser }) => {
       // Create fresh context without auth state
@@ -250,9 +247,11 @@ test.describe('Username/Password Authentication @auth', () => {
         // Should show loading text briefly
         const loadingButton = freshPage.getByRole('button', { name: /signing in/i });
         // Note: This may be too fast to catch, so we use a short timeout
-        await expect(loadingButton).toBeVisible({ timeout: 2000 }).catch(() => {
-          // Loading state may be too fast to catch - that's okay
-        });
+        await expect(loadingButton)
+          .toBeVisible({ timeout: 2000 })
+          .catch(() => {
+            // Loading state may be too fast to catch - that's okay
+          });
       } finally {
         await context.close();
       }

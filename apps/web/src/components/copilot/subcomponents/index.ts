@@ -8,5 +8,5 @@
  * @see https://docs.copilotkit.ai/custom-look-and-feel/bring-your-own-components
  */
 
-export { CustomHeader } from "./CustomHeader";
-export { ScopeIndicator } from "./ScopeIndicator";
+export { CustomHeader } from './CustomHeader';
+export { ScopeIndicator } from './ScopeIndicator';

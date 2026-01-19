@@ -106,18 +106,15 @@ test.describe('Social Login Authentication @auth', () => {
      * 2. Run: npm run test:e2e
      */
 
-    test.skip(
-      () => {
-        // Skip if auth state file doesn't exist
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const fs = require('fs');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const path = require('path');
-        const authFile = path.join(__dirname, '../playwright/.auth/user.json');
-        return !fs.existsSync(authFile);
-      },
-      'Auth0 not configured - set AUTH0_* environment variables to run auth tests'
-    );
+    test.skip(() => {
+      // Skip if auth state file doesn't exist
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const path = require('path');
+      const authFile = path.join(__dirname, '../playwright/.auth/user.json');
+      return !fs.existsSync(authFile);
+    }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
     test('authenticated user is redirected from login page to dashboard', async ({ page }) => {
       // Navigate to login page while authenticated
