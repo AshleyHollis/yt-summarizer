@@ -28,5 +28,5 @@ jobs:
           if ('${{ inputs.show_current }}' -eq 'true') {
             $params['ShowCurrentPermissions'] = $true
           }
-          
+
           .\scripts\configure-auth0-permissions.ps1 @params
