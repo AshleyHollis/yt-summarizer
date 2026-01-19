@@ -208,7 +208,7 @@ npm run dev
 
 ### Error: HTTP 500 on `/api/auth/login`
 **Cause**: Missing environment variables or incorrect middleware
-**Fix**: 
+**Fix**:
 1. Check Azure Portal env vars (Section 3)
 2. Verify middleware excludes `\.swa` (Section 5)
 3. Verify route handler exists (Section 6)
