@@ -16,7 +16,7 @@ on:
         description: 'Terraform version to use'
         required: true
         type: string
-      
+
       # Job control
       run-plan:
         description: 'Whether to run terraform plan'
@@ -28,21 +28,21 @@ on:
         required: false
         type: boolean
         default: false
-      
+
       # Environment configuration
       environment-name:
         description: 'GitHub environment name for apply job (e.g., production). Empty string = no environment.'
         required: false
         type: string
         default: ''
-      
+
       # PR-specific options
       post-plan-to-pr:
         description: 'Whether to post terraform plan to PR comments'
         required: false
         type: boolean
         default: false
-      
+
     secrets:
       # Azure credentials
       AZURE_CLIENT_ID:
@@ -51,7 +51,7 @@ on:
         required: true
       AZURE_SUBSCRIPTION_ID:
         required: true
-      
+
       # Auth0 credentials
       AUTH0_DOMAIN:
         required: true
@@ -59,7 +59,7 @@ on:
         required: true
       AUTH0_CLIENT_SECRET:
         required: true
-      
+
       # Terraform variables
       SQL_ADMIN_PASSWORD:
         required: true
@@ -67,7 +67,7 @@ on:
         required: true
       CLOUDFLARE_API_TOKEN:
         required: true
-    
+
     outputs:
       plan_summary:
         description: 'JSON summary of terraform plan'
