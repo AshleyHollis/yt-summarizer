@@ -120,17 +120,17 @@ declare -A CONNECTION_CLIENTS_MAP=(
 # Import each connection_clients resource if not already in state
 for RESOURCE_ADDR in "${!CONNECTION_CLIENTS_MAP[@]}"; do
   CONNECTION_ID="${CONNECTION_CLIENTS_MAP[$RESOURCE_ADDR]}"
-  
+
   echo "Processing connection clients for: ${CONNECTION_ID}"
-  
+
   # Check if resource already exists in state
   if terraform state show "${RESOURCE_ADDR}" &>/dev/null; then
     echo "  ✓ Already in Terraform state (skipping import)"
     continue
   fi
-  
+
   echo "  Importing into ${RESOURCE_ADDR}..."
-  
+
   if terraform import "${RESOURCE_ADDR}" "${CONNECTION_ID}"; then
     echo "  ✓ Successfully imported"
   else
