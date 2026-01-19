@@ -36,7 +36,7 @@ runs:
           # Copy to action directory for subsequent steps
           cp "$TERRAFORM_PLAN_DATA_DIR/plan-summary.json" "${{ github.action_path }}/plan-summary.json"
           cp "$TERRAFORM_PLAN_DATA_DIR/formatted-plan.json" "${{ github.action_path }}/formatted-plan.json"
-          
+
           # Write plan outcome to file (not written by terraform-plan action)
           echo "$PLAN_OUTCOME" > "${{ github.action_path }}/plan-outcome.txt"
 
