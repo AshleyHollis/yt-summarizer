@@ -43,18 +43,46 @@ Write-Host ""
 
 # Required scopes for Terraform
 $requiredScopes = @(
+    # Client management (for creating Auth0 applications)
     "read:clients",
     "create:clients",
     "update:clients",
     "delete:clients",
+    
+    # Client grants management (for API authorization)
     "read:client_grants",
     "create:client_grants",
     "update:client_grants",
     "delete:client_grants",
+    
+    # Resource server management (for Auth0 APIs)
     "read:resource_servers",
     "create:resource_servers",
     "update:resource_servers",
-    "delete:resource_servers"
+    "delete:resource_servers",
+    
+    # Connection management (for database, Google, GitHub auth)
+    "read:connections",
+    "create:connections",
+    "update:connections",
+    "delete:connections",
+    
+    # Actions management (for role claims and custom logic)
+    "read:actions",
+    "create:actions",
+    "update:actions",
+    "delete:actions",
+    
+    # Roles management (for RBAC)
+    "read:roles",
+    "create:roles",
+    "update:roles",
+    "delete:roles",
+    
+    # Role members management (assigning users to roles)
+    "read:role_members",
+    "create:role_members",
+    "delete:role_members"
 )
 
 Write-Host "📋 Required Scopes:" -ForegroundColor Yellow

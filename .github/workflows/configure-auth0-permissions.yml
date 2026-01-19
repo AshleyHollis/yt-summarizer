@@ -1,0 +1,32 @@
+name: Configure Auth0 Permissions
+
+on:
+  workflow_dispatch:
+    inputs:
+      show_current:
+        description: 'Only show current permissions (no changes)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  configure-permissions:
+    name: Update Auth0 Service Account Permissions
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run permission configuration script
+        shell: pwsh
+        env:
+          AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+        run: |
+          $params = @{}
+          if ('${{ inputs.show_current }}' -eq 'true') {
+            $params['ShowCurrentPermissions'] = $true
+          }
+          
+          .\scripts\configure-auth0-permissions.ps1 @params
