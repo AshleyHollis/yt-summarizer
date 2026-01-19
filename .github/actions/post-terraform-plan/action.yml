@@ -30,12 +30,12 @@ runs:
           echo "Using pre-written plan data from: $TERRAFORM_PLAN_DATA_DIR"
           echo "use_prewritten=true" >> $GITHUB_OUTPUT
           echo "data_dir=$TERRAFORM_PLAN_DATA_DIR" >> $GITHUB_OUTPUT
-          
+
           # Copy to action directory for subsequent steps
           cp "$TERRAFORM_PLAN_DATA_DIR/plan-summary.json" "${{ github.action_path }}/plan-summary.json"
           cp "$TERRAFORM_PLAN_DATA_DIR/formatted-plan.json" "${{ github.action_path }}/formatted-plan.json"
           cp "$TERRAFORM_PLAN_DATA_DIR/plan-outcome.txt" "${{ github.action_path }}/plan-outcome.txt"
-          
+
           echo "✅ Copied plan data files to action directory"
         else
           echo "No pre-written plan data found, will write from inputs"
