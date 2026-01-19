@@ -250,13 +250,12 @@ variable "enable_auth0_role_action" {
 }
 
 variable "auth0_test_users" {
-  description = "List of test users to create in Auth0"
-  type = list(object({
-    email          = string
+  description = "Map of test users to create in Auth0 (key = email address)"
+  type = map(object({
     password       = string
     email_verified = bool
     role           = string # 'admin' or 'normal'
   }))
   sensitive = true
-  default   = []
+  default   = {}
 }

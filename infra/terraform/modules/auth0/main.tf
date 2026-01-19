@@ -112,17 +112,14 @@ variable "github_client_secret" {
 
 # T010: User support
 variable "test_users" {
-  description = "List of test users to create"
-  type = list(object({
-    email          = string
+  description = "Map of test users to create (key = email address)"
+  type = map(object({
     password       = string
     email_verified = bool
     role           = string # 'admin' or 'normal'
   }))
-  default = []
-  # NOTE: Cannot mark as sensitive=true because it's used in for_each
-  # Terraform restriction: sensitive values cannot be used in for_each keys
-  # Passwords will be visible in plan output but are auto-rotated and stored in Key Vault
+  default   = {}
+  sensitive = true # Now safe: email (key) is not sensitive, only password (value) is
 }
 
 # T011: Action support
@@ -251,10 +248,10 @@ resource "auth0_resource_server" "api" {
 
 # T010: Test users
 resource "auth0_user" "test_user" {
-  for_each = { for idx, user in var.test_users : idx => user }
+  for_each = var.test_users
 
   connection_name = var.enable_database_connection ? auth0_connection.database[0].name : null
-  email           = each.value.email
+  email           = each.key # email is now the map key
   password        = each.value.password
   email_verified  = each.value.email_verified
 

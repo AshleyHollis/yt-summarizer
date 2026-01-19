@@ -64,20 +64,18 @@ module "auth0" {
   github_client_secret       = var.auth0_github_client_secret
 
   # T012: User and role configuration (T044-T045: Use generated passwords)
-  test_users = [
-    {
-      email          = "admin@test.yt-summarizer.internal"
+  test_users = {
+    "admin@test.yt-summarizer.internal" = {
       password       = random_password.admin_test_password.result
       email_verified = true
       role           = "admin"
     },
-    {
-      email          = "user@test.yt-summarizer.internal"
+    "user@test.yt-summarizer.internal" = {
       password       = random_password.normal_test_password.result
       email_verified = true
       role           = "user"
     }
-  ]
+  }
   enable_role_action = var.enable_auth0_role_action
 }
 
