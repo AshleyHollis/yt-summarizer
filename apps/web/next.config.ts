@@ -92,8 +92,12 @@ const nextConfig: NextConfig = {
 
     return {
       beforeFiles: [
-        // Exclude .swa paths from rewrites (required for SWA deployment validation)
-        // SWA uses /.swa/health.html to verify deployment
+        // Azure SWA health check: rewrite .html to route handler
+        // SWA requires /.swa/health.html but Next.js ignores dotfiles in public/
+        {
+          source: '/.swa/health.html',
+          destination: '/.swa/health',
+        },
       ],
       afterFiles: [
         // Generic proxy for absolute URL handling (mixed content fix)
