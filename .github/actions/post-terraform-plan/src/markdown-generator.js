@@ -48,12 +48,12 @@ function extractErrorDetails(planOutput) {
   }
 
   const lines = planOutput.split('\n');
-  
+
   // Detect state lock error
   if (planOutput.includes('state blob is already locked')) {
     const lockIdMatch = planOutput.match(/ID:\s+([a-f0-9-]+)/);
     const lockId = lockIdMatch ? lockIdMatch[1] : 'unknown';
-    
+
     return {
       type: 'state_lock',
       message: 'Terraform state is locked',
@@ -78,7 +78,7 @@ function extractErrorDetails(planOutput) {
   if (errorLines.length > 0) {
     // Take first 10 error lines to avoid huge messages
     const errorSnippet = errorLines.slice(0, 10).join('\n');
-    
+
     return {
       type: 'validation',
       message: 'Terraform validation failed',
@@ -231,12 +231,12 @@ function generatePrComment(options) {
     sections.push('');
   } else if (planOutcome === 'failure' || planOutcome === 'skipped') {
     const errorDetails = extractErrorDetails(planOutput);
-    
+
     sections.push('```diff');
     sections.push(`- ❌ ${planOutcome === 'skipped' ? 'Could not produce Terraform Plan' : 'Terraform Plan Failed'}`);
     sections.push('```');
     sections.push('');
-    
+
     // Display extracted error details if available
     if (errorDetails) {
       sections.push(`### ${errorDetails.message}`);
