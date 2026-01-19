@@ -811,9 +811,9 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
 
           action: upload
-          # For Next.js hybrid, app_location points to the standalone output
-          # This reduces deployment size from ~300MB to ~79MB (4x smaller!)
-          app_location: apps/web/.next/standalone
+          # For Next.js hybrid (standalone), point to apps/web where the build output exists
+          # SWA will upload the pre-built .next folder from this directory
+          app_location: apps/web
           # For Next.js hybrid, output_location MUST be empty
           # SWA handles the .next folder internally
           output_location: ""
