@@ -23,9 +23,22 @@ terraform plan -no-color -input=false -out=tfplan \
   -var="cloudflare_api_token=${CLOUDFLARE_API_TOKEN}" \
   -var="auth0_domain=${AUTH0_DOMAIN:-}" \
   -var="auth0_terraform_client_id=${AUTH0_CLIENT_ID:-}" \
-  2>&1 | tee plan_output.txt
+  2>&1 | tee plan_output.raw.txt
 
 PLAN_EXIT_CODE=$?
+
+# Scrub sensitive data from plan output
+# This prevents password/secret exposure even if sensitive flag is not properly set
+echo "🔒 Scrubbing sensitive fields from plan output..."
+sed -E \
+  -e 's/([a-zA-Z0-9_-]*password[a-zA-Z0-9_-]*\s*=\s*)"[^"]+"/\1"(sensitive value)"/gi' \
+  -e 's/([a-zA-Z0-9_-]*secret[a-zA-Z0-9_-]*\s*=\s*)"[^"]+"/\1"(sensitive value)"/gi' \
+  -e 's/([a-zA-Z0-9_-]*token[a-zA-Z0-9_-]*\s*=\s*)"[^"]+"/\1"(sensitive value)"/gi' \
+  -e 's/([a-zA-Z0-9_-]*key[a-zA-Z0-9_-]*\s*=\s*)"[^"]+"/\1"(sensitive value)"/gi' \
+  plan_output.raw.txt > plan_output.txt
+
+# Clean up raw file
+rm -f plan_output.raw.txt
 
 # Capture plan output to GITHUB_OUTPUT
 echo "plan_output<<EOF" >> "$GITHUB_OUTPUT"

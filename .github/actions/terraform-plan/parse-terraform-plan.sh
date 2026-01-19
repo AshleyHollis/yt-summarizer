@@ -39,7 +39,7 @@ EOF
 fi
 
 # Get structured JSON output from terraform
-if ! terraform show -json tfplan > plan.json 2>&1; then
+if ! terraform show -json tfplan > plan.json.raw 2>&1; then
   echo "::error::Failed to convert tfplan to JSON"
 
   SUMMARY=$(cat <<EOF
@@ -63,6 +63,27 @@ EOF
 
   exit 1
 fi
+
+# Scrub sensitive data from plan output
+# This prevents password/secret exposure even if sensitive flag is not properly set
+echo "🔒 Scrubbing sensitive fields from plan output..."
+cat plan.json.raw | \
+  jq 'walk(
+    if type == "object" then
+      with_entries(
+        if (.key | test("password|secret|token|key"; "i")) and (.value | type == "string") then
+          .value = "(sensitive value)"
+        else
+          .
+        end
+      )
+    else
+      .
+    end
+  )' > plan.json
+
+# Clean up raw file
+rm -f plan.json.raw
 
 # Parse plan summary from JSON
 ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"]))) | length' plan.json)

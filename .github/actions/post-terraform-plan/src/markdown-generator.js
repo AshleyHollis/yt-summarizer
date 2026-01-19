@@ -134,12 +134,14 @@ function generatePrComment(options) {
     sections.push('');
     sections.push('> ⚠️ **The plan failed to execute.** Check the workflow logs for detailed error messages.');
     sections.push('');
-  } else if (planOutcome === 'failure') {
+  } else if (planOutcome === 'failure' || planOutcome === 'skipped') {
     sections.push('```diff');
-    sections.push(`- ❌ Terraform Plan Failed`);
+    sections.push(`- ❌ ${planOutcome === 'skipped' ? 'Could not produce Terraform Plan' : 'Terraform Plan Failed'}`);
     sections.push('');
-    sections.push('Check the workflow logs for error details.');
+    sections.push(`${planOutcome === 'skipped' ? 'Plan generation was skipped due to validation errors.' : 'Check the workflow logs for error details.'}`);
     sections.push('```');
+    sections.push('');
+    sections.push('> ⚠️ **Could not determine infrastructure changes.** Check the workflow logs for detailed error messages.');
     sections.push('');
   } else if (hasChanges) {
     // Summary badges for visual impact

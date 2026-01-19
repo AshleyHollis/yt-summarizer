@@ -101,7 +101,7 @@ module "auth0_preview" {
   enable_github_connection   = false
 
   # T012: No test users or actions for preview app (share with prod)
-  test_users         = []
+  test_users         = {}
   enable_role_action = false
 }
 
