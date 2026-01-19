@@ -183,124 +183,31 @@ jobs:
   # ---------------------------------------------------------------------------
   # Plan and apply infrastructure changes (auto-apply)
   # ---------------------------------------------------------------------------
-  terraform-plan:
-    name: Terraform Plan
-    runs-on: ubuntu-latest
+  terraform:
+    name: Terraform
     needs: [detect-changes, wait-for-ci]
     if: |
       needs.wait-for-ci.result == 'success' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_terraform != false) ||
        (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
-    outputs:
-      plan_summary: ${{ steps.plan.outputs.plan_summary }}
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      # Auth0 Terraform Service Account - M2M credentials for managing Auth0 resources
-      # See docs/auth0-terraform-service-account.md for details
+    uses: ./.github/workflows/terraform-reusable.yml
+    with:
+      terraform-working-dir: ${{ needs.detect-changes.outputs.terraform_working_dir || 'infra/terraform' }}
+      terraform-version: ${{ needs.detect-changes.outputs.terraform_version || '1.10.3' }}
+      run-plan: true
+      run-apply: true
+      environment-name: 'production'
+      post-plan-to-pr: false
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
       AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
       AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_OIDC: true
-    defaults:
-      run:
-        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform with Azure
-        uses: ./.github/actions/setup-terraform-azure
-        with:
-          terraform-version: ${{ env.TERRAFORM_VERSION }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
-        with:
-          validators: terraform-config
-          terraform-directory: ${{ env.TERRAFORM_WORKING_DIR }}
-          fail-fast: 'true'
-          timeout-seconds: '60'
-
-      - name: Terraform Plan
-        id: plan
-        uses: ./.github/actions/terraform-plan
-        with:
-          working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Upload Terraform plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: |
-            ${{ env.TERRAFORM_WORKING_DIR }}/tfplan
-            ${{ env.TERRAFORM_WORKING_DIR }}/plan_output.txt
-            ${{ env.TERRAFORM_WORKING_DIR }}/plan.json
-
-  terraform-apply:
-    name: Terraform Apply
-    runs-on: ubuntu-latest
-    needs: terraform-plan
-    if: |
-      needs.terraform-plan.result == 'success' &&
-      fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true
-    environment:
-      name: production
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      # Auth0 Terraform Service Account - M2M credentials for managing Auth0 resources
-      # See docs/auth0-terraform-service-account.md for details
-      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_OIDC: true
-    defaults:
-      run:
-        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform with Azure
-        uses: ./.github/actions/setup-terraform-azure
-        with:
-          terraform-version: ${{ env.TERRAFORM_VERSION }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Download Terraform plan artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-plan
-          path: ${{ env.TERRAFORM_WORKING_DIR }}
-
-      - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
-        with:
-          validators: terraform-config
-          terraform-directory: ${{ env.TERRAFORM_WORKING_DIR }}
-          fail-fast: 'true'
-          timeout-seconds: '60'
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+      SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
 
   # ---------------------------------------------------------------------------
@@ -312,16 +219,16 @@ jobs:
   #   - prod-app.yaml updates automatically apply production app config
   #   - preview-appset.yaml updates automatically apply preview ApplicationSet
   #
-  # Runs after terraform-apply (infrastructure may create resources Argo CD needs)
+  # Runs after terraform (infrastructure may create resources Argo CD needs)
   # Runs before update-overlay (applications need to exist before we try to sync them)
   # ---------------------------------------------------------------------------
   sync-argocd-manifests:
     name: Sync Argo CD Manifests
     runs-on: ubuntu-latest
-    needs: [detect-changes, terraform-apply]
+    needs: [detect-changes, terraform]
     if: |
       !cancelled() &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
     steps:
       - name: Checkout code
@@ -356,11 +263,11 @@ jobs:
   get-ci-image-tag:
     name: Get CI Image Tag
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests]
+    needs: [detect-changes, wait-for-ci, terraform, sync-argocd-manifests]
     if: |
       !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       (
         (github.event_name == 'workflow_dispatch' && inputs.run_deploy != false) ||
@@ -411,10 +318,10 @@ jobs:
   get-last-prod-image:
     name: Get Last Production Image
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests]
+    needs: [detect-changes, wait-for-ci, terraform, sync-argocd-manifests]
     if: |
       needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       (
         (github.event_name == 'workflow_dispatch' && inputs.run_deploy == false) ||
@@ -463,11 +370,11 @@ jobs:
   update-overlay:
     name: Update Production Overlay
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests, get-ci-image-tag, get-last-prod-image]
+    needs: [detect-changes, wait-for-ci, terraform, sync-argocd-manifests, get-ci-image-tag, get-last-prod-image]
     if: |
       always() && !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       (
         needs.get-ci-image-tag.result == 'success' ||
@@ -750,7 +657,7 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [get-ci-image-tag, get-last-prod-image, sync-argocd-manifests, update-overlay, verify-deployment, deploy-frontend, detect-changes, wait-for-ci, terraform-plan, terraform-apply]
+    needs: [get-ci-image-tag, get-last-prod-image, sync-argocd-manifests, update-overlay, verify-deployment, deploy-frontend, detect-changes, wait-for-ci, terraform]
     if: always()
     steps:
       - name: Checkout code
@@ -763,8 +670,7 @@ jobs:
             echo ""
             echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
-            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
-            echo "- Terraform apply: ${{ needs.terraform-apply.result }} (reason: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true && 'plan has changes' || 'no changes' }})"
+            echo "- Terraform: ${{ needs.terraform.result }} (changes: ${{ needs.terraform.result == 'success' && needs.terraform.outputs.has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
             echo "- Argo CD manifests sync: ${{ needs.sync-argocd-manifests.result }} (reason: ${{ contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd') && 'argocd manifest changes' || 'no changes' }})"
             echo "- Backend deploy tag: ${{ needs.get-ci-image-tag.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
