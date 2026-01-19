@@ -2,7 +2,7 @@
 # Purpose: Runs terraform plan and captures output for PR comments
 # Inputs: Passed via working directory and environment variables
 #   SUBSCRIPTION_ID, SQL_ADMIN_PASSWORD, OPENAI_API_KEY, CLOUDFLARE_API_TOKEN,
-#   AUTH0_DOMAIN (optional)
+#   AUTH0_DOMAIN (optional), AUTH0_CLIENT_ID (optional)
 # Outputs:
 #   plan_output: Raw terraform plan output
 #   plan_summary: JSON summary of plan changes (add/change/destroy counts)
@@ -22,6 +22,7 @@ terraform plan -no-color -input=false -out=tfplan \
   -var="openai_api_key=${OPENAI_API_KEY}" \
   -var="cloudflare_api_token=${CLOUDFLARE_API_TOKEN}" \
   -var="auth0_domain=${AUTH0_DOMAIN:-}" \
+  -var="auth0_terraform_client_id=${AUTH0_CLIENT_ID:-}" \
   2>&1 | tee plan_output.txt
 
 PLAN_EXIT_CODE=$?

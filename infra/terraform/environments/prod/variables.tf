@@ -96,6 +96,13 @@ variable "auth0_domain" {
   default     = ""
 }
 
+variable "auth0_terraform_client_id" {
+  description = "Auth0 Terraform service account client ID (for enabling connection access)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "enable_auth0" {
   description = "Enable Auth0 resources (requires proper Auth0 Management API permissions)"
   type        = bool

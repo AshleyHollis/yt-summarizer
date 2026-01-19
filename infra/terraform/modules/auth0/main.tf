@@ -64,6 +64,12 @@ variable "enable_database_connection" {
   default     = false
 }
 
+variable "terraform_client_id" {
+  description = "Terraform service account client ID (needed to enable connection for user management)"
+  type        = string
+  default     = ""
+}
+
 variable "enable_google_connection" {
   description = "Enable Google OAuth connection"
   type        = bool
@@ -152,12 +158,16 @@ resource "auth0_connection" "database" {
   }
 }
 
-# T009: Enable database connection for BFF client
+# T009: Enable database connection for BFF client and Terraform service account
 resource "auth0_connection_clients" "database_clients" {
   count = var.enable_database_connection ? 1 : 0
 
-  connection_id   = auth0_connection.database[0].id
-  enabled_clients = [auth0_client.bff.id]
+  connection_id = auth0_connection.database[0].id
+  # Enable for BFF client (end-user auth) and Terraform client (user management)
+  enabled_clients = compact([
+    auth0_client.bff.id,
+    var.terraform_client_id
+  ])
 }
 
 # T009: Google OAuth connection

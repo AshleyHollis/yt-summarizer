@@ -55,6 +55,7 @@ module "auth0" {
 
   # T012: Connection configuration
   enable_database_connection = var.enable_auth0_database_connection
+  terraform_client_id        = var.auth0_terraform_client_id
   enable_google_connection   = var.enable_auth0_google_connection
   google_client_id           = var.auth0_google_client_id
   google_client_secret       = var.auth0_google_client_secret
