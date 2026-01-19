@@ -799,6 +799,28 @@ jobs:
           echo "✅ Cleaned up ${{ steps.cleanup-stale.outputs.deleted-count }} stale SWA environment(s)"
           echo "💡 Deleted environments for PRs: ${{ steps.cleanup-stale.outputs.stale-prs }}"
 
+      - name: Fetch Auth0 credentials from Azure Key Vault
+        id: fetch-auth0
+        run: |
+          # Fetch Auth0 preview credentials from Azure Key Vault
+          # These are required for @auth0/nextjs-auth0 to initialize at runtime
+          echo "Fetching Auth0 preview credentials from Key Vault..."
+
+          AUTH0_DOMAIN=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-preview-domain" --query "value" -o tsv)
+          AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-preview-client-id" --query "value" -o tsv)
+          AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-preview-client-secret" --query "value" -o tsv)
+          AUTH0_SESSION_SECRET=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-preview-session-secret" --query "value" -o tsv)
+
+          # Export as outputs for the next step
+          echo "auth0-domain=$AUTH0_DOMAIN" >> $GITHUB_OUTPUT
+          echo "::add-mask::$AUTH0_CLIENT_SECRET"
+          echo "auth0-client-id=$AUTH0_CLIENT_ID" >> $GITHUB_OUTPUT
+          echo "auth0-client-secret=$AUTH0_CLIENT_SECRET" >> $GITHUB_OUTPUT
+          echo "::add-mask::$AUTH0_SESSION_SECRET"
+          echo "auth0-session-secret=$AUTH0_SESSION_SECRET" >> $GITHUB_OUTPUT
+
+          echo "✅ Auth0 credentials fetched successfully"
+
       - name: Deploy to SWA staging environment
         id: deploy
         uses: Azure/static-web-apps-deploy@v1
@@ -806,6 +828,14 @@ jobs:
           # Set the backend API URL for runtime
           NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url || '' }}
           NEXT_PUBLIC_ENVIRONMENT: preview
+          # Auth0 configuration for Next.js runtime
+          # These variables are required for @auth0/nextjs-auth0 to initialize
+          # Note: AUTH0_BASE_URL is intentionally omitted - it will be inferred from the request
+          # by the Auth0 SDK using the Host header from incoming requests
+          AUTH0_SECRET: ${{ steps.fetch-auth0.outputs.auth0-session-secret }}
+          AUTH0_ISSUER_BASE_URL: https://${{ steps.fetch-auth0.outputs.auth0-domain }}
+          AUTH0_CLIENT_ID: ${{ steps.fetch-auth0.outputs.auth0-client-id }}
+          AUTH0_CLIENT_SECRET: ${{ steps.fetch-auth0.outputs.auth0-client-secret }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
