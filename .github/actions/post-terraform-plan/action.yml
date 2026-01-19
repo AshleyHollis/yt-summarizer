@@ -21,8 +21,30 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Check for pre-written plan data files
+      id: check-files
+      shell: bash
+      run: |
+        # Check if plan data was pre-written by workflow (to avoid argument list issues)
+        if [ -n "$TERRAFORM_PLAN_DATA_DIR" ] && [ -d "$TERRAFORM_PLAN_DATA_DIR" ]; then
+          echo "Using pre-written plan data from: $TERRAFORM_PLAN_DATA_DIR"
+          echo "use_prewritten=true" >> $GITHUB_OUTPUT
+          echo "data_dir=$TERRAFORM_PLAN_DATA_DIR" >> $GITHUB_OUTPUT
+          
+          # Copy to action directory for subsequent steps
+          cp "$TERRAFORM_PLAN_DATA_DIR/plan-summary.json" "${{ github.action_path }}/plan-summary.json"
+          cp "$TERRAFORM_PLAN_DATA_DIR/formatted-plan.json" "${{ github.action_path }}/formatted-plan.json"
+          cp "$TERRAFORM_PLAN_DATA_DIR/plan-outcome.txt" "${{ github.action_path }}/plan-outcome.txt"
+          
+          echo "✅ Copied plan data files to action directory"
+        else
+          echo "No pre-written plan data found, will write from inputs"
+          echo "use_prewritten=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Save plan data to files
       id: save-data
+      if: steps.check-files.outputs.use_prewritten != 'true'
       uses: actions/github-script@v7
       with:
         script: |
