@@ -1,0 +1,18 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Running pre-push validation..."
+echo ""
+
+# Run validation script
+pwsh -File scripts/validate-local.ps1
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Pre-push validation failed!"
+  echo "Please fix the issues above before pushing."
+  exit 1
+fi
+
+echo ""
+echo "✅ All pre-push checks passed!"

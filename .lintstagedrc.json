@@ -1,0 +1,13 @@
+{
+  "apps/web/**/*.{ts,tsx,js,jsx}": [
+    "cd apps/web && npx eslint --fix",
+    "cd apps/web && npx prettier --write"
+  ],
+  "apps/web/**/*.{json,css,md}": [
+    "cd apps/web && npx prettier --write"
+  ],
+  "services/**/*.py": [
+    "pwsh -Command \"cd $($args[0] | Split-Path -Parent | Split-Path -Parent) && uv run ruff check --fix $($args[0] | Split-Path -Leaf)\"",
+    "pwsh -Command \"cd $($args[0] | Split-Path -Parent | Split-Path -Parent) && uv run ruff format $($args[0] | Split-Path -Leaf)\""
+  ]
+}
