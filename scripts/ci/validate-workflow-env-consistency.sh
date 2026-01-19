@@ -62,27 +62,27 @@ echo ""
 for var in "${SHARED_ENV_VARS[@]}"; do
     # Extract env var value from preview.yml (look in env: section)
     preview_value=$(grep -A 100 "^env:" "$PREVIEW_WORKFLOW" | grep "^  $var:" | head -1 | sed "s/^  $var: //")
-    
+
     # Extract env var value from deploy-prod.yml (look in env: section)
     prod_value=$(grep -A 100 "^env:" "$DEPLOY_PROD_WORKFLOW" | grep "^  $var:" | head -1 | sed "s/^  $var: //")
-    
+
     if [[ -z "$preview_value" ]] && [[ -z "$prod_value" ]]; then
         echo -e "${YELLOW}⚠️  WARNING${NC}: $var not found in either workflow"
         continue
     fi
-    
+
     if [[ -z "$preview_value" ]]; then
         echo -e "${RED}❌ ERROR${NC}: $var missing from preview.yml"
         ((errors++))
         continue
     fi
-    
+
     if [[ -z "$prod_value" ]]; then
         echo -e "${RED}❌ ERROR${NC}: $var missing from deploy-prod.yml"
         ((errors++))
         continue
     fi
-    
+
     if [[ "$preview_value" != "$prod_value" ]]; then
         echo -e "${RED}❌ MISMATCH${NC}: $var"
         echo "    preview.yml:     $preview_value"
