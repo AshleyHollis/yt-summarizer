@@ -5,7 +5,7 @@
 .DESCRIPTION
     Mimics CI workflow locally to catch issues before pushing to remote.
     Runs TypeScript compilation, linting, tests, and builds for frontend.
-    
+
     This script is automatically run by the pre-push hook, but can also be
     run manually with: npm run validate
 
@@ -43,21 +43,21 @@ function Write-Status {
         [ValidateSet('Info', 'Success', 'Error', 'Warning')]
         [string]$Type = 'Info'
     )
-    
+
     $colors = @{
         'Info' = 'Cyan'
         'Success' = 'Green'
         'Error' = 'Red'
         'Warning' = 'Yellow'
     }
-    
+
     $symbols = @{
         'Info' = '🔍'
         'Success' = '✅'
         'Error' = '❌'
         'Warning' = '⚠️'
     }
-    
+
     Write-Host "$($symbols[$Type]) $Message" -ForegroundColor $colors[$Type]
 }
 
@@ -66,11 +66,11 @@ function Invoke-Check {
         [string]$Name,
         [scriptblock]$Command
     )
-    
+
     Write-Host ""
     Write-Status "Running: $Name" -Type Info
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
-    
+
     try {
         & $Command
         if ($LASTEXITCODE -ne 0) {
