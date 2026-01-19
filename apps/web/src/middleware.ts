@@ -109,6 +109,7 @@ export async function middleware(request: NextRequest) {
  * - Static files (_next/static)
  * - Image optimization files (_next/image)
  * - Favicon and metadata files
+ * - Azure SWA internal paths (/.swa/) - CRITICAL for SWA health checks
  */
 export const config = {
   matcher: [
@@ -117,7 +118,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico, sitemap.xml, robots.txt (metadata files)
+     * - .swa (Azure Static Web Apps internal paths - health checks)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|\\.swa).*)',
   ],
 };

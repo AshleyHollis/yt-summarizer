@@ -131,9 +131,13 @@ variable "auth0_allowed_callback_urls" {
   description = "Allowed Auth0 callback URLs for the BFF"
   type        = list(string)
   default = [
+    # FastAPI BFF endpoints
     "https://api.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
     "https://api-stg.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+    # Azure Static Web Apps (Next.js @auth0/nextjs-auth0)
+    "https://red-grass-06d413100-64.eastasia.6.azurestaticapps.net/api/auth/callback",
+    "http://localhost:3000/api/auth/callback",
   ]
 }
 
@@ -144,6 +148,7 @@ variable "auth0_allowed_logout_urls" {
     "https://web.yt-summarizer.apps.ashleyhollis.com",
     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
     "https://*.azurestaticapps.net",
+    "http://localhost:3000",
   ]
 }
 
@@ -154,6 +159,7 @@ variable "auth0_allowed_web_origins" {
     "https://web.yt-summarizer.apps.ashleyhollis.com",
     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
     "https://*.azurestaticapps.net",
+    "http://localhost:3000",
   ]
 }
 
@@ -174,6 +180,7 @@ variable "auth0_preview_allowed_callback_urls" {
   type        = list(string)
   default = [
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+    "https://*.azurestaticapps.net/api/auth/callback",
   ]
 }
 

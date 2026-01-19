@@ -663,12 +663,16 @@ jobs:
         env:
           # Configure proxy to talk to actual backend
           API_BASE_URL: ${{ vars.PRODUCTION_API_URL }}
+          # IMPORTANT: Auth0 variables are server-side only (set in Azure Portal)
+          # Do NOT pass AUTH0_* vars here - they must be configured in SWA environment settings
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_PRODUCTION_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: apps/web
-          output_location: .next
+          # For Next.js hybrid rendering: output_location MUST be empty string
+          # SWA handles the .next folder internally for server-side rendering
+          output_location: ""
           skip_app_build: true
           production_branch: main
 
