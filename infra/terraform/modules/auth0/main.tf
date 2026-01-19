@@ -244,7 +244,7 @@ resource "auth0_user" "test_user" {
 
   connection_name = var.enable_database_connection ? auth0_connection.database[0].name : null
   email           = each.value.email
-  password        = each.value.password
+  password        = sensitive(each.value.password)
   email_verified  = each.value.email_verified
 
   app_metadata = jsonencode({
@@ -253,6 +253,10 @@ resource "auth0_user" "test_user" {
 
   # Ensure database connection is created first
   depends_on = [auth0_connection.database]
+
+  lifecycle {
+    ignore_changes = [password]
+  }
 }
 
 # T011: Action to add role claims to tokens

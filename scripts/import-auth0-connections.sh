@@ -107,7 +107,41 @@ done
 
 echo ""
 echo "=============================================================================="
+echo "Importing Connection Clients"
+echo "=============================================================================="
+
+# Define connection clients mappings: Terraform resource address -> connection ID
+declare -A CONNECTION_CLIENTS_MAP=(
+  ["module.auth0[0].auth0_connection_clients.database_clients[0]"]="con_gKwFWLhlk6fSyChJ"
+  ["module.auth0[0].auth0_connection_clients.google_clients[0]"]="con_KkrDjvH2FUzYfCoA"
+  ["module.auth0[0].auth0_connection_clients.github_clients[0]"]="con_lF7fhGiVUVAObcAf"
+)
+
+# Import each connection_clients resource if not already in state
+for RESOURCE_ADDR in "${!CONNECTION_CLIENTS_MAP[@]}"; do
+  CONNECTION_ID="${CONNECTION_CLIENTS_MAP[$RESOURCE_ADDR]}"
+  
+  echo "Processing connection clients for: ${CONNECTION_ID}"
+  
+  # Check if resource already exists in state
+  if terraform state show "${RESOURCE_ADDR}" &>/dev/null; then
+    echo "  ✓ Already in Terraform state (skipping import)"
+    continue
+  fi
+  
+  echo "  Importing into ${RESOURCE_ADDR}..."
+  
+  if terraform import "${RESOURCE_ADDR}" "${CONNECTION_ID}"; then
+    echo "  ✓ Successfully imported"
+  else
+    echo "  ✗ Import failed"
+    exit 1
+  fi
+done
+
+echo ""
+echo "=============================================================================="
 echo "Import Complete"
 echo "=============================================================================="
-echo "All existing Auth0 connections have been imported into Terraform state."
+echo "All existing Auth0 connections and connection clients have been imported."
 echo "You can now run 'terraform apply' without conflicts."

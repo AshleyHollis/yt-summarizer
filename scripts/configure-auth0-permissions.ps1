@@ -83,7 +83,13 @@ $requiredScopes = @(
     # Role members management (assigning users to roles)
     "read:role_members",
     "create:role_members",
-    "delete:role_members"
+    "delete:role_members",
+
+    # User management (for test users)
+    "read:users",
+    "create:users",
+    "update:users",
+    "delete:users"
 )
 
 Write-Host "📋 Required Scopes:" -ForegroundColor Yellow
