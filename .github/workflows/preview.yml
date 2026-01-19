@@ -848,7 +848,7 @@ jobs:
         run: |
           # IMPORTANT: Runtime environment variables for Azure SWA must be configured
           # via the Azure Static Web Apps API, NOT via the deployment action env vars.
-          # 
+          #
           # The deployment action's env vars are only available during DEPLOYMENT,
           # not when the Next.js server starts up in the Azure runtime.
           #
