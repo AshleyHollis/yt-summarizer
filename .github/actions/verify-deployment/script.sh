@@ -26,8 +26,9 @@ echo ""
 # CRITICAL PRE-CHECK: Verify overlay actually contains expected image tag
 # If APP_NAME not provided, derive it from namespace
 if [ -z "$APP_NAME" ]; then
-  if [[ "${NAMESPACE}" == "preview-"* ]]; then
-    APP_NAME=$(echo ${NAMESPACE} | sed 's/^preview-/preview-pr-/')
+  if [[ "${NAMESPACE}" == "preview-pr-"* ]]; then
+    # Namespace is already in format preview-pr-{number}, use as-is
+    APP_NAME="${NAMESPACE}"
   elif [[ "${NAMESPACE}" == "prod" ]]; then
     APP_NAME="yt-summarizer-prod"
   elif [[ "${NAMESPACE}" == "yt-summarizer" ]]; then
@@ -182,11 +183,12 @@ check_pod_issues() {
 echo "Starting verification with fail-fast enabled..."
 echo ""
 
-# Determine app name: use provided env var, or derive from deployment labels, or default to preview pattern
+# Determine app name: use provided env var, or derive from deployment labels, or use namespace as-is
 if [ -z "$APP_NAME" ]; then
   APP_NAME=$(kubectl get deployment ${DEPLOYMENT} -n ${NAMESPACE} -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/instance}' 2>/dev/null || echo "")
   if [ -z "$APP_NAME" ]; then
-    APP_NAME=$(echo ${NAMESPACE} | sed 's/^/preview-/')
+    # Assume namespace name matches Argo CD app name (true for preview-pr-* and prod)
+    APP_NAME="${NAMESPACE}"
   fi
 fi
 
