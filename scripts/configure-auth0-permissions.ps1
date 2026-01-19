@@ -66,6 +66,7 @@ $requiredScopes = @(
     "create:connections",
     "update:connections",
     "delete:connections",
+    "update:connections_options",
 
     # Actions management (for role claims and custom logic)
     "read:actions",

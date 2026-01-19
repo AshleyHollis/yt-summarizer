@@ -409,6 +409,13 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '60'
 
+      - name: Import existing Auth0 connections
+        shell: bash
+        run: |
+          chmod +x ../../../../../scripts/import-auth0-connections.sh
+          ../../../../../scripts/import-auth0-connections.sh
+        continue-on-error: true
+
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
