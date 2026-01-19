@@ -33,7 +33,7 @@ The Auth0 Terraform service account is missing required Management API scopes.
    ```bash
    # You'll need to manually copy these from GitHub Secrets UI:
    # Settings → Secrets and variables → Actions → Repository secrets
-   
+
    # Look for:
    # - AUTH0_DOMAIN
    # - AUTH0_CLIENT_ID  
@@ -43,12 +43,12 @@ The Auth0 Terraform service account is missing required Management API scopes.
 2. **Run the configuration script**:
    ```powershell
    cd C:\Users\ashle\Source\GitHub\AshleyHollis\yt-summarizer
-   
+
    # Set environment variables (replace with actual values from GitHub Secrets)
    $env:AUTH0_DOMAIN = "dev-gvli0bfdrue0h8po.us.auth0.com"
    $env:AUTH0_CLIENT_ID = "Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6"
    $env:AUTH0_CLIENT_SECRET = "<get-from-github-secrets>"
-   
+
    # Run the script
    .\scripts\configure-auth0-permissions.ps1
    ```
@@ -57,7 +57,7 @@ The Auth0 Terraform service account is missing required Management API scopes.
    The script will output:
    ```
    ✅ Successfully updated client grant!
-   
+
    New scopes:
       - read:clients
       - create:clients
@@ -104,19 +104,19 @@ The Auth0 Terraform service account is missing required Management API scopes.
 
 4. **Grant Additional Scopes**:
    Find and enable these scopes (in addition to existing ones):
-   
+
    **Connections:**
    - ☑ read:connections
    - ☑ create:connections
    - ☑ update:connections
    - ☑ delete:connections
-   
+
    **Actions:**
    - ☑ read:actions
    - ☑ create:actions
    - ☑ update:actions
    - ☑ delete:actions
-   
+
    **Roles (RBAC):**
    - ☑ read:roles
    - ☑ create:roles
@@ -174,7 +174,7 @@ After Terraform succeeds:
 2. **Check Azure Key Vault**:
    ```bash
    az keyvault secret list --vault-name kv-ytsumm-prd --query "[?starts_with(name, 'auth0-')].name"
-   
+
    # Should show:
    # - auth0-terraform-domain (service account)
    # - auth0-terraform-client-id (service account)
