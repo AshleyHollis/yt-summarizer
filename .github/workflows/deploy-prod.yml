@@ -91,6 +91,26 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # =============================================================================
+  # SHARED CONFIGURATION (must match preview.yml)
+  # =============================================================================
+  # The following env vars are duplicated between preview.yml and deploy-prod.yml
+  # and MUST have identical values to prevent drift.
+  #
+  # Validation: scripts/ci/validate-workflow-env-consistency.sh
+  # CI Check: Runs automatically in CI workflow
+  #
+  # When updating these values:
+  #   1. Update BOTH preview.yml and deploy-prod.yml
+  #   2. Run: ./scripts/ci/validate-workflow-env-consistency.sh
+  #   3. Commit both files together
+  #
+  # Shared vars: ACR_NAME, ACR_LOGIN_SERVER, APP_NAME, API_IMAGE_NAME,
+  #              WORKERS_IMAGE_NAME, NAMESPACE_ARGOCD, WORKER_DEPLOYMENTS,
+  #              HEALTH_CHECK_*, ARGOCD_*, TERRAFORM_*, KUSTOMIZE_VERSION,
+  #              NODE_VERSION
+  # =============================================================================
+
   # Container Registry
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}

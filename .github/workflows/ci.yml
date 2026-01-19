@@ -818,6 +818,9 @@ jobs:
       - name: Run pre-commit on workflow files
         run: scripts/workflows/ci-run-precommit-workflows.sh
 
+      - name: Validate workflow env var consistency
+        run: bash scripts/ci/validate-workflow-env-consistency.sh
+
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK
   # ===========================================================================
