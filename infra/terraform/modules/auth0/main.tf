@@ -113,9 +113,8 @@ variable "test_users" {
     email_verified = bool
     role           = string # 'admin' or 'normal'
   }))
-  default = []
-  # Note: Not marked sensitive here to allow for_each iteration
-  # Individual resource attributes (password) are marked sensitive instead
+  default   = []
+  sensitive = true
 }
 
 # T011: Action support
@@ -244,7 +243,7 @@ resource "auth0_user" "test_user" {
 
   connection_name = var.enable_database_connection ? auth0_connection.database[0].name : null
   email           = each.value.email
-  password        = sensitive(each.value.password)
+  password        = each.value.password
   email_verified  = each.value.email_verified
 
   app_metadata = jsonencode({
