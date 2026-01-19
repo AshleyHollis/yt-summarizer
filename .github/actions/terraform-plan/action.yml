@@ -58,12 +58,15 @@ runs:
         CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
         AUTH0_DOMAIN: ${{ env.AUTH0_DOMAIN }}
       run: ${{ github.action_path }}/run-terraform-plan.sh
-      continue-on-error: true
+      # Do NOT use continue-on-error - we want the step to FAIL when plan fails
+      # Post-plan steps use 'if: always()' to run even on failure
 
     - name: Get JSON plan
       id: format
+      if: always()
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      # Only parse if plan succeeded, but always run to provide empty output
+      # Always run to provide output even if plan failed
+      # Returns empty summary with error flag if tfplan doesn't exist
       run: ${{ github.action_path }}/parse-terraform-plan.sh
       continue-on-error: true

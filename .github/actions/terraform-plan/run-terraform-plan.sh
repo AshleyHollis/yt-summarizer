@@ -49,6 +49,17 @@ echo "EOF" >> "$GITHUB_OUTPUT"
 if [ $PLAN_EXIT_CODE -ne 0 ]; then
   echo "::error::Terraform plan failed with exit code $PLAN_EXIT_CODE"
   echo "::error::Review the plan output above for detailed error messages"
+  
+  # Check if failure was due to state lock
+  if grep -q "state blob is already locked" plan_output.txt; then
+    LOCK_ID=$(grep "ID:" plan_output.txt | awk '{print $2}' | head -n1)
+    echo "::error::State lock detected - a previous operation may not have completed"
+    echo "::notice::Lock ID: $LOCK_ID"
+    echo "::notice::To unlock: Run 'terraform force-unlock $LOCK_ID' in infra/terraform/environments/prod"
+    echo "::notice::Or use: ./scripts/unlock-terraform-state.sh $LOCK_ID"
+    echo "::notice::IMPORTANT: Only unlock if you're certain no other terraform operation is running"
+  fi
+  
   # Note: tfplan file will NOT exist if plan failed
 fi
 

@@ -116,7 +116,9 @@ function generatePrComment(options) {
   sections.push('');
 
   // Header with Terraform branding
-  const statusIcon = planOutcome === 'success' ? '✅' : '❌';
+  // Show failure icon if plan failed OR if there's an error in the summary
+  const hasPlanError = planOutcome === 'failure' || planOutcome === 'skipped' || summary.error;
+  const statusIcon = hasPlanError ? '❌' : '✅';
   sections.push(`# ${statusIcon} Terraform Plan`);
   sections.push('');
 
