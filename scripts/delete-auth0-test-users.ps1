@@ -57,7 +57,7 @@ try {
         -Uri "https://$Domain/oauth/token" `
         -ContentType "application/json" `
         -Body $tokenBody
-    
+
     $accessToken = $tokenResponse.access_token
     Write-Host "✓ Got access token" -ForegroundColor Green
 }
@@ -70,16 +70,16 @@ catch {
 # Function to get user ID by email
 function Get-Auth0UserId {
     param([string]$Email)
-    
+
     $headers = @{
         Authorization = "Bearer $accessToken"
     }
-    
+
     try {
         $users = Invoke-RestMethod -Method Get `
             -Uri "https://$Domain/api/v2/users-by-email?email=$Email" `
             -Headers $headers
-        
+
         if ($users.Count -gt 0) {
             return $users[0].user_id
         }
@@ -94,26 +94,26 @@ function Get-Auth0UserId {
 # Function to delete user
 function Remove-Auth0User {
     param([string]$Email)
-    
+
     $userId = Get-Auth0UserId -Email $Email
-    
+
     if (-not $userId) {
         Write-Host "⚠️  User $Email not found in Auth0 (already deleted or never existed)" -ForegroundColor Yellow
         return $true
     }
-    
+
     Write-Host "Found user: $Email (ID: $userId)" -ForegroundColor Cyan
     Write-Host "Deleting..." -ForegroundColor Cyan
-    
+
     $headers = @{
         Authorization = "Bearer $accessToken"
     }
-    
+
     try {
         Invoke-RestMethod -Method Delete `
             -Uri "https://$Domain/api/v2/users/$userId" `
             -Headers $headers | Out-Null
-        
+
         Write-Host "✓ Successfully deleted $Email" -ForegroundColor Green
         return $true
     }
