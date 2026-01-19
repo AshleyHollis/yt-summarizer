@@ -232,24 +232,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify Azure credentials are configured
-        uses: ./.github/actions/verify-azure-credentials
+      - name: Setup Terraform with Azure
+        uses: ./.github/actions/setup-terraform-azure
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Validate Terraform configuration
         uses: ./.github/actions/validate
@@ -328,24 +317,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify Azure credentials are configured
-        uses: ./.github/actions/verify-azure-credentials
+      - name: Setup Terraform with Azure
+        uses: ./.github/actions/setup-terraform-azure
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Download Terraform plan artifact
         uses: actions/download-artifact@v4
