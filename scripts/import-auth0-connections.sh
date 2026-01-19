@@ -77,26 +77,26 @@ declare -A CONNECTION_MAP=(
 # Import each connection if it exists and is not already in state
 for RESOURCE_ADDR in "${!CONNECTION_MAP[@]}"; do
   CONNECTION_NAME="${CONNECTION_MAP[$RESOURCE_ADDR]}"
-  
+
   echo "Processing connection: ${CONNECTION_NAME}"
-  
+
   # Check if resource already exists in state
   if terraform state show "${RESOURCE_ADDR}" &>/dev/null; then
     echo "  ✓ Already in Terraform state (skipping import)"
     continue
   fi
-  
+
   # Find connection ID from Auth0
   CONNECTION_ID=$(echo "${CONNECTIONS}" | jq -r ".[] | select(.name == \"${CONNECTION_NAME}\") | .id")
-  
+
   if [[ -z "${CONNECTION_ID}" || "${CONNECTION_ID}" == "null" ]]; then
     echo "  ⚠ Connection not found in Auth0 (will be created on apply)"
     continue
   fi
-  
+
   echo "  Found connection ID: ${CONNECTION_ID}"
   echo "  Importing into ${RESOURCE_ADDR}..."
-  
+
   if terraform import "${RESOURCE_ADDR}" "${CONNECTION_ID}"; then
     echo "  ✓ Successfully imported"
   else
