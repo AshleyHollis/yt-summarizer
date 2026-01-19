@@ -513,6 +513,9 @@ jobs:
       !cancelled() &&
       needs.update-overlay.result == 'success'
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Setup deployment environment
         uses: ./.github/actions/setup-deployment-env
         with:

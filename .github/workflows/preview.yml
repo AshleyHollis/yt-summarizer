@@ -621,6 +621,9 @@ jobs:
       needs.update-overlay.result == 'success'
     needs: [update-overlay, check-concurrency, wait-for-ci, get-ingress, detect-changes]
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Setup deployment environment
         uses: ./.github/actions/setup-deployment-env
         with:

@@ -821,6 +821,9 @@ jobs:
       - name: Validate workflow env var consistency
         run: bash scripts/ci/validate-workflow-env-consistency.sh
 
+      - name: Validate composite actions usage
+        run: bash scripts/ci/validate-composite-actions.sh
+
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK
   # ===========================================================================

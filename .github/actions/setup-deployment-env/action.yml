@@ -1,11 +1,13 @@
 # Reusable deployment preparation action
 # Sets up the environment for Kubernetes deployment operations:
-# - Checks out code
 # - Authenticates to Azure and sets AKS cluster context
 # - Installs Kustomize
+#
+# NOTE: Requires actions/checkout@v4 to be run BEFORE this action in the workflow
+#       (composite actions cannot be loaded without repository checkout)
 
 name: 'Setup Deployment Environment'
-description: 'Prepare environment for Kubernetes deployments (checkout, AKS, kustomize)'
+description: 'Prepare environment for Kubernetes deployments (AKS auth, kustomize)'
 
 inputs:
   # Azure/AKS inputs
@@ -30,24 +32,9 @@ inputs:
     description: 'Kustomize version to install'
     required: true
 
-  # Checkout inputs (optional)
-  checkout-ref:
-    description: 'Git ref to checkout (branch, tag, or SHA). Defaults to workflow ref.'
-    required: false
-    default: ''
-  checkout-token:
-    description: 'GitHub token for checkout. Defaults to github.token.'
-    required: false
-    default: ${{ github.token }}
-
 runs:
   using: 'composite'
   steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ inputs.checkout-ref }}
-        token: ${{ inputs.checkout-token }}
 
     - name: Setup AKS
       uses: ./.github/actions/setup-aks
