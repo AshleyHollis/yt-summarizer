@@ -96,7 +96,20 @@ echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
 echo "$SUMMARY" >> "$GITHUB_OUTPUT"
 echo "EOF" >> "$GITHUB_OUTPUT"
 
-# Output the full JSON plan for parsing
-echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
-cat plan.json >> "$GITHUB_OUTPUT"
-echo "EOF" >> "$GITHUB_OUTPUT"
+# Write plan.json to a dedicated directory to avoid argument length limits
+# DO NOT write to GITHUB_OUTPUT - the file can be too large (>2MB with 16 resources)
+PLAN_DATA_DIR="${RUNNER_TEMP:-/tmp}/terraform-plan-data"
+mkdir -p "$PLAN_DATA_DIR"
+
+cp plan.json "$PLAN_DATA_DIR/formatted-plan.json"
+echo "$SUMMARY" > "$PLAN_DATA_DIR/plan-summary.json"
+
+# Export the directory path for downstream steps
+echo "TERRAFORM_PLAN_DATA_DIR=$PLAN_DATA_DIR" >> "$GITHUB_ENV"
+
+echo "✅ Plan data written to: $PLAN_DATA_DIR"
+echo "  - formatted-plan.json: $(wc -c < plan.json) bytes"
+echo "  - plan-summary.json: $(echo "$SUMMARY" | wc -c) bytes"
+
+# For backward compatibility, output a small marker (NOT the full plan)
+echo "formatted_plan=<file:$PLAN_DATA_DIR/formatted-plan.json>" >> "$GITHUB_OUTPUT"

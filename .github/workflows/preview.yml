@@ -328,44 +328,12 @@ jobs:
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         continue-on-error: true
 
-      - name: Write plan data to files
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-
-            // Create temp directory for plan data
-            const tempDir = path.join(process.env.RUNNER_TEMP, 'terraform-plan-data');
-            fs.mkdirSync(tempDir, { recursive: true });
-
-            // Write data files (GitHub Actions will expand these automatically)
-            const planSummary = `${{ steps.plan.outputs.plan_summary }}`;
-            const formattedPlan = `${{ steps.plan.outputs.formatted_plan }}`;
-            const planOutcome = `${{ steps.plan.outcome }}`;
-
-            fs.writeFileSync(path.join(tempDir, 'plan-summary.json'), planSummary);
-            fs.writeFileSync(path.join(tempDir, 'formatted-plan.json'), formattedPlan);
-            fs.writeFileSync(path.join(tempDir, 'plan-outcome.txt'), planOutcome);
-
-            // Log success
-            const summarySize = fs.statSync(path.join(tempDir, 'plan-summary.json')).size;
-            const planSize = fs.statSync(path.join(tempDir, 'formatted-plan.json')).size;
-
-            core.info(`✅ Plan data files created in ${tempDir}`);
-            core.info(`  - plan-summary.json: ${summarySize} bytes`);
-            core.info(`  - formatted-plan.json: ${planSize} bytes`);
-
-            // Export path for next step
-            core.exportVariable('TERRAFORM_PLAN_DATA_DIR', tempDir);
-
       - name: Post Plan to PR and Summary
         if: github.event_name == 'pull_request'
         uses: ./.github/actions/post-terraform-plan
         with:
           plan-summary: ${{ steps.plan.outputs.plan_summary }}
-          formatted-plan: ${{ steps.plan.outputs.formatted_plan }}
+          formatted-plan: 'unused'
           plan-outcome: ${{ steps.plan.outcome }}
 
       - name: Plan Status

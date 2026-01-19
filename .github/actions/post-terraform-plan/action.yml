@@ -24,21 +24,26 @@ runs:
     - name: Check for pre-written plan data files
       id: check-files
       shell: bash
+      env:
+        PLAN_OUTCOME: ${{ inputs.plan-outcome }}
       run: |
-        # Check if plan data was pre-written by workflow (to avoid argument list issues)
+        # Check if plan data was pre-written by terraform-plan action
         if [ -n "$TERRAFORM_PLAN_DATA_DIR" ] && [ -d "$TERRAFORM_PLAN_DATA_DIR" ]; then
-          echo "Using pre-written plan data from: $TERRAFORM_PLAN_DATA_DIR"
+          echo "✅ Using pre-written plan data from: $TERRAFORM_PLAN_DATA_DIR"
           echo "use_prewritten=true" >> $GITHUB_OUTPUT
           echo "data_dir=$TERRAFORM_PLAN_DATA_DIR" >> $GITHUB_OUTPUT
 
           # Copy to action directory for subsequent steps
           cp "$TERRAFORM_PLAN_DATA_DIR/plan-summary.json" "${{ github.action_path }}/plan-summary.json"
           cp "$TERRAFORM_PLAN_DATA_DIR/formatted-plan.json" "${{ github.action_path }}/formatted-plan.json"
-          cp "$TERRAFORM_PLAN_DATA_DIR/plan-outcome.txt" "${{ github.action_path }}/plan-outcome.txt"
+          
+          # Write plan outcome to file (not written by terraform-plan action)
+          echo "$PLAN_OUTCOME" > "${{ github.action_path }}/plan-outcome.txt"
 
           echo "✅ Copied plan data files to action directory"
+          ls -lh "${{ github.action_path }}"/*.json "${{ github.action_path }}"/*.txt 2>/dev/null || true
         else
-          echo "No pre-written plan data found, will write from inputs"
+          echo "⚠️  No pre-written plan data found, will write from inputs"
           echo "use_prewritten=false" >> $GITHUB_OUTPUT
         fi
 
