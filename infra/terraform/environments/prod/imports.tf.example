@@ -1,0 +1,49 @@
+# =============================================================================
+# Import Blocks for Auth0 Test Users
+# =============================================================================
+# This file defines import blocks for existing Auth0 test users.
+# When you run `terraform plan -generate-config-out=generated.tf`, Terraform will:
+#   1. Import the existing users into state
+#   2. Generate matching resource configuration
+#
+# Usage:
+#   1. Get the user IDs from Auth0 (see scripts/import-auth0-test-users.sh)
+#   2. Update the `id` fields below with actual Auth0 user IDs
+#   3. Run: terraform plan -generate-config-out=generated.tf
+#   4. Review generated.tf and merge into your configuration
+#   5. Delete this file after import is complete
+#
+# Alternative: Use terraform import command (see scripts/import-auth0-test-users.sh)
+# =============================================================================
+
+# NOTE: Replace "auth0|REPLACE_WITH_ACTUAL_USER_ID" with real user IDs from Auth0
+# Example: "auth0|6581234567890abcdef12345"
+
+# import {
+#   to = module.auth0[0].auth0_user.test_user["admin@test.yt-summarizer.internal"]
+#   id = "auth0|REPLACE_WITH_ADMIN_USER_ID"
+# }
+
+# import {
+#   to = module.auth0[0].auth0_user.test_user["user@test.yt-summarizer.internal"]
+#   id = "auth0|REPLACE_WITH_USER_ID"
+# }
+
+# =============================================================================
+# Instructions for getting user IDs:
+# =============================================================================
+# Option 1: Use the Auth0 Dashboard
+#   1. Go to Auth0 Dashboard → User Management → Users
+#   2. Search for admin@test.yt-summarizer.internal
+#   3. Click the user → Copy the user_id from the URL or Details section
+#   4. Repeat for user@test.yt-summarizer.internal
+#
+# Option 2: Use the import script
+#   1. Export AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET
+#   2. Run: ./scripts/import-auth0-test-users.sh
+#   3. Script will automatically import users into state
+#
+# Option 3: Delete and recreate
+#   1. Run: ./scripts/delete-auth0-test-users.sh
+#   2. Run: terraform apply (will create fresh users)
+# =============================================================================
