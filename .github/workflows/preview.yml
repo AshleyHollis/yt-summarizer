@@ -151,6 +151,7 @@ env:
   # Paths
   KUSTOMIZE_OVERLAY_PREVIEW: 'k8s/overlays/preview'
   ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
+  TERRAFORM_WORKING_DIR: 'infra/terraform/environments/prod'
 
   # Tool Versions
   TERRAFORM_VERSION: '1.5.7'
@@ -285,7 +286,7 @@ jobs:
       ARM_USE_OIDC: true
     defaults:
       run:
-        working-directory: infra/terraform/environments/prod
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -302,7 +303,7 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: terraform-config
-          terraform-directory: infra/terraform/environments/prod
+          terraform-directory: ${{ env.TERRAFORM_WORKING_DIR }}
           fail-fast: 'true'
           timeout-seconds: '60'
 
@@ -310,7 +311,7 @@ jobs:
         id: plan
         uses: ./.github/actions/terraform-plan
         with:
-          working-directory: 'infra/terraform/environments/prod'
+          working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
@@ -333,9 +334,9 @@ jobs:
         with:
           name: terraform-plan
           path: |
-            infra/terraform/environments/prod/tfplan
-            infra/terraform/environments/prod/plan_output.txt
-            infra/terraform/environments/prod/plan.json
+            ${{ env.TERRAFORM_WORKING_DIR }}/tfplan
+            ${{ env.TERRAFORM_WORKING_DIR }}/plan_output.txt
+            ${{ env.TERRAFORM_WORKING_DIR }}/plan.json
 
   # ===========================================================================
   # PHASE 1C: TERRAFORM APPLY
@@ -361,7 +362,7 @@ jobs:
       ARM_USE_OIDC: true
     defaults:
       run:
-        working-directory: infra/terraform/environments/prod
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -378,13 +379,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: terraform-plan
-          path: infra/terraform/environments/prod
+          path: ${{ env.TERRAFORM_WORKING_DIR }}
 
       - name: Validate Terraform configuration
         uses: ./.github/actions/validate
         with:
           validators: terraform-config
-          terraform-directory: infra/terraform/environments/prod
+          terraform-directory: ${{ env.TERRAFORM_WORKING_DIR }}
           fail-fast: 'true'
           timeout-seconds: '60'
 
