@@ -66,7 +66,7 @@ resource "azapi_update_resource" "swa_app_settings" {
 
 ### 3. Azure API Provider
 
-**Files**: 
+**Files**:
 - `infra/terraform/environments/prod/versions.tf` - Added `azapi` provider requirement (~> 2.0)
 - `infra/terraform/environments/prod/providers.tf` - Added `azapi` provider configuration
 
@@ -276,7 +276,7 @@ Expected output:
 
 **Symptoms**: Auth0 redirects back to SWA but shows "Callback URL mismatch" error.
 
-**Solution**: 
+**Solution**:
 1. Verify `terraform apply` completed successfully
 2. Check Auth0 Dashboard → Application → Settings → Allowed Callback URLs
 3. Ensure SWA domain matches exactly (with `/api/auth/callback` path)

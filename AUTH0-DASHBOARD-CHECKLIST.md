@@ -176,7 +176,7 @@ Paste this code:
 ```javascript
 /**
  * Add role claims to ID and Access tokens
- * 
+ *
  * Reads user.app_metadata.role and injects as custom claim
  * Namespace: https://yt-summarizer.com/role
  */
