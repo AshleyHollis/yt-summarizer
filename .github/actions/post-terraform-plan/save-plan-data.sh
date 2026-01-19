@@ -25,16 +25,12 @@
 set -euo pipefail
 
 # Write data to files (safer than passing large JSON through env vars)
-cat > plan-summary.json <<'PLAN_SUMMARY_EOF'
-$PLAN_SUMMARY
-PLAN_SUMMARY_EOF
-
-cat > formatted-plan.json <<'FORMATTED_PLAN_EOF'
-$FORMATTED_PLAN
-FORMATTED_PLAN_EOF
-
-cat > plan-outcome.txt <<'PLAN_OUTCOME_EOF'
-$PLAN_OUTCOME
-PLAN_OUTCOME_EOF
+# Use printf to avoid issues with large content
+printf '%s\n' "$PLAN_SUMMARY" > plan-summary.json
+printf '%s\n' "$FORMATTED_PLAN" > formatted-plan.json
+printf '%s\n' "$PLAN_OUTCOME" > plan-outcome.txt
 
 echo "✅ Plan data files created"
+echo "  - plan-summary.json: $(wc -c < plan-summary.json) bytes"
+echo "  - formatted-plan.json: $(wc -c < formatted-plan.json) bytes"
+echo "  - plan-outcome.txt: $(wc -c < plan-outcome.txt) bytes"

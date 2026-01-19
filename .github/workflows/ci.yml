@@ -155,6 +155,45 @@ jobs:
         working-directory: apps/web
         run: npm run lint
 
+      - name: Validate required frontend files exist
+        working-directory: apps/web
+        run: |
+          echo "🔍 Checking for critical frontend files..."
+          
+          # Check for commonly missing files that cause build failures
+          missing_files=()
+          
+          # Check for lib directory files (common gitignore issue)
+          if [ ! -f "src/lib/auth-utils.ts" ]; then
+            missing_files+=("src/lib/auth-utils.ts")
+          fi
+          
+          # Check for other critical files
+          critical_files=(
+            "src/lib/logger.ts"
+            "src/services/api.ts"
+            "src/types/index.ts"
+          )
+          
+          for file in "${critical_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "⚠️  Warning: $file not found (may be optional)"
+            fi
+          done
+          
+          if [ ${#missing_files[@]} -gt 0 ]; then
+            echo "❌ ERROR: Missing critical files:"
+            printf '  - %s\n' "${missing_files[@]}"
+            echo ""
+            echo "This is often caused by .gitignore patterns ignoring source code."
+            echo "Check .gitignore for overly broad patterns like 'lib/' instead of '/lib/'"
+            exit 1
+          fi
+          
+          echo "✅ All critical files present"
+
   # ===========================================================================
   # PHASE 3: SECURITY SCANNING
   # ===========================================================================
