@@ -799,11 +799,6 @@ jobs:
           echo "✅ Cleaned up ${{ steps.cleanup-stale.outputs.deleted-count }} stale SWA environment(s)"
           echo "💡 Deleted environments for PRs: ${{ steps.cleanup-stale.outputs.stale-prs }}"
 
-      - name: Prepare directory for SWA deployment
-        uses: ./.github/actions/prepare-swa-deployment
-        with:
-          working-directory: apps/web
-
       - name: Deploy to SWA staging environment
         id: deploy
         uses: Azure/static-web-apps-deploy@v1
