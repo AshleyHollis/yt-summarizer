@@ -1,8 +1,8 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #64
-# Image Tag: pr-64-0e2c6e5
-# Commit: 0e2c6e5d1ae34f0c371120972009cff74d34c016
-# Updated: 2026-01-19T06:04:41Z
+# Image Tag: pr-64-59530ed
+# Commit: 59530ed9fb07b3d0ff171faf587cc76d2bb5c7b8
+# Updated: 2026-01-19T08:09:48Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -25,11 +25,11 @@ patches:
   - path: patches/replicas-patch.yaml
   - path: patches/migration-job-patch.yaml
 images:
-  -
+  - 
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: pr-64-0e2c6e5
-  -
+    newTag: pr-64-59530ed
+  - 
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: pr-64-0e2c6e5
+    newTag: pr-64-59530ed
