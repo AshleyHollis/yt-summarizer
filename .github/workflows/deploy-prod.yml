@@ -655,7 +655,7 @@ jobs:
           namespace: ${{ env.NAMESPACE_PROD }}
           deployment-name: api
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
           image-name: ${{ env.API_IMAGE_NAME }}
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
 
@@ -664,7 +664,7 @@ jobs:
         with:
           namespace: ${{ env.NAMESPACE_PROD }}
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
           image-name: ${{ env.WORKERS_IMAGE_NAME }}
           workers: ${{ env.WORKER_DEPLOYMENTS }}
           fail-on-mismatch: 'true'

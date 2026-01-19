@@ -763,7 +763,7 @@ jobs:
           namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           deployment-name: api
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
           image-name: ${{ env.API_IMAGE_NAME }}
 
       - name: Verify workers deployment image
@@ -771,7 +771,7 @@ jobs:
         with:
           namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
           image-name: ${{ env.WORKERS_IMAGE_NAME }}
           workers: ${{ env.WORKER_DEPLOYMENTS }}
           fail-on-mismatch: 'true'
