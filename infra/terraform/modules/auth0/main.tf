@@ -251,8 +251,11 @@ resource "auth0_user" "test_user" {
     role = each.value.role
   })
 
-  # Ensure database connection is created first
-  depends_on = [auth0_connection.database]
+  # Ensure database connection is enabled for the BFF client before creating users
+  depends_on = [
+    auth0_connection.database,
+    auth0_connection_clients.database_clients
+  ]
 
   lifecycle {
     ignore_changes = [password]
