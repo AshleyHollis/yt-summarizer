@@ -119,8 +119,10 @@ variable "test_users" {
     email_verified = bool
     role           = string # 'admin' or 'normal'
   }))
-  default   = []
-  sensitive = true
+  default = []
+  # NOTE: Cannot mark as sensitive=true because it's used in for_each
+  # Terraform restriction: sensitive values cannot be used in for_each keys
+  # Passwords will be visible in plan output but are auto-rotated and stored in Key Vault
 }
 
 # T011: Action support
