@@ -12,7 +12,7 @@ inputs:
   azure-subscription-id:
     description: 'Azure Subscription ID'
     required: true
-  
+
   # ACR validation
   acr-registry:
     description: 'ACR registry name (e.g., acrytsummprd)'
@@ -27,7 +27,7 @@ inputs:
     description: 'Whether to fail if image is not found in ACR'
     required: false
     default: 'true'
-  
+
   # AKS setup (optional)
   setup-aks:
     description: 'Whether to setup AKS context'
@@ -39,7 +39,7 @@ inputs:
   aks-cluster-name:
     description: 'AKS cluster name (required if setup-aks is true)'
     required: false
-  
+
   # K8s pull verification (optional)
   verify-k8s-pull:
     description: 'Whether to verify Kubernetes can pull the image'
@@ -79,7 +79,7 @@ runs:
       shell: bash
       run: |
         echo "Verifying AKS cluster can pull image: ${{ inputs.acr-registry }}.azurecr.io/${{ inputs.acr-repository }}:${{ inputs.image-tag }}"
-        
+
         # Create a temporary pod to test image pull
         kubectl run test-pull-${{ github.run_id }} \
           --image=${{ inputs.acr-registry }}.azurecr.io/${{ inputs.acr-repository }}:${{ inputs.image-tag }} \
@@ -89,24 +89,24 @@ runs:
           echo "Failed to pull image from ACR"
           exit 1
         }
-        
+
         # Wait for pod to complete
         kubectl wait --for=condition=Ready pod/test-pull-${{ github.run_id }} \
           --namespace=${{ inputs.k8s-namespace }} \
           --timeout=60s || true
-        
+
         # Check pod status
         POD_STATUS=$(kubectl get pod test-pull-${{ github.run_id }} \
           --namespace=${{ inputs.k8s-namespace }} \
           -o jsonpath='{.status.phase}')
-        
+
         # Cleanup
         kubectl delete pod test-pull-${{ github.run_id }} \
           --namespace=${{ inputs.k8s-namespace }} || true
-        
+
         if [[ "$POD_STATUS" != "Running" ]] && [[ "$POD_STATUS" != "Succeeded" ]]; then
           echo "Image pull verification failed. Pod status: $POD_STATUS"
           exit 1
         fi
-        
+
         echo "✓ Cluster can successfully pull image"
