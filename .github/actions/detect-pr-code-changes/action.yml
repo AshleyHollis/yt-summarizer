@@ -36,6 +36,9 @@ outputs:
   needs_deployment:
     description: Whether the PR contains changes that require deployment
     value: ${{ steps.detect.outputs.needs_deployment }}
+  needs_backend_deployment:
+    description: Whether the PR contains changes that require backend (Kubernetes/Argo CD) deployment
+    value: ${{ steps.detect.outputs.needs_backend_deployment }}
 
 runs:
   using: composite

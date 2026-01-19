@@ -188,6 +188,7 @@ jobs:
     outputs:
       needs_image_build: ${{ steps.finalize.outputs.needs_image_build }}
       needs_deployment: ${{ steps.finalize.outputs.needs_deployment }}
+      needs_backend_deployment: ${{ steps.check.outputs.needs_backend_deployment }}
       infra_changed: ${{ steps.infra.outputs.infra_changed }}
       pr_number: ${{ steps.set-pr.outputs.pr_number }}
       pr_head_ref: ${{ steps.set-pr.outputs.pr_head_ref }}
@@ -594,7 +595,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
-      needs.detect-changes.outputs.needs_deployment == 'true' &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true'
     needs: [check-concurrency, detect-changes]
@@ -640,7 +641,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
-      needs.detect-changes.outputs.needs_deployment == 'true' &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success' &&
@@ -743,7 +744,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
-      needs.detect-changes.outputs.needs_deployment == 'true' &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.update-overlay.result == 'success'
