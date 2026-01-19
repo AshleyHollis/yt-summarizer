@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { createMockUser } from '../helpers/mockFactories';
 
 // Mock the useAuth hook
 vi.mock('../../hooks/useAuth');
@@ -48,10 +49,10 @@ function RoleBasedComponent({
   showLoading = false,
   children,
 }: RoleBasedComponentProps) {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   // Show loading state if enabled
-  if (loading && showLoading) {
+  if (isLoading && showLoading) {
     return <div data-testid="role-loading">Loading...</div>;
   }
 
@@ -85,14 +86,15 @@ describe('RoleBasedComponent', () => {
   describe('Authenticated User with Admin Role', () => {
     beforeEach(() => {
       vi.mocked(useAuth).mockReturnValue({
-        user: {
+        user: createMockUser({
           sub: 'auth0|123',
           email: 'admin@test.com',
           'https://yt-summarizer.com/role': 'admin',
-        },
-        loading: false,
+        }),
+        isLoading: false,
         isAuthenticated: true,
         error: null,
+        hasRole: (role) => role === 'admin',
       });
     });
 
@@ -146,14 +148,15 @@ describe('RoleBasedComponent', () => {
   describe('Authenticated User with Normal Role', () => {
     beforeEach(() => {
       vi.mocked(useAuth).mockReturnValue({
-        user: {
+        user: createMockUser({
           sub: 'auth0|456',
           email: 'user@test.com',
-          'https://yt-summarizer.com/role': 'user',
-        },
-        loading: false,
+          'https://yt-summarizer.com/role': 'normal',
+        }),
+        isLoading: false,
         isAuthenticated: true,
         error: null,
+        hasRole: (role) => role === 'normal',
       });
     });
 
@@ -169,7 +172,7 @@ describe('RoleBasedComponent', () => {
 
     it('should render children when user has matching role', () => {
       render(
-        <RoleBasedComponent requiredRole="user">
+        <RoleBasedComponent requiredRole="normal">
           <div data-testid="user-content">User Dashboard</div>
         </RoleBasedComponent>
       );
@@ -205,13 +208,14 @@ describe('RoleBasedComponent', () => {
   describe('Authenticated User without Role', () => {
     beforeEach(() => {
       vi.mocked(useAuth).mockReturnValue({
-        user: {
+        user: createMockUser({
           sub: 'auth0|789',
           email: 'norole@test.com',
-        },
-        loading: false,
+        }),
+        isLoading: false,
         isAuthenticated: true,
         error: null,
+        hasRole: () => false,
       });
     });
 
@@ -253,9 +257,10 @@ describe('RoleBasedComponent', () => {
     beforeEach(() => {
       vi.mocked(useAuth).mockReturnValue({
         user: null,
-        loading: false,
+        isLoading: false,
         isAuthenticated: false,
         error: null,
+        hasRole: () => false,
       });
     });
 
@@ -299,9 +304,10 @@ describe('RoleBasedComponent', () => {
     beforeEach(() => {
       vi.mocked(useAuth).mockReturnValue({
         user: null,
-        loading: true,
+        isLoading: true,
         isAuthenticated: false,
         error: null,
+        hasRole: () => false,
       });
     });
 
@@ -349,9 +355,10 @@ describe('RoleBasedComponent', () => {
     beforeEach(() => {
       vi.mocked(useAuth).mockReturnValue({
         user: null,
-        loading: false,
+        isLoading: false,
         isAuthenticated: false,
         error: new Error('Auth failed'),
+        hasRole: () => false,
       });
     });
 
@@ -382,14 +389,15 @@ describe('RoleBasedComponent', () => {
   describe('Complex Scenarios', () => {
     it('should handle nested RoleBasedComponents', () => {
       vi.mocked(useAuth).mockReturnValue({
-        user: {
+        user: createMockUser({
           sub: 'auth0|123',
           email: 'admin@test.com',
           'https://yt-summarizer.com/role': 'admin',
-        },
-        loading: false,
+        }),
+        isLoading: false,
         isAuthenticated: true,
         error: null,
+        hasRole: (role) => role === 'admin',
       });
 
       render(
@@ -410,14 +418,15 @@ describe('RoleBasedComponent', () => {
 
     it('should render multiple children correctly', () => {
       vi.mocked(useAuth).mockReturnValue({
-        user: {
+        user: createMockUser({
           sub: 'auth0|123',
           email: 'admin@test.com',
           'https://yt-summarizer.com/role': 'admin',
-        },
-        loading: false,
+        }),
+        isLoading: false,
         isAuthenticated: true,
         error: null,
+        hasRole: (role) => role === 'admin',
       });
 
       render(

@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { JobProgress } from '@/components/JobProgress';
+import { createMockVideoJobsProgress } from '../helpers/mockFactories';
 
 // Mock the API module
 vi.mock('@/services/api', () => ({
@@ -15,21 +16,6 @@ vi.mock('@/services/api', () => ({
 }));
 
 import { jobApi } from '@/services/api';
-
-const createMockProgress = (overrides = {}) => ({
-  video_id: '123',
-  overall_status: 'processing',
-  overall_progress: 50,
-  jobs: [
-    { job_id: 'job-1', job_type: 'transcribe', stage: 'completed', status: 'succeeded' },
-    { job_id: 'job-2', job_type: 'summarize', stage: 'processing', status: 'running' },
-    { job_id: 'job-3', job_type: 'embed', stage: 'queued', status: 'pending' },
-    { job_id: 'job-4', job_type: 'build_relationships', stage: 'queued', status: 'pending' },
-  ],
-  eta: null,
-  current_stage_name: null,
-  ...overrides,
-});
 
 describe('JobProgress', () => {
   beforeEach(() => {
@@ -49,7 +35,7 @@ describe('JobProgress', () => {
     });
 
     it('displays progress after API response', async () => {
-      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockProgress());
+      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockVideoJobsProgress());
 
       render(<JobProgress videoId="123" />);
 
@@ -59,7 +45,7 @@ describe('JobProgress', () => {
     });
 
     it('displays stage labels after API response', async () => {
-      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockProgress());
+      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockVideoJobsProgress());
 
       render(<JobProgress videoId="123" />);
 
@@ -72,7 +58,7 @@ describe('JobProgress', () => {
     });
 
     it('shows Processing Progress heading', async () => {
-      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockProgress());
+      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockVideoJobsProgress());
 
       render(<JobProgress videoId="123" />);
 
@@ -85,7 +71,7 @@ describe('JobProgress', () => {
   describe('Progress States', () => {
     it('shows 0% for zero progress', async () => {
       vi.mocked(jobApi.getVideoProgress).mockResolvedValue(
-        createMockProgress({ overall_progress: 0 })
+        createMockVideoJobsProgress({ overall_progress: 0 })
       );
 
       render(<JobProgress videoId="123" />);
@@ -96,7 +82,7 @@ describe('JobProgress', () => {
     });
 
     it('shows "In progress..." text for running stage', async () => {
-      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockProgress());
+      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockVideoJobsProgress());
 
       render(<JobProgress videoId="123" />);
 
@@ -107,15 +93,9 @@ describe('JobProgress', () => {
 
     it('shows Processing Complete! message when done', async () => {
       vi.mocked(jobApi.getVideoProgress).mockResolvedValue(
-        createMockProgress({
+        createMockVideoJobsProgress({
           overall_status: 'completed',
           overall_progress: 100,
-          jobs: [
-            { job_id: 'job-1', job_type: 'transcribe', status: 'succeeded' },
-            { job_id: 'job-2', job_type: 'summarize', status: 'succeeded' },
-            { job_id: 'job-3', job_type: 'embed', status: 'succeeded' },
-            { job_id: 'job-4', job_type: 'build_relationships', status: 'succeeded' },
-          ],
         })
       );
 
@@ -128,14 +108,8 @@ describe('JobProgress', () => {
 
     it('shows Processing Failed message when failed', async () => {
       vi.mocked(jobApi.getVideoProgress).mockResolvedValue(
-        createMockProgress({
+        createMockVideoJobsProgress({
           overall_status: 'failed',
-          jobs: [
-            { job_id: 'job-1', job_type: 'transcribe', status: 'succeeded' },
-            { job_id: 'job-2', job_type: 'summarize', status: 'failed' },
-            { job_id: 'job-3', job_type: 'embed', status: 'pending' },
-            { job_id: 'job-4', job_type: 'build_relationships', status: 'pending' },
-          ],
         })
       );
 
@@ -151,7 +125,7 @@ describe('JobProgress', () => {
     it('calls onComplete callback when overall_status is completed', async () => {
       const onComplete = vi.fn();
       vi.mocked(jobApi.getVideoProgress).mockResolvedValue(
-        createMockProgress({ overall_status: 'completed', overall_progress: 100 })
+        createMockVideoJobsProgress({ overall_status: 'completed', overall_progress: 100 })
       );
 
       render(<JobProgress videoId="123" onComplete={onComplete} />);
@@ -164,12 +138,8 @@ describe('JobProgress', () => {
     it('calls onFailed callback when overall_status is failed', async () => {
       const onFailed = vi.fn();
       vi.mocked(jobApi.getVideoProgress).mockResolvedValue(
-        createMockProgress({
+        createMockVideoJobsProgress({
           overall_status: 'failed',
-          jobs: [
-            { job_id: 'job-1', job_type: 'transcribe', status: 'succeeded' },
-            { job_id: 'job-2', job_type: 'summarize', status: 'failed' },
-          ],
         })
       );
 
@@ -183,7 +153,7 @@ describe('JobProgress', () => {
 
   describe('API calls', () => {
     it('fetches progress with videoId on mount', async () => {
-      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockProgress());
+      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockVideoJobsProgress());
 
       render(<JobProgress videoId="123" />);
 
@@ -195,7 +165,7 @@ describe('JobProgress', () => {
 
   describe('Accessibility', () => {
     it('has accessible progress bar', async () => {
-      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockProgress());
+      vi.mocked(jobApi.getVideoProgress).mockResolvedValue(createMockVideoJobsProgress());
 
       render(<JobProgress videoId="123" />);
 

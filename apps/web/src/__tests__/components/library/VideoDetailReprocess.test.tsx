@@ -33,28 +33,7 @@ vi.mock('@/services/api', () => ({
 }));
 
 import { libraryApi, videoApi } from '@/services/api';
-
-// Create a mock video response factory
-const createMockVideoDetail = (overrides = {}) => ({
-  video_id: 'test-video-id',
-  youtube_video_id: 'abc123',
-  youtube_url: 'https://youtube.com/watch?v=abc123',
-  title: 'Test Video Title',
-  description: 'Test description',
-  duration: 300,
-  publish_date: '2024-01-15T10:00:00Z',
-  thumbnail_url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg',
-  processing_status: 'completed',
-  channel: {
-    channel_id: 'channel-1',
-    name: 'Test Channel',
-    youtube_channel_id: 'UC12345',
-  },
-  facets: [],
-  summary: 'This is a test summary with content.',
-  transcript: 'Test transcript content',
-  ...overrides,
-});
+import { createMockVideoDetail, createMockSubmitVideoResponse } from '../../helpers/mockFactories';
 
 describe('Video Detail Page - Reprocess Button', () => {
   beforeEach(() => {
@@ -141,7 +120,9 @@ describe('Video Detail Page - Reprocess Button', () => {
       vi.mocked(libraryApi.getVideoDetail).mockResolvedValue(
         createMockVideoDetail({ processing_status: 'failed', summary: null })
       );
-      vi.mocked(videoApi.reprocess).mockResolvedValue({ video_id: 'test-video-id' });
+      vi.mocked(videoApi.reprocess).mockResolvedValue(
+        createMockSubmitVideoResponse({ video_id: 'test-video-id' })
+      );
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
@@ -165,7 +146,13 @@ describe('Video Detail Page - Reprocess Button', () => {
 
       // Delay the reprocess response to test loading state
       vi.mocked(videoApi.reprocess).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ video_id: 'test-video-id' }), 500))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve(createMockSubmitVideoResponse({ video_id: 'test-video-id' })),
+              500
+            )
+          )
       );
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
@@ -190,7 +177,13 @@ describe('Video Detail Page - Reprocess Button', () => {
       );
 
       vi.mocked(videoApi.reprocess).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ video_id: 'test-video-id' }), 500))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve(createMockSubmitVideoResponse({ video_id: 'test-video-id' })),
+              500
+            )
+          )
       );
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');

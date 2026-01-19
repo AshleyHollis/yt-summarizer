@@ -5,7 +5,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom';
 import { SubmitVideoForm } from '@/components/SubmitVideoForm';
+import { createMockSubmitVideoResponse } from '../helpers/mockFactories';
+import type { SubmitVideoResponse } from '@/services/api';
 
 // Mock the API module
 vi.mock('@/services/api', () => ({
@@ -108,7 +111,7 @@ describe('SubmitVideoForm', () => {
   describe('Submission', () => {
     it('shows loading state during submission', async () => {
       // Create a deferred promise to control resolution
-      let resolveSubmit: (value: unknown) => void;
+      let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
         () => new Promise((resolve) => { resolveSubmit = resolve; })
       );
@@ -127,15 +130,11 @@ describe('SubmitVideoForm', () => {
       });
 
       // Resolve the promise to clean up
-      resolveSubmit!({
+      resolveSubmit!(createMockSubmitVideoResponse({
         video_id: '123',
         youtube_video_id: 'dQw4w9WgXcQ',
         title: 'Test',
-        channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
-        processing_status: 'pending',
-        submitted_at: new Date().toISOString(),
-        jobs_queued: 1,
-      });
+      }));
     });
 
     it('shows success message after successful submission', async () => {
@@ -233,7 +232,7 @@ describe('SubmitVideoForm', () => {
 
     it('disables input and button during submission', async () => {
       // Create a deferred promise to control resolution
-      let resolveSubmit: (value: unknown) => void;
+      let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
         () => new Promise((resolve) => { resolveSubmit = resolve; })
       );
@@ -252,15 +251,9 @@ describe('SubmitVideoForm', () => {
       });
 
       // Resolve the promise to clean up
-      resolveSubmit!({
+      resolveSubmit!(createMockSubmitVideoResponse({
         video_id: '123',
-        youtube_video_id: 'dQw4w9WgXcQ',
-        title: 'Test',
-        channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
-        processing_status: 'pending',
-        submitted_at: new Date().toISOString(),
-        jobs_queued: 1,
-      });
+      }));
     });
   });
 });
