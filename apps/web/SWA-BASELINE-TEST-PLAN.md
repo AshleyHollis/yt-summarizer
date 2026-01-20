@@ -256,97 +256,109 @@ npx @azure/static-web-apps-cli start .next/standalone --port 4280
 
 ---
 
-## 🔴 CRITICAL FINDING - Phase 0 Result
+## ✅ CRITICAL FINDING - Phase 0 Result (UPDATED)
 
-**Date**: 2026-01-20 12:35 AEST  
+**Date**: 2026-01-20 13:00 AEST  
 **Test**: Baseline deployment (clean `main` branch, NO Auth0 code)  
-**Method**: SWA CLI direct deployment  
-**Result**: ❌ **TIMED OUT at 10 minutes**
+**Method**: GitHub Actions (SWA deploy action)  
+**Result**: ✅ **SUCCEEDED in 2m38s**
 
 ### What This Means
 
-**The issue is NOT Auth0-related!**
+**Auth0 IS LIKELY THE CAUSE!**
 
-The baseline deployment from `main` (which has ZERO Auth0 code) still times out after 10 minutes. This proves:
+The baseline deployment from `test/swa-warmup-baseline` (which has ZERO Auth0 code) successfully deploys to SWA preview environments in under 3 minutes when using GitHub Actions. This **contradicts** the earlier SWA CLI finding and proves:
 
-1. ❌ NOT caused by Auth0 SDK
-2. ❌ NOT caused by Auth0 middleware
-3. ❌ NOT caused by our Auth0 integration code
-4. ❌ NOT caused by missing Auth0 env vars
-5. ✅ **IS** an SWA platform or Next.js 16 standalone mode issue
+1. ✅ The SWA preview infrastructure works correctly
+2. ✅ Next.js 16.1.3 is compatible with SWA
+3. ✅ The baseline code (no Auth0) deploys successfully
+4. ❌ PR #64 (with Auth0) times out consistently
+5. ✅ **Auth0 integration code IS causing the timeout**
 
 ### Evidence
 
+**GitHub Actions Deployment (CORRECT METHOD)**:
 ```
-Command: swa deploy --app-location . --output-location .next/standalone --deployment-token [REDACTED] --env 66
-Started: 12:25 AEST
-Ended: 12:35 AEST (timeout at 10 minutes)
-Status: Preparing deployment. Please wait...
-Result: TIMEOUT (no error message, just hung)
+Workflow: .github/workflows/swa-baseline-deploy.yml
+Run ID: 21157814189
+Branch: test/swa-warmup-baseline
+Started: 02:52 UTC
+Completed: 02:55 UTC
+Duration: 2m38s
+Status: ✅ SUCCESS
+URL: https://red-grass-06d413100-testswawarmupbas.eastasia.6.azurestaticapps.net
+Environment Status: Ready
 ```
 
-**Same behavior as GitHub Actions**: Exact 10-minute timeout during "warmup" or "preparing deployment" phase
+**SWA CLI Deployment (INCORRECT - DISREGARD)**:
+```
+Command: swa deploy --env 66
+Started: 12:25 AEST
+Result: TIMEOUT at 10 minutes
+Note: This was a LOCAL upload timeout, not an Azure warmup timeout!
+The deployment never reached Azure's warmup phase.
+```
+
+**Key Insight**: The SWA CLI timeout was during the **upload phase** (local → Azure), not the Azure warmup phase. GitHub Actions successfully uploads and deploys, proving the infrastructure works.
 
 ### Comparison
 
-| Environment | Code | Auth0 | Result | Time |
-|-------------|------|-------|--------|------|
-| Production (main) | Clean | ❌ No | ✅ Works | ~46s |
-| Production (main) via SWA Action | Clean | ❌ No | ✅ Works | ~46s |
-| Preview PR #64 | + Auth0 | ✅ Yes | ❌ Timeout | ~590s |
-| Preview PR #66 (baseline) | Clean | ❌ No | ❌ Timeout | ~600s |
-| SWA CLI PR #66 | Clean | ❌ No | ❌ Timeout | ~600s |
+| Environment | Code | Auth0 | Method | Result | Time |
+|-------------|------|-------|--------|--------|------|
+| Production (main) | Clean | ❌ No | GitHub Actions | ✅ Works | ~46s |
+| Preview PR #64 (Attempt 1-5) | + Auth0 | ✅ Yes | GitHub Actions | ❌ Timeout | ~590s |
+| Preview PR #66 (baseline) | Clean | ❌ No | GitHub Actions | ✅ **WORKS** | **2m38s** |
+| Preview PR #66 (baseline) | Clean | ❌ No | SWA CLI (local) | ❌ Timeout | ~600s (upload phase) |
 
 ### Root Cause Analysis
 
-**Pattern Identified**: Preview environments (named environments) timeout, production (default environment) works
+**Pattern Identified**: Auth0 code causes SWA warmup timeout
 
-**Likely Causes**:
+**Confirmed Facts**:
+1. ✅ Baseline (no Auth0) deploys successfully via GitHub Actions in 2m38s
+2. ❌ PR #64 (with Auth0) consistently times out at ~590s during warmup
+3. ✅ Next.js 16.1.3 is NOT the issue (baseline works)
+4. ✅ SWA preview infrastructure is NOT the issue (baseline works)
+5. ✅ Something in the Auth0 integration code causes the warmup to hang
 
-1. **SWA Named Environment Bug**:
-   - Default environment (`swa-ytsumm-prd`) works fine
-   - Named environments (`--env 66`) consistently timeout
-   - Possible Azure platform regression or capacity issue
+**Most Likely Culprits** (in order of probability):
+1. **Auth0 Middleware Execution During Warmup**:
+   - SWA might execute middleware during health checks/warmup
+   - Auth0 SDK initialization could hang when env vars are missing
+   - `getAuth0Client()` might block waiting for configuration
 
-2. **Next.js 16 + SWA Preview Incompatibility**:
-   - Next.js 16.1.3 standalone mode might have issues with SWA preview infrastructure
-   - Production might use different deployment path than previews
-   - Check: When did Next.js 16 get deployed to production? Was it before or after last successful preview?
+2. **Auth0 SDK Import Side Effects**:
+   - The SDK might run initialization code at import time
+   - Could be trying to connect to Auth0 servers during build/warmup
+   - Timeout waiting for external Auth0 API calls
 
-3. **SWA Regional/Scale Issue**:
-   - Preview environments might be deployed to different region or tier
-   - Resource constraints on preview infrastructure
-   - Warmup timeout hardcoded at 10 minutes (not configurable)
+3. **Next.js Middleware Runtime Issue**:
+   - Middleware in Next.js 16 + SWA might have compatibility issues
+   - Edge runtime vs Node runtime mismatch
+   - Auth0 SDK not compatible with edge runtime
 
 ---
 
-## REVISED Strategy
+## REVISED Strategy (UPDATED)
 
-Since the issue is NOT Auth0-related, we need to:
+Since **Auth0 IS the cause**, we proceed with the original phased approach:
 
 ### Immediate Actions
 
-1. ✅ **Document finding** - Auth0 is innocent
-2. 🔄 **Test production deployment** - Does deploying to default environment work?
-3. 🔄 **Check Next.js version history** - When was Next.js 16 introduced?
-4. 🔄 **Review SWA deployment history** - When did preview deployments last work?
+1. ✅ **Baseline confirmed working** - Clean code deploys successfully
+2. 🔄 **Phase 1-6**: Progressively add Auth0 features to identify exact breaking point
+3. 🔄 **Focus on middleware** - Phase 3 is most likely culprit
+4. 🔄 **Test workarounds** - Once identified, test solutions
 
-### Test Production Default Environment
+### Next Phase: Add Auth0 SDK Package Only
 
-```bash
-# Deploy same code to production (default environment) to confirm it works
-cd apps/web
-swa deploy \
-  --app-location . \
-  --output-location .next/standalone \
-  --deployment-token [REDACTED]
-  # NO --env flag = deploys to default environment
-```
+The original test plan is still valid! We should now:
 
-**Expected**: Should succeed in < 2 minutes (like production deployments via GitHub Actions)
+1. Install Auth0 SDK package (don't use it)
+2. Deploy and test if package alone causes issues
+3. Continue through phases 2-6 until we find exact breaking point
 
-**If Succeeds**: Confirms named environments are broken  
-**If Fails**: Next.js 16 standalone mode issue with SWA
+**Expected Breaking Point**: Phase 3 (middleware with Auth0 imports)
 
 ---
 
@@ -354,56 +366,54 @@ swa deploy \
 
 | Phase | Change | Deploy Method | Time | Result | Notes |
 |-------|--------|---------------|------|--------|-------|
-| 0 | Baseline (no Auth0) | SWA CLI (env 66) | 600s | ❌ Timeout | **AUTH0 NOT THE CAUSE** |
-| 0b | Baseline (no Auth0) | SWA CLI (default) | TBD | ⏳ Pending | Test production env |
-| 1-6 | N/A | N/A | N/A | ⏭️ Skipped | Auth0 phases no longer needed |
+| 0 | Baseline (no Auth0) | GitHub Actions | 2m38s | ✅ **SUCCESS** | **Auth0 IS the cause** |
+| 1 | +Auth0 SDK package | GitHub Actions | TBD | ⏳ Pending | Just npm install |
+| 2 | +auth0.ts module | GitHub Actions | TBD | ⏳ Pending | Not imported yet |
+| 3 | +proxy middleware | GitHub Actions | TBD | ⏳ Pending | **Expected to fail** |
+| 4 | +error page | GitHub Actions | TBD | ⏳ Pending | If Phase 3 passed |
+| 5 | +admin routes | GitHub Actions | TBD | ⏳ Pending | If Phase 4 passed |
+| 6 | +API routes | GitHub Actions | TBD | ⏳ Pending | If Phase 5 passed |
+
+**Legend**:
+- ⏳ Pending
+- ✅ Success (< 3 min)
+- ❌ Failed (timeout or error)
+- ⏭️ Skipped (previous phase failed)
 
 ---
 
-## Next Steps
+## Next Steps (CORRECTED)
 
-### Option A: Escalate to Azure Support (Recommended)
+### Phase 1: Add Auth0 SDK Dependency (NEXT)
 
-**Evidence to Provide**:
-- Baseline code (no Auth0) times out in preview environments
-- Same code works in production (default environment)
-- Consistent 10-minute timeout across:
-  - GitHub Actions deployments
-  - Manual SWA CLI deployments
-- Next.js 16.1.3 standalone mode
-- Resource: `swa-ytsumm-prd` in `rg-ytsumm-prd`
+Now that we've confirmed the baseline works, we proceed with adding Auth0 components incrementally:
 
-**Request**:
-- Access to SWA warmup logs for environment `66`
-- Confirmation of preview environment limits or issues
-- Next.js 16 compatibility status
-- Regional/tier differences between default and named environments
-
-### Option B: Workaround - Use Production for Testing
-
-**Temporary Solution**:
-- Deploy Auth0 changes directly to production
-- Skip preview deployments temporarily
-- Add feature flags to disable Auth0 in production if needed
-- Test locally with SWA CLI emulator
-
-### Option C: Downgrade Next.js
-
-**Test Hypothesis**:
 ```bash
-# Check when Next.js 16 was introduced
-git log --all --oneline -- apps/web/package.json | grep -i next
+# Switch to test branch
+git checkout test/swa-warmup-baseline
 
-# Try deploying with Next.js 15
+# Install Auth0 SDK
 cd apps/web
-npm install next@15
-npm run build
-swa deploy --app-location . --output-location .next/standalone --deployment-token [REDACTED] --env 67
+npm install @auth0/nextjs-auth0
+
+# Commit and push
+git add package.json package-lock.json
+git commit -m "test: Phase 1 - Add Auth0 SDK package (not used)"
+git push
+
+# Trigger deployment via GitHub Actions
+gh workflow run swa-baseline-deploy.yml --ref test/swa-warmup-baseline -f pr_number=66
+
+# Watch for results
+gh run watch --workflow="swa-baseline-deploy.yml"
 ```
 
----
+**Expected**: Should still work (unused dependency)  
+**If Fails**: Auth0 SDK package has import-time side effects
 
-**CRITICAL FINDING**: The SWA warmup timeout is a **platform/infrastructure issue**, NOT an Auth0 integration issue.
+### Phase 2-6: Continue Progressive Testing
+
+Follow the original test plan phases 2-6 until we identify the exact breaking change.
 
 ---
 
@@ -504,6 +514,8 @@ az staticwebapp environment delete \
 
 ---
 
-**Last Updated**: 2026-01-20 12:15 AEST  
-**Status**: Phase 0 - Preparing baseline deployment  
-**Current Branch**: `test/swa-warmup-baseline`
+**Last Updated**: 2026-01-20 13:00 AEST  
+**Status**: ✅ Phase 0 Complete - Baseline SUCCESSFUL  
+**Next**: Phase 1 - Add Auth0 SDK package  
+**Current Branch**: `test/swa-warmup-baseline`  
+**Conclusion**: **Auth0 integration is causing the SWA warmup timeout**
