@@ -1,0 +1,96 @@
+name: Test SWA Baseline
+
+# Simple workflow to test SWA frontend deployment without all the backend complexity
+# Used for systematic Auth0 integration testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number for deployment'
+        required: false
+        type: string
+  pull_request:
+    branches:
+      - test/swa-warmup-baseline
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy-swa:
+    name: Deploy to SWA
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Get PR number
+        id: pr
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            PR_NUMBER="${{ inputs.pr_number }}"
+          else
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "PR Number: $PR_NUMBER"
+
+      - name: Install frontend dependencies
+        run: |
+          cd apps/web
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd apps/web
+          npm run build
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: 'apps/web'
+          output_location: '.next/standalone'
+          skip_app_build: true
+          deployment_environment: ${{ steps.pr.outputs.number }}
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.pr.outputs.number }};
+            const body = `### ✅ SWA Baseline Test Deployment Complete
+
+            **Environment**: \`${prNumber}\`
+            **Preview URL**: https://swa-ytsumm-prd-${prNumber}.azurestaticapps.net
+
+            **Test Phase**: Baseline (no Auth0)
+            **Expected**: App loads successfully in < 2 minutes
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });
