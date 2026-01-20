@@ -14,6 +14,7 @@ on:
     branches:
       - test/swa-warmup-baseline
       - fix/swa-working-baseline
+      - migration/phase-1-env-vars-v2
 
 permissions:
   id-token: write
@@ -36,7 +37,13 @@ jobs:
       - name: Build frontend
         working-directory: apps/web
         env:
-          # Use empty/placeholder API URL for baseline test
+          # Phase 1: Add placeholder Auth0 environment variables
+          AUTH0_SECRET: "placeholder-session-secret-min-32-chars-long-for-auth0"
+          AUTH0_BASE_URL: "https://white-meadow-0b8e2e000.6.azurestaticapps.net"
+          AUTH0_ISSUER_BASE_URL: "https://placeholder.auth0.com"
+          AUTH0_CLIENT_ID: "placeholder-client-id"
+          AUTH0_CLIENT_SECRET: "placeholder-client-secret"
+          # Existing baseline vars
           NEXT_PUBLIC_API_URL: "https://api-placeholder.example.com"
           NEXT_PUBLIC_ENVIRONMENT: "preview"
         run: |
