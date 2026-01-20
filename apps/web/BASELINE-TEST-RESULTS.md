@@ -74,10 +74,20 @@ Created simplified workflow: `.github/workflows/swa-baseline-deploy.yml`
 | **Phase 3** | + proxy middleware | proxy.ts | GitHub Actions | **2m33s** | ✅ **SUCCESS** |
 | **Phase 3.5** | + AuthProvider | AuthProvider + hooks | GitHub Actions | **3m11s** | ✅ **SUCCESS** |
 | **Phase 4** | + auth pages | All auth pages/components | GitHub Actions | **2m38s** | ✅ **SUCCESS** |
-| **Phase 5** | + modified pages | TBD | Pending | - | ⏳ |
+| **Phase 4.5** | Change proxy export | Named export (matching PR #64) | GitHub Actions | **2m32s** | ✅ **SUCCESS** |
+| **Phase 5** | + everything else | TBD | Pending | - | ⏳ |
 | **Auth0 (PR #64)** | Full integration | All | GitHub Actions | **~590s** | ❌ **TIMEOUT** |
 
-**Finding**: Phases 0-3.5 all succeed! The timeout must be caused by components added in Phase 4-5 or later.
+**Finding**: Phases 0-4.5 all succeed (including named export)! The Auth0 code is NOT the problem.
+
+**CRITICAL DISCOVERY**: The timeout is caused by some OTHER change in PR #64, not the Auth0 integration!
+
+**PR #64 Previous Fix Attempts** (all failed):
+- Removed rewrites from next.config.ts
+- Bypassed proxy middleware entirely
+- Used dynamic imports in middleware
+- Added explicit SWA health check route
+- Simplified various configs
 
 ---
 
