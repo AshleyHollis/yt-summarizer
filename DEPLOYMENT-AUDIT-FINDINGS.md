@@ -524,7 +524,7 @@ env:
 1. ✅ **Dead code eliminated**: Removed unused run-verification.sh and duplicate check-argocd-readiness.sh
 2. ✅ **Pipeline parity achieved**: Both preview and production now have consistent verification steps
 3. ✅ **Code consolidation**: HTTP polling logic now uses single health-check action
-4. ✅ **Configuration standardized**: 
+4. ✅ **Configuration standardized**:
    - Environment variables for all high-priority magic strings
    - Worker verification behavior consistent across pipelines
    - Certificate validation properly separated by purpose

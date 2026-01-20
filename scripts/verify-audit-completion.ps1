@@ -35,13 +35,13 @@ function Add-Check {
         [bool]$Passed,
         [string]$Details = ""
     )
-    
+
     $script:checks += [PSCustomObject]@{
         Name = $Name
         Passed = $Passed
         Details = $Details
     }
-    
+
     if (-not $Passed) {
         $script:allPassed = $false
     }
@@ -87,7 +87,7 @@ $requiredEnvVars = @(
 foreach ($envVar in $requiredEnvVars) {
     $inProd = $prodWorkflow -match "$envVar\s*:"
     $inPreview = $previewWorkflow -match "$envVar\s*:"
-    
+
     Add-Check -Name "Env var $envVar in production" -Passed $inProd
     Add-Check -Name "Env var $envVar in preview" -Passed $inPreview
 }
