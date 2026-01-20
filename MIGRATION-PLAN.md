@@ -50,27 +50,41 @@
 
 ---
 
-### Phase 2: Backend Infrastructure Integration
+### Phase 2: Backend Infrastructure Integration ✅ COMPLETE
 **Goal**: Add Auth0 backend infrastructure without frontend changes  
-**Risk**: Medium (backend changes only)
+**Risk**: Medium (backend changes only)  
+**Status**: ✅ Completed on 2026-01-20 20:45 UTC
 
-**Steps**:
-1. Merge backend Terraform state (Auth0 resources in Key Vault)
-2. Add API backend URL configuration
-3. Update workflow to fetch real Auth0 credentials
-4. Configure SWA runtime app settings (AFTER successful deployment)
-5. Test that app still deploys without Auth0 frontend code
+**Completed Steps**:
+1. ✅ Used GitHub Secrets for Auth0 credentials (avoided Azure Key Vault OIDC issues)
+2. ⏭️ Skipped API backend URL configuration (keeping placeholder for now)
+3. ✅ Updated workflow to use real Auth0 credentials from GitHub Secrets
+4. ⏭️ Deferred SWA runtime app settings (will configure when Auth0 UI is added)
+5. ✅ Tested app deploys successfully without Auth0 frontend code
 
-**Files to Change**:
-- `.github/workflows/swa-baseline-deploy.yml` (add Auth0 app settings step)
-- `apps/web/next.config.ts` (if API URL config needed)
+**Changes Made**:
+- Modified `.github/workflows/swa-baseline-deploy.yml`
+  - Updated `AUTH0_ISSUER_BASE_URL` to use `${{ secrets.AUTH0_DOMAIN }}`
+  - Updated `AUTH0_CLIENT_ID` to use `${{ secrets.AUTH0_CLIENT_ID }}`
+  - Updated `AUTH0_CLIENT_SECRET` to use `${{ secrets.AUTH0_CLIENT_SECRET }}`
+  - Added `migration/phase-2-real-auth0-secrets` to push triggers
 
-**Verification**:
-- Deployment still succeeds
-- SWA app settings configured correctly (check Azure Portal)
-- Frontend still works (no Auth0 UI yet, so no login)
+**Result**:
+- Deployment successful (Run #21186535045)
+- Production URL working: https://white-meadow-0b8e2e000.6.azurestaticapps.net
+- Performance improved: 137s (Phase 2) vs 229s (Phase 1 v2) - 40% faster!
+- Still slower than baseline: 137s vs 32s - investigating persistent overhead
 
-**Rollback**: `git revert HEAD` or `git reset --hard {previous-commit}`
+**Commit**: `6f905b2` - "migration: phase 2 - use real Auth0 secrets from GitHub Secrets"  
+**Tag**: `migration-phase-2-complete`
+
+**Notes**:
+- Successfully avoided Azure OIDC federation constraints by using GitHub Secrets
+- Auth0 integration still not functional (no UI code yet)
+- Session secret (`AUTH0_SECRET`) kept as placeholder
+- SWA runtime app settings deferred until Auth0 UI is integrated
+
+**Rollback**: Not needed (successful deployment)
 
 ---
 
