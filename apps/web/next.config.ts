@@ -68,27 +68,31 @@ const nextConfig: NextConfig = {
   // Redirect API requests to the backend during development AND preview
   // Note: Exclude .swa paths for Azure Static Web Apps health checks
   async rewrites() {
-    let backendUrl = process.env.API_URL || 'http://localhost:8000';
+    // TEMPORARY: Simplified rewrites to isolate SWA warmup timeout issue
+    // Testing hypothesis: Next.js might be validating rewrite destinations during startup
+    // and hanging when backend URLs are unreachable in preview environments
+
+    // let backendUrl = process.env.API_URL || 'http://localhost:8000';
 
     // Attempt to load dynamically injected backend URL (for CI/CD previews)
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fs = require('fs');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const path = require('path');
-      const configPath = path.join(__dirname, 'backend-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        if (config.url) {
-          backendUrl = config.url;
-          // Inject into env for server-side API calls (consumed by api.ts)
-          process.env.API_URL = backendUrl;
-          console.log(`[Next.js] Loaded backend URL from ${configPath}: ${backendUrl}`);
-        }
-      }
-    } catch (e) {
-      // Ignore errors in dev environment
-    }
+    // try {
+    //   // eslint-disable-next-line @typescript-eslint/no-require-imports
+    //   const fs = require('fs');
+    //   // eslint-disable-next-line @typescript-eslint/no-require-imports
+    //   const path = require('path');
+    //   const configPath = path.join(__dirname, 'backend-config.json');
+    //   if (fs.existsSync(configPath)) {
+    //     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    //     if (config.url) {
+    //       backendUrl = config.url;
+    //       // Inject into env for server-side API calls (consumed by api.ts)
+    //       process.env.API_URL = backendUrl;
+    //       console.log(`[Next.js] Loaded backend URL from ${configPath}: ${backendUrl}`);
+    //     }
+    //   }
+    // } catch (e) {
+    //   // Ignore errors in dev environment
+    // }
 
     return {
       beforeFiles: [
@@ -99,27 +103,7 @@ const nextConfig: NextConfig = {
           destination: '/.swa/health',
         },
       ],
-      afterFiles: [
-        // Generic proxy for absolute URL handling (mixed content fix)
-        // Matches /api/proxy/v1/... -> http://backend/v1/...
-        {
-          source: '/api/proxy/:path*',
-          destination: `${backendUrl}/:path*`,
-        },
-        {
-          source: '/api/:path*',
-          destination: `${backendUrl}/api/:path*`,
-        },
-        // Proxy health check endpoints to the backend API
-        {
-          source: '/health/:path*',
-          destination: `${backendUrl}/health/:path*`,
-        },
-        {
-          source: '/health',
-          destination: `${backendUrl}/health`,
-        },
-      ],
+      afterFiles: [], // TEMPORARY: All backend rewrites disabled for testing
       fallback: [],
     };
   },
