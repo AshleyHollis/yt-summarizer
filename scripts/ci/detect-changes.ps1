@@ -46,6 +46,14 @@ param(
 $ErrorActionPreference = "Stop"
 
 # =============================================================================
+# CHANGE DETECTION OVERRIDE - ALWAYS DEPLOY
+# =============================================================================
+# TEMPORARY: Change detection disabled to avoid deployment skipping issues
+# All areas are marked as changed, forcing full deployment every time
+# =============================================================================
+$FORCE_ALL_CHANGES = $true
+
+# =============================================================================
 # Area Detection Patterns
 # =============================================================================
 # Define detectable areas that jobs can check against.
@@ -125,40 +133,47 @@ else {
 # Match files to areas
 $changedAreas = New-Object System.Collections.Generic.HashSet[string]
 
-# Match files to areas
-$changedAreas = New-Object System.Collections.Generic.HashSet[string]
-
-function ConvertTo-RegexPattern {
-    param([string]$GlobPattern)
-
-    # Escape special regex chars except * and ?
-    $pattern = [regex]::Escape($GlobPattern)
-
-    # Convert glob wildcards to regex
-    $pattern = $pattern -replace '\\\*\\\*/', '([^/]+/)*'  # **/ matches zero or more path segments
-    $pattern = $pattern -replace '/\\\*\\\*', '(/.*)?'      # /** matches / followed by anything (optional)
-    $pattern = $pattern -replace '\\\*\\\*', '.*'           # ** matches anything
-    $pattern = $pattern -replace '\\\*', '[^/]*'            # * matches anything except /
-    $pattern = $pattern -replace '\\\?', '.'                # ? matches single char
-
-    return "^$pattern$"
-}
-
-foreach ($file in $changedFiles) {
+# OVERRIDE: If forced, mark all areas as changed
+if ($FORCE_ALL_CHANGES) {
+    Write-Host "`n⚠️  CHANGE DETECTION DISABLED - Forcing all areas as changed" -ForegroundColor Yellow
     foreach ($area in $areaPatterns.Keys) {
-        foreach ($pattern in $areaPatterns[$area]) {
-            $regexPattern = ConvertTo-RegexPattern -GlobPattern $pattern
+        [void]$changedAreas.Add($area)
+    }
+    $changedAreasArray = @($changedAreas | Sort-Object)
+} else {
+    # Original change detection logic
+    function ConvertTo-RegexPattern {
+        param([string]$GlobPattern)
 
-            if ($file -match $regexPattern) {
-                [void]$changedAreas.Add($area)
-                break
+        # Escape special regex chars except * and ?
+        $pattern = [regex]::Escape($GlobPattern)
+
+        # Convert glob wildcards to regex
+        $pattern = $pattern -replace '\\\*\\\*/', '([^/]+/)*'  # **/ matches zero or more path segments
+        $pattern = $pattern -replace '/\\\*\\\*', '(/.*)?'      # /** matches / followed by anything (optional)
+        $pattern = $pattern -replace '\\\*\\\*', '.*'           # ** matches anything
+        $pattern = $pattern -replace '\\\*', '[^/]*'            # * matches anything except /
+        $pattern = $pattern -replace '\\\?', '.'                # ? matches single char
+
+        return "^$pattern$"
+    }
+
+    foreach ($file in $changedFiles) {
+        foreach ($area in $areaPatterns.Keys) {
+            foreach ($pattern in $areaPatterns[$area]) {
+                $regexPattern = ConvertTo-RegexPattern -GlobPattern $pattern
+
+                if ($file -match $regexPattern) {
+                    [void]$changedAreas.Add($area)
+                    break
+                }
             }
         }
     }
-}
 
-# Convert to sorted array
-$changedAreasArray = @($changedAreas | Sort-Object)
+    # Convert to sorted array
+    $changedAreasArray = @($changedAreas | Sort-Object)
+}
 
 Write-Host "`nDetected Areas ($($changedAreasArray.Count)):"
 if ($changedAreasArray.Count -eq 0) {
