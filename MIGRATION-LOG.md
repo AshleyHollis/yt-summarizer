@@ -55,6 +55,58 @@ curl -I https://white-meadow-0b8e2e000.6.azurestaticapps.net
 
 ---
 
+### Entry 2: Phase 1 v2 - Add Auth0 Placeholder Environment Variables
+**Date**: 2026-01-20 20:38 UTC  
+**Phase**: 1  
+**Changes**: 
+- Modified `.github/workflows/swa-baseline-deploy.yml`
+  - Added placeholder Auth0 environment variables to build step
+  - Added `migration/phase-1-env-vars-v2` to push triggers
+- No Azure login step (avoided OIDC federation issue from v1)
+
+**Commit**: `4a11f0c` - "migration: phase 1 v2 - add Auth0 placeholder env vars (no Azure login)"  
+**Deployment**: Run #21186299177  
+**Duration**: 3m49s (229 seconds)  
+**Result**: ✅ **SUCCESS**
+
+**Details**:
+- Added 5 placeholder Auth0 environment variables to Next.js build
+- Variables are build-time placeholders, not functional Auth0 integration yet
+- Deployment succeeded but took significantly longer than baseline (229s vs 32s)
+- Production URL still responds with 200 OK
+- No errors, no timeouts, no cancellations
+
+**Environment Variables Added**:
+```yaml
+AUTH0_SECRET: "placeholder-session-secret-min-32-chars-long-for-auth0"
+AUTH0_BASE_URL: "https://white-meadow-0b8e2e000.6.azurestaticapps.net"
+AUTH0_ISSUER_BASE_URL: "https://placeholder.auth0.com"
+AUTH0_CLIENT_ID: "placeholder-client-id"
+AUTH0_CLIENT_SECRET: "placeholder-client-secret"
+```
+
+**Verification**:
+```bash
+curl -I https://white-meadow-0b8e2e000.6.azurestaticapps.net
+# HTTP/1.1 200 OK
+# Content-Type: text/html
+# Date: Tue, 20 Jan 2026 20:38:26 GMT
+```
+
+**Notes**:
+- **Performance degradation observed**: Deployment took 7x longer than baseline (229s vs 32s)
+- This increase is concerning and may indicate:
+  - Env vars causing longer build times
+  - SWA processing overhead with more environment variables
+  - Need to monitor if this persists in Phase 2
+- First attempt (v1) failed due to Azure OIDC federation constraints (branch name not allowed)
+- v2 approach succeeded by avoiding Azure login altogether
+- Auth0 integration is NOT functional yet - these are placeholders for build validation only
+
+**Rollback**: Not needed - deployment successful
+
+---
+
 ## Template for Future Entries
 
 ```markdown
@@ -100,6 +152,7 @@ curl -I https://...
 | Tag | Commit | Description | SWA Instance |
 |-----|--------|-------------|--------------|
 | baseline-working-swa-v1 | f1f21a4 | Initial working baseline | white-meadow-0b8e2e000 |
+| migration-phase-1-complete | 4a11f0c | Phase 1: Auth0 placeholder env vars | white-meadow-0b8e2e000 |
 
 ---
 
@@ -120,25 +173,37 @@ curl -I https://...
 **Solution**: Regenerate token and update GitHub secret immediately after creating new instance  
 **Prevention**: Always update `SWA_DEPLOYMENT_TOKEN` secret after creating new SWA instance
 
+### Issue 3: Azure OIDC Federation Branch Name Constraints
+**Discovered**: 2026-01-20  
+**Symptoms**: `AADSTS700213: No matching federated identity record found` during Azure login  
+**Affected Branches**: `migration/phase-1-env-vars`  
+**Root Cause**: Azure OIDC federated identity credentials only allow specific branch patterns  
+**Solution**: Avoid Azure login in workflows for feature branches; use placeholder values or allow branch patterns in Azure federation config  
+**Prevention**: Either configure Azure federation to allow `migration/*` pattern, or avoid Azure login steps in non-main/preview branches
+
 ---
 
 ## Statistics
 
-**Total Migration Attempts**: 1  
-**Successful Migrations**: 1  
-**Failed Migrations**: 0  
+**Total Migration Attempts**: 3 (1 baseline + 1 failed + 1 successful)  
+**Successful Migrations**: 2  
+**Failed Migrations**: 1 (Phase 1 v1 - OIDC issue)  
 **Rollbacks Performed**: 0  
 **Current Uptime**: 100%
 
-**Average Deployment Time**: 32 seconds  
-**Fastest Deployment**: 32 seconds (Run #21185824990)  
-**Slowest Deployment**: 32 seconds (Run #21185824990)
+**Average Deployment Time**: 130.5 seconds  
+**Fastest Deployment**: 32 seconds (Run #21185824990 - Baseline)  
+**Slowest Deployment**: 229 seconds (Run #21186299177 - Phase 1 v2)
 
 ---
 
 ## Next Steps
 
-1. Create git tag for baseline: `baseline-working-swa-v1`
-2. Begin Phase 1: Environment Variables & Secrets
-3. Document Phase 1 results in this log
-4. Update statistics after each migration
+1. ✅ ~~Create git tag for baseline: `baseline-working-swa-v1`~~
+2. ✅ ~~Begin Phase 1: Environment Variables & Secrets~~
+3. ✅ ~~Document Phase 1 results in this log~~
+4. ✅ ~~Update statistics after each migration~~
+5. **TODO**: Investigate Phase 1 v2 performance degradation (229s vs 32s baseline)
+6. **TODO**: Merge `migration/phase-1-env-vars-v2` to `fix/swa-working-baseline`
+7. **TODO**: Create git tag: `migration-phase-1-complete`
+8. **TODO**: Begin Phase 2: Fetch real Auth0 secrets from Key Vault

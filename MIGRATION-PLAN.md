@@ -18,24 +18,35 @@
 
 ## Migration Phases
 
-### Phase 1: Environment Variables & Secrets ✅ READY
+### Phase 1: Environment Variables & Secrets ✅ COMPLETE
 **Goal**: Add Auth0 environment variables without code changes  
-**Risk**: Low (just configuration)
+**Risk**: Low (just configuration)  
+**Status**: ✅ Completed on 2026-01-20 20:38 UTC
 
-**Steps**:
-1. Add Auth0 environment variable placeholders to workflow
-2. Test deployment still works with placeholder values
-3. Add Azure Key Vault fetch step (without using the values yet)
-4. Test deployment still works
+**Completed Steps**:
+1. ✅ Added Auth0 environment variable placeholders to workflow
+2. ✅ Tested deployment works with placeholder values
+3. ⚠️ Skipped Azure Key Vault fetch (due to OIDC branch constraints)
 
-**Files to Change**:
-- `.github/workflows/swa-baseline-deploy.yml`
+**Changes Made**:
+- Modified `.github/workflows/swa-baseline-deploy.yml`
+- Added 5 placeholder Auth0 environment variables
+- Added `migration/phase-1-env-vars-v2` to push triggers
 
-**Verification**:
-- Deployment succeeds with placeholder Auth0 vars
-- Production URL still works
+**Result**: 
+- Deployment successful (Run #21186299177)
+- Production URL working: https://white-meadow-0b8e2e000.6.azurestaticapps.net
+- ⚠️ Performance degradation: 229s vs 32s baseline (needs investigation)
 
-**Rollback**: `git revert HEAD`
+**Commit**: `4a11f0c` - "migration: phase 1 v2 - add Auth0 placeholder env vars (no Azure login)"  
+**Tag**: `migration-phase-1-complete`
+
+**Notes**:
+- Phase 1 v1 failed due to Azure OIDC federation not allowing `migration/*` branch pattern
+- Phase 1 v2 succeeded by using placeholder values instead of fetching from Key Vault
+- Will address real Auth0 secrets in Phase 2
+
+**Rollback**: Not needed (successful deployment)
 
 ---
 
