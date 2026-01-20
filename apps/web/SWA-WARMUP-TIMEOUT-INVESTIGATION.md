@@ -1,8 +1,9 @@
 # Azure SWA Preview Deployment - Warmup Timeout Investigation
 
-> **Status**: ACTIVE INVESTIGATION (as of 2026-01-20)  
+> **Status**: NEW APPROACH - Systematic Baseline Testing (as of 2026-01-20 12:05 AEST)  
 > **Issue**: Preview deployments timeout after ~10 minutes during warmup phase  
-> **Branch**: `004-auth0-ui-integration` (PR #64)
+> **Original Branch**: `004-auth0-ui-integration` (PR #64) - LEFT UNTOUCHED  
+> **Test Branch**: `test/swa-warmup-baseline` - Fresh investigation from main
 
 ## Problem Summary
 
@@ -20,7 +21,86 @@ Deployment Failure Reason: Web app warm up timed out. Please try again later.
 - **Broken**: Preview deployments timeout after ~589 seconds (~10 minutes)
 - **Pattern**: Consistent timeout at exactly ~590 seconds across multiple attempts
 
-## What We've Tried
+---
+
+## NEW APPROACH: Systematic Baseline Testing (2026-01-20 12:05 AEST)
+
+### Strategy Shift
+
+After 5 failed attempts to fix the issue on PR #64, we're taking a systematic approach:
+
+**Plan**:
+
+1. ✅ Leave PR #64 (`004-auth0-ui-integration`) **UNTOUCHED** for future reference
+2. 🔄 Create fresh branch `test/swa-warmup-baseline` from `main`
+3. 🔄 Deploy baseline (no Auth0) to preview using AzCLI
+4. 🔄 Confirm baseline works
+5. 🔄 Incrementally add Auth0 changes, testing after each addition
+6. 🔄 Identify exact change that causes timeout
+7. 🔄 Fix root cause and apply to PR #64
+
+**Why This Approach**:
+
+- Eliminates accumulated test modifications (bypassed middleware, simplified rewrites, dynamic imports)
+- Provides clean baseline to confirm preview deployments CAN work
+- Allows precise identification of breaking change
+- Avoids polluting PR #64 with test commits
+
+### Baseline Test Plan
+
+**Phase 1: Confirm Clean Baseline** (Expected: ✅ Works)
+
+- Branch from `main` (last known good state)
+- Deploy to preview environment using manual AzCLI deployment
+- Expected: Deployment succeeds in < 2 minutes
+- Confirms: Preview infrastructure works, Next.js 16 compatible
+
+**Phase 2: Add Auth0 SDK Dependency** (Test: Does dependency alone break it?)
+
+- Install `@auth0/nextjs-auth0` package
+- No code changes, just package.json
+- Deploy and test
+- Expected: Should still work (just unused dependency)
+
+**Phase 3: Add Auth0 Lazy Initialization** (Test: Does Auth0 client code break it?)
+
+- Add `apps/web/src/lib/auth0.ts` (lazy initialization)
+- No usage yet, just the module
+- Deploy and test
+- Expected: Should still work (module not imported)
+
+**Phase 4: Add Proxy Middleware** (Test: Does middleware break it?)
+
+- Add `apps/web/src/proxy.ts` with Auth0 checks
+- Add middleware registration
+- Deploy and test
+- Expected: This might be where it breaks
+
+**Phase 5: Add Auth0 Error Page** (Test: Does error page break it?)
+
+- Add `apps/web/src/app/auth-config-error/page.tsx`
+- Deploy and test
+
+**Phase 6: Add Protected Routes** (Test: Does admin page break it?)
+
+- Add admin role check logic
+- Deploy and test
+
+### Current Status
+
+- [x] Documentation updated with new strategy
+- [ ] Create test branch from main
+- [ ] Manual deploy baseline to preview
+- [ ] Confirm baseline works
+- [ ] Begin incremental Auth0 additions
+
+---
+
+## Previous Attempts Summary (On PR #64 Branch)
+
+**All attempts failed with same timeout (~585-590 seconds)**
+
+### What We've Eliminated
 
 ### Attempt 1: Make Auth0 Non-Blocking ✅ IMPLEMENTED
 
