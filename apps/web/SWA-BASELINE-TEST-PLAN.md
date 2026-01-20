@@ -330,7 +330,7 @@ The deployment never reached Azure's warmup phase.
    - SWA executes middleware during health checks/warmup
    - Auth0 SDK initialization in middleware hangs when env vars are missing
    - `getAuth0Client()` in middleware blocks waiting for configuration
-   
+
 2. **Auth0 Utility Module (`auth0.ts`) Side Effects**:
    - Module-level initialization code runs during import
    - Lazy initialization might not be truly lazy
