@@ -15,6 +15,7 @@ on:
       - test/swa-warmup-baseline
       - fix/swa-working-baseline
       - migration/phase-1-env-vars-v2
+      - migration/phase-2-real-auth0-secrets
 
 permissions:
   id-token: write
@@ -37,12 +38,12 @@ jobs:
       - name: Build frontend
         working-directory: apps/web
         env:
-          # Phase 1: Add placeholder Auth0 environment variables
+          # Phase 2: Use real Auth0 credentials from GitHub Secrets
           AUTH0_SECRET: "placeholder-session-secret-min-32-chars-long-for-auth0"
           AUTH0_BASE_URL: "https://white-meadow-0b8e2e000.6.azurestaticapps.net"
-          AUTH0_ISSUER_BASE_URL: "https://placeholder.auth0.com"
-          AUTH0_CLIENT_ID: "placeholder-client-id"
-          AUTH0_CLIENT_SECRET: "placeholder-client-secret"
+          AUTH0_ISSUER_BASE_URL: "https://${{ secrets.AUTH0_DOMAIN }}"
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
           # Existing baseline vars
           NEXT_PUBLIC_API_URL: "https://api-placeholder.example.com"
           NEXT_PUBLIC_ENVIRONMENT: "preview"
