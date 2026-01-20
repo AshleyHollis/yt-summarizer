@@ -185,7 +185,7 @@ Now that baseline is confirmed working, proceed with incremental Auth0 integrati
 
 ### Most Likely Cause: Middleware Execution During Warmup
 
-**Theory**: 
+**Theory**:
 1. SWA executes health checks during warmup
 2. Next.js middleware runs on EVERY request (including health checks)
 3. Auth0 middleware tries to initialize SDK
