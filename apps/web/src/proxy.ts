@@ -1,41 +1,34 @@
 /**
- * Next.js 16 Proxy for Route Protection (Auth0 v4 SDK)
+ * Next.js 16 Proxy for Auth0 Authentication and Route Protection
  *
- * This proxy handles authentication at the network boundary using the Auth0 SDK.
- * It automatically:
- * - Manages authentication cookies
- * - Handles auth redirects
- * - Protects routes based on configuration
+ * This unified proxy handles:
+ * 1. Auth0 authentication flows (/auth/* routes)
+ * 2. Route protection for admin routes
  *
- * Public Routes (always accessible):
- * - /login
- * - /access-denied
- * - /auth/*
+ * Auth0 Automatic Routes:
+ * - /auth/login - Initiate login flow
+ * - /auth/logout - End session
+ * - /auth/callback - OAuth callback handler
+ * - /auth/profile - Get user profile
  *
  * Protected Routes:
- * - /admin/* - Requires authentication AND admin role (handled by custom RBAC logic)
+ * - /admin/* - Requires authentication AND admin role
+ *
+ * CRITICAL for Azure SWA:
+ * - Uses dynamic imports to prevent loading Auth0 SDK at startup
+ * - Checks isAuth0Configured() BEFORE loading SDK
+ * - Matcher excludes health check paths to prevent warmup timeout
  *
  * @see https://nextjs.org/docs/app/building-your-application/routing/middleware
- * @see https://github.com/auth0/nextjs-auth0/blob/main/EXAMPLES.md#protecting-routes-with-middleware
+ * @see https://github.com/auth0/nextjs-auth0/blob/main/EXAMPLES.md
  */
 
 import { NextResponse } from 'next/server';
 
 /**
- * CRITICAL FIX: Do NOT import Auth0 at module level!
- * Static imports cause the Auth0 SDK to load during middleware initialization,
- * which can crash the app if Auth0 env vars are missing.
- *
- * Instead, use dynamic imports inside the function when needed.
- *
- * REMOVED: import { getAuth0Client, getAuth0Error } from './lib/auth0';
- */
-
-/**
  * Determines if a route requires protection
  */
 function shouldProtectRoute(pathname: string): boolean {
-  // Admin routes require authentication and admin role
   const adminRoutes = ['/admin'];
   return adminRoutes.some((route) => pathname.startsWith(route));
 }
@@ -56,28 +49,54 @@ function hasAdminRole(session: any): boolean {
   if (!session || !session.user) {
     return false;
   }
-
   const role = session.user['https://yt-summarizer.com/role'];
   return role === 'admin';
 }
 
 /**
- * Proxy function (Next.js 16+)
+ * Unified Proxy function (Next.js 16+)
  *
- * FIXED: Removed static Auth0 imports to prevent module-level SDK loading
- * Now uses dynamic imports only when auth is actually needed
+ * Handles both:
+ * 1. Auth0 authentication routes (/auth/*)
+ * 2. Admin route protection (/admin/*)
  *
- * Original functionality:
- * - Checks authentication status
- * - Checks user roles for admin routes
- * - Redirects to /auth/login if unauthenticated
- * - Redirects to /access-denied if unauthorized
- *
- * Note: Uses standard Request type (not NextRequest) for Next.js 16 compatibility
+ * CRITICAL: Uses dynamic imports to avoid loading Auth0 SDK at module init time.
+ * The isAuth0Configured() check happens BEFORE importing the SDK.
  */
 export async function proxy(request: Request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
+
+  // ============================================================
+  // PART 1: Handle Auth0 authentication routes (/auth/*)
+  // ============================================================
+  if (pathname.startsWith('/auth/')) {
+    // Dynamic import to prevent loading Auth0 SDK at module initialization
+    const { isAuth0Configured } = await import('./lib/auth0');
+
+    // Check if Auth0 is configured BEFORE loading the client
+    if (!isAuth0Configured()) {
+      console.warn('[Proxy] Auth0 not configured - skipping auth middleware for', pathname);
+      // Return 503 Service Unavailable for auth routes when not configured
+      return new Response('Authentication service not configured', { status: 503 });
+    }
+
+    // Only now load the full Auth0 client
+    const { getAuth0Client } = await import('./lib/auth0');
+    const client = await getAuth0Client();
+
+    if (!client) {
+      console.warn('[Proxy] Auth0 client failed to initialize');
+      return new Response('Authentication service unavailable', { status: 503 });
+    }
+
+    // Let Auth0 SDK handle authentication routes
+    return await client.middleware(request);
+  }
+
+  // ============================================================
+  // PART 2: Handle route protection
+  // ============================================================
 
   // Skip auth checks for public routes
   if (isPublicRoute(pathname)) {
@@ -90,21 +109,26 @@ export async function proxy(request: Request) {
   }
 
   // ONLY load Auth0 when we actually need to check authentication
-  // This prevents the SDK from loading during app startup
   try {
+    const { isAuth0Configured } = await import('./lib/auth0');
+
+    // Check if Auth0 is configured BEFORE loading the client
+    if (!isAuth0Configured()) {
+      console.warn('[Proxy] Auth0 not configured, redirecting to error page');
+      return NextResponse.redirect(new URL('/auth-config-error', request.url));
+    }
+
     const { getAuth0Client } = await import('./lib/auth0');
     const auth0Client = await getAuth0Client();
 
     if (!auth0Client) {
-      // Auth0 not configured - redirect to error page
-      console.warn('[Proxy] Auth0 not configured, redirecting to error page');
+      console.warn('[Proxy] Auth0 client failed to initialize, redirecting to error page');
       return NextResponse.redirect(new URL('/auth-config-error', request.url));
     }
 
     const session = await auth0Client.getSession();
 
     if (!session) {
-      // Not authenticated - redirect to login
       console.log('[Proxy] User not authenticated, redirecting to login');
       return NextResponse.redirect(new URL('/auth/login', request.url));
     }
@@ -119,7 +143,6 @@ export async function proxy(request: Request) {
     return NextResponse.next();
   } catch (error) {
     console.error('[Proxy] Error checking authentication:', error);
-    // On error, redirect to error page
     return NextResponse.redirect(new URL('/auth-config-error', request.url));
   }
 }
@@ -127,21 +150,20 @@ export async function proxy(request: Request) {
 /**
  * Configure which routes run this proxy
  *
- * This matcher excludes:
- * - Static files (_next/static)
- * - Image optimization files (_next/image)
- * - Favicon and metadata files
- * - Azure SWA internal paths (/.swa/) - CRITICAL for SWA health checks
+ * CRITICAL FOR SWA WARMUP:
+ * - Excludes Azure SWA health check paths (robots*.txt pattern)
+ * - Excludes static files and metadata
+ * - Only matches routes that need auth handling
+ *
+ * The matcher is intentionally narrow to ensure:
+ * 1. SWA warmup health checks (/robots933456.txt) skip the proxy entirely
+ * 2. The Auth0 SDK is never loaded during warmup
  */
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
-     * - .swa (Azure Static Web Apps internal paths - health checks)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|\\.swa).*)',
+    // Match /auth/* for Auth0 authentication handling
+    '/auth/:path*',
+    // Match /admin/* for route protection
+    '/admin/:path*',
   ],
 };
