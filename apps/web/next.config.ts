@@ -9,13 +9,6 @@ const withBundleAnalyzer = bundleAnalyzer({
 const isDev = process.env.NODE_ENV !== 'production';
 
 const nextConfig: NextConfig = {
-  // WORKAROUND: Disable Turbopack for Auth0 integration
-  // Turbopack has a known bug resolving package subpath exports in proxy/middleware runtime
-  // See: https://github.com/vercel/next.js/issues/88540
-  // This forces Next.js to use webpack instead, which handles Auth0's package.json exports correctly
-  // Can be removed once Turbopack subpath export resolution is fixed
-  turbo: false,
-
   // Enable standalone output for Azure SWA deployment
   // This reduces app size and is required for hybrid rendering on SWA
   output: 'standalone',
