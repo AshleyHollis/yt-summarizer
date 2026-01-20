@@ -554,13 +554,45 @@ jobs:
           NEXT_PUBLIC_ENVIRONMENT: production
         run: npm run build
 
+      - name: Setup Azure CLI
+        uses: ./.github/actions/setup-azure
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch Auth0 credentials from Key Vault
+        id: fetch-auth0
+        shell: bash
+        run: |
+          # Fetch Auth0 configuration from Azure Key Vault
+          echo "Fetching Auth0 credentials from Key Vault..."
+
+          AUTH0_DOMAIN=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-domain" --query "value" -o tsv)
+          AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-client-id" --query "value" -o tsv)
+          AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-client-secret" --query "value" -o tsv)
+          AUTH0_SESSION_SECRET=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-session-secret" --query "value" -o tsv)
+
+          # Mask secrets in logs
+          echo "::add-mask::$AUTH0_CLIENT_SECRET"
+          echo "::add-mask::$AUTH0_SESSION_SECRET"
+
+          # Set outputs for use in deployment steps
+          echo "auth0-domain=$AUTH0_DOMAIN" >> "$GITHUB_OUTPUT"
+          echo "auth0-client-id=$AUTH0_CLIENT_ID" >> "$GITHUB_OUTPUT"
+          echo "auth0-client-secret=$AUTH0_CLIENT_SECRET" >> "$GITHUB_OUTPUT"
+          echo "auth0-session-secret=$AUTH0_SESSION_SECRET" >> "$GITHUB_OUTPUT"
+
+          echo "✅ Auth0 credentials fetched successfully"
+
       - name: Deploy to Static Web Apps
+        id: deploy
         uses: Azure/static-web-apps-deploy@v1
         env:
           # Configure proxy to talk to actual backend
           API_BASE_URL: ${{ vars.PRODUCTION_API_URL }}
-          # IMPORTANT: Auth0 variables are server-side only (set in Azure Portal)
-          # Do NOT pass AUTH0_* vars here - they must be configured in SWA environment settings
+          # IMPORTANT: Auth0 variables are server-side only (configured via Azure CLI below)
+          # Do NOT pass AUTH0_* vars here - they must be configured in SWA runtime settings
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_PRODUCTION_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -571,6 +603,37 @@ jobs:
           output_location: ""
           skip_app_build: true
           production_branch: main
+
+      - name: Configure SWA production app settings (runtime)
+        id: configure-swa
+        run: |
+          # IMPORTANT: Runtime environment variables for Azure SWA must be configured
+          # via the Azure Static Web Apps API, NOT via the deployment action env vars.
+          #
+          # The deployment action's env vars are only available during DEPLOYMENT,
+          # not when the Next.js server starts up in the Azure runtime.
+          #
+          # This step configures the production environment's runtime app settings
+          # so that Auth0 and other runtime dependencies work correctly.
+
+          echo "Configuring SWA app settings for production environment..."
+
+          # Configure app settings using Azure CLI
+          # Format: key=value pairs separated by spaces
+          # Note: Production environment uses "default" as environment name
+          az staticwebapp appsettings set \
+            --name "swa-ytsumm-prd" \
+            --resource-group "rg-ytsumm-prd" \
+            --setting-names \
+              "AUTH0_SECRET=${{ steps.fetch-auth0.outputs.auth0-session-secret }}" \
+              "AUTH0_BASE_URL=${{ steps.deploy.outputs.static_web_app_url }}" \
+              "AUTH0_ISSUER_BASE_URL=https://${{ steps.fetch-auth0.outputs.auth0-domain }}" \
+              "AUTH0_CLIENT_ID=${{ steps.fetch-auth0.outputs.auth0-client-id }}" \
+              "AUTH0_CLIENT_SECRET=${{ steps.fetch-auth0.outputs.auth0-client-secret }}" \
+              "NEXT_PUBLIC_API_URL=${{ vars.PRODUCTION_API_URL }}" \
+              "NEXT_PUBLIC_ENVIRONMENT=production"
+
+          echo "✅ SWA app settings configured for production environment"
 
   # ---------------------------------------------------------------------------
   # Deployment Summary
