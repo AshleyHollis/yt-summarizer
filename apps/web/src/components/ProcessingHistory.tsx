@@ -32,9 +32,13 @@ function formatVariance(variance: number | null, variancePercent: number | null)
 
   return (
     <span className={colorClass}>
-      {sign}{formatElapsedTime(Math.abs(variance))}
+      {sign}
+      {formatElapsedTime(Math.abs(variance))}
       {variancePercent !== null && (
-        <span className="text-xs ml-1">({sign}{Math.round(variancePercent)}%)</span>
+        <span className="text-xs ml-1">
+          ({sign}
+          {Math.round(variancePercent)}%)
+        </span>
       )}
     </span>
   );
@@ -189,8 +193,10 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
   // Note: estimated_seconds already INCLUDES enforced delays (they're baked into
   // historical averages since job duration includes sleep time)
   const hasEnforcedDelay = (history.total_estimated_delay_seconds ?? 0) > 0;
-  const hasQueueWait = (history.total_wait_seconds ?? 0) > 0 || (history.total_estimated_wait_seconds ?? 0) > 0;
-  const queueWaitVariance = (history.total_wait_seconds ?? 0) - (history.total_estimated_wait_seconds ?? 0);
+  const hasQueueWait =
+    (history.total_wait_seconds ?? 0) > 0 || (history.total_estimated_wait_seconds ?? 0) > 0;
+  const queueWaitVariance =
+    (history.total_wait_seconds ?? 0) - (history.total_estimated_wait_seconds ?? 0);
 
   return (
     <div className={className}>
@@ -203,7 +209,8 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
             {formatElapsedTime(history.total_elapsed_seconds)}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {formatElapsedTime(history.total_wait_seconds)} queue + {formatElapsedTime(history.total_actual_seconds)} processing
+            {formatElapsedTime(history.total_wait_seconds)} queue +{' '}
+            {formatElapsedTime(history.total_actual_seconds)} processing
           </p>
         </div>
 
@@ -214,16 +221,15 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
             <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
               {formatElapsedTime(history.total_wait_seconds)}
             </p>
-            {history.total_estimated_wait_seconds !== null && history.total_estimated_wait_seconds > 0 && (
-              <>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Est. {formatElapsedTime(history.total_estimated_wait_seconds)}
-                </p>
-                <p className="text-xs mt-0.5">
-                  {formatVariance(queueWaitVariance, null)}
-                </p>
-              </>
-            )}
+            {history.total_estimated_wait_seconds !== null &&
+              history.total_estimated_wait_seconds > 0 && (
+                <>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Est. {formatElapsedTime(history.total_estimated_wait_seconds)}
+                  </p>
+                  <p className="text-xs mt-0.5">{formatVariance(queueWaitVariance, null)}</p>
+                </>
+              )}
           </div>
         )}
 
@@ -237,9 +243,7 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
             Est. {formatElapsedTime(history.total_estimated_seconds)}
           </p>
           {history.total_variance_seconds !== null && (
-            <p className="text-xs mt-0.5">
-              {formatVariance(history.total_variance_seconds, null)}
-            </p>
+            <p className="text-xs mt-0.5">{formatVariance(history.total_variance_seconds, null)}</p>
           )}
         </div>
 
@@ -332,11 +336,17 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
           {/* Overall timestamps */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-2 border-b border-gray-200 dark:border-gray-700">
             <span className="text-gray-500">Submitted:</span>
-            <span className="text-gray-700 dark:text-gray-300">{formatDateTime(history.submitted_at)}</span>
+            <span className="text-gray-700 dark:text-gray-300">
+              {formatDateTime(history.submitted_at)}
+            </span>
             <span className="text-gray-500">First job started:</span>
-            <span className="text-gray-700 dark:text-gray-300">{formatDateTime(history.first_job_started_at)}</span>
+            <span className="text-gray-700 dark:text-gray-300">
+              {formatDateTime(history.first_job_started_at)}
+            </span>
             <span className="text-gray-500">Last job completed:</span>
-            <span className="text-gray-700 dark:text-gray-300">{formatDateTime(history.last_job_completed_at)}</span>
+            <span className="text-gray-700 dark:text-gray-300">
+              {formatDateTime(history.last_job_completed_at)}
+            </span>
           </div>
 
           {/* Per-stage timestamps */}

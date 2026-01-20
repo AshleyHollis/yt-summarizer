@@ -72,9 +72,9 @@
  * @see threadPersistence.ts - API layer and message transformation
  */
 
-"use client";
+'use client';
 
-import { useCallback, useRef, useEffect, useState, useMemo } from "react";
+import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import {
   ChatThread,
   ThreadMessage,
@@ -89,8 +89,8 @@ import {
   updateThreadSettings,
   QueryScope,
   AISettings,
-} from "@/services/threadPersistence";
-import { useToolResultsOptional, PendingToolResult } from "@/contexts/ToolResultContext";
+} from '@/services/threadPersistence';
+import { useToolResultsOptional, PendingToolResult } from '@/contexts/ToolResultContext';
 
 // ============================================================================
 // Configuration
@@ -176,7 +176,6 @@ export function useThreadPersistence({
   getAISettings,
   setAISettings,
 }: UseThreadPersistenceOptions): UseThreadPersistenceResult {
-
   // Get tool result context for frontend tool results
   const toolResultsContext = useToolResultsOptional();
 
@@ -190,7 +189,7 @@ export function useThreadPersistence({
 
   // Save state (refs to avoid re-renders)
   const saveStateRef = useRef<SaveState>({
-    lastHash: "",
+    lastHash: '',
     lastCount: 0,
     pendingSave: null,
   });
@@ -236,11 +235,10 @@ export function useThreadPersistence({
         if (!mounted) return;
 
         // Validate that the initial thread exists
-        const validatedId = initialThreadId && threads.some(t => t.id === initialThreadId)
-          ? initialThreadId
-          : null;
+        const validatedId =
+          initialThreadId && threads.some((t) => t.id === initialThreadId) ? initialThreadId : null;
 
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           threads,
           activeThreadId: validatedId,
@@ -253,9 +251,9 @@ export function useThreadPersistence({
         }
       } catch (error) {
         if (!mounted) return;
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
-          error: "Failed to load threads",
+          error: 'Failed to load threads',
           isLoading: false,
         }));
       }
@@ -263,14 +261,16 @@ export function useThreadPersistence({
 
     loadInitialThreads();
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []); // Only run on mount - don't depend on initialThreadId to avoid re-fetching
 
   /**
    * Poll for thread list updates (catches cross-tab/browser changes)
    */
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -279,14 +279,15 @@ export function useThreadPersistence({
 
       try {
         const threads = await fetchThreads();
-        setState(prev => {
+        setState((prev) => {
           // Only update if IDs changed
-          const prevIds = new Set(prev.threads.map(t => t.id));
-          const newIds = new Set(threads.map(t => t.id));
+          const prevIds = new Set(prev.threads.map((t) => t.id));
+          const newIds = new Set(threads.map((t) => t.id));
 
-          const changed = prevIds.size !== newIds.size ||
-            threads.some(t => !prevIds.has(t.id)) ||
-            prev.threads.some(t => !newIds.has(t.id));
+          const changed =
+            prevIds.size !== newIds.size ||
+            threads.some((t) => !prevIds.has(t.id)) ||
+            prev.threads.some((t) => !newIds.has(t.id));
 
           return changed ? { ...prev, threads } : prev;
         });
@@ -295,8 +296,12 @@ export function useThreadPersistence({
       }
     };
 
-    const start = () => { intervalId = setInterval(poll, THREAD_POLL_INTERVAL_MS); };
-    const stop = () => { if (intervalId) clearInterval(intervalId); };
+    const start = () => {
+      intervalId = setInterval(poll, THREAD_POLL_INTERVAL_MS);
+    };
+    const stop = () => {
+      if (intervalId) clearInterval(intervalId);
+    };
 
     const onVisibility = () => {
       if (document.hidden) {
@@ -308,11 +313,11 @@ export function useThreadPersistence({
     };
 
     if (!document.hidden) start();
-    document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       stop();
-      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 
@@ -336,7 +341,7 @@ export function useThreadPersistence({
     if (!activeThreadId) {
       loadedThreadRef.current = null;
       setMessages([]);
-      saveStateRef.current = { lastHash: "", lastCount: 0, pendingSave: null };
+      saveStateRef.current = { lastHash: '', lastCount: 0, pendingSave: null };
       return;
     }
 
@@ -346,42 +351,44 @@ export function useThreadPersistence({
     // Mark that we're restoring settings (prevents immediate save overwrite)
     setIsRestoringSettings(true);
 
-    fetchThread(activeThreadId).then(result => {
-      if (!result || loadedThreadRef.current !== activeThreadId) {
+    fetchThread(activeThreadId)
+      .then((result) => {
+        if (!result || loadedThreadRef.current !== activeThreadId) {
+          setIsRestoringSettings(false);
+          return;
+        }
+
+        setMessages(result.messages);
+        saveStateRef.current.lastHash = computeMessageHash(result.messages);
+        saveStateRef.current.lastCount = result.messages.length;
+
+        // Restore scope and AI settings from the thread
+        if (result.thread.scope && setScope) {
+          setScope(result.thread.scope);
+        }
+        if (result.thread.aiSettings && setAISettings) {
+          setAISettings(result.thread.aiSettings);
+        }
+
+        // Allow a brief moment for state to propagate, then allow saving again
+        setTimeout(() => setIsRestoringSettings(false), 100);
+      })
+      .catch((err) => {
+        console.error('Failed to load thread:', err);
+        setMessages([]);
         setIsRestoringSettings(false);
-        return;
-      }
-
-      setMessages(result.messages);
-      saveStateRef.current.lastHash = computeMessageHash(result.messages);
-      saveStateRef.current.lastCount = result.messages.length;
-
-      // Restore scope and AI settings from the thread
-      if (result.thread.scope && setScope) {
-        setScope(result.thread.scope);
-      }
-      if (result.thread.aiSettings && setAISettings) {
-        setAISettings(result.thread.aiSettings);
-      }
-
-      // Allow a brief moment for state to propagate, then allow saving again
-      setTimeout(() => setIsRestoringSettings(false), 100);
-    }).catch(err => {
-      console.error("Failed to load thread:", err);
-      setMessages([]);
-      setIsRestoringSettings(false);
-    });
+      });
   }, [state.activeThreadId, state.isLoading, setMessages, setScope, setAISettings]);
 
   /**
    * Sync thread ID from external source (URL)
    */
   const syncThreadIdFromUrl = useCallback((threadId: string | null) => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.activeThreadId === threadId) return prev;
 
       // Validate thread exists
-      if (threadId && !prev.threads.some(t => t.id === threadId)) {
+      if (threadId && !prev.threads.some((t) => t.id === threadId)) {
         return prev; // Invalid thread ID, don't update
       }
 
@@ -395,33 +402,39 @@ export function useThreadPersistence({
   /**
    * Force reload a thread
    */
-  const reloadThread = useCallback(async (threadId: string) => {
-    loadedThreadRef.current = null; // Force reload
+  const reloadThread = useCallback(
+    async (threadId: string) => {
+      loadedThreadRef.current = null; // Force reload
 
-    try {
-      const result = await fetchThread(threadId);
-      if (result) {
-        setMessages(result.messages);
-        saveStateRef.current.lastHash = computeMessageHash(result.messages);
-        saveStateRef.current.lastCount = result.messages.length;
-        loadedThreadRef.current = threadId;
+      try {
+        const result = await fetchThread(threadId);
+        if (result) {
+          setMessages(result.messages);
+          saveStateRef.current.lastHash = computeMessageHash(result.messages);
+          saveStateRef.current.lastCount = result.messages.length;
+          loadedThreadRef.current = threadId;
+        }
+      } catch (err) {
+        console.error('Failed to reload thread:', err);
       }
-    } catch (err) {
-      console.error("Failed to reload thread:", err);
-    }
-  }, [setMessages]);
+    },
+    [setMessages]
+  );
 
   /**
    * Select a thread (load its messages)
    */
-  const selectThread = useCallback(async (threadId: string) => {
-    // Clear loaded ref to trigger reload
-    loadedThreadRef.current = null;
-    saveStateRef.current = { lastHash: "", lastCount: 0, pendingSave: null };
+  const selectThread = useCallback(
+    async (threadId: string) => {
+      // Clear loaded ref to trigger reload
+      loadedThreadRef.current = null;
+      saveStateRef.current = { lastHash: '', lastCount: 0, pendingSave: null };
 
-    setState(prev => ({ ...prev, activeThreadId: threadId }));
-    onThreadIdChange?.(threadId);
-  }, [onThreadIdChange]);
+      setState((prev) => ({ ...prev, activeThreadId: threadId }));
+      onThreadIdChange?.(threadId);
+    },
+    [onThreadIdChange]
+  );
 
   /**
    * Start a fresh chat (no thread yet)
@@ -432,10 +445,10 @@ export function useThreadPersistence({
 
     // Clear state
     loadedThreadRef.current = null;
-    saveStateRef.current = { lastHash: "", lastCount: 0, pendingSave: null };
+    saveStateRef.current = { lastHash: '', lastCount: 0, pendingSave: null };
     titledThreadsRef.current.clear();
 
-    setState(prev => ({ ...prev, activeThreadId: null }));
+    setState((prev) => ({ ...prev, activeThreadId: null }));
 
     // Clear messages and notify
     setMessages([]);
@@ -445,22 +458,25 @@ export function useThreadPersistence({
   /**
    * Delete a thread
    */
-  const deleteThreadHandler = useCallback(async (threadId: string) => {
-    await deleteThreadApi(threadId);
+  const deleteThreadHandler = useCallback(
+    async (threadId: string) => {
+      await deleteThreadApi(threadId);
 
-    setState(prev => {
-      const remaining = prev.threads.filter(t => t.id !== threadId);
-      const wasActive = prev.activeThreadId === threadId;
-      const newActiveId = wasActive ? (remaining[0]?.id || null) : prev.activeThreadId;
+      setState((prev) => {
+        const remaining = prev.threads.filter((t) => t.id !== threadId);
+        const wasActive = prev.activeThreadId === threadId;
+        const newActiveId = wasActive ? remaining[0]?.id || null : prev.activeThreadId;
 
-      if (wasActive) {
-        loadedThreadRef.current = null;
-        onThreadIdChange?.(newActiveId);
-      }
+        if (wasActive) {
+          loadedThreadRef.current = null;
+          onThreadIdChange?.(newActiveId);
+        }
 
-      return { ...prev, threads: remaining, activeThreadId: newActiveId };
-    });
-  }, [onThreadIdChange]);
+        return { ...prev, threads: remaining, activeThreadId: newActiveId };
+      });
+    },
+    [onThreadIdChange]
+  );
 
   // ============================================================================
   // Message Saving
@@ -473,12 +489,10 @@ export function useThreadPersistence({
     const pendingResults = [...pendingToolResultsRef.current];
     pendingToolResultsRef.current = [];
 
-    return pendingResults.map(result => ({
+    return pendingResults.map((result) => ({
       id: `tool-result-${result.toolCallId}`,
-      role: "tool" as const,
-      content: typeof result.result === "string"
-        ? result.result
-        : JSON.stringify(result.result),
+      role: 'tool' as const,
+      content: typeof result.result === 'string' ? result.result : JSON.stringify(result.result),
       toolCallId: result.toolCallId,
     }));
   }, []);
@@ -503,7 +517,7 @@ export function useThreadPersistence({
     const currentHash = computeMessageHash(allMessages);
 
     const hasNewMessages = allMessages.length > lastCount;
-    const hashChanged = currentHash !== lastHash && lastHash !== "";
+    const hashChanged = currentHash !== lastHash && lastHash !== '';
     const hasToolResults = toolResultMessages.length > 0;
 
     if (!hasNewMessages && !hashChanged && !hasToolResults) return;
@@ -521,12 +535,13 @@ export function useThreadPersistence({
       if (!messagesToSave || messagesToSave.length === 0) return;
 
       // Get first user message for title
-      const firstUserMessage = messagesToSave.find(m => m.role === "user");
+      const firstUserMessage = messagesToSave.find((m) => m.role === 'user');
       if (!firstUserMessage) return;
 
-      const content = typeof firstUserMessage.content === "string"
-        ? firstUserMessage.content
-        : JSON.stringify(firstUserMessage.content);
+      const content =
+        typeof firstUserMessage.content === 'string'
+          ? firstUserMessage.content
+          : JSON.stringify(firstUserMessage.content);
 
       // Update save state
       saveStateRef.current.lastHash = computeMessageHash(messagesToSave);
@@ -543,16 +558,21 @@ export function useThreadPersistence({
           await saveMessages(currentActiveThreadId, messagesToSave, title);
 
           // Update thread in list
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
-            threads: prev.threads.map(t =>
+            threads: prev.threads.map((t) =>
               t.id === currentActiveThreadId
-                ? { ...t, messageCount: messagesToSave.length, updatedAt: Date.now(), title: title || t.title }
+                ? {
+                    ...t,
+                    messageCount: messagesToSave.length,
+                    updatedAt: Date.now(),
+                    title: title || t.title,
+                  }
                 : t
             ),
           }));
         } catch (err) {
-          console.error("Failed to save messages:", err);
+          console.error('Failed to save messages:', err);
         }
       } else {
         // Create new thread atomically
@@ -563,8 +583,8 @@ export function useThreadPersistence({
         const currentAISettings = getAISettings?.() || null;
 
         try {
-          const newThread = await threadCreationTracker.startCreation(
-            () => createThread(messagesToSave, title, currentScope, currentAISettings)
+          const newThread = await threadCreationTracker.startCreation(() =>
+            createThread(messagesToSave, title, currentScope, currentAISettings)
           );
 
           if (!newThread) return;
@@ -573,7 +593,7 @@ export function useThreadPersistence({
           titledThreadsRef.current.add(newThread.id);
           loadedThreadRef.current = newThread.id;
 
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             threads: [newThread, ...prev.threads],
             activeThreadId: newThread.id,
@@ -581,7 +601,7 @@ export function useThreadPersistence({
 
           onThreadIdChange?.(newThread.id);
         } catch (err) {
-          console.error("Failed to create thread:", err);
+          console.error('Failed to create thread:', err);
         }
       }
     }, SAVE_DEBOUNCE_MS);
@@ -605,7 +625,7 @@ export function useThreadPersistence({
     try {
       await updateThreadSettings(currentActiveThreadId, currentScope, currentAISettings);
     } catch (err) {
-      console.error("Failed to save thread settings:", err);
+      console.error('Failed to save thread settings:', err);
     }
   }, [state, getScope, getAISettings]);
 
@@ -613,18 +633,31 @@ export function useThreadPersistence({
   // Return Value
   // ============================================================================
 
-  return useMemo(() => ({
-    threads: state.threads,
-    activeThreadId: state.activeThreadId,
-    isLoading: state.isLoading,
-    error: state.error,
-    isRestoringSettings,
-    startNewChat,
-    selectThread,
-    deleteThread: deleteThreadHandler,
-    syncThreadIdFromUrl,
-    saveIfNeeded,
-    reloadThread,
-    saveSettingsToThread,
-  }), [state, isRestoringSettings, startNewChat, selectThread, deleteThreadHandler, syncThreadIdFromUrl, saveIfNeeded, reloadThread, saveSettingsToThread]);
+  return useMemo(
+    () => ({
+      threads: state.threads,
+      activeThreadId: state.activeThreadId,
+      isLoading: state.isLoading,
+      error: state.error,
+      isRestoringSettings,
+      startNewChat,
+      selectThread,
+      deleteThread: deleteThreadHandler,
+      syncThreadIdFromUrl,
+      saveIfNeeded,
+      reloadThread,
+      saveSettingsToThread,
+    }),
+    [
+      state,
+      isRestoringSettings,
+      startNewChat,
+      selectThread,
+      deleteThreadHandler,
+      syncThreadIdFromUrl,
+      saveIfNeeded,
+      reloadThread,
+      saveSettingsToThread,
+    ]
+  );
 }

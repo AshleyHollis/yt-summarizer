@@ -190,7 +190,8 @@ export const ORDERED_TEST_VIDEOS = {
 export const IMPLICIT_ORDER_VIDEOS = {
   // Videos with NO explicit ordering indicators - LLM must infer order from content
   javascriptAsync: {
-    description: 'JavaScript async concepts - NO explicit difficulty labels, order must be inferred from content',
+    description:
+      'JavaScript async concepts - NO explicit difficulty labels, order must be inferred from content',
     expectedOrder: [
       {
         id: 'DHjqpvDnNGE',
@@ -222,7 +223,8 @@ export const IMPLICIT_ORDER_VIDEOS = {
         title: 'JavaScript Async Await',
         inferredLevel: 'intermediate-advanced', // Not in title
         duration: 451, // 7:31
-        prerequisiteChain: 'async/await is syntactic sugar for Promises - requires Promise understanding',
+        prerequisiteChain:
+          'async/await is syntactic sugar for Promises - requires Promise understanding',
       },
       {
         id: 'vKJpN5FAeF4',
@@ -240,9 +242,9 @@ export const IMPLICIT_ORDER_VIDEOS = {
 const ALL_TEST_VIDEOS = [
   ...new Set([
     ...TEST_VIDEOS,
-    ...ORDERED_TEST_VIDEOS.pythonOOP.expectedOrder.map(v => v.url),
-    ...ORDERED_TEST_VIDEOS.fitness.videos.map(v => v.url),
-    ...IMPLICIT_ORDER_VIDEOS.javascriptAsync.expectedOrder.map(v => v.url),
+    ...ORDERED_TEST_VIDEOS.pythonOOP.expectedOrder.map((v) => v.url),
+    ...ORDERED_TEST_VIDEOS.fitness.videos.map((v) => v.url),
+    ...IMPLICIT_ORDER_VIDEOS.javascriptAsync.expectedOrder.map((v) => v.url),
   ]),
 ];
 
@@ -300,7 +302,9 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
   const startTime = Date.now();
 
   console.log(`\n[global-setup] Monitoring batch progress for ${videoIds.size} videos...`);
-  console.log('[global-setup] ┌──────────────────────────────────────────────────────────────────┐');
+  console.log(
+    '[global-setup] ┌──────────────────────────────────────────────────────────────────┐'
+  );
 
   while (Date.now() - startTime < MAX_WAIT_TIME_MS) {
     const elapsed = Math.round((Date.now() - startTime) / 1000);
@@ -315,18 +319,20 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
     }
 
     // Count statuses
-    const completed = progressList.filter(p => p.status === 'completed').length;
-    const processing = progressList.filter(p => p.status === 'processing').length;
-    const pending = progressList.filter(p => p.status === 'pending').length;
-    const failed = progressList.filter(p => p.status === 'failed').length;
+    const completed = progressList.filter((p) => p.status === 'completed').length;
+    const processing = progressList.filter((p) => p.status === 'processing').length;
+    const pending = progressList.filter((p) => p.status === 'pending').length;
+    const failed = progressList.filter((p) => p.status === 'failed').length;
 
     // Find current processing video for details
-    const currentVideo = progressList.find(p => p.status === 'processing');
+    const currentVideo = progressList.find((p) => p.status === 'processing');
     const queueInfo = currentVideo
       ? `stage=${currentVideo.stage}, queue=${currentVideo.queuePosition ?? '-'}, eta=${formatTime(currentVideo.eta)}`
       : '';
 
-    console.log(`[global-setup] │ [${elapsed}s] ✓${completed} ⚙${processing} ⏳${pending} ✗${failed} ${queueInfo}`);
+    console.log(
+      `[global-setup] │ [${elapsed}s] ✓${completed} ⚙${processing} ⏳${pending} ✗${failed} ${queueInfo}`
+    );
 
     // Check completion via coverage endpoint
     try {
@@ -341,14 +347,20 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
         const segments = coverage.segmentCount || 0;
 
         if (segments >= MIN_SEGMENTS_REQUIRED) {
-          console.log('[global-setup] └──────────────────────────────────────────────────────────────────┘');
-          console.log(`[global-setup] ✓ Ready! ${segments} segments indexed, ${completed} videos completed`);
+          console.log(
+            '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+          );
+          console.log(
+            `[global-setup] ✓ Ready! ${segments} segments indexed, ${completed} videos completed`
+          );
 
           // Log final processing stats
           console.log('\n[global-setup] Processing Summary:');
           for (const progress of progressList) {
             if (progress.status === 'completed') {
-              console.log(`  ✓ ${progress.id.slice(0, 8)}... wait=${formatTime(progress.waitSeconds)} proc=${formatTime(progress.processingSeconds)}`);
+              console.log(
+                `  ✓ ${progress.id.slice(0, 8)}... wait=${formatTime(progress.waitSeconds)} proc=${formatTime(progress.processingSeconds)}`
+              );
             }
           }
 
@@ -359,10 +371,12 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
       // Ignore coverage check errors
     }
 
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  console.log('[global-setup] └──────────────────────────────────────────────────────────────────┘');
+  console.log(
+    '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+  );
   console.log(`[global-setup] ⚠ Timeout waiting for video processing. Tests may fail.`);
   return false;
 }
@@ -370,7 +384,9 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
 async function waitForVideoProcessing(): Promise<boolean> {
   const startTime = Date.now();
 
-  console.log(`[global-setup] Waiting for videos to be processed (need ${MIN_SEGMENTS_REQUIRED}+ segments)...`);
+  console.log(
+    `[global-setup] Waiting for videos to be processed (need ${MIN_SEGMENTS_REQUIRED}+ segments)...`
+  );
 
   while (Date.now() - startTime < MAX_WAIT_TIME_MS) {
     try {
@@ -385,7 +401,9 @@ async function waitForVideoProcessing(): Promise<boolean> {
         const segments = coverage.segmentCount || 0;
         const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-        console.log(`[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments (${elapsed}s elapsed)`);
+        console.log(
+          `[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments (${elapsed}s elapsed)`
+        );
 
         if (segments >= MIN_SEGMENTS_REQUIRED) {
           console.log(`[global-setup] ✓ Ready! ${segments} segments indexed`);
@@ -396,7 +414,7 @@ async function waitForVideoProcessing(): Promise<boolean> {
       console.log(`[global-setup] Coverage check failed: ${error}`);
     }
 
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
   console.log(`[global-setup] ⚠ Timeout waiting for video processing. Tests may fail.`);
@@ -436,7 +454,9 @@ async function globalSetup(config: FullConfig) {
         submitted++;
       } else if (response.status === 409) {
         // Video already exists - try to get its ID for monitoring
-        const existingResponse = await fetch(`${API_URL}/api/v1/videos?url=${encodeURIComponent(url)}`);
+        const existingResponse = await fetch(
+          `${API_URL}/api/v1/videos?url=${encodeURIComponent(url)}`
+        );
         if (existingResponse.ok) {
           const existingData = await existingResponse.json();
           if (existingData.items?.[0]?.id) {

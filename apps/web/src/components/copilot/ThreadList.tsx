@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { MessageSquare, Trash2 } from "lucide-react";
-import styles from "./ThreadedCopilotSidebar.module.css";
-import { formatRelativeDate } from "@/utils/formatDate";
+import { MessageSquare, Trash2 } from 'lucide-react';
+import styles from './ThreadedCopilotSidebar.module.css';
+import { formatRelativeDate } from '@/utils/formatDate';
 
 // ============================================================================
 // Types
@@ -39,9 +39,7 @@ export function ThreadList({
   onDeleteThread,
   onClose,
 }: ThreadListProps) {
-  const sortedThreads = threads
-    .slice()
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const sortedThreads = threads.slice().sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
     <div className={styles.threadDropdown}>
@@ -55,14 +53,12 @@ export function ThreadList({
               onSelectThread(thread.id);
               onClose();
             }}
-            className={`${styles.threadItem} ${isActive ? styles.active : ""}`}
+            className={`${styles.threadItem} ${isActive ? styles.active : ''}`}
           >
             <MessageSquare className={styles.threadIcon} />
 
             <div className={styles.threadInfo}>
-              <div className={styles.threadTitle}>
-                {thread.title}
-              </div>
+              <div className={styles.threadTitle}>{thread.title}</div>
               <div className={styles.threadMeta}>
                 {formatRelativeDate(thread.updatedAt)}
                 {thread.messageCount > 0 && ` • ${thread.messageCount}`}

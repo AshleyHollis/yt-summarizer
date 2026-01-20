@@ -196,10 +196,7 @@ export function completeProgress<T>(
 /**
  * Helper to mark progress as failed
  */
-export function failProgress(
-  current: WorkflowProgress,
-  error: WorkflowError
-): WorkflowProgress {
+export function failProgress(current: WorkflowProgress, error: WorkflowError): WorkflowProgress {
   return {
     ...current,
     status: 'failed',

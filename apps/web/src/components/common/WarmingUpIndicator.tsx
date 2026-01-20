@@ -43,7 +43,7 @@ export function WarmingUpIndicator({
     bgColor = 'bg-yellow-100 dark:bg-yellow-900/30';
     textColor = 'text-yellow-800 dark:text-yellow-200';
   } else if (status === 'unhealthy') {
-    displayMessage = message || 'Service unavailable. We\'re working to restore connectivity.';
+    displayMessage = message || "Service unavailable. We're working to restore connectivity.";
     bgColor = 'bg-red-100 dark:bg-red-900/30';
     textColor = 'text-red-800 dark:text-red-200';
     Icon = ErrorIcon;

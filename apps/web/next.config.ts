@@ -80,10 +80,10 @@ const nextConfig: NextConfig = {
       if (fs.existsSync(configPath)) {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         if (config.url) {
-            backendUrl = config.url;
-            // Inject into env for server-side API calls (consumed by api.ts)
-            process.env.API_URL = backendUrl;
-            console.log(`[Next.js] Loaded backend URL from ${configPath}: ${backendUrl}`);
+          backendUrl = config.url;
+          // Inject into env for server-side API calls (consumed by api.ts)
+          process.env.API_URL = backendUrl;
+          console.log(`[Next.js] Loaded backend URL from ${configPath}: ${backendUrl}`);
         }
       }
     } catch (e) {

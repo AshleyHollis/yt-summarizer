@@ -56,11 +56,7 @@ function getFacetTypeColor(type: string): {
 /**
  * Facet chips component for selecting/filtering by facets
  */
-export function FacetChips({
-  selectedFacets,
-  onFacetToggle,
-  onClearFacets,
-}: FacetChipsProps) {
+export function FacetChips({ selectedFacets, onFacetToggle, onClearFacets }: FacetChipsProps) {
   const [facets, setFacets] = useState<FacetCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,15 +83,10 @@ export function FacetChips({
   if (loading) {
     return (
       <div className="mb-4">
-        <label className="mb-2 block text-sm font-medium text-gray-700">
-          Topics & Tags
-        </label>
+        <label className="mb-2 block text-sm font-medium text-gray-700">Topics & Tags</label>
         <div className="flex flex-wrap gap-2">
           {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-7 w-20 animate-pulse rounded-full bg-gray-200"
-            />
+            <div key={i} className="h-7 w-20 animate-pulse rounded-full bg-gray-200" />
           ))}
         </div>
       </div>
@@ -105,9 +96,7 @@ export function FacetChips({
   if (error) {
     return (
       <div className="mb-4">
-        <label className="mb-2 block text-sm font-medium text-gray-700">
-          Topics & Tags
-        </label>
+        <label className="mb-2 block text-sm font-medium text-gray-700">Topics & Tags</label>
         <p className="text-sm text-red-600">{error}</p>
       </div>
     );
@@ -123,9 +112,7 @@ export function FacetChips({
   return (
     <div className="mb-4">
       <div className="mb-2 flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-700">
-          Topics & Tags
-        </label>
+        <label className="text-sm font-medium text-gray-700">Topics & Tags</label>
         {selectedFacets.length > 0 && (
           <button
             type="button"
@@ -154,9 +141,7 @@ export function FacetChips({
             >
               {facet.name}
               <span className="ml-1.5 text-gray-400">({facet.video_count})</span>
-              {isSelected && (
-                <XMarkIcon className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
-              )}
+              {isSelected && <XMarkIcon className="ml-1 h-3.5 w-3.5" aria-hidden="true" />}
             </button>
           );
         })}

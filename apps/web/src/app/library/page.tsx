@@ -25,17 +25,24 @@ const DEFAULT_FILTERS: FilterState = {
 const PAGE_SIZE = 12;
 
 // Polling intervals for updates
-const FAST_POLLING_INTERVAL = 5000;  // 5 seconds when videos are processing
+const FAST_POLLING_INTERVAL = 5000; // 5 seconds when videos are processing
 const SLOW_POLLING_INTERVAL = 30000; // 30 seconds to check for new videos
 
 // Valid processing status filter values
-const VALID_STATUSES: ProcessingStatusFilter[] = ['pending', 'processing', 'completed', 'failed', 'rate_limited'];
+const VALID_STATUSES: ProcessingStatusFilter[] = [
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+  'rate_limited',
+];
 
 /**
  * Toggle button for entering/exiting selection mode
  */
 function SelectionModeToggle() {
-  const { selectionMode, enterSelectionMode, exitSelectionMode, selectedVideos } = useVideoSelection();
+  const { selectionMode, enterSelectionMode, exitSelectionMode, selectedVideos } =
+    useVideoSelection();
 
   if (selectionMode) {
     return (
@@ -74,9 +81,10 @@ function LibraryContentWithParams() {
   const statusFromUrl = searchParams.get('status');
 
   // Validate status from URL is a valid ProcessingStatusFilter
-  const validStatus = statusFromUrl && VALID_STATUSES.includes(statusFromUrl as ProcessingStatusFilter)
-    ? (statusFromUrl as ProcessingStatusFilter)
-    : null;
+  const validStatus =
+    statusFromUrl && VALID_STATUSES.includes(statusFromUrl as ProcessingStatusFilter)
+      ? (statusFromUrl as ProcessingStatusFilter)
+      : null;
 
   return <LibraryContent initialStatus={validStatus} />;
 }
@@ -85,7 +93,6 @@ function LibraryContentWithParams() {
  * Library page content that displays videos
  */
 function LibraryContent({ initialStatus }: { initialStatus: ProcessingStatusFilter | null }) {
-
   const [filters, setFilters] = useState<FilterState>(() => ({
     ...DEFAULT_FILTERS,
     status: initialStatus,
@@ -102,44 +109,48 @@ function LibraryContent({ initialStatus }: { initialStatus: ProcessingStatusFilt
    */
   const hasVideosNeedingUpdates = useCallback((videoList: VideoCardType[]): boolean => {
     return videoList.some(
-      (video) => video.processing_status === 'pending' ||
-                 video.processing_status === 'processing' ||
-                 video.processing_status === 'rate_limited'
+      (video) =>
+        video.processing_status === 'pending' ||
+        video.processing_status === 'processing' ||
+        video.processing_status === 'rate_limited'
     );
   }, []);
 
-  const fetchVideos = useCallback(async (isPolling = false) => {
-    try {
-      // Only show loading spinner on initial load, not during polling
-      if (!isPolling) {
-        setLoading(true);
-      }
-      setError(null);
+  const fetchVideos = useCallback(
+    async (isPolling = false) => {
+      try {
+        // Only show loading spinner on initial load, not during polling
+        if (!isPolling) {
+          setLoading(true);
+        }
+        setError(null);
 
-      const response = await libraryApi.listVideos({
-        channel_id: filters.channelId || undefined,
-        from_date: filters.fromDate || undefined,
-        to_date: filters.toDate || undefined,
-        facets: filters.facets.length > 0 ? filters.facets : undefined,
-        status: filters.status || undefined,
-        search: filters.search || undefined,
-        sort_by: filters.sortBy,
-        sort_order: filters.sortOrder,
-        page,
-        page_size: PAGE_SIZE,
-      });
+        const response = await libraryApi.listVideos({
+          channel_id: filters.channelId || undefined,
+          from_date: filters.fromDate || undefined,
+          to_date: filters.toDate || undefined,
+          facets: filters.facets.length > 0 ? filters.facets : undefined,
+          status: filters.status || undefined,
+          search: filters.search || undefined,
+          sort_by: filters.sortBy,
+          sort_order: filters.sortOrder,
+          page,
+          page_size: PAGE_SIZE,
+        });
 
-      setVideos(response.videos);
-      setTotalCount(response.total_count);
-    } catch (err) {
-      console.error('Failed to fetch videos:', err);
-      setError('Failed to load videos. Please try again.');
-    } finally {
-      if (!isPolling) {
-        setLoading(false);
+        setVideos(response.videos);
+        setTotalCount(response.total_count);
+      } catch (err) {
+        console.error('Failed to fetch videos:', err);
+        setError('Failed to load videos. Please try again.');
+      } finally {
+        if (!isPolling) {
+          setLoading(false);
+        }
       }
-    }
-  }, [filters, page]);
+    },
+    [filters, page]
+  );
 
   // Initial fetch and refetch when filters/page change
   useEffect(() => {
@@ -248,8 +259,18 @@ function LibraryContent({ initialStatus }: { initialStatus: ProcessingStatusFilt
             {!loading && !error && videos.length === 0 && (
               <div className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-12 text-center shadow-sm">
                 <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
-                  <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  <svg
+                    className="w-8 h-8 text-gray-400 dark:text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
                   </svg>
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -311,11 +332,13 @@ function LibraryContent({ initialStatus }: { initialStatus: ProcessingStatusFilt
 export default function LibraryPage() {
   return (
     <VideoSelectionProvider>
-      <Suspense fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-gray-500">Loading...</div>
-        </div>
-      }>
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="text-gray-500">Loading...</div>
+          </div>
+        }
+      >
         <LibraryContentWithParams />
       </Suspense>
     </VideoSelectionProvider>

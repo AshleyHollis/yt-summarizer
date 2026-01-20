@@ -13,7 +13,8 @@ import { XMarkIcon, ChatBubbleLeftRightIcon, XCircleIcon } from '@heroicons/reac
 export function SelectionBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { selectedVideos, removeFromSelection, clearSelection, exitSelectionMode } = useVideoSelection();
+  const { selectedVideos, removeFromSelection, clearSelection, exitSelectionMode } =
+    useVideoSelection();
   const { setScope } = useScope();
 
   if (selectedVideos.length === 0) {
@@ -22,7 +23,7 @@ export function SelectionBar() {
 
   const handleChatWithSelected = () => {
     // Set the scope to include only selected video IDs
-    setScope({ videoIds: selectedVideos.map(v => v.video_id) });
+    setScope({ videoIds: selectedVideos.map((v) => v.video_id) });
 
     // Navigate to library with chat open
     const params = new URLSearchParams(searchParams.toString());
@@ -57,14 +58,12 @@ export function SelectionBar() {
         {/* Thumbnail strip */}
         <div className="flex items-center gap-1">
           {displayedVideos.map((video) => {
-            const thumbnailUrl = video.thumbnail_url ||
+            const thumbnailUrl =
+              video.thumbnail_url ||
               `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`;
 
             return (
-              <div
-                key={video.video_id}
-                className="relative group/thumb"
-              >
+              <div key={video.video_id} className="relative group/thumb">
                 <div className="w-12 h-8 rounded-md overflow-hidden ring-2 ring-gray-600 hover:ring-red-500 transition-all">
                   <Image
                     src={thumbnailUrl}

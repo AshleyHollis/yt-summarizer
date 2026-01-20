@@ -49,9 +49,7 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders hero section', async ({ page }) => {
-      await expect(
-        page.getByRole('heading', { name: /Add Content/i })
-      ).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Add Content/i })).toBeVisible();
     });
 
     test('renders submit form with URL input', async ({ page }) => {
@@ -165,7 +163,10 @@ test.describe('Core User Flows @smoke', () => {
 test.describe('Video Submission (Requires Backend)', () => {
   // These tests require the Aspire backend to be running with a working database
   // Skip unless USE_EXTERNAL_SERVER is set
-  test.skip(() => !process.env.USE_EXTERNAL_SERVER, 'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire');
+  test.skip(
+    () => !process.env.USE_EXTERNAL_SERVER,
+    'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
+  );
 
   test('submits video and shows loading state', async ({ page }) => {
     await page.goto('/add');
@@ -185,7 +186,9 @@ test.describe('Video Submission (Requires Backend)', () => {
     const videoPage = page.locator('[class*="video" i]');
 
     // Wait for either submitting state, an error message, or navigation
-    await expect(submittingButton.or(errorAlertWithText).or(videoPage)).toBeVisible({ timeout: 10000 });
+    await expect(submittingButton.or(errorAlertWithText).or(videoPage)).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('submits video and redirects to video detail page', async ({ page }) => {
@@ -228,7 +231,10 @@ test.describe('Video Submission (Requires Backend)', () => {
 });
 
 test.describe('Error Handling (Requires Backend)', () => {
-  test.skip(() => !process.env.USE_EXTERNAL_SERVER, 'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire');
+  test.skip(
+    () => !process.env.USE_EXTERNAL_SERVER,
+    'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
+  );
 
   test.skip('shows error message when API is unavailable', async ({ page }) => {
     // NOTE: This test is skipped because it's inherently flaky.
@@ -248,7 +254,8 @@ test.describe('Error Handling (Requires Backend)', () => {
 
     await submitButton.click();
 
-    const errorOrReady = page.getByText(/error|failed|unable|try again|could not/i)
+    const errorOrReady = page
+      .getByText(/error|failed|unable|try again|could not/i)
       .or(submitButton);
     await expect(errorOrReady).toBeVisible({ timeout: 10000 });
   });

@@ -130,7 +130,7 @@ function buildUrl(
  * Delay helper for exponential backoff
  */
 function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -151,10 +151,7 @@ const RETRY_CONFIG = {
  * Make an API request with automatic JSON handling, error processing,
  * and retry logic for degraded service (serverless DB wake-up).
  */
-async function request<T>(
-  endpoint: string,
-  options: ApiRequestOptions = {}
-): Promise<T> {
+async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
   const { body, params, correlationId, ...fetchOptions } = options;
 
   // Generate or use provided correlation ID
@@ -198,7 +195,9 @@ async function request<T>(
           RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
           RETRY_CONFIG.maxDelayMs
         );
-        console.log(`API returned ${response.status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries})`);
+        console.log(
+          `API returned ${response.status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries})`
+        );
         await delay(delayMs);
       }
     } catch (err) {
@@ -210,7 +209,9 @@ async function request<T>(
           RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
           RETRY_CONFIG.maxDelayMs
         );
-        console.log(`Network error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries})`);
+        console.log(
+          `Network error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries})`
+        );
         await delay(delayMs);
       }
     }
@@ -221,10 +222,12 @@ async function request<T>(
     const error = lastError || new Error('Failed to connect to API');
 
     // Check for certificate-related errors
-    if (error.message.includes('certificate') ||
-        error.message.includes('SSL') ||
-        error.message.includes('ERR_CERT') ||
-        error.message.includes('SEC_ERROR')) {
+    if (
+      error.message.includes('certificate') ||
+      error.message.includes('SSL') ||
+      error.message.includes('ERR_CERT') ||
+      error.message.includes('SEC_ERROR')
+    ) {
       throw new ApiClientError(
         'Backend certificate is invalid or untrusted. This may be a temporary deployment issue. Please try again later or contact support if the problem persists.',
         0,
@@ -252,12 +255,7 @@ async function request<T>(
       // Ignore JSON parsing errors for error response
     }
 
-    throw new ApiClientError(
-      errorMessage,
-      response.status,
-      responseCorrelationId,
-      details
-    );
+    throw new ApiClientError(errorMessage, response.status, responseCorrelationId, details);
   }
 
   // Handle empty responses
@@ -420,7 +418,13 @@ export type JobType = 'transcribe' | 'summarize' | 'embed' | 'build_relationship
 /**
  * Job stage
  */
-export type JobStage = 'queued' | 'running' | 'completed' | 'failed' | 'dead_lettered' | 'rate_limited';
+export type JobStage =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'dead_lettered'
+  | 'rate_limited';
 
 /**
  * Job status
@@ -621,8 +625,7 @@ export const videoApi = {
   /**
    * Get a video by ID
    */
-  getById: (videoId: string): Promise<VideoResponse> =>
-    api.get(`/api/v1/videos/${videoId}`),
+  getById: (videoId: string): Promise<VideoResponse> => api.get(`/api/v1/videos/${videoId}`),
 
   /**
    * Reprocess a video
@@ -654,8 +657,7 @@ export const jobApi = {
   /**
    * Get a job by ID
    */
-  getById: (jobId: string): Promise<JobResponse> =>
-    api.get(`/api/v1/jobs/${jobId}`),
+  getById: (jobId: string): Promise<JobResponse> => api.get(`/api/v1/jobs/${jobId}`),
 
   /**
    * Retry a failed job
@@ -683,7 +685,12 @@ export const jobApi = {
 /**
  * Processing status filter for library
  */
-export type ProcessingStatusFilter = 'pending' | 'processing' | 'completed' | 'failed' | 'rate_limited';
+export type ProcessingStatusFilter =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'rate_limited';
 
 /**
  * Sort field options
@@ -890,11 +897,7 @@ export const libraryApi = {
   /**
    * List video segments
    */
-  listSegments: (
-    videoId: string,
-    page?: number,
-    pageSize?: number
-  ): Promise<SegmentListResponse> =>
+  listSegments: (videoId: string, page?: number, pageSize?: number): Promise<SegmentListResponse> =>
     api.get(`/api/v1/library/videos/${videoId}/segments`, {
       params: { page, page_size: pageSize },
     }),
@@ -902,11 +905,7 @@ export const libraryApi = {
   /**
    * List channels
    */
-  listChannels: (
-    page?: number,
-    pageSize?: number,
-    search?: string
-  ): Promise<ChannelListResponse> =>
+  listChannels: (page?: number, pageSize?: number, search?: string): Promise<ChannelListResponse> =>
     api.get('/api/v1/library/channels', {
       params: { page, page_size: pageSize, search },
     }),
@@ -914,10 +913,7 @@ export const libraryApi = {
   /**
    * List facets
    */
-  listFacets: (
-    facetType?: string,
-    minCount?: number
-  ): Promise<FacetListResponse> =>
+  listFacets: (facetType?: string, minCount?: number): Promise<FacetListResponse> =>
     api.get('/api/v1/library/facets', {
       params: { facet_type: facetType, min_count: minCount },
     }),
@@ -925,8 +921,7 @@ export const libraryApi = {
   /**
    * Get library statistics
    */
-  getStats: (): Promise<LibraryStatsResponse> =>
-    api.get('/api/v1/library/stats'),
+  getStats: (): Promise<LibraryStatsResponse> => api.get('/api/v1/library/stats'),
 };
 
 // ============================================================================
@@ -1082,8 +1077,7 @@ export const batchApi = {
   /**
    * Get batch details
    */
-  getById: (batchId: string): Promise<BatchDetailResponse> =>
-    api.get(`/api/v1/batches/${batchId}`),
+  getById: (batchId: string): Promise<BatchDetailResponse> => api.get(`/api/v1/batches/${batchId}`),
 
   /**
    * Stream batch progress via Server-Sent Events

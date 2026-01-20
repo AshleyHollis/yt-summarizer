@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import {
-  channelApi,
-  ChannelVideosResponse,
-  ChannelVideo,
-  ApiClientError,
-} from '@/services/api';
+import { channelApi, ChannelVideosResponse, ChannelVideo, ApiClientError } from '@/services/api';
 
 /**
  * Props for ChannelForm component

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { ExclamationTriangleIcon, ArrowsPointingOutIcon } from "@heroicons/react/20/solid";
+import { ExclamationTriangleIcon, ArrowsPointingOutIcon } from '@heroicons/react/20/solid';
 
 interface UncertaintyMessageProps {
   message: string;
@@ -35,9 +35,7 @@ export function UncertaintyMessage({
           <ExclamationTriangleIcon className="h-4 w-4 text-amber-500" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-amber-500">
-            Limited Information
-          </p>
+          <p className="text-sm font-semibold text-amber-500">Limited Information</p>
           <p className="text-sm text-[var(--copilot-kit-secondary-contrast-color)] leading-relaxed mt-1">
             {message}
           </p>
@@ -48,7 +46,8 @@ export function UncertaintyMessage({
               <p className="text-sm text-[var(--copilot-kit-secondary-contrast-color)]">
                 {currentVideoTitle ? (
                   <>
-                    I only searched within &ldquo;<span className="font-medium">{currentVideoTitle}</span>&rdquo;.
+                    I only searched within &ldquo;
+                    <span className="font-medium">{currentVideoTitle}</span>&rdquo;.
                   </>
                 ) : (
                   <>Your search was limited to a subset of your library.</>

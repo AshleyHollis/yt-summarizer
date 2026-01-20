@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // We test the filtering logic directly since hooks require complex mocking
 
 describe('useCopilotActions Filtering Logic', () => {
-  const MIN_RELEVANCE_THRESHOLD = 0.50;
+  const MIN_RELEVANCE_THRESHOLD = 0.5;
 
   describe('Video Card Filtering', () => {
     const filterVideoCards = (videoCards: Array<{ relevanceScore: number; title: string }>) => {
@@ -23,19 +23,19 @@ describe('useCopilotActions Filtering Logic', () => {
     it('should filter out videos below 50% relevance threshold', () => {
       const videoCards = [
         { title: 'Heavy Clubs Video', relevanceScore: 0.81 },
-        { title: 'Irrelevant Video', relevanceScore: 0.30 },
+        { title: 'Irrelevant Video', relevanceScore: 0.3 },
         { title: 'Push Ups Video', relevanceScore: 0.99 },
       ];
 
       const filtered = filterVideoCards(videoCards);
 
       expect(filtered).toHaveLength(2);
-      expect(filtered.map(v => v.title)).toEqual(['Heavy Clubs Video', 'Push Ups Video']);
+      expect(filtered.map((v) => v.title)).toEqual(['Heavy Clubs Video', 'Push Ups Video']);
     });
 
     it('should include videos at exactly 50% threshold', () => {
       const videoCards = [
-        { title: 'Edge Case Video', relevanceScore: 0.50 },
+        { title: 'Edge Case Video', relevanceScore: 0.5 },
         { title: 'Below Threshold', relevanceScore: 0.49 },
       ];
 
@@ -83,14 +83,14 @@ describe('useCopilotActions Filtering Logic', () => {
     it('should filter out evidence below 40% confidence threshold', () => {
       const evidence = [
         { videoTitle: 'Heavy Clubs', confidence: 0.81 },
-        { videoTitle: 'Cooking Video', confidence: 0.30 },
+        { videoTitle: 'Cooking Video', confidence: 0.3 },
         { videoTitle: 'Push Ups', confidence: 0.94 },
       ];
 
       const filtered = filterEvidence(evidence);
 
       expect(filtered).toHaveLength(2);
-      expect(filtered.map(e => e.videoTitle)).toEqual(['Heavy Clubs', 'Push Ups']);
+      expect(filtered.map((e) => e.videoTitle)).toEqual(['Heavy Clubs', 'Push Ups']);
     });
 
     it('should filter out irrelevant sources for unrelated queries', () => {
@@ -107,9 +107,7 @@ describe('useCopilotActions Filtering Logic', () => {
 
     it('should keep highly relevant sources', () => {
       // Simulating "heavy clubs" query
-      const evidence = [
-        { videoTitle: 'Heavy Clubs That Most Beginners Miss', confidence: 0.81 },
-      ];
+      const evidence = [{ videoTitle: 'Heavy Clubs That Most Beginners Miss', confidence: 0.81 }];
 
       const filtered = filterEvidence(evidence);
 
@@ -130,13 +128,11 @@ describe('useCopilotActions Filtering Logic', () => {
       evidence: Array<{ confidence: number; videoTitle: string }>;
       uncertainty: string | null;
     }) => {
-      const filteredVideoCards = data.videoCards?.filter(
-        (video) => video.relevanceScore >= MIN_RELEVANCE_THRESHOLD
-      ) || [];
+      const filteredVideoCards =
+        data.videoCards?.filter((video) => video.relevanceScore >= MIN_RELEVANCE_THRESHOLD) || [];
 
-      const filteredEvidence = data.evidence?.filter(
-        (item) => item.confidence >= MIN_RELEVANCE_THRESHOLD
-      ) || [];
+      const filteredEvidence =
+        data.evidence?.filter((item) => item.confidence >= MIN_RELEVANCE_THRESHOLD) || [];
 
       return {
         ...data,
@@ -237,7 +233,7 @@ describe('useCopilotActions Filtering Logic', () => {
 
       expect(processed.videoCards).toHaveLength(2);
       expect(processed.evidence).toHaveLength(2);
-      expect(processed.videoCards.map(v => v.title)).not.toContain('Heavy Clubs Video');
+      expect(processed.videoCards.map((v) => v.title)).not.toContain('Heavy Clubs Video');
     });
   });
 });
@@ -286,24 +282,34 @@ describe('Tool Call Message Creation', () => {
      * Creates an assistant message with toolCalls array in the format
      * expected by CopilotKit and the persistence layer.
      */
-    function createAssistantToolCallMessage(toolCallId: string, toolName: string, toolArgs: string) {
+    function createAssistantToolCallMessage(
+      toolCallId: string,
+      toolName: string,
+      toolArgs: string
+    ) {
       return {
         id: toolCallId,
-        role: "assistant" as const,
-        toolCalls: [{
-          id: toolCallId,
-          type: "function" as const,
-          function: {
-            name: toolName,
-            arguments: toolArgs,
+        role: 'assistant' as const,
+        toolCalls: [
+          {
+            id: toolCallId,
+            type: 'function' as const,
+            function: {
+              name: toolName,
+              arguments: toolArgs,
+            },
           },
-        }],
+        ],
       };
     }
 
     it('should create assistant message with correct structure', () => {
       const toolCallId = 'call_abc123';
-      const message = createAssistantToolCallMessage(toolCallId, 'queryLibrary', '{"query":"test"}');
+      const message = createAssistantToolCallMessage(
+        toolCallId,
+        'queryLibrary',
+        '{"query":"test"}'
+      );
 
       expect(message.id).toBe(toolCallId);
       expect(message.role).toBe('assistant');
@@ -339,8 +345,8 @@ describe('Tool Call Message Creation', () => {
     function createToolResultMessage(messageId: string, toolCallId: string, result: unknown) {
       return {
         id: messageId,
-        role: "tool" as const,
-        content: typeof result === "string" ? result : JSON.stringify(result),
+        role: 'tool' as const,
+        content: typeof result === 'string' ? result : JSON.stringify(result),
         toolCallId,
       };
     }
@@ -385,7 +391,13 @@ describe('Tool Call Message Creation', () => {
       const assistantMsg = {
         id: toolCallId,
         role: 'assistant' as const,
-        toolCalls: [{ id: toolCallId, type: 'function' as const, function: { name: 'queryLibrary', arguments: '{}' } }],
+        toolCalls: [
+          {
+            id: toolCallId,
+            type: 'function' as const,
+            function: { name: 'queryLibrary', arguments: '{}' },
+          },
+        ],
       };
 
       const toolMsg = createToolResultMessage('result-id', toolCallId, { answer: 'test' });
@@ -397,12 +409,15 @@ describe('Tool Call Message Creation', () => {
   describe('Pending Tool Results Tracking', () => {
     it('should track pending results with full tool call info', () => {
       // Simulates the pendingToolResultsRef structure
-      const pendingResults = new Map<string, {
-        toolCallId: string;
-        result: unknown;
-        toolName: string;
-        toolArgs: string;
-      }>();
+      const pendingResults = new Map<
+        string,
+        {
+          toolCallId: string;
+          result: unknown;
+          toolName: string;
+          toolArgs: string;
+        }
+      >();
 
       const messageId = crypto.randomUUID();
       const toolCallId = 'call_test123';
@@ -424,16 +439,29 @@ describe('Tool Call Message Creation', () => {
     });
 
     it('should allow retrieving all pending entries', () => {
-      const pendingResults = new Map<string, {
-        toolCallId: string;
-        result: unknown;
-        toolName: string;
-        toolArgs: string;
-      }>();
+      const pendingResults = new Map<
+        string,
+        {
+          toolCallId: string;
+          result: unknown;
+          toolName: string;
+          toolArgs: string;
+        }
+      >();
 
       // Add multiple entries
-      pendingResults.set('msg-1', { toolCallId: 'call_1', result: {}, toolName: 'queryLibrary', toolArgs: '{}' });
-      pendingResults.set('msg-2', { toolCallId: 'call_2', result: {}, toolName: 'queryLibrary', toolArgs: '{}' });
+      pendingResults.set('msg-1', {
+        toolCallId: 'call_1',
+        result: {},
+        toolName: 'queryLibrary',
+        toolArgs: '{}',
+      });
+      pendingResults.set('msg-2', {
+        toolCallId: 'call_2',
+        result: {},
+        toolName: 'queryLibrary',
+        toolArgs: '{}',
+      });
 
       const entries = Array.from(pendingResults.entries());
 
@@ -442,14 +470,22 @@ describe('Tool Call Message Creation', () => {
     });
 
     it('should allow clearing processed entries', () => {
-      const pendingResults = new Map<string, {
-        toolCallId: string;
-        result: unknown;
-        toolName: string;
-        toolArgs: string;
-      }>();
+      const pendingResults = new Map<
+        string,
+        {
+          toolCallId: string;
+          result: unknown;
+          toolName: string;
+          toolArgs: string;
+        }
+      >();
 
-      pendingResults.set('msg-1', { toolCallId: 'call_1', result: {}, toolName: 'queryLibrary', toolArgs: '{}' });
+      pendingResults.set('msg-1', {
+        toolCallId: 'call_1',
+        result: {},
+        toolName: 'queryLibrary',
+        toolArgs: '{}',
+      });
 
       // Simulate processing and cleanup
       pendingResults.delete('msg-1');
@@ -479,23 +515,31 @@ describe('Tool Call Message Creation', () => {
     });
 
     it('should detect existing assistant tool calls', () => {
-      interface ToolCall { id: string; type: string; function: { name: string; arguments: string } }
+      interface ToolCall {
+        id: string;
+        type: string;
+        function: { name: string; arguments: string };
+      }
 
       const messages = [
         { id: 'user-1', role: 'user' as const },
         {
           id: 'call_existing',
           role: 'assistant' as const,
-          toolCalls: [{ id: 'call_existing', type: 'function', function: { name: 'queryLibrary', arguments: '{}' } }]
+          toolCalls: [
+            {
+              id: 'call_existing',
+              type: 'function',
+              function: { name: 'queryLibrary', arguments: '{}' },
+            },
+          ],
         },
       ];
 
       const existingAssistantToolCallIds = new Set(
         messages
           .filter((m) => m.role === 'assistant')
-          .flatMap((m) =>
-            ((m as { toolCalls?: ToolCall[] }).toolCalls || []).map(tc => tc.id)
-          )
+          .flatMap((m) => ((m as { toolCalls?: ToolCall[] }).toolCalls || []).map((tc) => tc.id))
       );
 
       expect(existingAssistantToolCallIds.has('call_existing')).toBe(true);

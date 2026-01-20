@@ -122,20 +122,22 @@ export function TranscriptViewer({
   // Error state
   if (error) {
     return (
-      <div className={`rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-6 ${className}`}>
+      <div
+        className={`rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-6 ${className}`}
+      >
         <p className="text-red-600 dark:text-red-400">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}>
+    <div
+      className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Transcript
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Transcript</h3>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="text-sm text-red-600 dark:text-red-400 hover:underline"

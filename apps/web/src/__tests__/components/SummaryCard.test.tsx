@@ -62,11 +62,7 @@ This concludes the summary.`;
         ok: true,
         text: async () => 'Summary content',
       });
-      render(
-        <SummaryCard
-          summaryUrl="https://example.com/summary.txt"
-        />
-      );
+      render(<SummaryCard summaryUrl="https://example.com/summary.txt" />);
       await waitFor(() => {
         expect(screen.getByText('AI Summary')).toBeInTheDocument();
       });

@@ -49,7 +49,9 @@ async function findProcessingVideo(): Promise<string | null> {
     }
 
     // Try pending
-    const pendingResponse = await fetch(`${API_URL}/api/v1/library/videos?status=pending&page_size=1`);
+    const pendingResponse = await fetch(
+      `${API_URL}/api/v1/library/videos?status=pending&page_size=1`
+    );
     if (pendingResponse.ok) {
       const data = await pendingResponse.json();
       if (data.videos?.[0]?.video_id) return data.videos[0].video_id;
@@ -66,7 +68,9 @@ test.describe('Queue Progress UI Updates', () => {
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
-  test('progress UI shows queue position and ETA updates during batch processing', async ({ page }) => {
+  test('progress UI shows queue position and ETA updates during batch processing', async ({
+    page,
+  }) => {
     // This test uses videos seeded by global-setup.ts
     // When run with WATCH_QUEUE_PROGRESS=true, global-setup submits but doesn't wait
     // So we can watch the UI update as videos process
@@ -110,8 +114,15 @@ test.describe('Queue Progress UI Updates', () => {
 
     while (Date.now() - startTime < QUEUE_PROCESSING_TIMEOUT && !completionSeen) {
       // Check for queue position display
-      const queuePositionEl = page.locator('text=/Queue Position|Position in queue|#\\d+ in queue|queue.*\\d+/i');
-      if (await queuePositionEl.first().isVisible().catch(() => false)) {
+      const queuePositionEl = page.locator(
+        'text=/Queue Position|Position in queue|#\\d+ in queue|queue.*\\d+/i'
+      );
+      if (
+        await queuePositionEl
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
         const text = await queuePositionEl.first().textContent();
         const match = text?.match(/(\d+)/);
         if (match) {
@@ -129,13 +140,23 @@ test.describe('Queue Progress UI Updates', () => {
 
       // Check for ETA display
       const etaEl = page.locator('text=/ETA|Estimated|remaining|~\\d+[ms]/i');
-      if (await etaEl.first().isVisible().catch(() => false)) {
+      if (
+        await etaEl
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
         sawEta = true;
       }
 
       // Check for current stage
       const stageEl = page.locator('text=/transcrib|summariz|embed/i');
-      if (await stageEl.first().isVisible().catch(() => false)) {
+      if (
+        await stageEl
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
         const text = await stageEl.first().textContent();
         const stage = text?.toLowerCase().match(/(transcrib|summariz|embed)/)?.[1] || '';
         if (stage && stage !== lastStage) {
@@ -156,7 +177,12 @@ test.describe('Queue Progress UI Updates', () => {
         await summaryTab.click();
         await page.waitForTimeout(500);
         const summaryContent = page.locator('.prose, .markdown, [class*="summary"]');
-        if (await summaryContent.first().isVisible().catch(() => false)) {
+        if (
+          await summaryContent
+            .first()
+            .isVisible()
+            .catch(() => false)
+        ) {
           const text = await summaryContent.first().textContent();
           if (text && text.length > 50) {
             console.log('\n  ✅ Video processing completed!');
@@ -167,7 +193,12 @@ test.describe('Queue Progress UI Updates', () => {
       }
 
       // Also check direct completed status
-      if (await completedEl.first().isVisible().catch(() => false)) {
+      if (
+        await completedEl
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
         console.log('\n  ✅ Video processing completed!');
         completionSeen = true;
         break;
@@ -175,7 +206,12 @@ test.describe('Queue Progress UI Updates', () => {
 
       // Check for errors
       const errorEl = page.locator('text=/failed|error/i');
-      if (await errorEl.first().isVisible().catch(() => false)) {
+      if (
+        await errorEl
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
         console.log('\n  ❌ Video processing failed!');
         break;
       }
@@ -186,9 +222,13 @@ test.describe('Queue Progress UI Updates', () => {
 
     // Log results
     console.log('\n📋 Test Results:');
-    console.log(`  Queue position displayed: ${sawQueuePosition ? '✓' : '(not visible - may have been first in queue)'}`);
+    console.log(
+      `  Queue position displayed: ${sawQueuePosition ? '✓' : '(not visible - may have been first in queue)'}`
+    );
     console.log(`  ETA displayed: ${sawEta ? '✓' : '(not visible)'}`);
-    console.log(`  Stage transitions: ${sawStageTransition ? '✓' : '(not visible - may have started mid-stage)'}`);
+    console.log(
+      `  Stage transitions: ${sawStageTransition ? '✓' : '(not visible - may have started mid-stage)'}`
+    );
     console.log(`  Completed: ${completionSeen ? '✓' : '✗'}`);
 
     // At minimum, we should see the video complete
@@ -232,7 +272,7 @@ test.describe('Queue Progress UI Updates', () => {
 
     // Track network requests to verify polling is happening
     const progressRequests: string[] = [];
-    page.on('request', request => {
+    page.on('request', (request) => {
       if (request.url().includes('/progress') || request.url().includes('/jobs/')) {
         progressRequests.push(request.url());
       }
@@ -246,7 +286,9 @@ test.describe('Queue Progress UI Updates', () => {
     expect(progressRequests.length).toBeGreaterThan(1);
 
     // The UI should reflect current status
-    const statusIndicator = page.locator('text=/processing|pending|completed|transcrib|summariz|embed/i');
+    const statusIndicator = page.locator(
+      'text=/processing|pending|completed|transcrib|summariz|embed/i'
+    );
     await expect(statusIndicator.first()).toBeVisible();
   });
 

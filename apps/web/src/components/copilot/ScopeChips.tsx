@@ -1,15 +1,14 @@
-"use client";
+'use client';
 
-import { useScope } from "@/app/providers";
-import { XMarkIcon } from "@heroicons/react/20/solid";
+import { useScope } from '@/app/providers';
+import { XMarkIcon } from '@heroicons/react/20/solid';
 
 interface ScopeChipsProps {
   onScopeChange?: () => void;
 }
 
 export function ScopeChips({ onScopeChange }: ScopeChipsProps) {
-  const { scope, removeChannel, removeVideo, removeFacet, clearScope } =
-    useScope();
+  const { scope, removeChannel, removeVideo, removeFacet, clearScope } = useScope();
 
   const hasScope =
     (scope.channels && scope.channels.length > 0) ||
@@ -19,11 +18,7 @@ export function ScopeChips({ onScopeChange }: ScopeChipsProps) {
     scope.dateRange?.to;
 
   if (!hasScope) {
-    return (
-      <div className="text-sm text-gray-500">
-        Searching entire library
-      </div>
-    );
+    return <div className="text-sm text-gray-500">Searching entire library</div>;
   }
 
   return (
@@ -70,7 +65,7 @@ export function ScopeChips({ onScopeChange }: ScopeChipsProps) {
       {/* Date range chip */}
       {(scope.dateRange?.from || scope.dateRange?.to) && (
         <Chip
-          label={`${scope.dateRange.from || "..."} to ${scope.dateRange.to || "..."}`}
+          label={`${scope.dateRange.from || '...'} to ${scope.dateRange.to || '...'}`}
           onRemove={() => {
             // Would need updateScope for this
             onScopeChange?.();
@@ -98,15 +93,15 @@ export function ScopeChips({ onScopeChange }: ScopeChipsProps) {
 interface ChipProps {
   label: string;
   onRemove: () => void;
-  color: "blue" | "green" | "purple" | "orange";
+  color: 'blue' | 'green' | 'purple' | 'orange';
 }
 
 function Chip({ label, onRemove, color }: ChipProps) {
   const colorClasses = {
-    blue: "bg-blue-100 text-blue-800",
-    green: "bg-green-100 text-green-800",
-    purple: "bg-purple-100 text-purple-800",
-    orange: "bg-orange-100 text-orange-800",
+    blue: 'bg-blue-100 text-blue-800',
+    green: 'bg-green-100 text-green-800',
+    purple: 'bg-purple-100 text-purple-800',
+    orange: 'bg-orange-100 text-orange-800',
   };
 
   return (
@@ -114,10 +109,7 @@ function Chip({ label, onRemove, color }: ChipProps) {
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${colorClasses[color]}`}
     >
       {label}
-      <button
-        onClick={onRemove}
-        className="hover:bg-black/10 rounded-full p-0.5"
-      >
+      <button onClick={onRemove} className="hover:bg-black/10 rounded-full p-0.5">
         <XMarkIcon className="h-3 w-3" />
       </button>
     </span>

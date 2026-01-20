@@ -5,7 +5,7 @@
  * frontend tools (Pattern A) and backend tool renderers (Pattern B).
  */
 
-import { QueryScope } from "@/app/providers";
+import { QueryScope } from '@/app/providers';
 
 // =============================================================================
 // Evidence & Citations
@@ -112,7 +112,7 @@ export interface TopicsResponse {
 // Tool Status Types
 // =============================================================================
 
-export type ToolStatus = "inProgress" | "executing" | "complete" | "error";
+export type ToolStatus = 'inProgress' | 'executing' | 'complete' | 'error';
 
 export interface ToolRenderProps<TArgs = Record<string, unknown>, TResult = unknown> {
   status: ToolStatus;

@@ -104,7 +104,9 @@ test.describe('Channel Ingestion Flow', () => {
 
       // Wait for videos to load (timeout for yt-dlp)
       // The loading state shows "Loading..." briefly, then videos appear
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       // Should show channel name in heading
       await expect(page.getByRole('heading', { name: /Darci Isabella/i })).toBeVisible();
@@ -116,7 +118,9 @@ test.describe('Channel Ingestion Flow', () => {
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
 
       // Wait for videos
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       // Check video items exist - they may have checkboxes or already-ingested indicators
       const firstVideo = page.locator('[data-testid="video-item"]').first();
@@ -130,7 +134,9 @@ test.describe('Channel Ingestion Flow', () => {
       // Fetch videos
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       // Check for channel info display
       await expect(page.getByText(/videos loaded/i)).toBeVisible();
@@ -140,7 +146,9 @@ test.describe('Channel Ingestion Flow', () => {
       // Fetch videos
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       // Check for select all / clear controls
       await expect(page.getByRole('button', { name: /Select All/i })).toBeVisible();
@@ -150,7 +158,10 @@ test.describe('Channel Ingestion Flow', () => {
 
   test.describe('Batch Creation', () => {
     // These tests require actual video processing to complete
-    test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
+    test.skip(
+      () => !LIVE_PROCESSING,
+      'Requires live AI processing - run with LIVE_PROCESSING=true'
+    );
 
     test.beforeEach(async ({ page }) => {
       await page.goto('/ingest');
@@ -160,7 +171,9 @@ test.describe('Channel Ingestion Flow', () => {
       // Fetch videos
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       // Should show ingest buttons
       await expect(page.getByRole('button', { name: /Ingest Selected/i })).toBeVisible();
@@ -171,7 +184,9 @@ test.describe('Channel Ingestion Flow', () => {
       // Fetch videos
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       // Click ingest all button
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
@@ -187,7 +202,9 @@ test.describe('Channel Ingestion Flow', () => {
       // Fetch and ingest videos
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
       await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
@@ -201,7 +218,9 @@ test.describe('Channel Ingestion Flow', () => {
       // Fetch and ingest videos
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
       await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
@@ -214,13 +233,17 @@ test.describe('Channel Ingestion Flow', () => {
       // Fetch and ingest videos
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
       await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
 
       // Wait for batch details to load (batch name should appear in heading)
-      await expect(page.getByRole('heading', { name: /Darci Isabella/i })).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: /Darci Isabella/i })).toBeVisible({
+        timeout: 10000,
+      });
 
       // Verify video count is displayed
       await expect(page.getByText(/\d+\s*videos?/i)).toBeVisible({ timeout: 10000 });
@@ -235,7 +258,9 @@ test.describe('Channel Ingestion Flow', () => {
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
 
       // Wait for videos to load
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
       await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 15000 });
@@ -282,7 +307,9 @@ test.describe('Channel Ingestion Flow', () => {
       await page.goto('/ingest');
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({ timeout: 60000 });
+      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+        timeout: 60000,
+      });
 
       // Check if any video shows "already ingested"
       // (This will be true if videos were previously ingested)

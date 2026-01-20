@@ -39,11 +39,7 @@ export interface UseHealthCheckResult {
  * Automatically increases polling frequency when service is degraded.
  */
 export function useHealthCheck(options: UseHealthCheckOptions = {}): UseHealthCheckResult {
-  const {
-    pollInterval = 5000,
-    continuous = false,
-    enabled = true,
-  } = options;
+  const { pollInterval = 5000, continuous = false, enabled = true } = options;
 
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
