@@ -1,9 +1,8 @@
-import type { NextRequest } from 'next/server';
 import { auth0 } from './lib/auth0';
 
 /**
- * Next.js middleware that handles Auth0 authentication.
- * This middleware intercepts requests and automatically handles:
+ * Next.js 16 proxy layer that handles Auth0 authentication.
+ * This proxy intercepts requests and automatically handles:
  * - /auth/login - Redirects to Auth0 login
  * - /auth/logout - Logs out user and clears session
  * - /auth/callback - Handles OAuth callback from Auth0
@@ -11,14 +10,17 @@ import { auth0 } from './lib/auth0';
  * - /auth/access-token - Returns access token
  * - /auth/backchannel-logout - Handles backchannel logout
  *
- * All auth routes are handled by the Auth0 SDK middleware automatically.
+ * All auth routes are handled by the Auth0 SDK automatically.
+ *
+ * Note: Next.js 16 uses proxy.ts (with standard Request) instead of
+ * middleware.ts (with NextRequest) for the new proxy layer.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: Request) {
   return await auth0.middleware(request);
 }
 
 /**
- * Matcher configuration to apply middleware to all routes except static assets.
+ * Matcher configuration to apply proxy to all routes except static assets.
  * Excludes:
  * - _next/static (Next.js static files)
  * - _next/image (Next.js Image Optimization files)

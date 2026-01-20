@@ -1,6 +1,4 @@
-// Direct import from dist path as workaround for Turbopack Edge runtime subpath export resolution
-// See: https://github.com/vercel/next.js/issues/XXXXX
-import { Auth0Client } from '@auth0/nextjs-auth0/dist/server/index.js';
+import { Auth0Client } from '@auth0/nextjs-auth0/server';
 
 /**
  * Auth0 client instance for server-side authentication.
