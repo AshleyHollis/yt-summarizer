@@ -265,7 +265,7 @@ npx @azure/static-web-apps-cli start .next/standalone --port 4280
 
 ### What This Means
 
-**The issue is NOT Auth0-related!** 
+**The issue is NOT Auth0-related!**
 
 The baseline deployment from `main` (which has ZERO Auth0 code) still times out after 10 minutes. This proves:
 
