@@ -303,39 +303,43 @@ The deployment never reached Azure's warmup phase.
 
 ### Comparison
 
-| Environment | Code | Auth0 | Method | Result | Time |
-|-------------|------|-------|--------|--------|------|
-| Production (main) | Clean | ❌ No | GitHub Actions | ✅ Works | ~46s |
-| Preview PR #64 (Attempt 1-5) | + Auth0 | ✅ Yes | GitHub Actions | ❌ Timeout | ~590s |
-| Preview PR #66 (baseline) | Clean | ❌ No | GitHub Actions | ✅ **WORKS** | **2m38s** |
-| Preview PR #66 (baseline) | Clean | ❌ No | SWA CLI (local) | ❌ Timeout | ~600s (upload phase) |
+| Environment | Code | Auth0 SDK | Auth0 Code | Method | Result | Time |
+|-------------|------|-----------|------------|--------|--------|------|
+| Production (main) | Clean | ❌ No | ❌ No | GitHub Actions | ✅ Works | ~46s |
+| Preview PR #64 (Attempt 1-5) | + Auth0 | ✅ Yes | ✅ Yes | GitHub Actions | ❌ Timeout | ~590s |
+| Preview PR #66 (Phase 0+1) | Clean | ✅ **YES** | ❌ No | GitHub Actions | ✅ **WORKS** | **2m38s** |
+| Preview PR #66 (SWA CLI) | Clean | ✅ Yes | ❌ No | SWA CLI (local) | ❌ Timeout | ~600s (upload phase) |
+
+**KEY INSIGHT**: Phase 0 baseline actually included Auth0 SDK package in `package.json`! Phase 1 was completed without knowing it.
 
 ### Root Cause Analysis
 
 **Pattern Identified**: Auth0 code causes SWA warmup timeout
 
 **Confirmed Facts**:
-1. ✅ Baseline (no Auth0) deploys successfully via GitHub Actions in 2m38s
-2. ❌ PR #64 (with Auth0) consistently times out at ~590s during warmup
-3. ✅ Next.js 16.1.3 is NOT the issue (baseline works)
-4. ✅ SWA preview infrastructure is NOT the issue (baseline works)
-5. ✅ Something in the Auth0 integration code causes the warmup to hang
+1. ✅ Baseline deploys successfully via GitHub Actions in 2m38s
+2. ✅ **Auth0 SDK package is ALREADY in baseline and works fine!** (discovered 2026-01-20)
+3. ❌ PR #64 (with Auth0 code) consistently times out at ~590s during warmup
+4. ✅ Next.js 16.1.3 is NOT the issue (baseline works)
+5. ✅ SWA preview infrastructure is NOT the issue (baseline works)
+6. ✅ Auth0 SDK package itself is NOT the issue (baseline includes it)
+7. ✅ Something in the Auth0 **usage code** causes the warmup to hang
 
-**Most Likely Culprits** (in order of probability):
-1. **Auth0 Middleware Execution During Warmup**:
-   - SWA might execute middleware during health checks/warmup
-   - Auth0 SDK initialization could hang when env vars are missing
-   - `getAuth0Client()` might block waiting for configuration
-
-2. **Auth0 SDK Import Side Effects**:
-   - The SDK might run initialization code at import time
-   - Could be trying to connect to Auth0 servers during build/warmup
-   - Timeout waiting for external Auth0 API calls
+**Most Likely Culprits** (in order of probability - updated based on Phase 1 result):
+1. **Auth0 Middleware Execution During Warmup** (HIGHEST PROBABILITY):
+   - SWA executes middleware during health checks/warmup
+   - Auth0 SDK initialization in middleware hangs when env vars are missing
+   - `getAuth0Client()` in middleware blocks waiting for configuration
+   
+2. **Auth0 Utility Module (`auth0.ts`) Side Effects**:
+   - Module-level initialization code runs during import
+   - Lazy initialization might not be truly lazy
+   - SDK tries to validate config at module load time
 
 3. **Next.js Middleware Runtime Issue**:
    - Middleware in Next.js 16 + SWA might have compatibility issues
    - Edge runtime vs Node runtime mismatch
-   - Auth0 SDK not compatible with edge runtime
+   - Auth0 SDK not compatible with edge runtime in SWA context
 
 ---
 
@@ -366,54 +370,57 @@ The original test plan is still valid! We should now:
 
 | Phase | Change | Deploy Method | Time | Result | Notes |
 |-------|--------|---------------|------|--------|-------|
-| 0 | Baseline (no Auth0) | GitHub Actions | 2m38s | ✅ **SUCCESS** | **Auth0 IS the cause** |
-| 1 | +Auth0 SDK package | GitHub Actions | TBD | ⏳ Pending | Just npm install |
-| 2 | +auth0.ts module | GitHub Actions | TBD | ⏳ Pending | Not imported yet |
+| 0 | Baseline (no Auth0 code) | GitHub Actions | 2m38s | ✅ **SUCCESS** | Proves infrastructure works |
+| 1 | +Auth0 SDK package | GitHub Actions | 2m38s | ✅ **SUCCESS** | **ALREADY INCLUDED IN PHASE 0!** |
+| 2 | +auth0.ts module | GitHub Actions | TBD | ⏳ **IN PROGRESS** | Not imported yet |
 | 3 | +proxy middleware | GitHub Actions | TBD | ⏳ Pending | **Expected to fail** |
 | 4 | +error page | GitHub Actions | TBD | ⏳ Pending | If Phase 3 passed |
 | 5 | +admin routes | GitHub Actions | TBD | ⏳ Pending | If Phase 4 passed |
 | 6 | +API routes | GitHub Actions | TBD | ⏳ Pending | If Phase 5 passed |
 
 **Legend**:
-- ⏳ Pending
+- ⏳ Pending / In Progress
 - ✅ Success (< 3 min)
 - ❌ Failed (timeout or error)
 - ⏭️ Skipped (previous phase failed)
+
+**Phase 1 Discovery**: The baseline test unintentionally included Auth0 SDK package in `package.json` (line 22). This serendipitously proved Phase 1 works!
 
 ---
 
 ## Next Steps (CORRECTED)
 
-### Phase 1: Add Auth0 SDK Dependency (NEXT)
+### ✅ Phase 1: Auth0 SDK Package - COMPLETE
 
-Now that we've confirmed the baseline works, we proceed with adding Auth0 components incrementally:
+**Discovery**: The baseline test inadvertently included `@auth0/nextjs-auth0` package in `package.json` (inherited from main branch state).
+
+**Result**: Package installs and builds successfully without causing timeout.
+
+**Conclusion**: Auth0 SDK package itself does NOT cause the issue. The problem is in HOW it's used.
+
+---
+
+### 🔄 Phase 2: Add Auth0 Utility Module - IN PROGRESS
+
+Next step is to add the Auth0 utility module that wraps the SDK:
 
 ```bash
-# Switch to test branch
-git checkout test/swa-warmup-baseline
-
-# Install Auth0 SDK
-cd apps/web
-npm install @auth0/nextjs-auth0
+# Copy auth0.ts from PR #64
+git fetch origin 004-auth0-ui-integration
+git show origin/004-auth0-ui-integration:apps/web/src/lib/auth0.ts > apps/web/src/lib/auth0.ts
 
 # Commit and push
-git add package.json package-lock.json
-git commit -m "test: Phase 1 - Add Auth0 SDK package (not used)"
+git add apps/web/src/lib/auth0.ts
+git commit -m "test: Phase 2 - Add auth0.ts utility module (not imported)"
 git push
 
-# Trigger deployment via GitHub Actions
+# Trigger deployment
 gh workflow run swa-baseline-deploy.yml --ref test/swa-warmup-baseline -f pr_number=66
-
-# Watch for results
 gh run watch --workflow="swa-baseline-deploy.yml"
 ```
 
-**Expected**: Should still work (unused dependency)  
-**If Fails**: Auth0 SDK package has import-time side effects
-
-### Phase 2-6: Continue Progressive Testing
-
-Follow the original test plan phases 2-6 until we identify the exact breaking change.
+**Expected**: Should still work (module not imported anywhere yet)  
+**If Fails**: Module-level code in auth0.ts has side effects
 
 ---
 
