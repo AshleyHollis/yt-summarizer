@@ -698,9 +698,10 @@ jobs:
           # For Next.js hybrid (standalone), point to apps/web where the build output exists
           # SWA will upload the pre-built .next folder from this directory
           app_location: apps/web
-          # For Next.js hybrid, output_location MUST be empty
-          # SWA handles the .next folder internally
-          output_location: ""
+          # TEST 1: Reverting to .next to match main branch (was empty string)
+          # Hypothesis: Empty string causing deployment failures
+          # See: SWA-DEPLOYMENT-TROUBLESHOOTING.md
+          output_location: .next
           skip_app_build: true
           # Deploying to a PR creates a staging environment automatically
           production_branch: main

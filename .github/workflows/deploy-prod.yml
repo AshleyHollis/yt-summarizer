@@ -598,9 +598,10 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: apps/web
-          # For Next.js hybrid rendering: output_location MUST be empty string
-          # SWA handles the .next folder internally for server-side rendering
-          output_location: ""
+          # TEST 1: Reverting to .next to match main branch (was empty string)
+          # Hypothesis: Empty string causing deployment failures
+          # See: SWA-DEPLOYMENT-TROUBLESHOOTING.md
+          output_location: .next
           skip_app_build: true
           production_branch: main
 
