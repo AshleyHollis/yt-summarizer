@@ -17,6 +17,7 @@ on:
       - migration/phase-1-env-vars-v2
       - migration/phase-2-real-auth0-secrets
       - migration/phase-5-middleware-approach
+      - migration/phase-6-auth-ui
 
 permissions:
   id-token: write
