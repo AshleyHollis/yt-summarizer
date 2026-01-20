@@ -75,7 +75,7 @@ function hasAdminRole(session: any): boolean {
  *
  * Note: Uses standard Request type (not NextRequest) for Next.js 16 compatibility
  */
-export default async function proxy(request: Request) {
+export async function proxy(request: Request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
 

@@ -66,12 +66,18 @@ Created simplified workflow: `.github/workflows/swa-baseline-deploy.yml`
 
 ## Comparison: Baseline vs Auth0
 
-| Deployment | Code | Auth0 | Method | Duration | Status |
-|------------|------|-------|--------|----------|--------|
-| **Baseline (PR #66)** | Clean `main` | ❌ No | GitHub Actions | **2m38s** | ✅ **SUCCESS** |
-| **Auth0 (PR #64)** | + Auth0 integration | ✅ Yes | GitHub Actions | **~590s** | ❌ **TIMEOUT** |
+| Deployment | Code | Components | Method | Duration | Status |
+|------------|------|------------|--------|----------|--------|
+| **Phase 0 (PR #66)** | Clean `main` | None | GitHub Actions | **2m38s** | ✅ **SUCCESS** |
+| **Phase 1** | + Auth0 SDK package | Package only | GitHub Actions | **Skipped** | ⏭️ (already in Phase 0) |
+| **Phase 2** | + auth0.ts utility | auth0.ts | GitHub Actions | **3m6s** | ✅ **SUCCESS** |
+| **Phase 3** | + proxy middleware | proxy.ts | GitHub Actions | **2m33s** | ✅ **SUCCESS** |
+| **Phase 3.5** | + AuthProvider | AuthProvider + hooks | GitHub Actions | **3m11s** | ✅ **SUCCESS** |
+| **Phase 4** | + auth pages | All auth pages/components | GitHub Actions | **2m38s** | ✅ **SUCCESS** |
+| **Phase 5** | + modified pages | TBD | Pending | - | ⏳ |
+| **Auth0 (PR #64)** | Full integration | All | GitHub Actions | **~590s** | ❌ **TIMEOUT** |
 
-**Difference**: 10x slower, never completes
+**Finding**: Phases 0-3.5 all succeed! The timeout must be caused by components added in Phase 4-5 or later.
 
 ---
 
