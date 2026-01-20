@@ -14,6 +14,7 @@ on:
     branches:
       - test/swa-warmup-baseline
       - fix/swa-working-baseline
+      - migration/phase-1-env-vars
 
 permissions:
   id-token: write
@@ -33,14 +34,46 @@ jobs:
           node-version: "20"
           working-directory: apps/web
 
+      # PHASE 1: Add Azure login and Auth0 secret fetch (without using them yet)
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch Auth0 credentials from Key Vault
+        id: fetch-auth0
+        run: |
+          echo "Fetching Auth0 credentials from Key Vault..."
+          
+          # Fetch Auth0 preview environment credentials
+          AUTH0_DOMAIN=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-preview-domain" --query "value" -o tsv)
+          AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-preview-client-id" --query "value" -o tsv)
+          AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-preview-client-secret" --query "value" -o tsv)
+          AUTH0_SESSION_SECRET=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-preview-session-secret" --query "value" -o tsv)
+          
+          # Mask secrets in logs
+          echo "::add-mask::$AUTH0_CLIENT_SECRET"
+          echo "::add-mask::$AUTH0_SESSION_SECRET"
+          
+          # Export as outputs for potential future use
+          echo "auth0-domain=$AUTH0_DOMAIN" >> $GITHUB_OUTPUT
+          echo "auth0-client-id=$AUTH0_CLIENT_ID" >> $GITHUB_OUTPUT
+          echo "auth0-client-secret=$AUTH0_CLIENT_SECRET" >> $GITHUB_OUTPUT
+          echo "auth0-session-secret=$AUTH0_SESSION_SECRET" >> $GITHUB_OUTPUT
+          
+          echo "✅ Auth0 credentials fetched successfully (not used in build yet)"
+
       - name: Build frontend
         working-directory: apps/web
         env:
-          # Use empty/placeholder API URL for baseline test
+          # Still using placeholder API URL - no Auth0 in build yet
           NEXT_PUBLIC_API_URL: "https://api-placeholder.example.com"
           NEXT_PUBLIC_ENVIRONMENT: "preview"
         run: |
           echo "Building Next.js app..."
+          echo "Note: Auth0 secrets fetched but not used in this phase"
           npm run build
 
       - name: Deploy to SWA
