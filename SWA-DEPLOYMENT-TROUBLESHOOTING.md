@@ -15,7 +15,7 @@
 
 ### Current State
 - **Branch**: `fix/swa-backend-integration-baseline`
-- **Latest Commit**: `43d50e3` - "fix: add SWA runtime app settings configuration to production workflow"
+- **Latest Commit**: `7e13d21` - "test: revert SWA output_location to .next (Test 1)"
 - **SWA Resource**: Freshly recreated (old stuck, new clean)
   - Old: `proud-coast-0bd36cb00.6.azurestaticapps.net`
   - New: `proud-smoke-05b9a9c00.4.azurestaticapps.net`
@@ -49,41 +49,59 @@ output_location: ""  # Empty string - correct per MS docs but failing
 
 ---
 
-### Test 1: Revert output_location to .next
-**Hypothesis**: Empty `output_location` is causing SWA deployment failures  
-**Method**: Change `output_location` from `""` back to `.next` in deploy-prod.yml  
-**Expected**: Deployment succeeds (matches main branch config)  
-**Status**: PENDING
+### Test 1: Revert output_location to .next (FAILED)
+**Commit**: `7e13d21`  
+**Hypothesis**: Empty `output_location` is incompatible with SWA Next.js hybrid deployment  
+**Method**: Changed `output_location: ""` → `output_location: .next` in both workflows  
+**Run**: #21185010302  
+**Result**: ❌ FAILED - Deployment still times out with warmup timeout  
+**Duration**: Still timing out after 15+ minutes  
+**Conclusion**: `output_location` setting is NOT the root cause
 
-**Steps**:
-1. Update `.github/workflows/deploy-prod.yml`
-2. Change `output_location: ""` to `output_location: .next`
-3. Commit and push
-4. Trigger deployment via GitHub Actions
-5. Monitor deployment logs
-
-**If SUCCEEDS**: Empty output_location is the root cause  
-**If FAILS**: Continue to Test 2
+**Analysis**: Successful baseline workflow (Run #21157814189) used `output_location: ""` (empty string) and deployed successfully in 54 seconds. This proves empty string is NOT the problem.
 
 ---
 
-### Test 2: SWA CLI Deployment (Fallback)
-**Hypothesis**: GitHub Action has issues, direct SWA CLI might work  
-**Method**: Use `swa deploy` with minimal config  
-**Status**: NOT STARTED
+### Test 2: Simple Isolated Workflow (IN PROGRESS)
+**Commit**: TBD  
+**Hypothesis**: Complex workflow orchestration or Auth0 timing is causing the warmup timeout  
+**Method**: Created minimal workflow based on successful baseline (Run #21157814189)
 
-**Known Issue**: SWA CLI hangs on large Next.js apps (131MB, 3586 files)  
-**Mitigations**:
-- Use `--verbose` flag to see where it hangs
-- Try with production build already completed
-- May need to increase timeout
+**Key simplifications**:
+- ✅ No job dependencies (single standalone job)
+- ✅ No Auth0 configuration step
+- ✅ No backend URL requirement (placeholder API URL)
+- ✅ Empty `output_location` (same as successful baseline)
+- ✅ Minimal build configuration
 
----
+**Successful baseline comparison** (test/swa-warmup-baseline):
+```yaml
+# Successful workflow that deployed in 54 seconds
+app_location: apps/web
+output_location: ""        # Empty string - worked fine
+skip_app_build: true
+# No Auth0 config
+# No complex dependencies
+# Simple placeholder API URL
+```
 
-### Test 3: Standalone Server Bundle
-**Hypothesis**: SWA doesn't handle .next/standalone correctly  
-**Method**: Deploy without standalone, just standard .next  
-**Status**: NOT STARTED
+**Current preview workflow** (failing):
+```yaml
+# Complex workflow with multiple jobs
+needs: [get-ingress, build-frontend]  # Job dependencies
+# Fetches Auth0 credentials from Key Vault
+# Configures Auth0 AFTER deployment completes
+# Real backend URL from previous jobs
+app_location: apps/web
+output_location: .next     # Changed in Test 1 - still fails
+skip_app_build: true
+```
+
+**Expected outcomes**:
+- ✅ **SUCCESS**: Proves complex orchestration/Auth0 is the root cause → Simplify preview workflow
+- ❌ **FAILURE**: Indicates deeper Next.js/SWA platform issue → Investigate build artifacts
+
+**Status**: Workflow created (`.github/workflows/swa-simple-test.yml`), ready to commit
 
 ---
 
@@ -115,11 +133,18 @@ For Next.js with hybrid rendering:
 
 ## Decision Log
 
-### Decision 1: Quick Fix First
-**Date**: 2026-01-21  
-**Rationale**: Need working deployment ASAP, investigate properly later  
-**Action**: Revert to `.next` to match main branch  
-**Risk**: Low - main branch proves this works
+### Decision 1: Abandon output_location Theory
+**Date**: 2026-01-21 06:00 UTC  
+**Rationale**: Test 1 failed even after reverting to `.next`. Successful baseline used empty string successfully.  
+**Action**: Pivot to Test 2 - investigate workflow complexity and Auth0 timing  
+**Evidence**: Run #21157814189 (successful) used `output_location: ""` and deployed in 54 seconds
+
+### Decision 2: Test Simple Isolated Workflow
+**Date**: 2026-01-21 06:05 UTC  
+**Rationale**: Successful baseline had no job dependencies, no Auth0 config, minimal orchestration  
+**Action**: Create `.github/workflows/swa-simple-test.yml` based on successful baseline  
+**Expected outcome**: Isolate whether deployment mechanism works, identify if orchestration is the issue  
+**Risk**: Low - mirrors proven working workflow
 
 ---
 
