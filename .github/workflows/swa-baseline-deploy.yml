@@ -16,6 +16,7 @@ on:
       - fix/swa-working-baseline
       - migration/phase-1-env-vars-v2
       - migration/phase-2-real-auth0-secrets
+      - migration/phase-5-auth0-routes
 
 permissions:
   id-token: write
