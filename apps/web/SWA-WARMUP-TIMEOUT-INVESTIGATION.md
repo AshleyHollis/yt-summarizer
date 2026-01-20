@@ -81,6 +81,57 @@ export async function proxy(request: Request) {
 
 ---
 
+### Attempt 5: Dynamic Imports in Middleware ❌ FAILED
+
+**Hypothesis**: Static imports in middleware cause Auth0 SDK to load/crash during module initialization
+
+**Changes Made**:
+
+Converted static imports to dynamic imports in `apps/web/src/proxy.ts`:
+
+```typescript
+// BEFORE (static import - loads at module level):
+import { getAuth0Client } from './lib/auth0';
+
+// AFTER (dynamic import - loads only when called):
+const { getAuth0Client } = await import('./lib/auth0');
+```
+
+**Reasoning**:
+
+- Next.js middleware loads during app initialization
+- Static imports execute immediately when file is loaded
+- If Auth0 SDK crashes when env vars missing, it prevents server startup
+- Dynamic imports delay loading until actually needed
+
+**Expected Outcome**: App starts successfully, Auth0 only loads when auth check needed
+
+**Actual Outcome**:
+
+- ✅ Frontend build succeeded
+- ✅ Upload to SWA succeeded
+- ❌ Deployment still timed out at warmup
+
+**Conclusion**: Module-level imports are NOT the cause
+
+**Commits**:
+
+- `bc8e29b` - "fix: use dynamic imports in proxy to prevent Auth0 SDK loading at module level"
+
+**Workflow Run**: 21156496027  
+**Started**: 01:43:47Z  
+**Failed**: 01:53:47Z  
+**Time to failure**: 585.9 seconds (~9.8 minutes)
+
+**Error**:
+
+```
+Deployment Failed :(
+Deployment Failure Reason: Web app warm up timed out. Please try again later.
+```
+
+---
+
 ### Attempt 4: Simplify Next.js Rewrites ❌ FAILED
 
 **Hypothesis**: Next.js validates rewrite destinations during startup, hangs when backend unreachable
@@ -137,11 +188,12 @@ Deployment Failure Reason: Web app warm up timed out. Please try again later.
 Based on systematic testing:
 
 - ❌ Auth0 lazy initialization - Not the cause (made it graceful, still fails)
-- ❌ Proxy middleware - Not the cause (bypassed completely, still fails)
+- ❌ Proxy middleware logic - Not the cause (bypassed completely, still fails)
 - ❌ Next.js rewrites - Not the cause (removed all backend rewrites, still fails)
+- ❌ Module-level imports - Not the cause (converted to dynamic imports, still fails)
 - ❌ AzCLI app settings timing - Not relevant (runs after warmup succeeds)
 
-**Key Insight**: Something else in the Next.js app is crashing/hanging during initialization
+**Key Insight**: The issue is NOT related to our Auth0 integration code. Something deeper in Next.js standalone mode or SWA platform is causing the timeout.
 
 ---
 
@@ -658,14 +710,17 @@ export function getAuth0Client(): Auth0Client | null {
 - **RESULT**: ❌ FAILED - Still times out (Run 21155710988, Time: 583.3s)
 - **Conclusion**: Rewrites are NOT the cause
 
-### Session 2026-01-20 (Next - Option 3)
+### Session 2026-01-20 (Morning - Option 3)
 
-- **PLAN**: Check API routes for module-level issues
-- **Target**: `apps/web/src/app/api/proxy/[...path]/route.ts`
-- **Action**: Temporarily remove API routes to isolate issue
+- **TESTED**: Option 3 - Convert to dynamic imports in proxy middleware
+- **Hypothesis**: Static Auth0 imports in middleware cause SDK to crash during init
+- **Changes**: Changed `import { getAuth0Client } from './lib/auth0'` to `const { getAuth0Client } = await import('./lib/auth0')`
+- **Commit**: bc8e29b
+- **RESULT**: ❌ FAILED - Still times out (Run 21156496027, Time: 585.9s)
+- **Conclusion**: Module-level imports are NOT the cause
 
 ---
 
-**Last Updated**: 2026-01-20 01:18 UTC  
+**Last Updated**: 2026-01-20 11:54 AEST  
 **Investigators**: OpenCode AI  
-**Status**: Under Active Investigation - Testing Option 3
+**Status**: Under Active Investigation - Moving to Option 4

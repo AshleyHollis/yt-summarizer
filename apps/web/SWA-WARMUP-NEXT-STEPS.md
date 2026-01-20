@@ -8,6 +8,16 @@
 **Root Cause**: Likely server crash during startup (not just missing env vars)  
 **Impact**: Cannot deploy previews, blocking Auth0 integration PR #64
 
+## What We've Already Tested
+
+- ✅ **Option 2: Bypass Proxy Middleware** - ❌ FAILED (Run 21155101426, commit ba3c581)
+- ✅ **Option 3: Simplify Next.js Rewrites** - ❌ FAILED (Run 21155710988, commit cd36788)
+- ✅ **Dynamic Imports in Middleware** - ❌ FAILED (Run 21156496027, commit bc8e29b)
+
+**Conclusion**: The issue is NOT in our Auth0 integration code. It's something deeper.
+
+---
+
 ## What To Try Next (Priority Order)
 
 ### 🔴 Option 1: Check for Module-Level Crashes (15 minutes)
