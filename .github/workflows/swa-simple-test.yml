@@ -109,7 +109,7 @@ jobs:
             **Workflow:** Simple isolated test (no Auth0, no dependencies)
             **Commit:** ${context.sha}
 
-            ${outcome === 'success' 
+            ${outcome === 'success'
               ? '✅ **Root cause identified:** Complex workflow orchestration or Auth0 timing\n\nThe SWA deployment works when isolated. The timeout issue is caused by the full preview workflow complexity.'
               : '❌ **Deeper issue:** SWA deployment fails even in isolation\n\nThis indicates a problem with the build artifacts, Next.js config, or SWA platform compatibility.'}
 
