@@ -47,6 +47,104 @@ Deployment Failure Reason: Web app warm up timed out. Please try again later.
 
 ---
 
+### Attempt 3: Bypass Proxy Middleware ❌ FAILED
+
+**Hypothesis**: Proxy middleware crashes during startup when Auth0 not available
+
+**Changes Made**:
+
+Completely bypassed all auth logic in `apps/web/src/proxy.ts`:
+
+```typescript
+export async function proxy(request: Request) {
+  console.log('[Proxy] BYPASSED - Testing SWA warmup issue');
+  return NextResponse.next(); // Skip all auth checks
+}
+```
+
+**Expected Outcome**: App starts without auth logic, warmup succeeds
+
+**Actual Outcome**:
+
+- ✅ Frontend build succeeded
+- ✅ Upload to SWA succeeded
+- ❌ Deployment still timed out at warmup
+
+**Conclusion**: Proxy middleware is NOT the cause
+
+**Commits**:
+
+- `ba3c581` - "test: bypass proxy middleware to isolate SWA warmup timeout"
+
+**Workflow Run**: 21155101426  
+**Time to failure**: ~590 seconds
+
+---
+
+### Attempt 4: Simplify Next.js Rewrites ❌ FAILED
+
+**Hypothesis**: Next.js validates rewrite destinations during startup, hangs when backend unreachable
+
+**Changes Made**:
+
+Removed ALL backend rewrites in `apps/web/next.config.ts`:
+
+```typescript
+async rewrites() {
+  return {
+    beforeFiles: [
+      {
+        source: '/.swa/health.html',
+        destination: '/.swa/health',
+      },
+    ],
+    afterFiles: [], // REMOVED: All backend proxy rewrites
+    fallback: [],
+  };
+}
+```
+
+**Expected Outcome**: App starts without trying to contact backend, warmup succeeds
+
+**Actual Outcome**:
+
+- ✅ Frontend build succeeded
+- ✅ Upload to SWA succeeded
+- ❌ Deployment still timed out at warmup
+
+**Conclusion**: Next.js rewrites are NOT the cause
+
+**Commits**:
+
+- `cd36788` - "test: simplify Next.js rewrites to isolate SWA warmup timeout"
+
+**Workflow Run**: 21155710988  
+**Started**: 00:58:23Z  
+**Failed**: 01:08:35Z  
+**Time to failure**: 583.3 seconds (~9.7 minutes)
+
+**Error**:
+
+```
+Deployment Failed :(
+Deployment Failure Reason: Web app warm up timed out. Please try again later.
+```
+
+---
+
+## What We've Eliminated
+
+Based on systematic testing:
+
+- ❌ Auth0 lazy initialization - Not the cause (made it graceful, still fails)
+- ❌ Proxy middleware - Not the cause (bypassed completely, still fails)
+- ❌ Next.js rewrites - Not the cause (removed all backend rewrites, still fails)
+- ❌ AzCLI app settings timing - Not relevant (runs after warmup succeeds)
+
+**Key Insight**: Something else in the Next.js app is crashing/hanging during initialization
+
+---
+
 ### Attempt 2: Configure Auth0 Env Vars via AzCLI ✅ IMPLEMENTED
 
 **Hypothesis**: SWA needs runtime env vars configured after deployment
@@ -544,15 +642,30 @@ export function getAuth0Client(): Auth0Client | null {
 - Fixed Next.js build error (client component)
 - Deployment still times out
 
-### Session 2026-01-20 (Current)
+### Session 2026-01-20 (Morning - Option 1)
 
 - Reviewed GitHub issues for similar problems
 - Identified server crash as likely root cause
 - Created investigation plan
-- Next: Code audit to find what's crashing
+- **TESTED**: Option 1 - Bypass proxy middleware completely
+- **RESULT**: ❌ FAILED - Still times out (Run 21155101426)
+
+### Session 2026-01-20 (Morning - Option 2)
+
+- **TESTED**: Option 2 - Simplify Next.js rewrites
+- **Changes**: Removed ALL afterFiles rewrites, commented out backend URL config
+- **Commit**: cd36788
+- **RESULT**: ❌ FAILED - Still times out (Run 21155710988, Time: 583.3s)
+- **Conclusion**: Rewrites are NOT the cause
+
+### Session 2026-01-20 (Next - Option 3)
+
+- **PLAN**: Check API routes for module-level issues
+- **Target**: `apps/web/src/app/api/proxy/[...path]/route.ts`
+- **Action**: Temporarily remove API routes to isolate issue
 
 ---
 
-**Last Updated**: 2026-01-20  
+**Last Updated**: 2026-01-20 01:18 UTC  
 **Investigators**: OpenCode AI  
-**Status**: Under Active Investigation
+**Status**: Under Active Investigation - Testing Option 3

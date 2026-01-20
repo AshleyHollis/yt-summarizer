@@ -20,7 +20,16 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getAuth0Client, getAuth0Error } from './lib/auth0';
+
+/**
+ * CRITICAL FIX: Do NOT import Auth0 at module level!
+ * Static imports cause the Auth0 SDK to load during middleware initialization,
+ * which can crash the app if Auth0 env vars are missing.
+ *
+ * Instead, use dynamic imports inside the function when needed.
+ *
+ * REMOVED: import { getAuth0Client, getAuth0Error } from './lib/auth0';
+ */
 
 /**
  * Determines if a route requires protection
@@ -55,8 +64,8 @@ function hasAdminRole(session: any): boolean {
 /**
  * Proxy function (Next.js 16+)
  *
- * TEMPORARY: Bypassed for SWA warmup timeout investigation
- * See: apps/web/SWA-WARMUP-NEXT-STEPS.md
+ * FIXED: Removed static Auth0 imports to prevent module-level SDK loading
+ * Now uses dynamic imports only when auth is actually needed
  *
  * Original functionality:
  * - Checks authentication status
@@ -67,13 +76,52 @@ function hasAdminRole(session: any): boolean {
  * Note: Uses standard Request type (not NextRequest) for Next.js 16 compatibility
  */
 export async function proxy(request: Request) {
-  console.log('[Proxy] BYPASSED - Testing SWA warmup issue (middleware disabled)');
-  console.log('[Proxy] Request path:', new URL(request.url).pathname);
+  const url = new URL(request.url);
+  const pathname = url.pathname;
 
-  // TEMPORARY: Bypass ALL auth logic to test if middleware is causing warmup timeout
-  // If deployment succeeds with this change, the issue is in the proxy middleware
-  // If deployment still fails, the issue is elsewhere (likely next.config.ts or module loading)
-  return NextResponse.next();
+  // Skip auth checks for public routes
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Skip auth checks for routes that don't need protection
+  if (!shouldProtectRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  // ONLY load Auth0 when we actually need to check authentication
+  // This prevents the SDK from loading during app startup
+  try {
+    const { getAuth0Client } = await import('./lib/auth0');
+    const auth0Client = getAuth0Client();
+
+    if (!auth0Client) {
+      // Auth0 not configured - redirect to error page
+      console.warn('[Proxy] Auth0 not configured, redirecting to error page');
+      return NextResponse.redirect(new URL('/auth-config-error', request.url));
+    }
+
+    const session = await auth0Client.getSession();
+
+    if (!session) {
+      // Not authenticated - redirect to login
+      console.log('[Proxy] User not authenticated, redirecting to login');
+      return NextResponse.redirect(new URL('/auth/login', request.url));
+    }
+
+    // Check admin access for admin routes
+    if (pathname.startsWith('/admin') && !hasAdminRole(session)) {
+      console.log('[Proxy] User lacks admin role, redirecting to access denied');
+      return NextResponse.redirect(new URL('/access-denied', request.url));
+    }
+
+    // Authenticated and authorized
+    return NextResponse.next();
+  } catch (error) {
+    console.error('[Proxy] Error checking authentication:', error);
+    // On error, redirect to error page
+    return NextResponse.redirect(new URL('/auth-config-error', request.url));
+  }
 }
 
 /**
