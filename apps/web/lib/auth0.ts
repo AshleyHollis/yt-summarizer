@@ -1,4 +1,4 @@
-import { Auth0Client } from '@auth0/nextjs-auth0/server';
+import { Auth0Client } from './auth0-server';
 
 /**
  * Auth0 client instance for server-side authentication.
