@@ -19,4 +19,3 @@ module "swa" {
 # NOTE: App settings are now managed via Azure CLI in deployment pipelines
 # instead of Terraform to avoid state drift and provide more flexible updates.
 # See: .github/actions/prepare-swa-deployment/script.sh
-
