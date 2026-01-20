@@ -55,94 +55,24 @@ function hasAdminRole(session: any): boolean {
 /**
  * Proxy function (Next.js 16+)
  *
- * Runs on every request to protected routes.
+ * TEMPORARY: Bypassed for SWA warmup timeout investigation
+ * See: apps/web/SWA-WARMUP-NEXT-STEPS.md
+ *
+ * Original functionality:
  * - Checks authentication status
  * - Checks user roles for admin routes
  * - Redirects to /auth/login if unauthenticated
  * - Redirects to /access-denied if unauthorized
  *
- * Graceful Degradation:
- * - If Auth0 is not configured, protected routes redirect to /auth-config-error
- * - Public routes remain accessible
- *
  * Note: Uses standard Request type (not NextRequest) for Next.js 16 compatibility
  */
 export async function proxy(request: Request) {
-  const url = new URL(request.url);
-  const { pathname } = url;
+  console.log('[Proxy] BYPASSED - Testing SWA warmup issue (middleware disabled)');
+  console.log('[Proxy] Request path:', new URL(request.url).pathname);
 
-  // Get Auth0 client (may be null if not configured)
-  const auth0 = getAuth0Client();
-
-  // If Auth0 is not configured and we're on a protected route, show error page
-  if (!auth0) {
-    // Allow public routes to work even without auth
-    if (isPublicRoute(pathname) || pathname === '/auth-config-error') {
-      return NextResponse.next();
-    }
-
-    // Protected routes redirect to config error page
-    if (shouldProtectRoute(pathname)) {
-      const errorUrl = new URL('/auth-config-error', request.url);
-      const error = getAuth0Error();
-      if (error) {
-        errorUrl.searchParams.set('error', error.message);
-      }
-      return NextResponse.redirect(errorUrl);
-    }
-
-    // Non-protected routes continue normally
-    return NextResponse.next();
-  }
-
-  // Auth0 is configured - proceed with normal authentication flow
-
-  // First, let Auth0 SDK handle its own routes
-  try {
-    const auth0Response = await auth0.middleware(request);
-    if (auth0Response) {
-      return auth0Response;
-    }
-  } catch (error) {
-    console.error('[Proxy] Auth0 middleware error:', error);
-    // If middleware fails, treat as unauthenticated but don't crash
-  }
-
-  // Skip protection for public routes
-  if (isPublicRoute(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Check if route requires protection
-  if (!shouldProtectRoute(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Get session for protected routes
-  let session;
-  try {
-    session = await auth0.getSession();
-  } catch (error) {
-    console.error('[Proxy] Failed to get session:', error);
-    // Treat as unauthenticated if session fetch fails
-    session = null;
-  }
-
-  // If no session, redirect to login
-  if (!session) {
-    const loginUrl = new URL('/auth/login', request.url);
-    loginUrl.searchParams.set('returnTo', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // Check role-based access for admin routes
-  if (pathname.startsWith('/admin')) {
-    if (!hasAdminRole(session)) {
-      const accessDeniedUrl = new URL('/access-denied', request.url);
-      return NextResponse.redirect(accessDeniedUrl);
-    }
-  }
-
+  // TEMPORARY: Bypass ALL auth logic to test if middleware is causing warmup timeout
+  // If deployment succeeds with this change, the issue is in the proxy middleware
+  // If deployment still fails, the issue is elsewhere (likely next.config.ts or module loading)
   return NextResponse.next();
 }
 
