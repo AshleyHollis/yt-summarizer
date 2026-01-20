@@ -21,10 +21,38 @@ const createMockProgress = (overrides = {}) => ({
   overall_status: 'processing',
   overall_progress: 50,
   jobs: [
-    { job_id: 'job-1', job_type: 'transcribe', stage: 'completed', status: 'succeeded' },
-    { job_id: 'job-2', job_type: 'summarize', stage: 'processing', status: 'running' },
-    { job_id: 'job-3', job_type: 'embed', stage: 'queued', status: 'pending' },
-    { job_id: 'job-4', job_type: 'build_relationships', stage: 'queued', status: 'pending' },
+    { 
+      job_id: 'job-1', 
+      job_type: 'transcribe', 
+      stage: 'completed', 
+      status: 'succeeded',
+      retry_count: 0,
+      created_at: '2024-01-01T00:00:00Z'
+    },
+    { 
+      job_id: 'job-2', 
+      job_type: 'summarize', 
+      stage: 'processing', 
+      status: 'running',
+      retry_count: 0,
+      created_at: '2024-01-01T00:00:00Z'
+    },
+    { 
+      job_id: 'job-3', 
+      job_type: 'embed', 
+      stage: 'queued', 
+      status: 'pending',
+      retry_count: 0,
+      created_at: '2024-01-01T00:00:00Z'
+    },
+    { 
+      job_id: 'job-4', 
+      job_type: 'build_relationships', 
+      stage: 'queued', 
+      status: 'pending',
+      retry_count: 0,
+      created_at: '2024-01-01T00:00:00Z'
+    },
   ],
   eta: null,
   current_stage_name: null,

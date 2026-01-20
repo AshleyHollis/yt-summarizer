@@ -15,7 +15,7 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
-const mockHealthApi = healthApi as { getHealth: ReturnType<typeof vi.fn> };
+const mockHealthApi = healthApi as unknown as { getHealth: ReturnType<typeof vi.fn> };
 
 describe('useHealthCheck', () => {
   const mockHealthyResponse: HealthStatus = {

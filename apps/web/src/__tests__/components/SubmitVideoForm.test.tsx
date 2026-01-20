@@ -108,7 +108,15 @@ describe('SubmitVideoForm', () => {
   describe('Submission', () => {
     it('shows loading state during submission', async () => {
       // Create a deferred promise to control resolution
-      let resolveSubmit: (value: unknown) => void;
+      let resolveSubmit: (value: {
+        video_id: string;
+        youtube_video_id: string;
+        title: string;
+        channel: { channel_id: string; name: string; youtube_channel_id: string };
+        processing_status: string;
+        submitted_at: string;
+        jobs_queued: number;
+      }) => void;
       vi.mocked(videoApi.submit).mockImplementation(
         () => new Promise((resolve) => { resolveSubmit = resolve; })
       );
@@ -233,7 +241,15 @@ describe('SubmitVideoForm', () => {
 
     it('disables input and button during submission', async () => {
       // Create a deferred promise to control resolution
-      let resolveSubmit: (value: unknown) => void;
+      let resolveSubmit: (value: {
+        video_id: string;
+        youtube_video_id: string;
+        title: string;
+        channel: { channel_id: string; name: string; youtube_channel_id: string };
+        processing_status: string;
+        submitted_at: string;
+        jobs_queued: number;
+      }) => void;
       vi.mocked(videoApi.submit).mockImplementation(
         () => new Promise((resolve) => { resolveSubmit = resolve; })
       );
