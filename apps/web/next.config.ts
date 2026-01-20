@@ -32,6 +32,9 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // Transpile Auth0 package for Edge runtime compatibility
+  transpilePackages: ['@auth0/nextjs-auth0'],
+
   // Environment variables that are exposed to the browser
   // NEXT_PUBLIC_* variables are automatically exposed
   env: {
