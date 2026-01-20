@@ -199,7 +199,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setError(null);
 
         // Call the Auth0 session endpoint to get the current user
-        const response = await fetch('/api/auth/me');
+        // Add timeout to prevent hanging during SWA warmup
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        const response = await fetch('/api/auth/me', {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           // User is not authenticated (401/403) - this is expected
@@ -222,6 +230,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setIsLoading(false);
         }
       } catch (err) {
+        // Handle timeout gracefully - treat as not authenticated
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.warn('Auth session check timed out - treating as not authenticated');
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
+          }
+          return;
+        }
+
         console.error('Error fetching user session:', err);
         if (mounted) {
           setError(err instanceof Error ? err : new Error('Unknown error fetching user'));
