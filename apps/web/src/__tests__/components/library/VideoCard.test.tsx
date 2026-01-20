@@ -27,13 +27,9 @@ vi.mock('next/image', () => ({
 
 // Mock next/link
 vi.mock('next/link', () => ({
-  default: ({
-    children,
-    href,
-  }: {
-    children: React.ReactNode;
-    href: string;
-  }) => <a href={href}>{children}</a>,
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 describe('VideoCard', () => {
@@ -43,6 +39,7 @@ describe('VideoCard', () => {
     title: 'Test Video Title',
     channel_id: '123e4567-e89b-12d3-a456-426614174001',
     channel_name: 'Test Channel',
+    channel_thumbnail_url: null,
     duration: 215,
     publish_date: '2024-01-15T10:30:00Z',
     thumbnail_url: 'https://example.com/thumbnail.jpg',
@@ -100,10 +97,7 @@ describe('VideoCard', () => {
       renderVideoCard({ video: mockVideo });
 
       const link = screen.getByRole('link');
-      expect(link).toHaveAttribute(
-        'href',
-        `/library/${mockVideo.video_id}`
-      );
+      expect(link).toHaveAttribute('href', `/library/${mockVideo.video_id}`);
     });
 
     it('uses thumbnail URL from video', () => {

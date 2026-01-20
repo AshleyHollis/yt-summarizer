@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -9,9 +9,14 @@ import {
   ExternalLink,
   AlertCircle,
   CheckCircle2,
-} from "lucide-react";
-import { copilotBoxStyles, copilotTextSizes, copilotColors, copilotButtonStyles } from "./copilotStyles";
-import { formatDuration } from "@/utils/formatDuration";
+} from 'lucide-react';
+import {
+  copilotBoxStyles,
+  copilotTextSizes,
+  copilotColors,
+  copilotButtonStyles,
+} from './copilotStyles';
+import { formatDuration } from '@/utils/formatDuration';
 
 /**
  * Evidence for a learning path item - links back to source video segments
@@ -65,9 +70,9 @@ function formatTimestamp(seconds: number): string {
   const secs = Math.floor(seconds % 60);
 
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -102,7 +107,7 @@ function LearningPathItemCard({
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
+          if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setIsExpanded(!isExpanded);
           }
@@ -121,7 +126,9 @@ function LearningPathItemCard({
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className={`${copilotTextSizes.body} ${copilotColors.primary} font-medium truncate`}>
+              <h4
+                className={`${copilotTextSizes.body} ${copilotColors.primary} font-medium truncate`}
+              >
                 {item.title}
               </h4>
               {isExpanded ? (
@@ -132,14 +139,16 @@ function LearningPathItemCard({
             </div>
 
             <div className="flex items-center gap-3">
-              <span className={`flex items-center gap-1 ${copilotTextSizes.small} ${copilotColors.muted}`}>
+              <span
+                className={`flex items-center gap-1 ${copilotTextSizes.small} ${copilotColors.muted}`}
+              >
                 <Clock className="w-3.5 h-3.5" />
                 {formatDuration(item.estimatedDuration)}
               </span>
               {item.prerequisites.length > 0 && (
                 <span className={`${copilotTextSizes.small} ${copilotColors.muted}`}>
-                  Requires: Step{item.prerequisites.length > 1 ? "s" : ""}{" "}
-                  {item.prerequisites.join(", ")}
+                  Requires: Step{item.prerequisites.length > 1 ? 's' : ''}{' '}
+                  {item.prerequisites.join(', ')}
                 </span>
               )}
             </div>
@@ -155,8 +164,12 @@ function LearningPathItemCard({
             </p>
 
             {/* Rationale - Why this video */}
-            <div className={`p-3 rounded-lg ${copilotColors.bg.primary} border ${copilotColors.border.default}`}>
-              <h5 className={`${copilotTextSizes.small} ${copilotColors.accent} font-medium mb-1 flex items-center gap-1.5`}>
+            <div
+              className={`p-3 rounded-lg ${copilotColors.bg.primary} border ${copilotColors.border.default}`}
+            >
+              <h5
+                className={`${copilotTextSizes.small} ${copilotColors.accent} font-medium mb-1 flex items-center gap-1.5`}
+              >
                 <BookOpen className="w-3.5 h-3.5" />
                 Why this video?
               </h5>
@@ -202,10 +215,14 @@ function LearningPathItemCard({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center gap-2">
-                        <span className={`${copilotTextSizes.xs} ${copilotColors.accent} font-mono`}>
+                        <span
+                          className={`${copilotTextSizes.xs} ${copilotColors.accent} font-mono`}
+                        >
                           {formatTimestamp(ev.timestampStart)}
                         </span>
-                        <span className={`${copilotTextSizes.small} ${copilotColors.primary} line-clamp-2`}>
+                        <span
+                          className={`${copilotTextSizes.small} ${copilotColors.primary} line-clamp-2`}
+                        >
                           {ev.segmentText}
                         </span>
                         <ExternalLink className="w-3.5 h-3.5 text-[var(--copilot-kit-muted-color)] flex-shrink-0" />
@@ -255,13 +272,17 @@ export function LearningPathView({ learningPath, onVideoClick }: LearningPathVie
           {learningPath.description}
         </p>
         <div className="flex items-center gap-4">
-          <span className={`flex items-center gap-1.5 ${copilotTextSizes.small} ${copilotColors.muted}`}>
+          <span
+            className={`flex items-center gap-1.5 ${copilotTextSizes.small} ${copilotColors.muted}`}
+          >
             <Clock className="w-4 h-4" />
             Total: {formatDuration(learningPath.estimatedDuration)}
           </span>
-          <span className={`flex items-center gap-1.5 ${copilotTextSizes.small} ${copilotColors.muted}`}>
+          <span
+            className={`flex items-center gap-1.5 ${copilotTextSizes.small} ${copilotColors.muted}`}
+          >
             <BookOpen className="w-4 h-4" />
-            {learningPath.items.length} video{learningPath.items.length !== 1 ? "s" : ""}
+            {learningPath.items.length} video{learningPath.items.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
@@ -282,7 +303,9 @@ export function LearningPathView({ learningPath, onVideoClick }: LearningPathVie
       {/* Gaps - What's missing */}
       {learningPath.gaps.length > 0 && (
         <div className={`${copilotBoxStyles.static} mt-4`}>
-          <h4 className={`flex items-center gap-2 ${copilotTextSizes.small} ${copilotColors.muted} font-medium mb-2`}>
+          <h4
+            className={`flex items-center gap-2 ${copilotTextSizes.small} ${copilotColors.muted} font-medium mb-2`}
+          >
             <AlertCircle className="w-4 h-4" />
             Topics not covered in your library:
           </h4>

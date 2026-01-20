@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { WhyThisButton } from "./WhyThisButton";
-import { ExplanationPanel } from "./ExplanationPanel";
-import { formatDuration } from "@/utils/formatDuration";
+import { useState } from 'react';
+import Link from 'next/link';
+import { WhyThisButton } from './WhyThisButton';
+import { ExplanationPanel } from './ExplanationPanel';
+import { formatDuration } from '@/utils/formatDuration';
 
 interface KeyMoment {
   timestamp: string;
@@ -65,7 +65,11 @@ export function CopilotVideoCard({
             {/* Play overlay on hover */}
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
               <div className="w-7 h-7 rounded-full bg-red-600/95 shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
-                <svg className="w-3.5 h-3.5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-3.5 h-3.5 text-white ml-0.5"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </div>
@@ -109,9 +113,7 @@ export function CopilotVideoCard({
       </div>
 
       {/* US5: Explanation panel - shown when "Why this?" is clicked */}
-      {explanation && isExplanationExpanded && (
-        <ExplanationPanel explanation={explanation} />
-      )}
+      {explanation && isExplanationExpanded && <ExplanationPanel explanation={explanation} />}
     </div>
   );
 }
@@ -127,7 +129,8 @@ function RelevanceIndicator({ score }: { score: number }) {
   const maxDisplay = 100;
 
   const clampedScore = Math.max(minScore, Math.min(score, maxScore));
-  const rescaledScore = minDisplay + ((clampedScore - minScore) / (maxScore - minScore)) * (maxDisplay - minDisplay);
+  const rescaledScore =
+    minDisplay + ((clampedScore - minScore) / (maxScore - minScore)) * (maxDisplay - minDisplay);
   const percentage = Math.round(rescaledScore);
 
   // Color based on display percentage

@@ -43,9 +43,7 @@ describe('WarmingUpIndicator', () => {
   });
 
   it('should hide indicator when show prop is false', () => {
-    const { container } = render(
-      <WarmingUpIndicator status="degraded" show={false} />
-    );
+    const { container } = render(<WarmingUpIndicator status="degraded" show={false} />);
     expect(container.firstChild).toBeNull();
   });
 

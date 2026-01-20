@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { Lightbulb } from "lucide-react";
-import { KeyMomentsList } from "./KeyMomentsList";
-import { RelationshipBadge } from "./RelationshipBadge";
+import { Lightbulb } from 'lucide-react';
+import { KeyMomentsList } from './KeyMomentsList';
+import { RelationshipBadge } from './RelationshipBadge';
 
 interface KeyMoment {
   timestamp: string;
@@ -29,10 +29,7 @@ interface ExplanationPanelProps {
  * Displayed inline when user clicks "Why this?" - no API call needed.
  * US5 - Transparency feature.
  */
-export function ExplanationPanel({
-  explanation,
-  className = "",
-}: ExplanationPanelProps) {
+export function ExplanationPanel({ explanation, className = '' }: ExplanationPanelProps) {
   const hasKeyMoments = explanation.keyMoments && explanation.keyMoments.length > 0;
   const hasRelationship = !!explanation.relatedTo;
 

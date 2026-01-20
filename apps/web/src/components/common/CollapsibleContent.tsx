@@ -68,9 +68,7 @@ export function CollapsibleContent({
   }, [children, collapsedHeight]);
 
   // Calculate the max-height for transitions
-  const maxHeight = isExpanded || !needsCollapse
-    ? contentHeight ?? 'none'
-    : collapsedHeight;
+  const maxHeight = isExpanded || !needsCollapse ? (contentHeight ?? 'none') : collapsedHeight;
 
   return (
     <div className={`relative ${className}`}>
@@ -79,7 +77,7 @@ export function CollapsibleContent({
         ref={contentRef}
         className="transition-[max-height] duration-300 ease-in-out overflow-hidden"
         style={{
-          maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight
+          maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
         }}
       >
         {children}

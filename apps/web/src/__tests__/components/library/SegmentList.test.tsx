@@ -52,9 +52,7 @@ describe('SegmentList', () => {
 
   describe('Rendering', () => {
     it('renders all segments', () => {
-      render(
-        <SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />
-      );
+      render(<SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />);
 
       expect(screen.getByText('Hello and welcome to this video')).toBeInTheDocument();
       expect(screen.getByText('Today we will be learning about Python')).toBeInTheDocument();
@@ -68,9 +66,7 @@ describe('SegmentList', () => {
     });
 
     it('renders timestamp links', () => {
-      render(
-        <SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />
-      );
+      render(<SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />);
 
       const links = screen.getAllByRole('link');
       expect(links.length).toBe(3);
@@ -79,9 +75,7 @@ describe('SegmentList', () => {
 
   describe('Timestamp formatting', () => {
     it('formats short timestamps as MM:SS', () => {
-      render(
-        <SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />
-      );
+      render(<SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />);
 
       // 0 seconds = 0:00
       expect(screen.getByText('0:00')).toBeInTheDocument();
@@ -90,9 +84,7 @@ describe('SegmentList', () => {
     });
 
     it('formats long timestamps as HH:MM:SS', () => {
-      render(
-        <SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />
-      );
+      render(<SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />);
 
       // 3661 seconds = 1:01:01
       expect(screen.getByText('1:01:01')).toBeInTheDocument();
@@ -101,26 +93,16 @@ describe('SegmentList', () => {
 
   describe('YouTube links', () => {
     it('links to correct YouTube timestamp', () => {
-      render(
-        <SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />
-      );
+      render(<SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />);
 
       const links = screen.getAllByRole('link');
 
-      expect(links[0]).toHaveAttribute(
-        'href',
-        'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=0'
-      );
-      expect(links[1]).toHaveAttribute(
-        'href',
-        'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10'
-      );
+      expect(links[0]).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=0');
+      expect(links[1]).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10');
     });
 
     it('opens links in new tab', () => {
-      render(
-        <SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />
-      );
+      render(<SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />);
 
       const links = screen.getAllByRole('link');
       links.forEach((link) => {
@@ -132,9 +114,7 @@ describe('SegmentList', () => {
 
   describe('Segment text display', () => {
     it('displays segment text content', () => {
-      render(
-        <SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />
-      );
+      render(<SegmentList segments={mockSegments} youtubeVideoId={mockYoutubeVideoId} />);
 
       mockSegments.forEach((segment) => {
         expect(screen.getByText(segment.text)).toBeInTheDocument();

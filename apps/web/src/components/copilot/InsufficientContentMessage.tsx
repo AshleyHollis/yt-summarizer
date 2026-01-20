@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { AlertCircle, Lightbulb, Plus } from "lucide-react";
-import { copilotBoxStyles, copilotTextSizes, copilotColors } from "./copilotStyles";
+import { AlertCircle, Lightbulb, Plus } from 'lucide-react';
+import { copilotBoxStyles, copilotTextSizes, copilotColors } from './copilotStyles';
 
 interface InsufficientContentMessageProps {
   message: string;
-  synthesisType: "learning_path" | "watch_list";
+  synthesisType: 'learning_path' | 'watch_list';
   query?: string;
   onIngestMore?: () => void;
   onBroaderScope?: () => void;
@@ -26,7 +26,7 @@ export function InsufficientContentMessage({
   onIngestMore,
   onBroaderScope,
 }: InsufficientContentMessageProps) {
-  const typeLabel = synthesisType === "learning_path" ? "learning path" : "watch list";
+  const typeLabel = synthesisType === 'learning_path' ? 'learning path' : 'watch list';
 
   return (
     <div className={`${copilotBoxStyles.static} space-y-4`}>
@@ -39,15 +39,17 @@ export function InsufficientContentMessage({
           <h3 className={`${copilotTextSizes.header} ${copilotColors.primary}`}>
             Not Enough Content
           </h3>
-          <p className={`${copilotTextSizes.body} ${copilotColors.muted} mt-1`}>
-            {message}
-          </p>
+          <p className={`${copilotTextSizes.body} ${copilotColors.muted} mt-1`}>{message}</p>
         </div>
       </div>
 
       {/* Suggestions */}
-      <div className={`p-4 rounded-lg ${copilotColors.bg.primary} border ${copilotColors.border.default}`}>
-        <h4 className={`flex items-center gap-2 ${copilotTextSizes.small} ${copilotColors.primary} font-medium mb-3`}>
+      <div
+        className={`p-4 rounded-lg ${copilotColors.bg.primary} border ${copilotColors.border.default}`}
+      >
+        <h4
+          className={`flex items-center gap-2 ${copilotTextSizes.small} ${copilotColors.primary} font-medium mb-3`}
+        >
           <Lightbulb className="w-4 h-4 text-yellow-500" />
           Suggestions to create a {typeLabel}:
         </h4>
@@ -63,11 +65,13 @@ export function InsufficientContentMessage({
           </li>
 
           <li className={`${copilotTextSizes.body} ${copilotColors.primary}`}>
-            <strong>Remove scope filters:</strong> Expand your search to include all channels and topics in your library.
+            <strong>Remove scope filters:</strong> Expand your search to include all channels and
+            topics in your library.
           </li>
 
           <li className={`${copilotTextSizes.body} ${copilotColors.primary}`}>
-            <strong>Add more videos:</strong> Ingest additional videos on this topic to build up your library.
+            <strong>Add more videos:</strong> Ingest additional videos on this topic to build up
+            your library.
           </li>
         </ul>
       </div>

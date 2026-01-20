@@ -198,7 +198,9 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
               `}
               disabled={isLoading}
               aria-invalid={!!error}
-              aria-describedby={error ? 'url-error' : urlType !== 'unknown' ? 'url-type' : undefined}
+              aria-describedby={
+                error ? 'url-error' : urlType !== 'unknown' ? 'url-type' : undefined
+              }
             />
             {/* URL type indicator */}
             {urlType !== 'unknown' && !isLoading && (
@@ -305,9 +307,11 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
             text-white transition-colors duration-200
             focus:outline-none focus:ring-2 focus:ring-offset-2
             disabled:opacity-50 disabled:cursor-not-allowed
-            ${urlType === 'channel'
-              ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500'
-              : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'}
+            ${
+              urlType === 'channel'
+                ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500'
+                : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+            }
           `}
         >
           {getButtonText()}
@@ -327,7 +331,13 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
  */
 function VideoIcon({ className = '' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <polygon points="23 7 16 12 23 17 23 7" />
       <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
     </svg>
@@ -339,7 +349,13 @@ function VideoIcon({ className = '' }: { className?: string }) {
  */
 function ChannelIcon({ className = '' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />

@@ -34,9 +34,7 @@ export function HealthStatusProvider({
   });
 
   return (
-    <HealthStatusContext.Provider value={healthState}>
-      {children}
-    </HealthStatusContext.Provider>
+    <HealthStatusContext.Provider value={healthState}>{children}</HealthStatusContext.Provider>
   );
 }
 

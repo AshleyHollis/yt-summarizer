@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Enable class-based dark mode for next-themes */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -265,7 +265,9 @@ html {
 .yt-link {
   color: var(--accent);
   text-decoration: none;
-  transition: color 0.15s ease-out, text-decoration 0.15s ease-out;
+  transition:
+    color 0.15s ease-out,
+    text-decoration 0.15s ease-out;
 }
 
 .yt-link:hover {
@@ -333,23 +335,13 @@ html {
 }
 
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    #f0f0f0 25%,
-    #e0e0e0 50%,
-    #f0f0f0 75%
-  );
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
 .dark .skeleton {
-  background: linear-gradient(
-    90deg,
-    #2a2a2a 25%,
-    #3a3a3a 50%,
-    #2a2a2a 75%
-  );
+  background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
   background-size: 200% 100%;
 }
 
@@ -384,12 +376,16 @@ html {
   z-index: 50 !important;
   background: var(--copilot-kit-background-color, #ffffff) !important;
   border: 1px solid var(--copilot-kit-separator-color, #e5e5e5) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08) !important;
   border-radius: 12px !important;
 }
 
 .dark .copilotKitWindow {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Chat header styling - YouTube-like */
@@ -407,11 +403,11 @@ html {
 }
 
 /* Eliminate gaps between messages */
-[class*="copilotKitMessages"] {
+[class*='copilotKitMessages'] {
   gap: 6px !important;
 }
 
-[class*="copilotKitMessages"] > div {
+[class*='copilotKitMessages'] > div {
   gap: 6px !important;
 }
 
@@ -426,15 +422,15 @@ html {
   display: none !important;
 }
 
-[class*="copilotKitMessages"] > div > div {
+[class*='copilotKitMessages'] > div > div {
   gap: 2px !important;
   margin: 0 !important;
   padding: 0 !important;
 }
 
 /* Remove default message container padding */
-[class*="copilotKit"] [class*="message"],
-[class*="copilotKit"] [class*="Message"] {
+[class*='copilotKit'] [class*='message'],
+[class*='copilotKit'] [class*='Message'] {
   margin: 4px 0 !important;
   padding: 0 !important;
 }
@@ -464,7 +460,9 @@ html {
   background: var(--copilot-kit-secondary-color, #f2f2f2) !important;
   border: 1px solid var(--copilot-kit-separator-color, #e5e5e5) !important;
   font-size: 14px !important;
-  transition: border-color 0.15s, box-shadow 0.15s !important;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s !important;
 }
 
 .copilotKitInputContainer textarea:focus,
@@ -476,9 +474,9 @@ html {
 
 /* User messages - clean box style aligned right with subtle border */
 .copilotKitUserMessage,
-[class*="copilotKitUserMessage" i],
-[class*="copilotKit"] [class*="userMessage" i],
-[class*="copilotKit"] [class*="user-message" i] {
+[class*='copilotKitUserMessage' i],
+[class*='copilotKit'] [class*='userMessage' i],
+[class*='copilotKit'] [class*='user-message' i] {
   background: var(--copilot-kit-secondary-color, #f2f2f2) !important;
   border: 1px solid var(--copilot-kit-separator-color, #e5e5e5) !important;
   border-left: 3px solid var(--copilot-kit-primary-color, #cc0000) !important;
@@ -493,7 +491,7 @@ html {
 }
 
 /* Also target any element with background gradient red that contains user text */
-[class*="copilotKit"] div[style*="background"] {
+[class*='copilotKit'] div[style*='background'] {
   background: var(--copilot-kit-secondary-color, #f3f4f6) !important;
 }
 
@@ -512,22 +510,22 @@ html {
 }
 
 /* Some CopilotKit builds use hashed classnames; ensure assistant bubbles can stretch */
-[class*="copilotKitAssistantMessage" i] {
+[class*='copilotKitAssistantMessage' i] {
   width: 100% !important;
   max-width: 100% !important;
   align-self: stretch !important;
 }
 
 /* Tighten all message wrappers */
-[class*="copilotKit"] [class*="wrapper"],
-[class*="copilotKit"] [class*="Wrapper"],
-[class*="copilotKit"] [class*="container"],
-[class*="copilotKit"] [class*="Container"] {
+[class*='copilotKit'] [class*='wrapper'],
+[class*='copilotKit'] [class*='Wrapper'],
+[class*='copilotKit'] [class*='container'],
+[class*='copilotKit'] [class*='Container'] {
   gap: 4px !important;
 }
 
 /* Send button - red with YouTube-like styling */
-[class*="copilotKit"] button[type="submit"],
+[class*='copilotKit'] button[type='submit'],
 .copilotKitSendButton {
   background: var(--copilot-kit-primary-color, #cc0000) !important;
   border-radius: 50% !important;
@@ -542,14 +540,14 @@ html {
   border: none !important;
 }
 
-[class*="copilotKit"] button[type="submit"]:hover,
+[class*='copilotKit'] button[type='submit']:hover,
 .copilotKitSendButton:hover {
   background: #b30000 !important;
   transform: scale(1.05) !important;
   box-shadow: 0 4px 12px rgba(204, 0, 0, 0.4) !important;
 }
 
-[class*="copilotKit"] button[type="submit"]:active,
+[class*='copilotKit'] button[type='submit']:active,
 .copilotKitSendButton:active {
   transform: scale(0.95) !important;
 }
@@ -561,8 +559,8 @@ html {
 
 /* Hide regenerate/action buttons */
 .copilotKitMessageControls,
-[class*="messageActions"],
-[class*="MessageActions"],
+[class*='messageActions'],
+[class*='MessageActions'],
 .copilotKitMessageActions {
   display: none !important;
 }
@@ -573,41 +571,41 @@ p.poweredBy {
 }
 
 /* Hide the inspector and version banner */
-button[aria-label="Web Inspector"],
-[class*="inspector"],
-[class*="Inspector"],
-[class*="devConsole"],
-[class*="DevConsole"],
-[class*="CopilotKit"] [role="note"] {
+button[aria-label='Web Inspector'],
+[class*='inspector'],
+[class*='Inspector'],
+[class*='devConsole'],
+[class*='DevConsole'],
+[class*='CopilotKit'] [role='note'] {
   display: none !important;
 }
 
 /* ==================== YouTube-style Icon Button Boxes ==================== */
 /* Icon and button hover feedback with box borders */
-.copilotKitWindow button:not([type="submit"]),
-.copilotKitSidebar button:not([type="submit"]),
-[class*="copilotKit"] button:not([type="submit"]) {
+.copilotKitWindow button:not([type='submit']),
+.copilotKitSidebar button:not([type='submit']),
+[class*='copilotKit'] button:not([type='submit']) {
   transition: all 0.15s ease-out !important;
   border: 1px solid transparent !important;
   border-radius: 8px !important;
 }
 
-.copilotKitWindow button:not([type="submit"]):hover,
-.copilotKitSidebar button:not([type="submit"]):hover,
-[class*="copilotKit"] button:not([type="submit"]):hover {
+.copilotKitWindow button:not([type='submit']):hover,
+.copilotKitSidebar button:not([type='submit']):hover,
+[class*='copilotKit'] button:not([type='submit']):hover {
   background-color: var(--copilot-kit-secondary-color, rgba(0, 0, 0, 0.05)) !important;
   border-color: var(--copilot-kit-separator-color, #e5e5e5) !important;
 }
 
-.copilotKitWindow button:not([type="submit"]):active,
-.copilotKitSidebar button:not([type="submit"]):active,
-[class*="copilotKit"] button:not([type="submit"]):active {
+.copilotKitWindow button:not([type='submit']):active,
+.copilotKitSidebar button:not([type='submit']):active,
+[class*='copilotKit'] button:not([type='submit']):active {
   transform: scale(0.95) !important;
 }
 
-.dark .copilotKitWindow button:not([type="submit"]):hover,
-.dark .copilotKitSidebar button:not([type="submit"]):hover,
-.dark [class*="copilotKit"] button:not([type="submit"]):hover {
+.dark .copilotKitWindow button:not([type='submit']):hover,
+.dark .copilotKitSidebar button:not([type='submit']):hover,
+.dark [class*='copilotKit'] button:not([type='submit']):hover {
   background-color: rgba(255, 255, 255, 0.1) !important;
   border-color: var(--copilot-kit-separator-color, #3f3f3f) !important;
 }
@@ -615,13 +613,13 @@ button[aria-label="Web Inspector"],
 /* Icon hover effects for SVG icons in chat */
 .copilotKitWindow svg,
 .copilotKitSidebar svg,
-[class*="copilotKit"] svg {
+[class*='copilotKit'] svg {
   transition: all 0.15s ease-out !important;
 }
 
 .copilotKitWindow button:hover svg,
 .copilotKitSidebar button:hover svg,
-[class*="copilotKit"] button:hover svg {
+[class*='copilotKit'] button:hover svg {
   color: var(--copilot-kit-primary-color, #cc0000) !important;
 }
 
@@ -660,14 +658,16 @@ button[aria-label="Web Inspector"],
 
 /* Hide the copilotKitMarkdown div for all assistant messages (tool renders handle display) */
 .copilotKitAssistantMessage .copilotKitMarkdown,
-[class*="copilotKitAssistantMessage"] .copilotKitMarkdown,
-[class*="copilotKitAssistantMessage"] [class*="copilotKitMarkdown"] {
+[class*='copilotKitAssistantMessage'] .copilotKitMarkdown,
+[class*='copilotKitAssistantMessage'] [class*='copilotKitMarkdown'] {
   display: none !important;
 }
 
 /* Exception: Keep the first assistant message (greeting) visible - it has no tool render */
 .copilotKitMessagesContainer .copilotKitAssistantMessage:first-child .copilotKitMarkdown,
-[class*="copilotKitMessages"] [class*="copilotKitAssistantMessage"]:first-child [class*="copilotKitMarkdown"] {
+[class*='copilotKitMessages']
+  [class*='copilotKitAssistantMessage']:first-child
+  [class*='copilotKitMarkdown'] {
   display: block !important;
 }
 
@@ -686,9 +686,9 @@ button[aria-label="Web Inspector"],
  */
 .copilotKitTypingIndicator,
 .copilotKitActivityDot,
-[class*="TypingIndicator"],
-[class*="typingIndicator"],
-[class*="ActivityDot"],
-[class*="activityDot"] {
+[class*='TypingIndicator'],
+[class*='typingIndicator'],
+[class*='ActivityDot'],
+[class*='activityDot'] {
   display: none !important;
 }

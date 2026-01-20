@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { HelpCircle } from "lucide-react";
+import { HelpCircle } from 'lucide-react';
 
 interface WhyThisButtonProps {
   onClick: () => void;
@@ -13,11 +13,7 @@ interface WhyThisButtonProps {
  * Toggles the explanation panel visibility.
  * US5 - Transparency feature.
  */
-export function WhyThisButton({
-  onClick,
-  isExpanded,
-  className = "",
-}: WhyThisButtonProps) {
+export function WhyThisButton({ onClick, isExpanded, className = '' }: WhyThisButtonProps) {
   return (
     <button
       onClick={onClick}
@@ -26,7 +22,7 @@ export function WhyThisButton({
         text-xs font-medium
         text-gray-500 hover:text-red-600
         transition-colors
-        ${isExpanded ? "text-red-600" : ""}
+        ${isExpanded ? 'text-red-600' : ''}
         ${className}
       `}
       aria-expanded={isExpanded}

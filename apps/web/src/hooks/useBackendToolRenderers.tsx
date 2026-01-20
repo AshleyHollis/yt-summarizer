@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Backend Tool Renderers (Pattern B)
@@ -33,14 +33,23 @@
  * See: https://docs.copilotkit.ai/langgraph/generative-ui/backend-tools
  */
 
-import { useRenderToolCall, useCopilotChat } from "@copilotkit/react-core";
-import { TextMessage, MessageRole } from "@copilotkit/runtime-client-gql";
-import { useCallback } from "react";
-import { ToolLoadingState, isToolLoading, isToolComplete } from "@/components/copilot/ToolLoadingState";
-import { CopilotVideoCard } from "@/components/copilot/CopilotVideoCard";
-import { CopilotMessage } from "@/components/copilot/CopilotMessage";
-import { formatTime } from "./copilot-utils";
-import type { RecommendedVideo, ScoredSegment, CoverageResponse, Evidence } from "@/types/copilot-types";
+import { useRenderToolCall, useCopilotChat } from '@copilotkit/react-core';
+import { TextMessage, MessageRole } from '@copilotkit/runtime-client-gql';
+import { useCallback } from 'react';
+import {
+  ToolLoadingState,
+  isToolLoading,
+  isToolComplete,
+} from '@/components/copilot/ToolLoadingState';
+import { CopilotVideoCard } from '@/components/copilot/CopilotVideoCard';
+import { CopilotMessage } from '@/components/copilot/CopilotMessage';
+import { formatTime } from './copilot-utils';
+import type {
+  RecommendedVideo,
+  ScoredSegment,
+  CoverageResponse,
+  Evidence,
+} from '@/types/copilot-types';
 
 // =============================================================================
 // Backend Tool Renderers
@@ -51,7 +60,7 @@ import type { RecommendedVideo, ScoredSegment, CoverageResponse, Evidence } from
  * Call this once in your component to enable rich UI for backend tools.
  */
 export function useBackendToolRenderers() {
-  useQueryLibraryRenderer();  // PRIMARY - rich RAG response
+  useQueryLibraryRenderer(); // PRIMARY - rich RAG response
   useSearchVideosRenderer();
   useSearchSegmentsRenderer();
   useLibraryCoverageRenderer();
@@ -82,20 +91,20 @@ function useQueryLibraryRenderer() {
   );
 
   useRenderToolCall({
-    name: "query_library",
+    name: 'query_library',
     render: ({ status, result, args }) => {
       if (isToolLoading(status)) {
         return (
           <ToolLoadingState
             title="Searching your video library..."
-            description={args?.query ? `Looking for: "${args.query}"` : "Finding relevant content"}
+            description={args?.query ? `Looking for: "${args.query}"` : 'Finding relevant content'}
           />
         );
       }
 
       if (isToolComplete(status) && result) {
         // Filter low-relevance content
-        const MIN_RELEVANCE = 0.50;
+        const MIN_RELEVANCE = 0.5;
         const videoCards = (result.videoCards || []).filter(
           (v: RecommendedVideo) => v.relevanceScore >= MIN_RELEVANCE
         );
@@ -105,17 +114,21 @@ function useQueryLibraryRenderer() {
 
         return (
           <CopilotMessage
-            answer={result.answer || ""}
+            answer={result.answer || ''}
             evidence={evidence}
             videoCards={videoCards}
             followups={result.followups || []}
             uncertainty={result.uncertainty || null}
             scopeEcho={result.scopeEcho || null}
-            aiSettingsEcho={result.aiSettingsEcho ? {
-              useVideoContext: result.aiSettingsEcho.useVideoContext ?? true,
-              useLLMKnowledge: result.aiSettingsEcho.useLLMKnowledge ?? true,
-              useWebSearch: result.aiSettingsEcho.useWebSearch ?? false,
-            } : null}
+            aiSettingsEcho={
+              result.aiSettingsEcho
+                ? {
+                    useVideoContext: result.aiSettingsEcho.useVideoContext ?? true,
+                    useLLMKnowledge: result.aiSettingsEcho.useLLMKnowledge ?? true,
+                    useWebSearch: result.aiSettingsEcho.useWebSearch ?? false,
+                  }
+                : null
+            }
             onFollowupClick={handleFollowupClick}
           />
         );
@@ -135,7 +148,7 @@ function useQueryLibraryRenderer() {
  */
 function useSearchVideosRenderer() {
   useRenderToolCall({
-    name: "search_videos",
+    name: 'search_videos',
     render: ({ status, result, args }) => {
       if (isToolLoading(status)) {
         return (
@@ -182,7 +195,7 @@ function useSearchVideosRenderer() {
  */
 function useSearchSegmentsRenderer() {
   useRenderToolCall({
-    name: "search_segments",
+    name: 'search_segments',
     render: ({ status, result, args }) => {
       if (isToolLoading(status)) {
         return (
@@ -227,7 +240,7 @@ function useSearchSegmentsRenderer() {
  */
 function useLibraryCoverageRenderer() {
   useRenderToolCall({
-    name: "get_library_coverage",
+    name: 'get_library_coverage',
     render: ({ status, result }) => {
       if (isToolLoading(status)) {
         return (
@@ -253,14 +266,11 @@ function useLibraryCoverageRenderer() {
  */
 function useVideoSummaryRenderer() {
   useRenderToolCall({
-    name: "get_video_summary",
+    name: 'get_video_summary',
     render: ({ status }) => {
       if (isToolLoading(status)) {
         return (
-          <ToolLoadingState
-            title="Loading video summary..."
-            description="Fetching key points"
-          />
+          <ToolLoadingState title="Loading video summary..." description="Fetching key points" />
         );
       }
       return <></>;
@@ -273,14 +283,11 @@ function useVideoSummaryRenderer() {
  */
 function useTopicsRenderer() {
   useRenderToolCall({
-    name: "get_topics_for_channel",
+    name: 'get_topics_for_channel',
     render: ({ status }) => {
       if (isToolLoading(status)) {
         return (
-          <ToolLoadingState
-            title="Analyzing topics..."
-            description="Finding covered subjects"
-          />
+          <ToolLoadingState title="Analyzing topics..." description="Finding covered subjects" />
         );
       }
       return <></>;
@@ -310,9 +317,7 @@ function SegmentCard({ segment }: { segment: ScoredSegment }) {
           </a>
         )}
       </div>
-      <p className="text-xs text-[var(--copilot-kit-muted-color)] line-clamp-2">
-        {segment.text}
-      </p>
+      <p className="text-xs text-[var(--copilot-kit-muted-color)] line-clamp-2">{segment.text}</p>
     </div>
   );
 }
@@ -335,9 +340,7 @@ function CoverageCard({ coverage }: { coverage: CoverageResponse }) {
 function StatCard({ value, label }: { value: number; label: string }) {
   return (
     <div className="p-2 bg-[var(--copilot-kit-background-color)] rounded-lg">
-      <div className="text-lg font-bold text-[var(--copilot-kit-primary-color)]">
-        {value}
-      </div>
+      <div className="text-lg font-bold text-[var(--copilot-kit-primary-color)]">{value}</div>
       <div className="text-xs text-[var(--copilot-kit-muted-color)]">{label}</div>
     </div>
   );

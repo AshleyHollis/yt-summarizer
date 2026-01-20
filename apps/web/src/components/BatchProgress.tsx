@@ -134,12 +134,7 @@ export function BatchProgress({
         cleanup?.();
         setUseSSE(false);
       }, 5000);
-      cleanup = batchApi.streamProgress(
-        batchId,
-        handleUpdate,
-        handleComplete,
-        handleError
-      );
+      cleanup = batchApi.streamProgress(batchId, handleUpdate, handleComplete, handleError);
     } else {
       // Fallback to polling
       let cancelled = false;
@@ -278,7 +273,9 @@ export function BatchProgress({
             </p>
           )}
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(batch.status)}`}>
+        <span
+          className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(batch.status)}`}
+        >
           {batch.status.charAt(0).toUpperCase() + batch.status.slice(1)}
         </span>
       </div>
@@ -389,10 +386,7 @@ export function BatchProgress({
               </svg>
             )}
             {item.error_message && (
-              <span
-                className="text-xs text-red-500 truncate max-w-32"
-                title={item.error_message}
-              >
+              <span className="text-xs text-red-500 truncate max-w-32" title={item.error_message}>
                 {item.error_message}
               </span>
             )}

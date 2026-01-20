@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * ScopeIndicator - Shows what context and knowledge sources the AI can use
@@ -14,7 +14,7 @@
  * on video pages all three options are available.
  */
 
-import { useVideoContext, useScope, useAISettings } from "@/app/providers";
+import { useVideoContext, useScope, useAISettings } from '@/app/providers';
 import {
   FolderOpenIcon,
   FilmIcon,
@@ -24,11 +24,11 @@ import {
   BookOpenIcon,
   InformationCircleIcon,
   RectangleStackIcon,
-  XMarkIcon
-} from "@heroicons/react/20/solid";
-import { useState } from "react";
+  XMarkIcon,
+} from '@heroicons/react/20/solid';
+import { useState } from 'react';
 
-type ScopeLevel = "library" | "channel" | "video" | "selected";
+type ScopeLevel = 'library' | 'channel' | 'video' | 'selected';
 
 export function ScopeIndicator() {
   const { currentVideo } = useVideoContext();
@@ -40,14 +40,14 @@ export function ScopeIndicator() {
   const getCurrentScopeLevel = (): ScopeLevel => {
     // Check if there are multiple selected videos (from library selection)
     if (scope.videoIds && scope.videoIds.length > 1) {
-      return "selected";
+      return 'selected';
     }
     if (
       currentVideo &&
       scope.videoIds?.length === 1 &&
       scope.videoIds[0] === currentVideo.videoId
     ) {
-      return "video";
+      return 'video';
     }
     if (
       currentVideo &&
@@ -55,13 +55,13 @@ export function ScopeIndicator() {
       scope.channels[0] === currentVideo.channelName &&
       !scope.videoIds?.length
     ) {
-      return "channel";
+      return 'channel';
     }
     // Also check for single video selection without currentVideo context
     if (scope.videoIds?.length === 1 && !currentVideo) {
-      return "selected";
+      return 'selected';
     }
-    return "library";
+    return 'library';
   };
 
   const currentLevel = getCurrentScopeLevel();
@@ -71,15 +71,15 @@ export function ScopeIndicator() {
     if (level === currentLevel) return;
 
     switch (level) {
-      case "library":
+      case 'library':
         clearScope();
         break;
-      case "channel":
+      case 'channel':
         if (currentVideo) {
           setScope({ channels: [currentVideo.channelName] });
         }
         break;
-      case "video":
+      case 'video':
         if (currentVideo) {
           setScope({ videoIds: [currentVideo.videoId] });
         }
@@ -88,34 +88,49 @@ export function ScopeIndicator() {
   };
 
   // Scope options for segmented control
-  const scopeOptions: { level: ScopeLevel; label: string; description: string; icon: typeof FolderOpenIcon }[] = [
-    { level: "library", label: "All Videos", description: "Search your entire library", icon: FolderOpenIcon },
-    { level: "channel", label: "This Channel", description: currentVideo ? `Only ${currentVideo.channelName}` : "Only this channel", icon: UsersIcon },
-    { level: "video", label: "This Video", description: "Only the current video", icon: FilmIcon },
+  const scopeOptions: {
+    level: ScopeLevel;
+    label: string;
+    description: string;
+    icon: typeof FolderOpenIcon;
+  }[] = [
+    {
+      level: 'library',
+      label: 'All Videos',
+      description: 'Search your entire library',
+      icon: FolderOpenIcon,
+    },
+    {
+      level: 'channel',
+      label: 'This Channel',
+      description: currentVideo ? `Only ${currentVideo.channelName}` : 'Only this channel',
+      icon: UsersIcon,
+    },
+    { level: 'video', label: 'This Video', description: 'Only the current video', icon: FilmIcon },
   ];
 
   // Knowledge source toggles with better descriptions
   const knowledgeSources = [
     {
-      key: "useVideoContext" as const,
-      label: "Your Videos",
+      key: 'useVideoContext' as const,
+      label: 'Your Videos',
       icon: BookOpenIcon,
-      description: "Search transcripts & summaries from your library",
-      shortDesc: "Library content"
+      description: 'Search transcripts & summaries from your library',
+      shortDesc: 'Library content',
     },
     {
-      key: "useLLMKnowledge" as const,
-      label: "AI Knowledge",
+      key: 'useLLMKnowledge' as const,
+      label: 'AI Knowledge',
       icon: LightBulbIcon,
       description: "Include AI's general knowledge in answers",
-      shortDesc: "General knowledge"
+      shortDesc: 'General knowledge',
     },
     {
-      key: "useWebSearch" as const,
-      label: "Web Search",
+      key: 'useWebSearch' as const,
+      label: 'Web Search',
       icon: GlobeAltIcon,
-      description: "Search the web for current information",
-      shortDesc: "Live web results"
+      description: 'Search the web for current information',
+      shortDesc: 'Live web results',
     },
   ];
 
@@ -125,7 +140,9 @@ export function ScopeIndicator() {
       <div className="flex items-center gap-2">
         {/* Search scope section */}
         <div className="flex items-center gap-1">
-          <span className="text-[10px] text-[var(--copilot-kit-muted-color)] font-medium">Search:</span>
+          <span className="text-[10px] text-[var(--copilot-kit-muted-color)] font-medium">
+            Search:
+          </span>
           {currentVideo ? (
             <div className="flex items-center bg-[var(--copilot-kit-background-color)] rounded p-0.5 border border-[var(--copilot-kit-separator-color)]">
               {scopeOptions.map(({ level, label, description, icon: Icon }) => {
@@ -136,9 +153,10 @@ export function ScopeIndicator() {
                     onClick={() => handleScopeChange(level)}
                     className={`
                       flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded transition-all
-                      ${isActive
-                        ? "bg-[var(--copilot-kit-primary-color)] text-white font-medium"
-                        : "text-[var(--copilot-kit-muted-color)] hover:text-[var(--copilot-kit-secondary-contrast-color)] hover:bg-[var(--copilot-kit-background-color)]"
+                      ${
+                        isActive
+                          ? 'bg-[var(--copilot-kit-primary-color)] text-white font-medium'
+                          : 'text-[var(--copilot-kit-muted-color)] hover:text-[var(--copilot-kit-secondary-contrast-color)] hover:bg-[var(--copilot-kit-background-color)]'
                       }
                     `}
                     title={description}
@@ -149,7 +167,7 @@ export function ScopeIndicator() {
                 );
               })}
             </div>
-          ) : currentLevel === "selected" ? (
+          ) : currentLevel === 'selected' ? (
             // Show selected videos badge with clear option - styled to match segmented control buttons
             <div className="flex items-center bg-[var(--copilot-kit-background-color)] rounded p-0.5 border border-[var(--copilot-kit-separator-color)]">
               <button
@@ -158,7 +176,10 @@ export function ScopeIndicator() {
                 title={`Searching ${scope.videoIds?.length} selected video${scope.videoIds && scope.videoIds.length !== 1 ? 's' : ''} - click to clear`}
               >
                 <RectangleStackIcon className="h-2.5 w-2.5" />
-                <span>{scope.videoIds?.length} Video{scope.videoIds && scope.videoIds.length !== 1 ? 's' : ''} Selected</span>
+                <span>
+                  {scope.videoIds?.length} Video
+                  {scope.videoIds && scope.videoIds.length !== 1 ? 's' : ''} Selected
+                </span>
                 <span className="inline-flex items-center justify-center ml-0.5 rounded-sm group-hover/clear:bg-white/20 transition-colors">
                   <XMarkIcon className="h-2.5 w-2.5" />
                 </span>
@@ -183,7 +204,9 @@ export function ScopeIndicator() {
 
         {/* Knowledge sources section */}
         <div className="flex items-center gap-1">
-          <span className="text-[10px] text-[var(--copilot-kit-muted-color)] font-medium">Include:</span>
+          <span className="text-[10px] text-[var(--copilot-kit-muted-color)] font-medium">
+            Include:
+          </span>
           <div className="flex items-center bg-[var(--copilot-kit-background-color)] rounded p-0.5 border border-[var(--copilot-kit-separator-color)]">
             {knowledgeSources.map(({ key, label, icon: Icon, description }) => {
               const isActive = settings[key];
@@ -193,12 +216,13 @@ export function ScopeIndicator() {
                   onClick={() => toggleSetting(key)}
                   className={`
                     flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded transition-all
-                    ${isActive
-                      ? "bg-[var(--copilot-kit-primary-color)] text-white font-medium"
-                      : "text-[var(--copilot-kit-muted-color)] hover:text-[var(--copilot-kit-secondary-contrast-color)] hover:bg-[var(--copilot-kit-background-color)]"
+                    ${
+                      isActive
+                        ? 'bg-[var(--copilot-kit-primary-color)] text-white font-medium'
+                        : 'text-[var(--copilot-kit-muted-color)] hover:text-[var(--copilot-kit-secondary-contrast-color)] hover:bg-[var(--copilot-kit-background-color)]'
                     }
                   `}
-                  title={`${isActive ? "Disable" : "Enable"}: ${description}`}
+                  title={`${isActive ? 'Disable' : 'Enable'}: ${description}`}
                 >
                   <Icon className="h-2.5 w-2.5" />
                   <span>{label}</span>
@@ -221,19 +245,37 @@ export function ScopeIndicator() {
       {/* Help panel - shows when help button is clicked */}
       {showHelp && (
         <div className="mt-1 p-2 bg-[var(--copilot-kit-background-color)] rounded border border-[var(--copilot-kit-separator-color)] text-[10px]">
-          <div className="font-medium text-[var(--copilot-kit-secondary-contrast-color)] mb-1.5">How to customize AI responses:</div>
+          <div className="font-medium text-[var(--copilot-kit-secondary-contrast-color)] mb-1.5">
+            How to customize AI responses:
+          </div>
           <div className="space-y-1.5">
             <div>
-              <span className="font-medium text-[var(--copilot-kit-secondary-contrast-color)]">Search:</span>
-              <span className="text-[var(--copilot-kit-muted-color)]"> Choose which videos to search — all videos, just this channel, or only this video.</span>
+              <span className="font-medium text-[var(--copilot-kit-secondary-contrast-color)]">
+                Search:
+              </span>
+              <span className="text-[var(--copilot-kit-muted-color)]">
+                {' '}
+                Choose which videos to search — all videos, just this channel, or only this video.
+              </span>
             </div>
             <div>
-              <span className="font-medium text-[var(--copilot-kit-secondary-contrast-color)]">Include:</span>
-              <span className="text-[var(--copilot-kit-muted-color)]"> Toggle what the AI can use in its answers:</span>
+              <span className="font-medium text-[var(--copilot-kit-secondary-contrast-color)]">
+                Include:
+              </span>
+              <span className="text-[var(--copilot-kit-muted-color)]">
+                {' '}
+                Toggle what the AI can use in its answers:
+              </span>
               <ul className="mt-0.5 ml-3 space-y-0.5 text-[var(--copilot-kit-muted-color)]">
-                <li>• <strong>Your Videos</strong> — Transcripts and summaries from your library</li>
-                <li>• <strong>AI Knowledge</strong> — The AI's general training knowledge</li>
-                <li>• <strong>Web Search</strong> — Live search results from the internet</li>
+                <li>
+                  • <strong>Your Videos</strong> — Transcripts and summaries from your library
+                </li>
+                <li>
+                  • <strong>AI Knowledge</strong> — The AI's general training knowledge
+                </li>
+                <li>
+                  • <strong>Web Search</strong> — Live search results from the internet
+                </li>
               </ul>
             </div>
           </div>

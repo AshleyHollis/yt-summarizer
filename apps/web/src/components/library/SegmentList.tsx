@@ -37,7 +37,9 @@ export function SegmentList({ segments, youtubeVideoId }: SegmentListProps) {
             title={`Watch from ${formatDuration(segment.start_time)} on YouTube`}
           >
             <PlayIcon className="h-4 w-4" />
-            <span className="text-xs font-medium tabular-nums">{formatDuration(segment.start_time)}</span>
+            <span className="text-xs font-medium tabular-nums">
+              {formatDuration(segment.start_time)}
+            </span>
           </a>
 
           {/* Segment text */}

@@ -94,7 +94,9 @@ export default function DebugPage() {
             <li>NEXT_PUBLIC_ variables are baked into the build at build time</li>
             <li>Empty API URL means the app will use relative paths (not what we want for SWA)</li>
             <li>Check the build logs to see what values were set during npm run build</li>
-            <li>If values are empty here but were set in CI, the build may not be using them correctly</li>
+            <li>
+              If values are empty here but were set in CI, the build may not be using them correctly
+            </li>
           </ul>
         </div>
 

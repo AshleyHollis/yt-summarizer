@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Copilot Actions Hook (Optimized)
@@ -15,13 +15,13 @@
  * - Copilot Readable: Context provided to the agent (scope, current video)
  */
 
-import { useCopilotReadable } from "@copilotkit/react-core";
-import { useScope, useAISettings } from "@/app/providers";
-import { useCallback } from "react";
+import { useCopilotReadable } from '@copilotkit/react-core';
+import { useScope, useAISettings } from '@/app/providers';
+import { useCallback } from 'react';
 
 // Modular hooks
-import { useFrontendTools } from "./useFrontendTools";
-import { useBackendToolRenderers } from "./useBackendToolRenderers";
+import { useFrontendTools } from './useFrontendTools';
+import { useBackendToolRenderers } from './useBackendToolRenderers';
 
 // Re-export types for consumers
 export type {
@@ -31,10 +31,10 @@ export type {
   CoverageResponse,
   ScoredSegment,
   SegmentSearchResponse,
-} from "@/types/copilot-types";
+} from '@/types/copilot-types';
 
 // Re-export utils
-export { formatTime, API_URL } from "./copilot-utils";
+export { formatTime, API_URL } from './copilot-utils';
 
 /**
  * Main hook to register all Copilot actions.
@@ -55,21 +55,21 @@ export function useCopilotActions() {
   // Provide current scope to the agent - THIS CONTROLS WHAT TO SEARCH
   useCopilotReadable({
     description:
-      "The current search scope filters. IMPORTANT: This controls what videos to search. " +
-      "If videoIds is set, ONLY search those videos. " +
-      "If channels is set, ONLY search videos from those channels. " +
-      "If empty ({}), search the ENTIRE library.",
+      'The current search scope filters. IMPORTANT: This controls what videos to search. ' +
+      'If videoIds is set, ONLY search those videos. ' +
+      'If channels is set, ONLY search videos from those channels. ' +
+      'If empty ({}), search the ENTIRE library.',
     value: scope,
   });
 
   // Provide AI knowledge settings to the agent
   useCopilotReadable({
     description:
-      "AI knowledge source settings that control what the agent can use to answer questions. " +
-      "useVideoContext: Whether to search the video library for context (RAG retrieval). " +
-      "useLLMKnowledge: Whether the AI can use its general trained knowledge in answers. " +
-      "useWebSearch: Whether to search the web for current information. " +
-      "IMPORTANT: Pass these settings to the query_library tool to respect user preferences.",
+      'AI knowledge source settings that control what the agent can use to answer questions. ' +
+      'useVideoContext: Whether to search the video library for context (RAG retrieval). ' +
+      'useLLMKnowledge: Whether the AI can use its general trained knowledge in answers. ' +
+      'useWebSearch: Whether to search the web for current information. ' +
+      'IMPORTANT: Pass these settings to the query_library tool to respect user preferences.',
     value: aiSettings,
   });
 
@@ -97,12 +97,12 @@ export function useCopilotActions() {
  */
 export function useCoverage() {
   const { scope } = useScope();
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const fetchCoverage = useCallback(async () => {
     const response = await fetch(`${API_URL}/api/v1/copilot/coverage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scope }),
     });
 
