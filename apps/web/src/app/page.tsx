@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 
 /**
  * Root page - redirects to add content page
- * Updated to trigger CI/CD pipeline validation
+ * Test deployment with full preview workflow - Auth0 integration test
  */
 export default function Home() {
   redirect('/add');
