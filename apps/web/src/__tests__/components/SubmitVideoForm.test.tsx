@@ -24,7 +24,7 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
-import { videoApi, ApiClientError } from '@/services/api';
+import { videoApi, ApiClientError, type SubmitVideoResponse } from '@/services/api';
 
 describe('SubmitVideoForm', () => {
   beforeEach(() => {
@@ -108,17 +108,12 @@ describe('SubmitVideoForm', () => {
   describe('Submission', () => {
     it('shows loading state during submission', async () => {
       // Create a deferred promise to control resolution
-      let resolveSubmit: (value: {
-        video_id: string;
-        youtube_video_id: string;
-        title: string;
-        channel: { channel_id: string; name: string; youtube_channel_id: string };
-        processing_status: string;
-        submitted_at: string;
-        jobs_queued: number;
-      }) => void;
+      let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
-        () => new Promise((resolve) => { resolveSubmit = resolve; })
+        () =>
+          new Promise((resolve) => {
+            resolveSubmit = resolve;
+          })
       );
 
       render(<SubmitVideoForm />);
@@ -241,17 +236,12 @@ describe('SubmitVideoForm', () => {
 
     it('disables input and button during submission', async () => {
       // Create a deferred promise to control resolution
-      let resolveSubmit: (value: {
-        video_id: string;
-        youtube_video_id: string;
-        title: string;
-        channel: { channel_id: string; name: string; youtube_channel_id: string };
-        processing_status: string;
-        submitted_at: string;
-        jobs_queued: number;
-      }) => void;
+      let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
-        () => new Promise((resolve) => { resolveSubmit = resolve; })
+        () =>
+          new Promise((resolve) => {
+            resolveSubmit = resolve;
+          })
       );
 
       render(<SubmitVideoForm />);
