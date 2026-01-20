@@ -1,4 +1,4 @@
-import { auth0 } from './lib/auth0';
+import { auth0 } from '../lib/auth0';
 
 /**
  * Next.js 16 proxy layer that handles Auth0 authentication.
