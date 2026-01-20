@@ -1,0 +1,112 @@
+name: 'Setup Azure and Validate ACR Image'
+description: 'Logs into Azure, optionally sets AKS context, and validates that an image exists in ACR'
+
+inputs:
+  # Azure credentials
+  azure-client-id:
+    description: 'Azure Client ID for OIDC authentication'
+    required: true
+  azure-tenant-id:
+    description: 'Azure Tenant ID'
+    required: true
+  azure-subscription-id:
+    description: 'Azure Subscription ID'
+    required: true
+
+  # ACR validation
+  acr-registry:
+    description: 'ACR registry name (e.g., acrytsummprd)'
+    required: true
+  acr-repository:
+    description: 'Repository name in ACR (e.g., yt-summarizer-api)'
+    required: true
+  image-tag:
+    description: 'Image tag to validate'
+    required: true
+  fail-if-missing:
+    description: 'Whether to fail if image is not found in ACR'
+    required: false
+    default: 'true'
+
+  # AKS setup (optional)
+  setup-aks:
+    description: 'Whether to setup AKS context'
+    required: false
+    default: 'false'
+  aks-resource-group:
+    description: 'AKS resource group (required if setup-aks is true)'
+    required: false
+  aks-cluster-name:
+    description: 'AKS cluster name (required if setup-aks is true)'
+    required: false
+
+  # K8s pull verification (optional)
+  verify-k8s-pull:
+    description: 'Whether to verify Kubernetes can pull the image'
+    required: false
+    default: 'false'
+  k8s-namespace:
+    description: 'Kubernetes namespace for pull verification (required if verify-k8s-pull is true)'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.azure-client-id }}
+        tenant-id: ${{ inputs.azure-tenant-id }}
+        subscription-id: ${{ inputs.azure-subscription-id }}
+
+    - name: Validate image exists in ACR
+      uses: ./.github/actions/validate-acr-image
+      with:
+        registry: ${{ inputs.acr-registry }}
+        repository: ${{ inputs.acr-repository }}
+        tag: ${{ inputs.image-tag }}
+        fail-if-missing: ${{ inputs.fail-if-missing }}
+
+    - name: Set AKS context
+      if: inputs.setup-aks == 'true'
+      uses: azure/aks-set-context@v4
+      with:
+        resource-group: ${{ inputs.aks-resource-group }}
+        cluster-name: ${{ inputs.aks-cluster-name }}
+
+    - name: Verify cluster can pull image
+      if: inputs.verify-k8s-pull == 'true'
+      shell: bash
+      run: |
+        echo "Verifying AKS cluster can pull image: ${{ inputs.acr-registry }}.azurecr.io/${{ inputs.acr-repository }}:${{ inputs.image-tag }}"
+
+        # Create a temporary pod to test image pull
+        kubectl run test-pull-${{ github.run_id }} \
+          --image=${{ inputs.acr-registry }}.azurecr.io/${{ inputs.acr-repository }}:${{ inputs.image-tag }} \
+          --namespace=${{ inputs.k8s-namespace }} \
+          --restart=Never \
+          --command -- /bin/sh -c "echo 'Image pull successful' && exit 0" || {
+          echo "Failed to pull image from ACR"
+          exit 1
+        }
+
+        # Wait for pod to complete
+        kubectl wait --for=condition=Ready pod/test-pull-${{ github.run_id }} \
+          --namespace=${{ inputs.k8s-namespace }} \
+          --timeout=60s || true
+
+        # Check pod status
+        POD_STATUS=$(kubectl get pod test-pull-${{ github.run_id }} \
+          --namespace=${{ inputs.k8s-namespace }} \
+          -o jsonpath='{.status.phase}')
+
+        # Cleanup
+        kubectl delete pod test-pull-${{ github.run_id }} \
+          --namespace=${{ inputs.k8s-namespace }} || true
+
+        if [[ "$POD_STATUS" != "Running" ]] && [[ "$POD_STATUS" != "Succeeded" ]]; then
+          echo "Image pull verification failed. Pod status: $POD_STATUS"
+          exit 1
+        fi
+
+        echo "✓ Cluster can successfully pull image"

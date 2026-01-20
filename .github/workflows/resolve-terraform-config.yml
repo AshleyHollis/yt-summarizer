@@ -1,0 +1,43 @@
+# =============================================================================
+# Reusable Workflow: Resolve Terraform Configuration
+# =============================================================================
+# Resolves Terraform configuration from repo/org Actions Variables
+#
+# This workflow is called by preview.yml and deploy-prod.yml to centralize
+# terraform configuration resolution and eliminate duplication.
+#
+# Configuration Variables (set in repo/org settings):
+#   - TERRAFORM_VERSION: Terraform version (default: '1.5.7')
+#   - TERRAFORM_WORKING_DIR: Terraform directory (default: 'infra/terraform/environments/prod')
+#
+# Benefits:
+#   - Single source of truth for terraform config resolution
+#   - Consistent behavior across all workflows
+#   - Easy to extend with additional config values
+# =============================================================================
+
+name: Resolve Terraform Config
+
+on:
+  workflow_call:
+    outputs:
+      terraform_version:
+        description: "Resolved Terraform version"
+        value: ${{ jobs.resolve.outputs.terraform_version }}
+      terraform_working_dir:
+        description: "Resolved Terraform working directory"
+        value: ${{ jobs.resolve.outputs.terraform_working_dir }}
+
+jobs:
+  resolve:
+    name: Resolve Terraform Config
+    runs-on: ubuntu-latest
+    outputs:
+      terraform_version: ${{ steps.resolve.outputs.terraform_version }}
+      terraform_working_dir: ${{ steps.resolve.outputs.terraform_working_dir }}
+    steps:
+      - name: Resolve Terraform configuration from Actions Variables
+        id: resolve
+        run: |
+          echo "terraform_version=${{ vars.TERRAFORM_VERSION || '1.5.7' }}" >> "$GITHUB_OUTPUT"
+          echo "terraform_working_dir=${{ vars.TERRAFORM_WORKING_DIR || 'infra/terraform/environments/prod' }}" >> "$GITHUB_OUTPUT"

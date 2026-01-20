@@ -155,6 +155,73 @@ jobs:
         working-directory: apps/web
         run: npm run lint
 
+      - name: Check TypeScript types
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
+      - name: Validate required frontend files exist
+        working-directory: apps/web
+        run: |
+          echo "🔍 Checking for critical frontend files..."
+
+          # Check for commonly missing files that cause build failures
+          missing_files=()
+
+          # Check for lib directory files (common gitignore issue)
+          if [ ! -f "src/lib/auth-utils.ts" ]; then
+            missing_files+=("src/lib/auth-utils.ts")
+          fi
+
+          # Check for other critical files
+          critical_files=(
+            "src/lib/logger.ts"
+            "src/services/api.ts"
+            "src/types/index.ts"
+          )
+
+          for file in "${critical_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "⚠️  Warning: $file not found (may be optional)"
+            fi
+          done
+
+          if [ ${#missing_files[@]} -gt 0 ]; then
+            echo "❌ ERROR: Missing critical files:"
+            printf '  - %s\n' "${missing_files[@]}"
+            echo ""
+            echo "This is often caused by .gitignore patterns ignoring source code."
+            echo "Check .gitignore for overly broad patterns like 'lib/' instead of '/lib/'"
+            exit 1
+          fi
+
+          echo "✅ All critical files present"
+
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint-frontend]
+    # Main branch: Always run | PR: Run if frontend changed
+    # Requires lint-frontend to pass (or skip if not needed)
+    if: |
+      (needs.detect-changes.outputs.is_main_branch == 'true' ||
+       contains(needs.detect-changes.outputs.changed_areas, 'apps/web')) &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          working-directory: apps/web
+
+      - name: Build Next.js
+        working-directory: apps/web
+        run: npm run build
+
   # ===========================================================================
   # PHASE 3: SECURITY SCANNING
   # ===========================================================================
@@ -398,13 +465,14 @@ jobs:
   test-frontend:
     name: Test Frontend
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-frontend, scan-javascript-security]
+    needs: [detect-changes, lint-frontend, build-frontend, scan-javascript-security]
     # Main branch: Always run | PR: Run if frontend changed
-    # Requires lint and security scans to pass
+    # Requires lint, build, and security scans to pass
     if: |
       (needs.detect-changes.outputs.is_main_branch == 'true' ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web')) &&
       (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
+      (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') &&
       (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped')
     steps:
       - name: Checkout code
@@ -514,7 +582,7 @@ jobs:
   build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, lint-frontend, scan-python-security, scan-javascript-security, test-shared, test-api, test-workers, test-frontend]
+    needs: [detect-changes, lint-python, lint-frontend, build-frontend, scan-python-security, scan-javascript-security, test-shared, test-api, test-workers, test-frontend]
     # IMAGE BUILDING CONDITIONS:
     # - ACR must be configured (vars.ACR_NAME != '')
     # - Main branch: Always build images after tests pass
@@ -532,6 +600,7 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
+      (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') &&
       (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped') &&
       (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped') &&
       (needs.test-shared.result == 'success' || needs.test-shared.result == 'skipped') &&
@@ -779,6 +848,12 @@ jobs:
       - name: Run pre-commit on workflow files
         run: scripts/workflows/ci-run-precommit-workflows.sh
 
+      - name: Validate workflows (env vars & composite actions)
+        uses: ./.github/actions/validate
+        with:
+          validators: workflow-env-consistency,workflow-composite-actions
+          verbose: 'false'
+
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK
   # ===========================================================================
@@ -799,6 +874,7 @@ jobs:
       - detect-changes
       - lint-python
       - lint-frontend
+      - build-frontend
       - scan-python-security
       - scan-javascript-security
       - test-shared

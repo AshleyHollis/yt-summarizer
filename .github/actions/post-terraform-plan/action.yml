@@ -10,6 +10,10 @@ inputs:
   plan-outcome:
     description: 'Plan outcome (success/failure)'
     required: true
+  plan-output:
+    description: 'Raw terraform plan output (for error display)'
+    required: false
+    default: ''
   skip-pr-comment:
     description: 'Skip posting to PR comment (true/false)'
     required: false
@@ -21,15 +25,71 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Save plan data to files
-      id: save-data
+    - name: Check for pre-written plan data files
+      id: check-files
       shell: bash
       env:
-        PLAN_SUMMARY: ${{ inputs.plan-summary }}
-        FORMATTED_PLAN: ${{ inputs.formatted-plan }}
         PLAN_OUTCOME: ${{ inputs.plan-outcome }}
-      working-directory: ${{ github.action_path }}
-      run: ${{ github.action_path }}/save-plan-data.sh
+      run: |
+        # Check if plan data was pre-written by terraform-plan action
+        if [ -n "$TERRAFORM_PLAN_DATA_DIR" ] && [ -d "$TERRAFORM_PLAN_DATA_DIR" ]; then
+          echo "✅ Using pre-written plan data from: $TERRAFORM_PLAN_DATA_DIR"
+          echo "use_prewritten=true" >> $GITHUB_OUTPUT
+          echo "data_dir=$TERRAFORM_PLAN_DATA_DIR" >> $GITHUB_OUTPUT
+
+          # Copy to action directory for subsequent steps
+          cp "$TERRAFORM_PLAN_DATA_DIR/plan-summary.json" "${{ github.action_path }}/plan-summary.json"
+          cp "$TERRAFORM_PLAN_DATA_DIR/formatted-plan.json" "${{ github.action_path }}/formatted-plan.json"
+
+          # Write plan outcome to file (not written by terraform-plan action)
+          echo "$PLAN_OUTCOME" > "${{ github.action_path }}/plan-outcome.txt"
+
+          echo "✅ Copied plan data files to action directory"
+          ls -lh "${{ github.action_path }}"/*.json "${{ github.action_path }}"/*.txt 2>/dev/null || true
+        else
+          echo "⚠️  No pre-written plan data found, will write from inputs"
+          echo "use_prewritten=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Save plan data to files
+      id: save-data
+      if: steps.check-files.outputs.use_prewritten != 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          // Get inputs
+          const planSummary = `${{ inputs.plan-summary }}`;
+          const formattedPlan = `${{ inputs.formatted-plan }}`;
+          const planOutcome = `${{ inputs.plan-outcome }}`;
+          const planOutput = `${{ inputs.plan-output }}`;
+
+          // Define file paths
+          const actionPath = '${{ github.action_path }}';
+          const summaryPath = path.join(actionPath, 'plan-summary.json');
+          const planPath = path.join(actionPath, 'formatted-plan.json');
+          const outcomePath = path.join(actionPath, 'plan-outcome.txt');
+          const outputPath = path.join(actionPath, 'plan-output.txt');
+
+          // Write files
+          fs.writeFileSync(summaryPath, planSummary);
+          fs.writeFileSync(planPath, formattedPlan);
+          fs.writeFileSync(outcomePath, planOutcome);
+          fs.writeFileSync(outputPath, planOutput || '');
+
+          // Log file sizes
+          const summarySize = fs.statSync(summaryPath).size;
+          const planSize = fs.statSync(planPath).size;
+          const outcomeSize = fs.statSync(outcomePath).size;
+          const outputSize = fs.statSync(outputPath).size;
+
+          core.info(`✅ Plan data files created`);
+          core.info(`  - plan-summary.json: ${summarySize} bytes`);
+          core.info(`  - formatted-plan.json: ${planSize} bytes`);
+          core.info(`  - plan-outcome.txt: ${outcomeSize} bytes`);
+          core.info(`  - plan-output.txt: ${outputSize} bytes`);
 
     - name: Generate PR Comment
       id: generate-comment
@@ -39,6 +99,7 @@ runs:
         PLAN_SUMMARY_PATH: ${{ github.action_path }}/plan-summary.json
         FORMATTED_PLAN_PATH: ${{ github.action_path }}/formatted-plan.json
         PLAN_OUTCOME_PATH: ${{ github.action_path }}/plan-outcome.txt
+        PLAN_OUTPUT_PATH: ${{ github.action_path }}/plan-output.txt
         PLAN_OUTCOME: ${{ inputs.plan-outcome }}
       working-directory: ${{ github.action_path }}
       run: ${{ github.action_path }}/generate-pr-comment.sh
@@ -111,6 +172,7 @@ runs:
         PLAN_SUMMARY_PATH: ${{ github.action_path }}/plan-summary.json
         FORMATTED_PLAN_PATH: ${{ github.action_path }}/formatted-plan.json
         PLAN_OUTCOME_PATH: ${{ github.action_path }}/plan-outcome.txt
+        PLAN_OUTPUT_PATH: ${{ github.action_path }}/plan-output.txt
         PLAN_OUTCOME: ${{ inputs.plan-outcome }}
       working-directory: ${{ github.action_path }}
       run: ${{ github.action_path }}/generate-pipeline-summary.sh

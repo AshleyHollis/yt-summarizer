@@ -65,73 +65,93 @@ on:
   workflow_dispatch:
     inputs:
       run_terraform:
-        description: 'Run terraform plan/apply'
+        description: "Run terraform plan/apply"
         required: false
         type: boolean
         default: true
       run_deploy:
-        description: 'Build and deploy backend'
+        description: "Build and deploy backend"
         required: false
         type: boolean
         default: true
       run_frontend:
-        description: 'Deploy frontend'
+        description: "Deploy frontend"
         required: false
         type: boolean
         default: true
       run_health_check:
-        description: 'Run post-deploy health checks'
+        description: "Run post-deploy health checks"
         required: false
         type: boolean
         default: true
-
 
 concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
 env:
+  # =============================================================================
+  # SHARED CONFIGURATION (must match preview.yml)
+  # =============================================================================
+  # The following env vars are duplicated between preview.yml and deploy-prod.yml
+  # and MUST have identical values to prevent drift.
+  #
+  # Validation: scripts/ci/validate-workflow-env-consistency.sh
+  # CI Check: Runs automatically in CI workflow
+  #
+  # When updating these values:
+  #   1. Update BOTH preview.yml and deploy-prod.yml
+  #   2. Run: ./scripts/ci/validate-workflow-env-consistency.sh
+  #   3. Commit both files together
+  #
+  # Shared vars: ACR_NAME, ACR_LOGIN_SERVER, APP_NAME, API_IMAGE_NAME,
+  #              WORKERS_IMAGE_NAME, NAMESPACE_ARGOCD, WORKER_DEPLOYMENTS,
+  #              HEALTH_CHECK_*, ARGOCD_*, TERRAFORM_*, KUSTOMIZE_VERSION,
+  #              NODE_VERSION
+  # =============================================================================
+
   # Container Registry
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
 
   # Application Names
-  APP_NAME: 'yt-summarizer'
-  API_IMAGE_NAME: 'yt-summarizer-api'
-  WORKERS_IMAGE_NAME: 'yt-summarizer-workers'
-  ARGOCD_APP_NAME_PROD: 'yt-summarizer-prod'
+  APP_NAME: "yt-summarizer"
+  API_IMAGE_NAME: "yt-summarizer-api"
+  WORKERS_IMAGE_NAME: "yt-summarizer-workers"
+  ARGOCD_APP_NAME_PROD: "yt-summarizer-prod"
 
   # Namespaces
-  NAMESPACE_PROD: 'yt-summarizer'
-  NAMESPACE_ARGOCD: 'argocd'
+  NAMESPACE_PROD: "yt-summarizer"
+  NAMESPACE_ARGOCD: "argocd"
 
   # Worker List
-  WORKER_DEPLOYMENTS: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
+  WORKER_DEPLOYMENTS: "transcribe-worker,summarize-worker,embed-worker,relationships-worker"
 
   # URLs
+  PRODUCTION_HOST: "api.yt-summarizer.apps.ashleyhollis.com"
   PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
-  HEALTH_CHECK_PATH: '/health/ready'
+  HEALTH_CHECK_PATH: "/health/ready"
 
   # Timeouts (seconds)
-  ARGOCD_SYNC_TIMEOUT: '360'
-  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'
-  HEALTH_CHECK_MAX_ATTEMPTS: '10'
-  HEALTH_CHECK_INTERVAL: '15'
-  HEALTH_CHECK_TIMEOUT: '30'
+  ARGOCD_SYNC_TIMEOUT: "360"
+  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: "300"
+  HEALTH_CHECK_MAX_ATTEMPTS: "10"
+  HEALTH_CHECK_INTERVAL: "15"
+  HEALTH_CHECK_TIMEOUT: "30"
 
   # Paths
-  KUSTOMIZE_OVERLAY_PROD: 'k8s/overlays/prod'
-  ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
+  KUSTOMIZE_OVERLAY_PROD: "k8s/overlays/prod"
+  ARGOCD_MANIFESTS_PATH: "k8s/argocd"
+  TERRAFORM_WORKING_DIR: "infra/terraform/environments/prod"
 
   # Tool Versions
-  TERRAFORM_VERSION: '1.5.7'
-  KUSTOMIZE_VERSION: '5.8.0'
-  NODE_VERSION: '20'
+  TERRAFORM_VERSION: "1.5.7"
+  KUSTOMIZE_VERSION: "5.8.0"
+  NODE_VERSION: "20"
 
 permissions:
   id-token: write
   contents: write
-
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -176,194 +196,44 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ github.sha }}
-          timeout-seconds: '1800'
+          timeout-seconds: "1800"
+
+  # ---------------------------------------------------------------------------
+  # Resolve Terraform Configuration
+  # ---------------------------------------------------------------------------
+  # Calls reusable workflow to resolve Terraform configuration from Actions Variables
+  # See .github/workflows/resolve-terraform-config.yml for details
+  tf-config:
+    uses: ./.github/workflows/resolve-terraform-config.yml
 
   # ---------------------------------------------------------------------------
   # Plan and apply infrastructure changes (auto-apply)
   # ---------------------------------------------------------------------------
-  terraform-plan:
-    name: Terraform Plan
-    runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci]
+  terraform:
+    name: Terraform
+    needs: [detect-changes, wait-for-ci, tf-config]
     if: |
       needs.wait-for-ci.result == 'success' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_terraform != false) ||
        (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
-    outputs:
-      plan_summary: ${{ steps.plan.outputs.plan_summary }}
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      # =======================================================================
-      # Auth0 Terraform Service Account Credentials
-      # =======================================================================
-      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
-      # M2M application that allows Terraform to manage Auth0 resources.
-      #
-      # IMPORTANT: These are NOT the credentials for the user-facing application.
-      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
-      # application for end-user authentication. Those BFF credentials will be
-      # different and must be stored in Azure Key Vault after Terraform completes.
-      #
-      # Service Account Details:
-      #   - Application: "Terraform Service Account" (M2M)
-      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
-      #   - Purpose: Manage Auth0 resources via Terraform
-      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
-      #
-      # What Terraform Creates:
-      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
-      #   - Auth0 API: "yt-summarizer-api" (resource server)
-      #
-      # Documentation: docs/auth0-terraform-service-account.md
-      # =======================================================================
+    uses: ./.github/workflows/terraform-reusable.yml
+    with:
+      terraform-working-dir: ${{ needs.tf-config.outputs.terraform_working_dir }}
+      terraform-version: ${{ needs.tf-config.outputs.terraform_version }}
+      run-plan: true
+      run-apply: true
+      environment-name: "production"
+      post-plan-to-pr: false
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
       AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
       AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_OIDC: true
-    defaults:
-      run:
-        working-directory: infra/terraform/environments/prod
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify Azure credentials are configured
-        uses: ./.github/actions/verify-azure-credentials
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
-        with:
-          validators: terraform-config
-          terraform-directory: infra/terraform/environments/prod
-          fail-fast: 'true'
-          timeout-seconds: '60'
-
-      - name: Terraform Plan
-        id: plan
-        uses: ./.github/actions/terraform-plan
-        with:
-          working-directory: 'infra/terraform/environments/prod'
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Upload Terraform plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: |
-            infra/terraform/environments/prod/tfplan
-            infra/terraform/environments/prod/plan_output.txt
-            infra/terraform/environments/prod/plan.json
-
-  terraform-apply:
-    name: Terraform Apply
-    runs-on: ubuntu-latest
-    needs: terraform-plan
-    if: |
-      needs.terraform-plan.result == 'success' &&
-      fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true
-    environment:
-      name: production
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      # =======================================================================
-      # Auth0 Terraform Service Account Credentials
-      # =======================================================================
-      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
-      # M2M application that allows Terraform to manage Auth0 resources.
-      #
-      # IMPORTANT: These are NOT the credentials for the user-facing application.
-      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
-      # application for end-user authentication. Those BFF credentials will be
-      # different and must be stored in Azure Key Vault after Terraform completes.
-      #
-      # Service Account Details:
-      #   - Application: "Terraform Service Account" (M2M)
-      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
-      #   - Purpose: Manage Auth0 resources via Terraform
-      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
-      #
-      # What Terraform Creates:
-      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
-      #   - Auth0 API: "yt-summarizer-api" (resource server)
-      #
-      # Documentation: docs/auth0-terraform-service-account.md
-      # =======================================================================
-      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_OIDC: true
-    defaults:
-      run:
-        working-directory: infra/terraform/environments/prod
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify Azure credentials are configured
-        uses: ./.github/actions/verify-azure-credentials
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Download Terraform plan artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-plan
-          path: infra/terraform/environments/prod
-
-      - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
-        with:
-          validators: terraform-config
-          terraform-directory: infra/terraform/environments/prod
-          fail-fast: 'true'
-          timeout-seconds: '60'
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
-
+      SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
   # ---------------------------------------------------------------------------
   # Sync Argo CD Manifests
@@ -374,31 +244,27 @@ jobs:
   #   - prod-app.yaml updates automatically apply production app config
   #   - preview-appset.yaml updates automatically apply preview ApplicationSet
   #
-  # Runs after terraform-apply (infrastructure may create resources Argo CD needs)
+  # Runs after terraform (infrastructure may create resources Argo CD needs)
   # Runs before update-overlay (applications need to exist before we try to sync them)
   # ---------------------------------------------------------------------------
   sync-argocd-manifests:
     name: Sync Argo CD Manifests
     runs-on: ubuntu-latest
-    needs: [detect-changes, terraform-apply]
+    needs: [detect-changes, terraform]
     if: |
       !cancelled() &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Setup AKS
+        uses: ./.github/actions/setup-aks
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Set AKS Context
-        uses: azure/aks-set-context@v4
-        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
@@ -407,8 +273,7 @@ jobs:
         with:
           mode: all
           namespace: ${{ env.NAMESPACE_ARGOCD }}
-          verbose: 'true'
-
+          verbose: "true"
 
   # ---------------------------------------------------------------------------
   # Get CI Image Tag (Code Changes)
@@ -422,11 +287,11 @@ jobs:
   get-ci-image-tag:
     name: Get CI Image Tag
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests]
+    needs: [detect-changes, wait-for-ci, terraform, sync-argocd-manifests]
     if: |
       !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       (
         (github.event_name == 'workflow_dispatch' && inputs.run_deploy != false) ||
@@ -449,20 +314,16 @@ jobs:
         shell: bash
         run: scripts/workflows/prod-extract-ci-image-tag.sh
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Setup Azure and validate ACR image
+        uses: ./.github/actions/setup-azure-acr
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate CI image exists in ACR
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.extract.outputs.image_tag }}
-          fail-if-missing: 'true'
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ steps.extract.outputs.image_tag }}
+          fail-if-missing: "true"
 
   # ---------------------------------------------------------------------------
   # Get Last Production Image (for K8s-only or infra-only changes)
@@ -477,10 +338,10 @@ jobs:
   get-last-prod-image:
     name: Get Last Production Image
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests]
+    needs: [detect-changes, wait-for-ci, terraform, sync-argocd-manifests]
     if: |
       needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       (
         (github.event_name == 'workflow_dispatch' && inputs.run_deploy == false) ||
@@ -508,20 +369,16 @@ jobs:
         shell: bash
         run: scripts/workflows/prod-find-last-image.sh
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Setup Azure and validate ACR image
+        uses: ./.github/actions/setup-azure-acr
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate image exists in ACR
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.find-tag.outputs.image_tag }}
-          fail-if-missing: 'true'
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ steps.find-tag.outputs.image_tag }}
+          fail-if-missing: "true"
 
   # ---------------------------------------------------------------------------
   # Update Production Overlay
@@ -529,11 +386,19 @@ jobs:
   update-overlay:
     name: Update Production Overlay
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests, get-ci-image-tag, get-last-prod-image]
+    needs:
+      [
+        detect-changes,
+        wait-for-ci,
+        terraform,
+        sync-argocd-manifests,
+        get-ci-image-tag,
+        get-last-prod-image,
+      ]
     if: |
       always() && !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       (
         needs.get-ci-image-tag.result == 'success' ||
@@ -555,19 +420,19 @@ jobs:
       - name: Setup Python with dependencies
         uses: ./.github/actions/setup-kustomize
         with:
-          install-python: 'true'
+          install-python: "true"
 
-       # NOTE: CI has already validated prod overlay before this branch was created.
-       # This baseline check is kept as a safety net in case kustomization.yaml was
-       # modified after merge, though merge commits cannot modify files without
-       # triggering a new CI validation. Kept for defensive robustness.
+        # NOTE: CI has already validated prod overlay before this branch was created.
+        # This baseline check is kept as a safety net in case kustomization.yaml was
+        # modified after merge, though merge commits cannot modify files without
+        # triggering a new CI validation. Kept for defensive robustness.
       - name: Validate current production overlay (baseline)
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
           overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Determine image tag
         id: determine-tag
@@ -584,37 +449,31 @@ jobs:
         with:
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
 
-       # This validation is critical - it runs AFTER update-prod-kustomization
-       # inserts image tags. Ensures the modified manifest is still valid.
-       # This is where we catch errors introduced by the kustomization update action.
+        # This validation is critical - it runs AFTER update-prod-kustomization
+        # inserts image tags. Ensures the modified manifest is still valid.
+        # This is where we catch errors introduced by the kustomization update action.
       - name: Validate updated production overlay
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
           overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
+      - name: Setup Azure, AKS and validate image
+        uses: ./.github/actions/setup-azure-acr
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Set AKS context
-        uses: azure/aks-set-context@v4
-        with:
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Verify cluster can pull image
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.determine-tag.outputs.image_tag }}
-          run-k8s-pull-test: 'true'
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-registry: ${{ env.ACR_NAME }}
+          acr-repository: ${{ env.API_IMAGE_NAME }}
+          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
+          setup-aks: "true"
+          aks-resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          aks-cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+          verify-k8s-pull: "true"
+          k8s-namespace: ${{ env.NAMESPACE_PROD }}
 
       - name: Validate image tag format
         if: needs.get-ci-image-tag.result == 'success'
@@ -626,7 +485,7 @@ jobs:
       - name: Commit and push changes
         uses: ./.github/actions/commit-kustomization
         with:
-          file-path: '${{ env.KUSTOMIZE_OVERLAY_PROD }}/kustomization.yaml'
+          file-path: "${{ env.KUSTOMIZE_OVERLAY_PROD }}/kustomization.yaml"
           commit-message: |
             chore(prod): deploy ${{ steps.determine-tag.outputs.image_tag }} to production
 
@@ -637,8 +496,7 @@ jobs:
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             [skip ci]
-          git-branch: 'main'
-
+          git-branch: "main"
 
   # ---------------------------------------------------------------------------
   # Verify Deployment
@@ -661,22 +519,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Setup deployment environment
+        uses: ./.github/actions/setup-deployment-env
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Set AKS Context
-        uses: azure/aks-set-context@v4
-        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Setup Kustomize
-        uses: ./.github/actions/setup-kustomize
-        with:
           kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
       - name: Cleanup stuck Argo CD operations
@@ -695,22 +545,22 @@ jobs:
           argocd-app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
           target-namespace: ${{ env.NAMESPACE_PROD }}
-          timeout-seconds: '60'
+          timeout-seconds: "60"
 
       - name: Validate Argo CD readiness (fail-fast)
         uses: ./.github/actions/check-argocd-readiness
         with:
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout: '60'
-          verbose: 'true'
+          timeout: "60"
+          verbose: "true"
         continue-on-error: false
       - name: Wait for Argo CD to sync
         uses: ./.github/actions/wait-for-argocd
         with:
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           namespace: ${{ env.NAMESPACE_PROD }}
-          pr-number: '0'
+          pr-number: "0"
           timeout-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
 
       - name: Determine expected image tag
@@ -729,7 +579,7 @@ jobs:
           namespace: ${{ env.NAMESPACE_PROD }}
           deployment-name: api
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
           image-name: ${{ env.API_IMAGE_NAME }}
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
 
@@ -738,10 +588,10 @@ jobs:
         with:
           namespace: ${{ env.NAMESPACE_PROD }}
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
           image-name: ${{ env.WORKERS_IMAGE_NAME }}
           workers: ${{ env.WORKER_DEPLOYMENTS }}
-          fail-on-mismatch: 'true'
+          fail-on-mismatch: "true"
 
       - name: Collect deployment diagnostics on failure
         if: failure()
@@ -752,24 +602,24 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-           name: deployment-diagnostics-prod
-           path: diagnostics/
-           retention-days: 7
+          name: deployment-diagnostics-prod
+          path: diagnostics/
+          retention-days: 7
 
       - name: Verify TLS certificate
         uses: ./.github/actions/verify-certificate
         with:
-          host: api.yt-summarizer.apps.ashleyhollis.com
+          host: ${{ env.PRODUCTION_HOST }}
 
       - name: Run external API health check
         uses: ./.github/actions/health-check
         with:
           url: ${{ env.PRODUCTION_URL }}${{ env.HEALTH_CHECK_PATH }}
-          max-attempts: '20'
-          interval-seconds: '10'
-          timeout-seconds: '5'
-          expected-status: '200'
-          service-name: 'Production API (External)'
+          max-attempts: "20"
+          interval-seconds: "10"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Production API (External)"
 
       - name: Run API health checks
         uses: ./.github/actions/health-check
@@ -778,34 +628,21 @@ jobs:
           max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
           interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
           timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
-          expected-status: '200'
-          service-name: 'Production API'
+          expected-status: "200"
+          service-name: "Production API"
 
   # ---------------------------------------------------------------------------
   # Deploy Frontend to SWA
   # ---------------------------------------------------------------------------
-  # DECOUPLED FROM BACKEND: Frontend deployment is independent of backend jobs.
-  # Frontend can deploy whenever:
-  #   - apps/web code changes (auto)
-  #   - Workflow dispatch with run_frontend=true (manual)
-  #   - Workflow/CI files change (for env var updates)
-  #
-  # This allows frontend-only deployments without requiring backend image validation.
-  # ---------------------------------------------------------------------------
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci]
+    needs: [update-overlay, verify-deployment]
     if: |
       !cancelled() &&
-      needs.wait-for-ci.result == 'success' &&
-      (
-        (github.event_name == 'workflow_dispatch' && inputs.run_frontend != false) ||
-        (github.event_name != 'workflow_dispatch' && (
-          contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'ci')
-        ))
-      )
+      needs.update-overlay.result == 'success' &&
+      needs.verify-deployment.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_frontend != false)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -829,12 +666,16 @@ jobs:
         env:
           # Configure proxy to talk to actual backend
           API_BASE_URL: ${{ vars.PRODUCTION_API_URL }}
+          # IMPORTANT: Auth0 variables are server-side only (set in Azure Portal)
+          # Do NOT pass AUTH0_* vars here - they must be configured in SWA environment settings
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_PRODUCTION_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: apps/web
-          output_location: .next
+          # For Next.js hybrid rendering: output_location MUST be empty string
+          # SWA handles the .next folder internally for server-side rendering
+          output_location: ""
           skip_app_build: true
           production_branch: main
 
@@ -844,7 +685,18 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [get-ci-image-tag, get-last-prod-image, sync-argocd-manifests, update-overlay, verify-deployment, deploy-frontend, detect-changes, wait-for-ci, terraform-plan, terraform-apply]
+    needs:
+      [
+        get-ci-image-tag,
+        get-last-prod-image,
+        sync-argocd-manifests,
+        update-overlay,
+        verify-deployment,
+        deploy-frontend,
+        detect-changes,
+        wait-for-ci,
+        terraform,
+      ]
     if: always()
     steps:
       - name: Checkout code
@@ -857,8 +709,7 @@ jobs:
             echo ""
             echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
-            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
-            echo "- Terraform apply: ${{ needs.terraform-apply.result }} (reason: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true && 'plan has changes' || 'no changes' }})"
+            echo "- Terraform: ${{ needs.terraform.result }} (changes: ${{ needs.terraform.result == 'success' && needs.terraform.outputs.has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
             echo "- Argo CD manifests sync: ${{ needs.sync-argocd-manifests.result }} (reason: ${{ contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd') && 'argocd manifest changes' || 'no changes' }})"
             echo "- Backend deploy tag: ${{ needs.get-ci-image-tag.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"

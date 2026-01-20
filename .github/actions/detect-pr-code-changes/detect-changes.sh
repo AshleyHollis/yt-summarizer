@@ -150,9 +150,17 @@ echo "$FILES"
 # - All image build triggers above
 # - k8s/** (Kubernetes manifests - change deployment config)
 #
-# This allows K8s-only changes to trigger preview deployments using existing images
+# BACKEND DEPLOYMENT TRIGGERS (Kubernetes/Argo CD deployment):
+# - services/api/** (API service)
+# - services/workers/** (background workers)
+# - services/shared/** (shared libraries)
+# - k8s/** (Kubernetes manifests)
+# - **/Dockerfile* for backend services
+#
+# This allows frontend-only changes to skip Kubernetes operations
 HAS_IMAGE_BUILD=false
 HAS_DEPLOYMENT=false
+HAS_BACKEND_DEPLOYMENT=false
 echo "🔍 Analyzing files for build/deployment triggers..."
 while IFS= read -r file; do
   if [[ -n "$file" ]]; then
@@ -160,20 +168,36 @@ while IFS= read -r file; do
     # Skip docs, specs, and markdown files
     if [[ "$file" =~ ^docs/ ]] || [[ "$file" =~ ^specs/ ]] || [[ "$file" =~ \.md$ ]]; then
       echo "     [skip] docs/specs/markdown"
-    # Check if file triggers image building
+    # Check for backend services (triggers backend deployment)
     elif [[ "$file" =~ ^services/api/ ]] || \
       [[ "$file" =~ ^services/workers/ ]] || \
-      [[ "$file" =~ ^services/shared/ ]] || \
-      [[ "$file" =~ ^apps/web/ ]] || \
-      [[ "$file" =~ /Dockerfile ]] || \
-      [[ "$file" =~ ^docker-compose.*\.yml$ ]] || \
-      [[ "$file" == .dockerignore ]]; then
-      echo "     [BUILD] triggers image build"
+      [[ "$file" =~ ^services/shared/ ]]; then
+      echo "     [BACKEND] triggers backend deployment + image build"
       HAS_IMAGE_BUILD=true
       HAS_DEPLOYMENT=true
-    # Check if file triggers deployment (but not image build)
+      HAS_BACKEND_DEPLOYMENT=true
+    # Check for Kubernetes manifests (triggers backend deployment)
     elif [[ "$file" =~ ^k8s/ ]]; then
-      echo "     [DEPLOY] triggers deployment (K8s config)"
+      echo "     [BACKEND] triggers backend deployment (K8s config)"
+      HAS_DEPLOYMENT=true
+      HAS_BACKEND_DEPLOYMENT=true
+    # Check for frontend changes (no backend deployment needed)
+    elif [[ "$file" =~ ^apps/web/ ]]; then
+      echo "     [FRONTEND] triggers image build (frontend only)"
+      HAS_IMAGE_BUILD=true
+      HAS_DEPLOYMENT=true
+    # Check for Docker files
+    elif [[ "$file" =~ /Dockerfile ]] || \
+      [[ "$file" =~ ^docker-compose.*\.yml$ ]] || \
+      [[ "$file" == .dockerignore ]]; then
+      # Determine if it's backend or frontend Dockerfile
+      if [[ "$file" =~ ^services/ ]]; then
+        echo "     [BACKEND] triggers backend deployment + image build (backend Dockerfile)"
+        HAS_BACKEND_DEPLOYMENT=true
+      else
+        echo "     [BUILD] triggers image build (Dockerfile)"
+      fi
+      HAS_IMAGE_BUILD=true
       HAS_DEPLOYMENT=true
     else
       echo "     [skip] does not trigger build or deployment"
@@ -184,7 +208,9 @@ done <<< "$FILES"
 echo "📊 Analysis Results:"
 echo "   needs_image_build=$HAS_IMAGE_BUILD"
 echo "   needs_deployment=$HAS_DEPLOYMENT"
+echo "   needs_backend_deployment=$HAS_BACKEND_DEPLOYMENT"
 
 # Set outputs
 echo "needs_image_build=$HAS_IMAGE_BUILD" >> $GITHUB_OUTPUT
 echo "needs_deployment=$HAS_DEPLOYMENT" >> $GITHUB_OUTPUT
+echo "needs_backend_deployment=$HAS_BACKEND_DEPLOYMENT" >> $GITHUB_OUTPUT

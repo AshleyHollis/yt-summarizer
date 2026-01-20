@@ -5,11 +5,15 @@
 
 ## Critical Rules (Read First)
 1. **Before marking ANY task complete, run** `./scripts/run-tests.ps1`.
-2. **Run pre-commit locally before pushing**: `python -m pre_commit run --all-files --verbose`.
-3. **E2E tests are mandatory** for completion; do not use `-SkipE2E` for final verification.
-4. If Aspire is not running, start it with the wrapper (see below) before E2E tests.
-5. Prefer official Aspire docs: https://aspire.dev and https://learn.microsoft.com/dotnet/aspire.
-6. **ALL secrets and credentials MUST be stored in Azure Key Vault** and managed via Terraform. Never ask the user to manually store secrets unless Terraform cannot support it. This includes:
+2. **Git hooks will automatically run validation**:
+   - **Pre-commit**: Runs lint-staged (ESLint, Prettier) on changed files
+   - **Pre-push**: Runs full validation (TypeScript, lint, tests, build)
+   - To bypass hooks (NOT recommended): `git commit --no-verify` or `git push --no-verify`
+3. **Manual validation**: Run `npm run validate` or `./scripts/validate-local.ps1` anytime
+4. **E2E tests are mandatory** for completion; do not use `-SkipE2E` for final verification.
+5. If Aspire is not running, start it with the wrapper (see below) before E2E tests.
+6. Prefer official Aspire docs: https://aspire.dev and https://learn.microsoft.com/dotnet/aspire.
+7. **ALL secrets and credentials MUST be stored in Azure Key Vault** and managed via Terraform. Never ask the user to manually store secrets unless Terraform cannot support it. This includes:
    - API keys (OpenAI, Cloudflare, etc.)
    - Database passwords
    - Auth0 credentials (both service account and BFF application)
@@ -90,6 +94,62 @@
 - **Python lint**: `cd services/api && uv run ruff check .`
 - **Python format**: `cd services/api && uv run ruff format .`
 - `ruff.toml` defines import sorting (isort) and line length = 100.
+
+## Local Validation & Git Hooks
+
+### Automatic Validation (Git Hooks)
+This repository uses Husky to automatically run validation checks:
+
+**Pre-Commit Hook** (runs on `git commit`):
+- ESLint with auto-fix on changed `.ts/.tsx` files
+- Prettier formatting on changed files
+- Fast and scoped to staged changes only
+
+**Pre-Push Hook** (runs on `git push`):
+- Full TypeScript compilation check (`tsc --noEmit`)
+- ESLint validation (all files)
+- Prettier format check (all files)
+- Frontend tests (`npm run test:run`)
+- Production build validation (`npm run build`)
+
+**Bypassing Hooks** (NOT recommended):
+```bash
+git commit --no-verify   # Skip pre-commit
+git push --no-verify     # Skip pre-push
+```
+
+### Manual Validation
+Run validation checks anytime before committing:
+
+```bash
+# Full validation (mirrors pre-push hook)
+npm run validate
+
+# Or directly:
+./scripts/validate-local.ps1
+
+# Fast validation (skip tests and build)
+./scripts/validate-local.ps1 -SkipTests -SkipBuild
+
+# Just tests
+./scripts/validate-local.ps1 -SkipBuild
+
+# Just build
+./scripts/validate-local.ps1 -SkipTests
+```
+
+### Why This Matters
+- **Saves time**: Catch issues locally before CI fails (5-10 min per failed CI run)
+- **Fast feedback**: Pre-commit runs in seconds, pre-push in 1-2 minutes
+- **Prevents broken builds**: TypeScript errors caught before push
+- **Team efficiency**: Fewer "fix CI" commits polluting history
+
+### First-Time Setup
+If hooks aren't working after cloning:
+```bash
+npm install          # Installs Husky and sets up hooks
+```
+
 
 ## Code Style Guidelines
 ### General

@@ -32,6 +32,21 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Initialize Terraform with backend
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        AUTH0_DOMAIN: ${{ env.AUTH0_DOMAIN }}
+        AUTH0_CLIENT_ID: ${{ env.AUTH0_CLIENT_ID }}
+        AUTH0_CLIENT_SECRET: ${{ env.AUTH0_CLIENT_SECRET }}
+        ARM_CLIENT_ID: ${{ env.ARM_CLIENT_ID }}
+        ARM_TENANT_ID: ${{ env.ARM_TENANT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ env.ARM_SUBSCRIPTION_ID }}
+        ARM_USE_OIDC: ${{ env.ARM_USE_OIDC }}
+      run: |
+        # Re-initialize with backend enabled (validation step used -backend=false)
+        terraform init -backend=true -reconfigure
+
     - name: Run terraform plan
       id: plan
       shell: bash
@@ -43,10 +58,15 @@ runs:
         CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
         AUTH0_DOMAIN: ${{ env.AUTH0_DOMAIN }}
       run: ${{ github.action_path }}/run-terraform-plan.sh
-      continue-on-error: true
+      # Do NOT use continue-on-error - we want the step to FAIL when plan fails
+      # Post-plan steps use 'if: always()' to run even on failure
 
     - name: Get JSON plan
       id: format
+      if: always()
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      # Always run to provide output even if plan failed
+      # Returns empty summary with error flag if tfplan doesn't exist
       run: ${{ github.action_path }}/parse-terraform-plan.sh
+      continue-on-error: true

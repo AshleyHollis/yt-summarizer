@@ -11,6 +11,10 @@ provider "azurerm" {
   subscription_id = var.subscription_id
 }
 
+provider "azapi" {
+  subscription_id = var.subscription_id
+}
+
 provider "auth0" {
   # Uses AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET environment variables.
 }

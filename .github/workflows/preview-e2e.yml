@@ -46,9 +46,39 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Retrieve Auth0 test credentials from Key Vault
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            # Retrieve test user credentials from Azure Key Vault
+            # These are created by Terraform in infra/terraform/environments/prod/auth0.tf
+
+            AUTH0_ADMIN_EMAIL=$(az keyvault secret show --vault-name "yt-summarizer-kv" --name "auth0-admin-test-email" --query "value" -o tsv)
+            AUTH0_ADMIN_PASSWORD=$(az keyvault secret show --vault-name "yt-summarizer-kv" --name "auth0-admin-test-password" --query "value" -o tsv)
+            AUTH0_USER_EMAIL=$(az keyvault secret show --vault-name "yt-summarizer-kv" --name "auth0-user-test-email" --query "value" -o tsv)
+            AUTH0_USER_PASSWORD=$(az keyvault secret show --vault-name "yt-summarizer-kv" --name "auth0-user-test-password" --query "value" -o tsv)
+
+            # Export to GitHub Actions environment
+            echo "AUTH0_ADMIN_TEST_EMAIL=$AUTH0_ADMIN_EMAIL" >> $GITHUB_ENV
+            echo "::add-mask::$AUTH0_ADMIN_PASSWORD"
+            echo "AUTH0_ADMIN_TEST_PASSWORD=$AUTH0_ADMIN_PASSWORD" >> $GITHUB_ENV
+            echo "AUTH0_USER_TEST_EMAIL=$AUTH0_USER_EMAIL" >> $GITHUB_ENV
+            echo "::add-mask::$AUTH0_USER_PASSWORD"
+            echo "AUTH0_USER_TEST_PASSWORD=$AUTH0_USER_PASSWORD" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -83,6 +113,17 @@ jobs:
           BASE_URL: ${{ inputs.environment_url }}
           NEXT_PUBLIC_API_URL: ${{ inputs.api_url }}
           API_URL: ${{ inputs.api_url }}
+          # Auth0 configuration (needed for login page and OAuth)
+          AUTH0_SECRET: ${{ secrets.AUTH0_SECRET }}
+          AUTH0_BASE_URL: ${{ inputs.environment_url }}
+          AUTH0_ISSUER_BASE_URL: ${{ secrets.AUTH0_ISSUER_BASE_URL }}
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+          # Test user credentials from Key Vault
+          AUTH0_ADMIN_TEST_EMAIL: ${{ env.AUTH0_ADMIN_TEST_EMAIL }}
+          AUTH0_ADMIN_TEST_PASSWORD: ${{ env.AUTH0_ADMIN_TEST_PASSWORD }}
+          AUTH0_USER_TEST_EMAIL: ${{ env.AUTH0_USER_TEST_EMAIL }}
+          AUTH0_USER_TEST_PASSWORD: ${{ env.AUTH0_USER_TEST_PASSWORD }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
