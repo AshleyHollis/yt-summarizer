@@ -10,6 +10,10 @@
  * - /auth/callback - OAuth callback handler
  * - /auth/profile - Get user profile (built-in SDK route)
  *
+ * IMPORTANT: Only runs on /auth/* routes to avoid warmup timeouts.
+ * Auth0 requires environment variables that are set AFTER deployment,
+ * so we must narrow the matcher to avoid running on warmup health checks.
+ *
  * @see https://github.com/auth0/nextjs-auth0#readme
  */
 
@@ -31,11 +35,14 @@ export async function proxy(request: Request) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
+     * CRITICAL: Only match /auth/* routes to avoid SWA warmup timeout.
+     *
+     * During SWA deployment, Azure performs warmup health checks to "/", "/health", etc.
+     * Auth0 environment variables are only available AFTER deployment completes.
+     * If proxy runs on warmup requests, getAuth0Client() may cause timeouts.
+     *
+     * By narrowing to /auth/*, warmup requests skip this proxy entirely.
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    '/auth/:path*',
   ],
 };
