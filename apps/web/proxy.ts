@@ -14,13 +14,17 @@
  * Auth0 requires environment variables that are set AFTER deployment,
  * so we must narrow the matcher to avoid running on warmup health checks.
  *
+ * CRITICAL: Uses dynamic imports to prevent loading Auth0 SDK at module init time.
+ * This is essential for Azure SWA warmup to succeed.
+ *
  * @see https://github.com/auth0/nextjs-auth0#readme
  */
 
-import { getAuth0Client } from './src/lib/auth0';
-
 export async function proxy(request: Request) {
-  const client = getAuth0Client();
+  // Dynamic import to prevent loading Auth0 SDK at module initialization time
+  // This is critical for Azure SWA warmup to succeed
+  const { getAuth0Client } = await import('./src/lib/auth0');
+  const client = await getAuth0Client();
 
   // If Auth0 is not configured, pass through the request
   if (!client) {

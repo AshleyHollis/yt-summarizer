@@ -93,7 +93,7 @@ export async function proxy(request: Request) {
   // This prevents the SDK from loading during app startup
   try {
     const { getAuth0Client } = await import('./lib/auth0');
-    const auth0Client = getAuth0Client();
+    const auth0Client = await getAuth0Client();
 
     if (!auth0Client) {
       // Auth0 not configured - redirect to error page

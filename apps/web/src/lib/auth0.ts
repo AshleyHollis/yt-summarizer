@@ -8,10 +8,14 @@
  * If Auth0 environment variables are missing or invalid, the app will still start,
  * but authentication features will be disabled.
  *
+ * CRITICAL: We use dynamic imports to avoid loading the Auth0 SDK at module load time.
+ * This prevents SWA warmup timeouts because the SDK is only loaded when actually needed.
+ *
  * @module auth0-client
  */
 
-import { Auth0Client } from '@auth0/nextjs-auth0/server';
+// Type import only - doesn't execute any code at runtime
+import type { Auth0Client } from '@auth0/nextjs-auth0/server';
 
 /**
  * Checks if Auth0 environment variables are properly configured
@@ -46,7 +50,14 @@ let _auth0Client: Auth0Client | null = null;
 let _initializationAttempted = false;
 let _initializationError: Error | null = null;
 
-export function getAuth0Client(): Auth0Client | null {
+/**
+ * Get the Auth0 client instance (async, uses dynamic import)
+ *
+ * CRITICAL: This function is async because it uses dynamic imports to
+ * avoid loading the Auth0 SDK at module initialization time. This is
+ * necessary to prevent Azure SWA warmup timeouts.
+ */
+export async function getAuth0Client(): Promise<Auth0Client | null> {
   // Return cached client if already initialized
   if (_initializationAttempted) {
     return _auth0Client;
@@ -55,7 +66,7 @@ export function getAuth0Client(): Auth0Client | null {
   _initializationAttempted = true;
 
   try {
-    // Check if configuration is present
+    // Check if configuration is present BEFORE loading the SDK
     if (!isAuth0Configured()) {
       const missingVars = [
         'AUTH0_SECRET',
@@ -75,8 +86,12 @@ export function getAuth0Client(): Auth0Client | null {
       return null;
     }
 
+    // Only load the SDK when we know configuration is present
+    // This is the key fix - dynamic import prevents loading at module init time
+    const { Auth0Client: Auth0ClientClass } = await import('@auth0/nextjs-auth0/server');
+
     // Attempt to create client
-    _auth0Client = new Auth0Client();
+    _auth0Client = new Auth0ClientClass();
     console.log('[Auth0] Authentication is ENABLED');
     return _auth0Client;
   } catch (error) {
@@ -93,20 +108,3 @@ export function getAuth0Client(): Auth0Client | null {
 export function getAuth0Error(): Error | null {
   return _initializationError;
 }
-
-/**
- * Legacy export for backward compatibility
- * @deprecated Use getAuth0Client() instead for better error handling
- */
-export const auth0 = new Proxy({} as Auth0Client, {
-  get(_target, prop) {
-    const client = getAuth0Client();
-    if (!client) {
-      throw new Error(
-        `Auth0 is not configured. Missing environment variables. Cannot access property '${String(prop)}'.`
-      );
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (client as any)[prop];
-  },
-});

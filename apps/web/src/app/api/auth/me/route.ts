@@ -18,7 +18,7 @@ import { getAuth0Client } from '@/lib/auth0';
  */
 export async function GET(req: NextRequest) {
   try {
-    const client = getAuth0Client();
+    const client = await getAuth0Client();
 
     // If Auth0 is not configured, return 401 immediately
     if (!client) {
