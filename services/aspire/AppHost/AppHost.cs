@@ -9,6 +9,12 @@ var azureOpenAiApiKey = builder.AddParameter("azure-openai-api-key", secret: tru
 var azureOpenAiDeployment = builder.AddParameter("azure-openai-deployment", secret: false);
 var azureOpenAiEmbeddingDeployment = builder.AddParameter("azure-openai-embedding-deployment", secret: false);
 
+// Auth0 configuration (for BFF authentication)
+var auth0Domain = builder.AddParameter("auth0-domain", secret: false);
+var auth0ClientId = builder.AddParameter("auth0-client-id", secret: false);
+var auth0ClientSecret = builder.AddParameter("auth0-client-secret", secret: true);
+var auth0SessionSecret = builder.AddParameter("auth0-session-secret", secret: true);
+
 // Azure Storage (Azurite for local dev)
 var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator(azurite =>
@@ -41,7 +47,12 @@ var api = builder.AddPythonModule("api", "../../api", "uvicorn")
     .WithEnvironment("AZURE_OPENAI_ENDPOINT", azureOpenAiEndpoint)
     .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
     .WithEnvironment("AZURE_OPENAI_DEPLOYMENT", azureOpenAiDeployment)
-    .WithEnvironment("API_BASE_URL", "http://localhost:8000");
+    .WithEnvironment("API_BASE_URL", "http://localhost:8000")
+    .WithEnvironment("AUTH0_DOMAIN", auth0Domain)
+    .WithEnvironment("AUTH0_CLIENT_ID", auth0ClientId)
+    .WithEnvironment("AUTH0_CLIENT_SECRET", auth0ClientSecret)
+    .WithEnvironment("AUTH0_SESSION_SECRET", auth0SessionSecret)
+    .WithEnvironment("AUTH0_DEFAULT_RETURN_TO", "http://localhost:3000");
 
 // Next.js Frontend
 var web = builder.AddNpmApp("web", "../../../apps/web", "dev")
