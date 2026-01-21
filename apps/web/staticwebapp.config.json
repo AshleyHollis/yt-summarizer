@@ -4,6 +4,10 @@
   },
   "routes": [
     {
+      "route": "/api/*",
+      "rewrite": "https://api.yt-summarizer.apps.ashleyhollis.com/api/{*path}"
+    },
+    {
       "route": "/.swa/*",
       "headers": {
         "Cache-Control": "no-cache"
