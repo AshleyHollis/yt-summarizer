@@ -41,7 +41,7 @@ jobs:
         working-directory: apps/web
         env:
           # Backend API handles authentication
-          NEXT_PUBLIC_API_URL: "https://api-placeholder.example.com"
+          NEXT_PUBLIC_API_URL: "https://api.yt-summarizer.apps.ashleyhollis.com"
           NEXT_PUBLIC_ENVIRONMENT: "preview"
         run: |
           echo "Building Next.js app..."
