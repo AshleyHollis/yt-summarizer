@@ -29,7 +29,7 @@ export function login(returnTo?: string): void {
     params.set('return_to', returnTo);
   }
   
-  const loginUrl = `${API_BASE_URL}/auth/login${params.toString() ? `?${params}` : ''}`;
+  const loginUrl = `${API_BASE_URL}/api/auth/login${params.toString() ? `?${params}` : ''}`;
   window.location.href = loginUrl;
 }
 
@@ -38,7 +38,7 @@ export function login(returnTo?: string): void {
  * Backend will clear session cookie and redirect to Auth0 logout
  */
 export function logout(): void {
-  const logoutUrl = `${API_BASE_URL}/auth/logout`;
+  const logoutUrl = `${API_BASE_URL}/api/auth/logout`;
   window.location.href = logoutUrl;
 }
 
@@ -48,7 +48,7 @@ export function logout(): void {
  */
 export async function getSession(): Promise<Session> {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/session`, {
+    const response = await fetch(`${API_BASE_URL}/api/auth/session`, {
       method: 'GET',
       credentials: 'include', // Send cookies cross-origin
       headers: {
