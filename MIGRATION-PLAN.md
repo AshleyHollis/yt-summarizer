@@ -33,7 +33,7 @@
 - Added 5 placeholder Auth0 environment variables
 - Added `migration/phase-1-env-vars-v2` to push triggers
 
-**Result**: 
+**Result**:
 - Deployment successful (Run #21186299177)
 - Production URL working: https://white-meadow-0b8e2e000.6.azurestaticapps.net
 - ⚠️ Performance degradation: 229s vs 32s baseline (needs investigation)

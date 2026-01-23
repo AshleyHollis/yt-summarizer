@@ -30,9 +30,9 @@ This document specifies the authentication endpoints that the backend API must i
 
 **Response:**
 - **Status:** 302 Found
-- **Headers:** 
+- **Headers:**
   - `Location`: Auth0 authorization URL with appropriate parameters
-  
+
 **Example:**
 ```
 GET /auth/login?return_to=/dashboard

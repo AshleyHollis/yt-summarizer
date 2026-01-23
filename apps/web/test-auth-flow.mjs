@@ -7,7 +7,7 @@ const TEST_PASSWORD = process.env.TEST_PASSWORD || '';
 
 async function testAuthFlow() {
   console.log('🚀 Starting Auth Flow E2E Test\n');
-  
+
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -41,27 +41,27 @@ async function testAuthFlow() {
 
     // Step 5: Fill in credentials
     console.log('5️⃣  Entering credentials...');
-    
+
     // Wait for and fill the username field
     const usernameField = page.locator('input[name="username"]');
     await usernameField.waitFor({ state: 'visible', timeout: 10000 });
     await usernameField.click();
     await usernameField.type(TEST_EMAIL, { delay: 50 });
-    
+
     // Verify the username was entered
     const usernameValue = await usernameField.inputValue();
     console.log(`   Username entered: ${usernameValue}`);
-    
+
     // Wait for and fill the password field
     const passwordField = page.locator('input[name="password"]');
     await passwordField.waitFor({ state: 'visible', timeout: 10000 });
     await passwordField.click();
     await passwordField.type(TEST_PASSWORD, { delay: 50 });
-    
+
     // Verify the password was entered
     const passwordValue = await passwordField.inputValue();
     console.log(`   Password entered: ${passwordValue.length} characters`);
-    
+
     console.log('   ✅ Credentials entered\n');
 
     // Step 6: Submit login form
@@ -71,7 +71,7 @@ async function testAuthFlow() {
 
     // Wait a moment to see if there's an error
     await page.waitForTimeout(2000);
-    
+
     // Check for error messages
     const errorElement = await page.locator('.error, .alert, [class*="error"], [class*="alert"]').first().textContent().catch(() => null);
     if (errorElement) {
@@ -92,7 +92,7 @@ async function testAuthFlow() {
       return await res.json();
     }, API_BASE_URL);
     console.log(`   📊 Session: ${JSON.stringify(authSessionResponse, null, 2)}`);
-    
+
     if (authSessionResponse.isAuthenticated && authSessionResponse.user) {
       console.log(`   ✅ Authenticated as: ${authSessionResponse.user.email || authSessionResponse.user.name}\n`);
     } else {
@@ -118,7 +118,7 @@ async function testAuthFlow() {
       return await res.json();
     }, API_BASE_URL);
     console.log(`   📊 Session: ${JSON.stringify(loggedOutSessionResponse)}`);
-    
+
     if (!loggedOutSessionResponse.isAuthenticated) {
       console.log('   ✅ Session successfully cleared\n');
     } else {
@@ -126,16 +126,16 @@ async function testAuthFlow() {
     }
 
     console.log('✅ All auth flow tests passed!\n');
-    
+
   } catch (error) {
     console.error('\n❌ Test failed:', error.message);
     console.error('\nCurrent URL:', page.url());
-    
+
     // Take screenshot on failure
     const screenshotPath = 'auth-test-failure.png';
     await page.screenshot({ path: screenshotPath, fullPage: true });
     console.error(`Screenshot saved to: ${screenshotPath}`);
-    
+
     throw error;
   } finally {
     await browser.close();
