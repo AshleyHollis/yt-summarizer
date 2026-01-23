@@ -51,7 +51,7 @@
    - **Build Command**: `npm run build`
    - **Output Mode**: Standalone (`.next/standalone`)
    - **Config File**: `apps/web/staticwebapp.config.json` (used by SWA)
-   
+
 5. **Deployment Logs - Success Indicators**
    ```
    Status: InProgress. Time: 0.7788051(s)
@@ -186,7 +186,7 @@ If a change breaks deployment:
    ```bash
    # Checkout working baseline
    git checkout fix/swa-working-baseline
-   
+
    # Force push to fix/swa-working-baseline
    git push origin fix/swa-working-baseline --force
    ```
@@ -195,7 +195,7 @@ If a change breaks deployment:
    ```bash
    # Wait for workflow to complete
    gh run watch --workflow=swa-baseline-deploy.yml
-   
+
    # Check production URL
    curl -I https://white-meadow-0b8e2e000.6.azurestaticapps.net
    ```

@@ -1,6 +1,6 @@
 /**
  * Authentication service for communicating with backend API
- * 
+ *
  * This service handles all authentication-related API calls to the backend.
  * The backend API manages the Auth0 OAuth flow and session cookies.
  */
@@ -28,7 +28,7 @@ export function login(returnTo?: string): void {
   if (returnTo) {
     params.set('return_to', returnTo);
   }
-  
+
   const loginUrl = `${API_BASE_URL}/api/auth/login${params.toString() ? `?${params}` : ''}`;
   window.location.href = loginUrl;
 }
