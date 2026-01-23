@@ -112,12 +112,14 @@ resource "azurerm_mssql_server" "server" {
 }
 
 resource "azurerm_mssql_database" "database" {
-  name                        = var.database_name
-  server_id                   = azurerm_mssql_server.server.id
-  sku_name                    = var.sku_name
-  max_size_gb                 = var.max_size_gb
-  min_capacity                = var.min_capacity
-  auto_pause_delay_in_minutes = var.auto_pause_delay_in_minutes
+  name        = var.database_name
+  server_id   = azurerm_mssql_server.server.id
+  sku_name    = var.sku_name
+  max_size_gb = var.max_size_gb
+
+  # Serverless-specific settings (only for GP_S SKUs)
+  min_capacity                = can(regex("^GP_S_", var.sku_name)) ? var.min_capacity : null
+  auto_pause_delay_in_minutes = can(regex("^GP_S_", var.sku_name)) ? var.auto_pause_delay_in_minutes : null
 
   # Enable zone redundancy for production (not needed for hobby project)
   zone_redundant = false
