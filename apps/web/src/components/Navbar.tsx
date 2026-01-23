@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/common';
+import { AuthButton } from '@/components/auth/AuthButton';
 
 /**
  * Main navigation bar component
@@ -62,8 +63,9 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right section: Theme toggle */}
-          <div className="flex items-center">
+          {/* Right section: Auth and Theme toggle */}
+          <div className="flex items-center gap-4">
+            <AuthButton />
             <ThemeToggle />
           </div>
         </div>

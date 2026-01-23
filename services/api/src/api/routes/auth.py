@@ -170,7 +170,8 @@ def _build_callback_url(request: Request) -> str:
     # Check for X-Forwarded-Proto header to handle reverse proxy HTTPS
     proto = request.headers.get("X-Forwarded-Proto", "http")
     host = request.headers.get("Host", str(request.base_url.netloc))
-    return f"{proto}://{host}/api/auth/callback/auth0"
+    # Use /auth/callback as the primary callback URL
+    return f"{proto}://{host}/api/auth/callback"
 
 
 def _ensure_auth_settings(settings: Any) -> Any:
@@ -272,6 +273,7 @@ async def login(request: Request, returnTo: str | None = None) -> RedirectRespon
     return RedirectResponse(url=authorize_url, status_code=status.HTTP_302_FOUND)
 
 
+@router.get("/callback", status_code=status.HTTP_302_FOUND)
 @router.get("/callback/auth0", status_code=status.HTTP_302_FOUND)
 async def auth0_callback(
     request: Request, code: str | None = None, state: str | None = None
@@ -362,3 +364,43 @@ async def get_current_user(request: Request) -> UserInfo:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     return UserInfo(**session_data.user_info)
+
+
+class SessionResponse(BaseModel):
+    user: dict[str, Any] | None = None
+    isAuthenticated: bool
+
+
+@router.get("/session", response_model=SessionResponse)
+async def get_session(request: Request) -> SessionResponse:
+    """Get current session information.
+
+    Returns user info if authenticated, or isAuthenticated=false if not.
+    This endpoint does NOT return 401 - it always returns 200 with session status.
+    """
+    settings = get_settings()
+
+    # Don't throw error if Auth0 not configured - just return not authenticated
+    try:
+        auth = _ensure_auth_settings(settings)
+    except HTTPException:
+        return SessionResponse(isAuthenticated=False)
+
+    session_id = request.cookies.get(auth.session_cookie_name)
+    if not session_id:
+        return SessionResponse(isAuthenticated=False)
+
+    session_data = await session_store.get_session(session_id)
+    if not session_data:
+        return SessionResponse(isAuthenticated=False)
+
+    # Transform user_info to match frontend expectations
+    user_info = session_data.user_info
+    user = {
+        "id": user_info.get("sub", ""),
+        "email": user_info.get("email", ""),
+        "name": user_info.get("name", ""),
+        "picture": user_info.get("picture"),
+    }
+
+    return SessionResponse(user=user, isAuthenticated=True)

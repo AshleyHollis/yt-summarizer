@@ -124,8 +124,11 @@ variable "auth0_allowed_callback_urls" {
   description = "Allowed Auth0 callback URLs for the BFF"
   type        = list(string)
   default = [
+    "https://api.yt-summarizer.apps.ashleyhollis.com/api/auth/callback",
     "https://api.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+    "https://api-stg.yt-summarizer.apps.ashleyhollis.com/api/auth/callback",
     "https://api-stg.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+    "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
   ]
 }
@@ -166,6 +169,7 @@ variable "auth0_preview_allowed_callback_urls" {
   description = "Allowed Auth0 callback URLs for preview environments"
   type        = list(string)
   default = [
+    "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
   ]
 }
