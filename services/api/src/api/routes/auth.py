@@ -278,12 +278,13 @@ async def login(request: Request, returnTo: str | None = None) -> RedirectRespon
 async def auth0_callback(
     request: Request, code: str | None = None, state: str | None = None
 ) -> RedirectResponse:
+    # Validate required parameters FIRST before checking settings
+    if not code or not state:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code or state")
+
     settings = get_settings()
     auth = _ensure_auth_settings(settings)
     correlation_id = get_correlation_id(request)
-
-    if not code or not state:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code or state")
 
     state_payload = _parse_state(state, auth.session_secret)
     return_to = _sanitize_return_to(state_payload["returnTo"], settings)
@@ -326,15 +327,19 @@ async def auth0_callback(
 @router.post("/logout", response_model=LogoutResponse)
 async def logout(request: Request) -> JSONResponse:
     settings = get_settings()
-    auth = _ensure_auth_settings(settings)
 
-    session_id = request.cookies.get(auth.session_cookie_name)
+    # Check for session cookie first before validating settings
+    session_cookie_name = settings.auth.session_cookie_name
+    session_id = request.cookies.get(session_cookie_name)
     if not session_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     session_data = await session_store.get_session(session_id)
     if not session_data:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    # Now that we know user is authenticated, validate full auth settings
+    auth = _ensure_auth_settings(settings)
 
     await session_store.delete_session(session_id)
     response = JSONResponse({"success": True, "message": "Logged out successfully"})
@@ -353,9 +358,10 @@ async def logout(request: Request) -> JSONResponse:
 @router.get("/me", response_model=UserInfo)
 async def get_current_user(request: Request) -> UserInfo:
     settings = get_settings()
-    auth = _ensure_auth_settings(settings)
 
-    session_id = request.cookies.get(auth.session_cookie_name)
+    # Check for session cookie first before validating settings
+    session_cookie_name = settings.auth.session_cookie_name
+    session_id = request.cookies.get(session_cookie_name)
     if not session_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
