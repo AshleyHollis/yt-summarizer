@@ -733,13 +733,13 @@ Azure SWA standard tier does not execute Next.js middleware/proxy at runtime:
 25. ✅ ~~Create and run E2E Playwright auth test~~
 26. ✅ ~~Verify full auth flow works end-to-end~~
 27. ✅ ~~Update MIGRATION-LOG.md with Phase 6 completion~~
-28. **TODO**: Update `k8s/overlays/prod/kustomization.yaml` with correct API image tag
-29. **TODO**: Commit Phase 6 documentation and test updates
-30. **TODO**: Merge `migration/phase-6-auth-ui` to `main` branch
-31. **TODO**: Create git tag: `migration-phase-6-complete`
-32. **TODO**: Re-enable ArgoCD auto-sync
-33. **TODO**: Run full backend test suite (`./scripts/run-tests.ps1`)
-34. **TODO**: Begin Phase 7: Video Upload & Storage
-35. **TODO**: Begin Phase 8: Search & Retrieval
-36. **TODO**: Begin Phase 9: Frontend Features  
-37. **TODO**: Begin Phase 10: Production Readiness
+28. ✅ ~~Update `k8s/overlays/prod/kustomization.yaml` with correct API image tag~~
+29. ✅ ~~Commit Phase 6 documentation and test updates~~
+30. ✅ ~~Merge `migration/phase-6-auth-ui` to `main` branch~~
+31. ✅ ~~Create git tag: `migration-phase-6-complete`~~
+32. ✅ ~~Re-enable ArgoCD auto-sync~~
+33. ✅ ~~Run full backend test suite~~ (485 passed, 7 failed - 3 auth error codes, 4 blob storage integration)
+34. **TODO**: Fix 3 failing auth tests (error code validation: returning 500 instead of 401/400)
+35. **TODO**: Begin Phase 7: Preview Workflow Integration (per MIGRATION-PLAN.md)
+36. **TODO**: Begin Phase 8: Production Workflow Updates (per MIGRATION-PLAN.md)
+37. **TODO**: Complete migration and celebrate! 🎉
