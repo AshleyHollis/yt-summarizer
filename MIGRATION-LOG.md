@@ -23,7 +23,7 @@ Each entry should include:
 ### Entry 1: Baseline Establishment
 **Date**: 2026-01-21 06:20 UTC  
 **Phase**: Pre-migration  
-**Changes**: 
+**Changes**:
 - Created fresh SWA instance `white-meadow-0b8e2e000.6.azurestaticapps.net`
 - Updated `SWA_DEPLOYMENT_TOKEN` in GitHub Secrets
 - Created branch `fix/swa-working-baseline` from commit `f1f21a4`
@@ -58,7 +58,7 @@ curl -I https://white-meadow-0b8e2e000.6.azurestaticapps.net
 ### Entry 2: Phase 1 v2 - Add Auth0 Placeholder Environment Variables
 **Date**: 2026-01-20 20:38 UTC  
 **Phase**: 1  
-**Changes**: 
+**Changes**:
 - Modified `.github/workflows/swa-baseline-deploy.yml`
   - Added placeholder Auth0 environment variables to build step
   - Added `migration/phase-1-env-vars-v2` to push triggers
@@ -110,7 +110,7 @@ curl -I https://white-meadow-0b8e2e000.6.azurestaticapps.net
 ### Entry 3: Phase 2 - Real Auth0 Secrets from GitHub Secrets
 **Date**: 2026-01-20 20:45 UTC  
 **Phase**: 2  
-**Changes**: 
+**Changes**:
 - Modified `.github/workflows/swa-baseline-deploy.yml`
   - Updated Auth0 environment variables to use real secrets from GitHub Secrets
   - Changed `AUTH0_ISSUER_BASE_URL` from placeholder to `https://${{ secrets.AUTH0_DOMAIN }}`
@@ -178,7 +178,7 @@ curl -I https://white-meadow-0b8e2e000.6.azurestaticapps.net
 ### Entry 5: Phase 4 - Add Auth0 Package Dependency
 **Date**: 2026-01-20  
 **Phase**: 4  
-**Changes**: 
+**Changes**:
 - Added `@auth0/nextjs-auth0@4.14.0` to `apps/web/package.json`
 - Ran `npm install` to update lockfile
 - No code changes, only dependency addition
@@ -204,7 +204,7 @@ curl -I https://white-meadow-0b8e2e000.6.azurestaticapps.net
 ### Entry 6: Phase 5 - Auth0 Middleware Implementation (Multiple Attempts)
 **Date**: 2026-01-20  
 **Phase**: 5  
-**Changes**: 
+**Changes**:
 - Branch: `migration/phase-5-auth0-middleware`
 - Multiple iterations attempting to implement Auth0 Next.js SDK v4
 - Created `proxy.ts` (Next.js 16 Edge middleware pattern)
@@ -276,7 +276,7 @@ Confirmed from Auth0 documentation:
 ### Entry 7: Phase 6 - Architectural Pivot to Backend API Authentication
 **Date**: 2026-01-20  
 **Phase**: 6  
-**Changes**: 
+**Changes**:
 - Branch: `migration/phase-6-auth-ui`
 - **REMOVED** Auth0 frontend integration completely
   - Uninstalled `@auth0/nextjs-auth0` package
@@ -365,7 +365,7 @@ curl -I https://white-meadow-0b8e2e000-migrationphase6a.eastasia.6.azurestaticap
 ### Entry 8: Phase 6 Complete - Backend Auth Integration & E2E Flow Verified
 **Date**: 2026-01-24  
 **Phase**: 6  
-**Changes**: 
+**Changes**:
 - Branch: `migration/phase-6-auth-ui`
 - **BACKEND API IMPLEMENTATION**
   - Implemented all 4 auth endpoints in `services/api/src/api/routes/auth.py`
@@ -516,7 +516,7 @@ cd apps/web && node test-auth-flow.mjs
 1. **ArgoCD Image Tag Drift**: K8s has `sha-bda74d4` but main branch still has old tag
    - Need to merge branch to main or update kustomization.yaml
    - ArgoCD auto-sync temporarily disabled to prevent revert
-   
+
 2. **Test Logout Step**: Logout button not found on production web app
    - Production web may not have auth UI deployed yet
    - This is expected - SWA preview has auth UI, production web is separate instance
@@ -547,7 +547,7 @@ cd apps/web && node test-auth-flow.mjs
 ### Entry {N}: Phase {X} - {Name}
 **Date**: YYYY-MM-DD HH:MM UTC  
 **Phase**: {1-8}  
-**Changes**: 
+**Changes**:
 - File 1 changed
 - File 2 added
 - Environment variable X updated
@@ -574,7 +574,7 @@ curl -I https://...
 - Edge cases discovered
 - Future considerations
 
-**Rollback**: 
+**Rollback**:
 - If rollback was needed, document the commands used
 - Document the state after rollback
 ```
@@ -621,13 +621,13 @@ curl -I https://...
 
 ### Issue 4: Azure Static Web Apps Does Not Execute Next.js Middleware
 **Discovered**: 2026-01-20 (Phase 5)  
-**Symptoms**: 
+**Symptoms**:
 - Build logs show middleware/proxy detection: `ƒ Proxy (Middleware)`
 - Build completes successfully with Edge middleware
 - Runtime requests to middleware routes return 404
 - `/auth/login` and other middleware-handled routes not executed
 
-**Root Cause**: 
+**Root Cause**:
 Azure SWA standard tier does not execute Next.js middleware/proxy at runtime:
 - SWA has its own routing layer that intercepts requests before Next.js middleware
 - Build-time detection does not guarantee runtime execution
@@ -640,19 +640,19 @@ Azure SWA standard tier does not execute Next.js middleware/proxy at runtime:
 - Custom Edge middleware for request interception
 - Rewrites/redirects defined in middleware
 
-**Solution**: 
+**Solution**:
 - Use backend API for authentication instead of frontend middleware
 - Delegate auth flows to K8s/server-side API
 - Frontend receives session cookies from backend
 - Use SWA's built-in routing (staticwebapp.config.json) for simple rewrites
 
-**Prevention**: 
+**Prevention**:
 - Verify platform capabilities before choosing SDK patterns
 - Prefer backend-managed auth for SWA deployments
 - Check Azure SWA feature compatibility documentation
 - Test middleware execution in SWA environment before full implementation
 
-**Impact**: 
+**Impact**:
 - Blocked Auth0 frontend integration (Phase 5 failed)
 - Required architectural pivot to backend API auth (Phase 6)
 - Multiple deployment attempts and investigation (5+ builds)
@@ -733,13 +733,13 @@ Azure SWA standard tier does not execute Next.js middleware/proxy at runtime:
 25. ✅ ~~Create and run E2E Playwright auth test~~
 26. ✅ ~~Verify full auth flow works end-to-end~~
 27. ✅ ~~Update MIGRATION-LOG.md with Phase 6 completion~~
-28. **TODO**: Update `k8s/overlays/prod/kustomization.yaml` with correct API image tag
-29. **TODO**: Commit Phase 6 documentation and test updates
-30. **TODO**: Merge `migration/phase-6-auth-ui` to `main` branch
-31. **TODO**: Create git tag: `migration-phase-6-complete`
-32. **TODO**: Re-enable ArgoCD auto-sync
-33. **TODO**: Run full backend test suite (`./scripts/run-tests.ps1`)
-34. **TODO**: Begin Phase 7: Video Upload & Storage
-35. **TODO**: Begin Phase 8: Search & Retrieval
-36. **TODO**: Begin Phase 9: Frontend Features  
-37. **TODO**: Begin Phase 10: Production Readiness
+28. ✅ ~~Update `k8s/overlays/prod/kustomization.yaml` with correct API image tag~~
+29. ✅ ~~Commit Phase 6 documentation and test updates~~
+30. ✅ ~~Merge `migration/phase-6-auth-ui` to `main` branch~~
+31. ✅ ~~Create git tag: `migration-phase-6-complete`~~
+32. ✅ ~~Re-enable ArgoCD auto-sync~~
+33. ✅ ~~Run full backend test suite~~ (485 passed, 7 failed - 3 auth error codes, 4 blob storage integration)
+34. **TODO**: Fix 3 failing auth tests (error code validation: returning 500 instead of 401/400)
+35. **TODO**: Begin Phase 7: Preview Workflow Integration (per MIGRATION-PLAN.md)
+36. **TODO**: Begin Phase 8: Production Workflow Updates (per MIGRATION-PLAN.md)
+37. **TODO**: Complete migration and celebrate! 🎉
