@@ -5,51 +5,22 @@
 # Updates prod overlay with image digests, Argo CD syncs automatically
 # NO manual approval gates - relies on PR review process
 #
+# SIMPLIFIED STRATEGY:
+# -------------------
+# - Always runs terraform/deploy jobs (predictable behavior)
+# - Uses CI-built images (sha-{commit}) for consistency
+# - Removed detect-changes logic for reliability and debuggability
+#
 # IMAGE BUILD STRATEGY:
-# ---------------------
-# Two-path strategy based on change detection:
-#
-# Path 1: CODE CHANGES (use CI-built images)
-#   - Triggers: services/api, services/workers, services/shared, apps/web, docker
-#   - CI Workflow: Builds images as sha-{commit} (runs in parallel)
-#   - Production: Waits for CI, extracts sha-{commit} tag
-#   - Validates: Image exists in ACR
-#   - Updates: Production kustomization with CI-built SHA tag
-#   - Result: ArgoCD deploys CI-tested code
-#
-# Path 2: K8S/INFRA ONLY (use existing production image)
-#   - Triggers: k8s manifests, infra/terraform (no code changes)
-#   - Reads: Current production kustomization for SHA tag
-#   - Validates: Image exists in ACR
-#   - Updates: Production kustomization (same image, new config)
-#   - Result: ArgoCD deploys config changes only
-#
-# IMAGE TAG FORMAT:
-#   - Production: sha-{7-char-commit-sha} (deterministic, immutable)
-#   - Built by CI: Once per commit (no duplication)
-#   - Never use: Non-deterministic tags in production kustomization
-#
-# RATIONALE:
-#   - Efficient: Images built once in CI, reused by production
-#   - Consistent: Same images that passed all CI tests
-#   - Fast: No duplicate builds (5-10 min saved per deployment)
-#   - Deterministic: Each deployment traceable to git commit
-#   - Safe: Image validation ensures ACR has required tags
-#   - Auditable: Git history = deployment history
-#
-# KEY DIFFERENCE FROM OLD APPROACH:
-#   - OLD: Production built images inline (duplicate of CI builds)
-#   - NEW: Production waits for CI and uses CI-built images
-#   - BENEFIT: 5-10 minutes faster, no ACR storage waste
+#   - CI builds images as sha-{commit} when code is pushed to main
+#   - Production waits for CI and uses those tested images
+#   - Each deployment is traceable to a specific git commit
 #
 # EXTRACTED SCRIPTS:
 #   - scripts/workflows/prod-extract-ci-image-tag.sh: Get image tag from CI workflow
-#   - scripts/workflows/prod-find-last-image.sh: Get last deployed production image
-#   - scripts/workflows/prod-determine-image-tag.sh: Decide which image to use
 #
 # See also: preview.yml for PR-scoped image strategy
 #           ci.yml for image building logic
-#           REFACTORING.md for adding new workflow scripts
 
 name: Deploy to Production
 
@@ -135,33 +106,11 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Detect changes for Terraform gating
-  # ---------------------------------------------------------------------------
-  detect-changes:
-    name: Detect Changes
-    runs-on: ubuntu-latest
-    outputs:
-      changed_areas: ${{ steps.detect.outputs.changed_areas }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect changes
-        id: detect
-        uses: ./.github/actions/detect-pipeline-changes
-        with:
-          base-sha: ${{ github.event.before || 'HEAD~1' }}
-          head-sha: ${{ github.sha }}
-
-  # ---------------------------------------------------------------------------
   # Wait for CI to succeed (auto-apply gate)
   # ---------------------------------------------------------------------------
   wait-for-ci:
     name: Wait for CI
     runs-on: ubuntu-latest
-    needs: detect-changes
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -184,11 +133,11 @@ jobs:
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci]
+    needs: [wait-for-ci]
     if: |
       needs.wait-for-ci.result == 'success' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_terraform != false) ||
-       (github.event_name != 'workflow_dispatch' && contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')))
+       (github.event_name != 'workflow_dispatch'))
     outputs:
       plan_summary: ${{ steps.plan.outputs.plan_summary }}
     permissions:
@@ -380,11 +329,10 @@ jobs:
   sync-argocd-manifests:
     name: Sync Argo CD Manifests
     runs-on: ubuntu-latest
-    needs: [detect-changes, terraform-apply]
+    needs: [terraform-apply]
     if: |
       !cancelled() &&
-      needs.terraform-apply.result != 'failure' &&
-      contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
+      needs.terraform-apply.result != 'failure'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -411,33 +359,22 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
-  # Get CI Image Tag (Code Changes)
+  # Get Image Tag from CI
   # ---------------------------------------------------------------------------
-  # For code changes, CI workflow has already built and pushed images.
-  # This job extracts the image tag from CI artifacts (same as preview workflow).
-  #
-  # CI builds images as sha-{commit} when code is pushed to main.
-  # We use that same image instead of rebuilding.
+  # Always use the CI-built image for this commit (sha-{commit}).
+  # Simpler and more reliable than conditional logic.
   # ---------------------------------------------------------------------------
-  get-ci-image-tag:
-    name: Get CI Image Tag
+  get-image-tag:
+    name: Get Image Tag
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests]
+    needs: [wait-for-ci, terraform-apply, sync-argocd-manifests]
     if: |
       !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
       needs.terraform-apply.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
-      (
-        (github.event_name == 'workflow_dispatch' && inputs.run_deploy != false) ||
-        (github.event_name != 'workflow_dispatch' && (
-          contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'docker')
-        ))
-      )
+      ((github.event_name == 'workflow_dispatch' && inputs.run_deploy != false) ||
+       (github.event_name != 'workflow_dispatch'))
     outputs:
       image_tag: ${{ steps.extract.outputs.image_tag }}
     steps:
@@ -465,80 +402,18 @@ jobs:
           fail-if-missing: 'true'
 
   # ---------------------------------------------------------------------------
-  # Get Last Production Image (for K8s-only or infra-only changes)
-  # ---------------------------------------------------------------------------
-  # When no code changes but K8s/infra changes exist, we need to know which
-  # production image to use. This job reads the current prod kustomization
-  # to get the existing SHA tag.
-  #
-  # This is different from preview which searches PR history - production
-  # uses the CURRENT prod kustomization as the source of truth.
-  # ---------------------------------------------------------------------------
-  get-last-prod-image:
-    name: Get Last Production Image
-    runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests]
-    if: |
-      needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
-      needs.sync-argocd-manifests.result != 'failure' &&
-      (
-        (github.event_name == 'workflow_dispatch' && inputs.run_deploy == false) ||
-        (github.event_name != 'workflow_dispatch' && (
-          contains(needs.detect-changes.outputs.changed_areas, 'k8s') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')
-        ) && !(
-          contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'docker')
-        ))
-      )
-    outputs:
-      image_tag: ${{ steps.find-tag.outputs.image_tag }}
-    steps:
-      - name: Checkout main branch
-        uses: actions/checkout@v4
-        with:
-          ref: main
-
-      - name: Read current production image tag
-        id: find-tag
-        shell: bash
-        run: scripts/workflows/prod-find-last-image.sh
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate image exists in ACR
-        uses: ./.github/actions/validate-acr-image
-        with:
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.find-tag.outputs.image_tag }}
-          fail-if-missing: 'true'
-
-  # ---------------------------------------------------------------------------
   # Update Production Overlay
   # ---------------------------------------------------------------------------
   update-overlay:
     name: Update Production Overlay
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci, terraform-apply, sync-argocd-manifests, get-ci-image-tag, get-last-prod-image]
+    needs: [wait-for-ci, terraform-apply, sync-argocd-manifests, get-image-tag]
     if: |
       always() && !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
       needs.terraform-apply.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
-      (
-        needs.get-ci-image-tag.result == 'success' ||
-        needs.get-last-prod-image.result == 'success'
-      )
+      needs.get-image-tag.result == 'success'
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -569,15 +444,11 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '30'
 
-      - name: Determine image tag
+      - name: Set image tag
         id: determine-tag
         shell: bash
         run: |
-          scripts/workflows/prod-determine-image-tag.sh \
-            "${{ needs.get-ci-image-tag.result }}" \
-            "${{ needs.get-last-prod-image.result }}" \
-            "${{ needs.get-ci-image-tag.outputs.image_tag }}" \
-            "${{ needs.get-last-prod-image.outputs.image_tag }}"
+          echo "image_tag=${{ needs.get-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Update production kustomization
         uses: ./.github/actions/update-prod-kustomization
@@ -617,7 +488,7 @@ jobs:
           run-k8s-pull-test: 'true'
 
       - name: Validate image tag format
-        if: needs.get-ci-image-tag.result == 'success'
+        if: needs.get-image-tag.result == 'success'
         uses: ./.github/actions/validate-image-tag
         with:
           ci-image-tag: ${{ steps.determine-tag.outputs.image_tag }}
@@ -653,7 +524,7 @@ jobs:
   verify-deployment:
     name: Verify Deployment
     runs-on: ubuntu-latest
-    needs: [update-overlay, get-ci-image-tag, get-last-prod-image]
+    needs: [update-overlay, get-image-tag]
     if: |
       !cancelled() &&
       needs.update-overlay.result == 'success'
@@ -713,15 +584,11 @@ jobs:
           pr-number: '0'
           timeout-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
 
-      - name: Determine expected image tag
+      - name: Set expected image tag
         id: expected-tag
         shell: bash
         run: |
-          if [[ -n "${{ needs.get-ci-image-tag.outputs.image_tag }}" ]]; then
-            echo "image_tag=${{ needs.get-ci-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "image_tag=${{ needs.get-last-prod-image.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "image_tag=${{ needs.get-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Verify API deployment image
         uses: ./.github/actions/verify-deployment
@@ -795,17 +662,12 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    needs: [detect-changes, wait-for-ci]
+    needs: [wait-for-ci]
     if: |
       !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
-      (
-        (github.event_name == 'workflow_dispatch' && inputs.run_frontend != false) ||
-        (github.event_name != 'workflow_dispatch' && (
-          contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-          contains(needs.detect-changes.outputs.changed_areas, 'ci')
-        ))
-      )
+      ((github.event_name == 'workflow_dispatch' && inputs.run_frontend != false) ||
+       (github.event_name != 'workflow_dispatch'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -844,7 +706,7 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [get-ci-image-tag, get-last-prod-image, sync-argocd-manifests, update-overlay, verify-deployment, deploy-frontend, detect-changes, wait-for-ci, terraform-plan, terraform-apply]
+    needs: [get-image-tag, sync-argocd-manifests, update-overlay, verify-deployment, deploy-frontend, wait-for-ci, terraform-plan, terraform-apply]
     if: always()
     steps:
       - name: Checkout code
@@ -853,14 +715,13 @@ jobs:
       - name: Write execution rationale
         run: |
           {
-            echo "## Prod Deployment Rationale"
+            echo "## Prod Deployment Summary"
             echo ""
-            echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
-            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }}, reason: ${{ github.event_name == 'workflow_dispatch' && inputs.run_terraform == true && 'manual request' || contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform') && 'infra changes' || 'not requested' }})"
-            echo "- Terraform apply: ${{ needs.terraform-apply.result }} (reason: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true && 'plan has changes' || 'no changes' }})"
-            echo "- Argo CD manifests sync: ${{ needs.sync-argocd-manifests.result }} (reason: ${{ contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd') && 'argocd manifest changes' || 'no changes' }})"
-            echo "- Backend deploy tag: ${{ needs.get-ci-image-tag.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag || 'n/a' }}"
+            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }})"
+            echo "- Terraform apply: ${{ needs.terraform-apply.result }}"
+            echo "- Argo CD manifests sync: ${{ needs.sync-argocd-manifests.result }}"
+            echo "- Backend deploy tag: ${{ needs.get-image-tag.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
             echo "- Deployment verification: ${{ needs.verify-deployment.result }}"
             echo "- Frontend deploy: ${{ needs.deploy-frontend.result }}"
@@ -869,7 +730,7 @@ jobs:
       - name: Generate summary
         uses: ./.github/actions/create-prod-summary
         with:
-          image-tag: ${{ needs.get-ci-image-tag.outputs.image_tag || needs.get-last-prod-image.outputs.image_tag }}
+          image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
           commit-sha: ${{ github.sha }}
           update-overlay-result: ${{ needs.update-overlay.result }}
           verify-deployment-result: ${{ needs.verify-deployment.result }}
