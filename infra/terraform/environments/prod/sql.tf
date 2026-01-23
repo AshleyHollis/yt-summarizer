@@ -14,7 +14,12 @@ module "sql" {
 
   # Serverless for cost savings
   sku_name                    = "GP_S_Gen5_1"
-  auto_pause_delay_in_minutes = 120
+  auto_pause_delay_in_minutes = 60 # Reduced from 120 to pause faster
+
+  # Cost optimization: Reduced from 32GB to 2GB (sufficient for development)
+  max_size_gb = 2
+
+  # Min capacity already at optimal 0.5 vCores (default)
 
   tags = local.common_tags
 }
