@@ -18,7 +18,6 @@
 #
 # BUILD MODES:
 #   - ACR configured → Build and push images to Azure Container Registry
-#   - No ACR → Validate builds locally without push
 #
 # KEY PATTERN - always() for conditional dependencies:
 #   Jobs with always() run even when dependencies skip/fail
@@ -101,7 +100,7 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           FORCE_FULL: >-
             ${{
-              (github.event.inputs.force_full == 'true') ||
+              (github.event.inputs.force_full == 'true' && github.ref_name == 'main') ||
               (github.event_name == 'pull_request' &&
                 contains(github.event.pull_request.labels.*.name, 'ci-full'))
             }}
@@ -574,13 +573,14 @@ jobs:
     # IMAGE BUILDING CONDITIONS:
     # - ACR must be configured (vars.ACR_NAME != '')
     # - Main branch: Always build images after tests pass
-    # - PR branch: Build only if code/docker areas changed
+    # - PR branch: Build if code/docker areas changed or full run is forced
     # - All lint, security scans, and tests must pass (or skip if not run)
     # - always(): Run even if some dependencies were skipped, then check their results
     if: |
       always() &&
       vars.ACR_NAME != '' &&
       (needs.detect-changes.outputs.is_main_branch == 'true' ||
+       needs.detect-changes.outputs.force_full == 'true' ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
@@ -635,7 +635,7 @@ jobs:
     #
     # IMAGE BUILDING:
     # - Main branch: Always build after meta succeeds
-    # - PR branch: Build only if code/docker areas changed
+    # - PR branch: Build if code/docker areas changed or full run is forced
     if: |
       always() &&
       needs.build-images-meta.result == 'success' &&
@@ -644,6 +644,7 @@ jobs:
        needs.detect-changes.outputs.is_main_branch == 'true' ||
        github.event_name == 'pull_request') &&
       (needs.detect-changes.outputs.is_main_branch == 'true' ||
+       needs.detect-changes.outputs.force_full == 'true' ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
@@ -679,51 +680,6 @@ jobs:
           service: ${{ matrix.service }}
           image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
           push: true
-
-  # ---------------------------------------------------------------------------
-  # BUILD VALIDATION (No ACR)
-  # ---------------------------------------------------------------------------
-  # FLOW: No ACR configured → Build images locally without pushing
-  # PURPOSE: Validate Dockerfiles work without requiring Azure credentials
-  # WHEN: ACR_NAME is empty OR force_full on a non-main branch
-  # ---------------------------------------------------------------------------
-  build-images-validate:
-    name: Build Images (Validate - parallel)
-    runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, lint-frontend]
-    # Run when ACR is not configured or when forcing full validation on a branch
-    # Main branch: Always validate | PR: Validate if code/docker changed
-    if: |
-      (vars.ACR_NAME == '' ||
-       (needs.detect-changes.outputs.force_full == 'true' &&
-        needs.detect-changes.outputs.is_main_branch != 'true' &&
-        github.event_name != 'pull_request')) &&
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       needs.detect-changes.outputs.force_full == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker'))
-    strategy:
-      matrix:
-        include:
-          - service: api
-            dockerfile: services/api/Dockerfile
-            image: yt-summarizer-api
-          - service: workers
-            dockerfile: services/workers/Dockerfile
-            image: yt-summarizer-workers
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build ${{ matrix.service }} image (no push)
-        uses: ./.github/actions/build-images
-        with:
-          service: ${{ matrix.service }}
-          image-tag: validate
-          push: false
 
   # ===========================================================================
   # E2E TESTING - Runs in Preview Workflow
@@ -888,7 +844,6 @@ jobs:
       - test-frontend
       - build-images
       - build-images-meta
-      - build-images-validate
       - validate-terraform
       - kubernetes-validate
       - secret-scanning
@@ -911,7 +866,6 @@ jobs:
             echo "- Security Scans (Python/JS): ${{ needs.scan-python-security.result }}/${{ needs.scan-javascript-security.result }}"
             echo "- Tests (shared/api/workers/frontend): ${{ needs.test-shared.result }}/${{ needs.test-api.result }}/${{ needs.test-workers.result }}/${{ needs.test-frontend.result }}"
             echo "- Build Images: ${{ needs.build-images.result }} (ACR: ${{ vars.ACR_NAME != '' && 'configured' || 'not configured' }})"
-            echo "- Build Images (validate): ${{ needs.build-images-validate.result }}"
             echo "- Terraform Validate: ${{ needs.validate-terraform.result }}"
             echo "- K8s Validate: ${{ needs.kubernetes-validate.result }}"
             echo "- Secret Scanning: ${{ needs.secret-scanning.result }}"
@@ -958,5 +912,4 @@ jobs:
           secret-scanning-result: ${{ needs.secret-scanning.result }}
           secret-scanning-should-run: ${{ needs.detect-changes.outputs.has_code_changes }}
           build-images-result: ${{ needs.build-images.result }}
-          build-images-validate-result: ${{ needs.build-images-validate.result }}
           acr-configured: ${{ vars.ACR_NAME != '' }}

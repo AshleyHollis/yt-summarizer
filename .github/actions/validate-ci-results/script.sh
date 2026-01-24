@@ -23,7 +23,6 @@
 #   SECRET_SCANNING_RESULT     - Result of secret-scanning job
 #   SECRET_SCANNING_SHOULD_RUN - Whether secret-scanning should have run
 #   BUILD_IMAGES_RESULT        - Result of build-images job
-#   BUILD_IMAGES_VALIDATE_RESULT - Result of build-images-validate job
 #
 # Logic:
 #   1. Check if each job should have run based on changed areas
@@ -135,15 +134,12 @@ else
   echo "⏭️  secret-scanning skipped (no code changes)"
 fi
 
-# Check build jobs - one must succeed if builds are required
+# Check build jobs
 if should_run_job "build-images"; then
-  BUILD_PUSH="${BUILD_IMAGES_RESULT}"
-  BUILD_VALIDATE="${BUILD_IMAGES_VALIDATE_RESULT}"
-
-  if [ "$BUILD_PUSH" = "success" ] || [ "$BUILD_PUSH" = "skipped" -a "$BUILD_VALIDATE" = "success" ]; then
-    echo "✅ Build validation passed"
+  if [ "${BUILD_IMAGES_RESULT}" = "success" ]; then
+    echo "✅ Build images passed"
   else
-    echo "❌ Build jobs failed: build-images=$BUILD_PUSH, build-images-validate=$BUILD_VALIDATE"
+    echo "❌ Build images failed: build-images=${BUILD_IMAGES_RESULT}"
     EXIT_CODE=1
   fi
 else

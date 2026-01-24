@@ -37,9 +37,6 @@ inputs:
   build-images-result:
     description: 'Result of build-images job'
     required: true
-  build-images-validate-result:
-    description: 'Result of build-images-validate job'
-    required: true
   acr-configured:
     description: 'Whether ACR is configured (vars.ACR_NAME is set)'
     required: true
@@ -62,5 +59,4 @@ runs:
         SECRET_SCANNING_RESULT: ${{ inputs.secret-scanning-result }}
         SECRET_SCANNING_SHOULD_RUN: ${{ inputs.secret-scanning-should-run }}
         BUILD_IMAGES_RESULT: ${{ inputs.build-images-result }}
-        BUILD_IMAGES_VALIDATE_RESULT: ${{ inputs.build-images-validate-result }}
       run: bash ${{ github.action_path }}/script.sh
