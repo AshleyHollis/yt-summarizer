@@ -15,32 +15,45 @@ export function Navbar() {
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
 
-  // Check if user has admin role
-  const isAdmin = user && (user as any)['https://yt-summarizer.com/role'] === 'admin';
+  // Check if user has admin role (Auth0 custom claim)
+  const isAdmin =
+    user &&
+    'https://yt-summarizer.com/role' in user &&
+    (user as Record<string, unknown>)['https://yt-summarizer.com/role'] === 'admin';
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-gray-200/80 dark:border-gray-800/80 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md">
-      <div className="px-4 sm:px-6">
-        <div className="flex h-12 items-center justify-between">
-          {/* Left section: Logo and nav links */}
-          <div className="flex items-center">
-            <Link href="/" className="flex shrink-0 items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-sm shadow-red-500/20">
-                <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
-                </svg>
-              </div>
-              <span className="text-lg font-bold bg-gradient-to-r from-red-500 to-rose-500 bg-clip-text text-transparent">
-                YT Summarizer
-              </span>
-            </Link>
-            <div className="ml-8 flex items-center space-x-1">
+    <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/90 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/90">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex h-16 items-center justify-between px-4">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
+              <svg
+                className="h-5 w-5 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <span className="text-xl font-bold text-gray-900 dark:text-white">YT Summarizer</span>
+          </Link>
+
+          {/* Desktop Navigation Links */}
+          <div className="hidden md:flex md:items-center md:space-x-4">
+            <div className="flex space-x-1">
               <Link
                 href="/add"
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  isActive('/add') || isActive('/submit') || isActive('/ingest')
-                    ? 'bg-red-500 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400'
+                  isActive('/add')
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-blue-500/10 hover:text-blue-500 dark:hover:text-blue-400'
                 }`}
               >
                 Add
@@ -49,8 +62,8 @@ export function Navbar() {
                 href="/library"
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive('/library')
-                    ? 'bg-red-500 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400'
+                    ? 'bg-green-500 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-green-500/10 hover:text-green-500 dark:hover:text-green-400'
                 }`}
               >
                 Library
@@ -80,10 +93,10 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right section: Auth and Theme toggle */}
-          <div className="flex items-center gap-4">
-            <AuthButton />
+          {/* Right Side: Auth Button & Theme Toggle */}
+          <div className="flex items-center space-x-3">
             <ThemeToggle />
+            <AuthButton />
           </div>
         </div>
       </div>
