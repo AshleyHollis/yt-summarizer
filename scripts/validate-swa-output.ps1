@@ -70,3 +70,15 @@ if (-not ($buildScript -match "^next build --webpack")) {
 }
 
 Write-Host "[SWA] output_location, token, and build script validated." -ForegroundColor Green
+
+$rootPackageJson = Join-Path $repoRoot "package.json"
+if (Test-Path $rootPackageJson) {
+    throw "Root package.json detected. Remove root lockfiles to avoid Next.js output tracing issues in SWA."
+}
+
+$rootPackageLock = Join-Path $repoRoot "package-lock.json"
+if (Test-Path $rootPackageLock) {
+    throw "Root package-lock.json detected. Remove root lockfiles to avoid Next.js output tracing issues in SWA."
+}
+
+Write-Host "[SWA] root lockfiles check passed." -ForegroundColor Green
