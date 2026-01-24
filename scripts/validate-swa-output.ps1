@@ -65,12 +65,8 @@ if (-not $buildScript) {
     throw "Missing build script in apps/web/package.json"
 }
 
-if ($buildScript -match "--webpack") {
-    throw "Invalid build script in apps/web/package.json. Remove --webpack to match SWA baseline."
+if (-not ($buildScript -match "^next build --webpack")) {
+    throw "Invalid build script in apps/web/package.json. Expected to start with 'next build --webpack' to match SWA baseline."
 }
 
-if (-not ($buildScript -match "^next build")) {
-    throw "Invalid build script in apps/web/package.json. Expected to start with 'next build'."
-}
-
-Write-Host "[SWA] output_location and build script validated." -ForegroundColor Green
+Write-Host "[SWA] output_location, token, and build script validated." -ForegroundColor Green
