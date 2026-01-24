@@ -479,7 +479,7 @@ jobs:
     needs: [detect-changes, wait-for-ci]
     if: |
       needs.detect-changes.outputs.needs_deployment == 'true' &&
-      needs.detect-changes.outputs.needs_image_build == 'false'
+      (needs.detect-changes.outputs.needs_image_build == 'false' || github.event_name == 'workflow_dispatch')
     outputs:
       image_tag: ${{ steps.find-tag.outputs.image_tag }}
     steps:
