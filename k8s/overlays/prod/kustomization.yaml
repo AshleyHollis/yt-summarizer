@@ -2,7 +2,7 @@
 # Production Overlay Kustomization
 # =============================================================================
 # Single production environment - auto-synced by Argo CD on merge to main
-# Last updated: 2026-01-24T04:56:00Z
+# Last updated: 2026-01-24T05:25:55Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -124,12 +124,14 @@ patches:
                     cpu: 500m
                     memory: 512Mi
 images:
-  - name: yt-summarizer-api
+  - 
+    name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: sha-efa93ea
-  - name: yt-summarizer-workers
+    newTag: sha-eb6c395
+  - 
+    name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: sha-efa93ea
+    newTag: sha-eb6c395
 labels:
 - pairs:
     environment: "production"
