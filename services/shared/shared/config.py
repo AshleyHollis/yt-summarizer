@@ -354,7 +354,7 @@ class AuthSettings(BaseSettings):
     )
     default_return_to: str = Field(
         default="https://web.yt-summarizer.apps.ashleyhollis.com",
-        description="Default return URL after login (CloudFlare DNS)",
+        description="Default return URL after login",
     )
     session_cookie_name: str = Field(
         default="session",
