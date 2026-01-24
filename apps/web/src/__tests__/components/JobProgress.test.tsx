@@ -21,10 +21,10 @@ const createMockProgress = (overrides = {}) => ({
   overall_status: 'processing',
   overall_progress: 50,
   jobs: [
-    { job_id: 'job-1', job_type: 'transcribe', stage: 'completed', status: 'succeeded' },
-    { job_id: 'job-2', job_type: 'summarize', stage: 'processing', status: 'running' },
-    { job_id: 'job-3', job_type: 'embed', stage: 'queued', status: 'pending' },
-    { job_id: 'job-4', job_type: 'build_relationships', stage: 'queued', status: 'pending' },
+    { job_id: 'job-1', job_type: 'transcribe' as const, stage: 'completed' as const, status: 'succeeded' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+    { job_id: 'job-2', job_type: 'summarize' as const, stage: 'running' as const, status: 'running' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+    { job_id: 'job-3', job_type: 'embed' as const, stage: 'queued' as const, status: 'pending' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+    { job_id: 'job-4', job_type: 'build_relationships' as const, stage: 'queued' as const, status: 'pending' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
   ],
   eta: null,
   current_stage_name: null,
@@ -111,10 +111,10 @@ describe('JobProgress', () => {
           overall_status: 'completed',
           overall_progress: 100,
           jobs: [
-            { job_id: 'job-1', job_type: 'transcribe', status: 'succeeded' },
-            { job_id: 'job-2', job_type: 'summarize', status: 'succeeded' },
-            { job_id: 'job-3', job_type: 'embed', status: 'succeeded' },
-            { job_id: 'job-4', job_type: 'build_relationships', status: 'succeeded' },
+            { job_id: 'job-1', job_type: 'transcribe' as const, status: 'succeeded' as const, stage: 'completed' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+            { job_id: 'job-2', job_type: 'summarize' as const, status: 'succeeded' as const, stage: 'completed' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+            { job_id: 'job-3', job_type: 'embed' as const, status: 'succeeded' as const, stage: 'completed' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+            { job_id: 'job-4', job_type: 'build_relationships' as const, status: 'succeeded' as const, stage: 'completed' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
           ],
         })
       );
@@ -131,10 +131,10 @@ describe('JobProgress', () => {
         createMockProgress({
           overall_status: 'failed',
           jobs: [
-            { job_id: 'job-1', job_type: 'transcribe', status: 'succeeded' },
-            { job_id: 'job-2', job_type: 'summarize', status: 'failed' },
-            { job_id: 'job-3', job_type: 'embed', status: 'pending' },
-            { job_id: 'job-4', job_type: 'build_relationships', status: 'pending' },
+            { job_id: 'job-1', job_type: 'transcribe' as const, status: 'succeeded' as const, stage: 'completed' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+            { job_id: 'job-2', job_type: 'summarize' as const, status: 'failed' as const, stage: 'failed' as const, retry_count: 1, created_at: '2024-01-01T00:00:00Z' },
+            { job_id: 'job-3', job_type: 'embed' as const, status: 'pending' as const, stage: 'queued' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+            { job_id: 'job-4', job_type: 'build_relationships' as const, status: 'pending' as const, stage: 'queued' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
           ],
         })
       );
@@ -167,8 +167,8 @@ describe('JobProgress', () => {
         createMockProgress({
           overall_status: 'failed',
           jobs: [
-            { job_id: 'job-1', job_type: 'transcribe', status: 'succeeded' },
-            { job_id: 'job-2', job_type: 'summarize', status: 'failed' },
+            { job_id: 'job-1', job_type: 'transcribe' as const, status: 'succeeded' as const, stage: 'completed' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
+            { job_id: 'job-2', job_type: 'summarize' as const, status: 'failed' as const, stage: 'failed' as const, retry_count: 1, created_at: '2024-01-01T00:00:00Z' },
           ],
         })
       );
