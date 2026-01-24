@@ -20,7 +20,7 @@
 #   If workflow_dispatch AND inputs.run_preview != 'true':
 #     Set both flags to false (skip preview deployment)
 #   Otherwise:
-#     Keep values from change detection
+#     Always deploy all components (set both flags true)
 #
 # Exit: Always succeeds
 # =============================================================================
@@ -34,6 +34,9 @@ needs_deployment="${INITIAL_NEEDS_DEPLOYMENT}"
 if [[ "${EVENT_NAME}" == "workflow_dispatch" ]] && [[ "${RUN_PREVIEW}" != "true" ]]; then
   needs_image_build=false
   needs_deployment=false
+else
+  needs_image_build=true
+  needs_deployment=true
 fi
 
 echo "needs_image_build=$needs_image_build" >> "$GITHUB_OUTPUT"
