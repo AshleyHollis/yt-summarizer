@@ -46,9 +46,9 @@
    - **No complex orchestration**
 
 4. **Frontend Configuration**
-   - **Next.js Version**: 16.1.3 (Turbopack)
+   - **Next.js Version**: 16.1.3 (Webpack build)
    - **Node Version**: 20
-   - **Build Command**: `npm run build`
+   - **Build Command**: `next build --webpack` (via `npm run build`)
    - **Output Mode**: Standalone (`.next/standalone`)
    - **Config File**: `apps/web/staticwebapp.config.json` (used by SWA)
 
