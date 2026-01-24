@@ -486,7 +486,7 @@ jobs:
       - name: Checkout PR branch with full history
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.detect-changes.outputs.pr_head_ref || github.ref_name }}
+          ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           fetch-depth: 0  # Need full history to walk commits
 
       - name: Find most recent image-building commit in PR
@@ -645,7 +645,7 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.detect-changes.outputs.pr_head_ref || github.ref_name }}
+          ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Kustomize
@@ -874,7 +874,7 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.detect-changes.outputs.pr_head_ref || github.ref_name }}
+          ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
 
       - name: Verify SWA token is configured
         uses: ./.github/actions/verify-secret
