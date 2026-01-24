@@ -328,6 +328,7 @@ Migration is complete when:
 - ✅ Frontend UI fully functional
 - ✅ All tests pass
 - ✅ Documentation up to date
+- ✅ No root lockfiles (SWA validation passes)
 
 ---
 
@@ -343,19 +344,20 @@ Migration is complete when:
 
 ## Migration Status
 
-**Current Phase**: Pre-migration setup  
+**Current Phase**: Post-migration stabilization  
 **Last Known Good State**: `baseline-working-swa-v1` (Commit `f1f21a4`)  
-**Next Phase**: Phase 1 - Environment Variables & Secrets
+**Next Phase**: None (all phases complete)
 
-**Overall Progress**: 0/8 phases complete
+**Overall Progress**: 8/8 phases complete + stabilization
 
 | Phase | Status | Date | Notes |
 |-------|--------|------|-------|
-| Phase 1: Env Vars | ⏳ Pending | - | - |
-| Phase 2: Backend | ⏳ Pending | - | - |
-| Phase 3: API Proxy | ⏳ Pending | - | - |
-| Phase 4: Auth0 Deps | ⏳ Pending | - | - |
-| Phase 5: Auth0 Routes | ⏳ Pending | - | - |
-| Phase 6: Auth0 UI | ⏳ Pending | - | - |
-| Phase 7: Preview Workflow | ⏳ Pending | - | - |
-| Phase 8: Production | ⏳ Pending | - | - |
+| Phase 1: Env Vars | ✅ Complete | 2026-01-20 | Placeholder env vars validated |
+| Phase 2: Backend | ✅ Complete | 2026-01-20 | Real Auth0 secrets from GitHub |
+| Phase 3: API Proxy | ⏭️ Skipped | 2026-01-20 | Merged into Phase 5 |
+| Phase 4: Auth0 Deps | ✅ Complete | 2026-01-20 | SDK added then removed |
+| Phase 5: Auth0 Routes | ❌ Abandoned | 2026-01-20 | SWA middleware unsupported |
+| Phase 6: Auth0 UI | ✅ Complete | 2026-01-24 | Backend API auth pattern |
+| Phase 7: Preview Workflow | ✅ Complete | 2026-01-24 | Baseline preview deploys |
+| Phase 8: Production | ✅ Complete | 2026-01-24 | Baseline prod deploy |
+| Stabilization | ✅ Complete | 2026-01-24 | Remove root lockfiles |
