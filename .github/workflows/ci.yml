@@ -99,7 +99,12 @@ jobs:
           GITHUB_REF: ${{ github.ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
-          FORCE_FULL: ${{ github.event.inputs.force_full || 'false' }}
+          FORCE_FULL: >-
+            ${{
+              (github.event.inputs.force_full == 'true') ||
+              (github.event_name == 'pull_request' &&
+                contains(github.event.pull_request.labels.*.name, 'ci-full'))
+            }}
         run: scripts/workflows/ci-check-branch.sh
 
       - name: Detect changes
@@ -636,7 +641,8 @@ jobs:
       needs.build-images-meta.result == 'success' &&
       vars.ACR_NAME != '' &&
       (needs.detect-changes.outputs.force_full != 'true' ||
-       needs.detect-changes.outputs.is_main_branch == 'true') &&
+       needs.detect-changes.outputs.is_main_branch == 'true' ||
+       github.event_name == 'pull_request') &&
       (needs.detect-changes.outputs.is_main_branch == 'true' ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
@@ -690,7 +696,8 @@ jobs:
     if: |
       (vars.ACR_NAME == '' ||
        (needs.detect-changes.outputs.force_full == 'true' &&
-        needs.detect-changes.outputs.is_main_branch != 'true')) &&
+        needs.detect-changes.outputs.is_main_branch != 'true' &&
+        github.event_name != 'pull_request')) &&
       (needs.detect-changes.outputs.is_main_branch == 'true' ||
        needs.detect-changes.outputs.force_full == 'true' ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
@@ -751,7 +758,8 @@ jobs:
         uses: azure/login@v2
         if: |
           needs.detect-changes.outputs.force_full != 'true' ||
-          needs.detect-changes.outputs.is_main_branch == 'true'
+          needs.detect-changes.outputs.is_main_branch == 'true' ||
+          github.event_name == 'pull_request'
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
