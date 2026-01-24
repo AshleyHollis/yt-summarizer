@@ -124,11 +124,11 @@ patches:
                     cpu: 500m
                     memory: 512Mi
 images:
-  - 
+  -
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: sha-944bd61
-  - 
+    newTag: sha-cb36f05
+  -
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
     newTag: sha-944bd61
