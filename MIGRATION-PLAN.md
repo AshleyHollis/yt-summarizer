@@ -196,6 +196,8 @@
 - Preview deployments work for PRs
 - SWA staging environments created correctly
 - Backend URL fetched and injected correctly
+- Frontend preview URL returns HTTP 200 (health check step)
+- Latest verified preview run: #21314260453 (preview/swa-stable)
 
 **Rollback**: `git revert HEAD` or disable preview workflow
 
@@ -217,6 +219,7 @@
 - Production deployment succeeds
 - Production Auth0 login works
 - No disruption to existing users
+- Frontend URL returns HTTP 200 after SWA deploy
 
 **Rollback**: `git revert HEAD` or deploy previous main commit
 
