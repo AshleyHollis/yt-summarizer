@@ -14,7 +14,7 @@ export function Navbar() {
   const { user } = useAuth();
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
-  
+
   // Check if user has admin role
   const isAdmin = user && (user as any)['https://yt-summarizer.com/role'] === 'admin';
 

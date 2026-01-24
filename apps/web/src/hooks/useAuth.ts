@@ -1,6 +1,6 @@
 /**
  * useAuth Hook
- * 
+ *
  * Provides authentication state and user information from the backend session.
  * This hook fetches the current user session from the API and manages loading state.
  */
