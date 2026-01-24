@@ -41,6 +41,19 @@ foreach ($check in $checks) {
     }
 }
 
+$deployWorkflowPath = Join-Path $repoRoot ".github\workflows\deploy-prod.yml"
+$tokenMatches = Select-String -Path $deployWorkflowPath -Pattern '^\s*azure_static_web_apps_api_token:\s*\${{\s*secrets\.([^\s}]+)\s*}}'
+if (-not $tokenMatches) {
+    throw "Missing azure_static_web_apps_api_token in deploy-prod.yml"
+}
+
+foreach ($match in $tokenMatches) {
+    $tokenName = $match.Matches[0].Groups[1].Value.Trim()
+    if ($tokenName -ne "SWA_DEPLOYMENT_TOKEN") {
+        throw "Invalid SWA token in deploy-prod.yml. Expected SWA_DEPLOYMENT_TOKEN, found $tokenName."
+    }
+}
+
 $packageJsonPath = Join-Path $repoRoot "apps\web\package.json"
 if (-not (Test-Path $packageJsonPath)) {
     throw "Missing package.json: apps/web/package.json"
