@@ -339,7 +339,7 @@ jobs:
         uses: ./.github/actions/run-pytest
         with:
           working-directory: services/api
-          parallel: 'false'
+          parallel: 'true'
           pytest-args: '-v --tb=short'
           markers: 'not integration and not live'
 
@@ -439,6 +439,18 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           working-directory: apps/web
+
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: >-
+            ${{ runner.os }}-nextjs-
+            ${{ hashFiles('apps/web/package-lock.json') }}-
+            ${{ hashFiles('apps/web/next.config.*') }}-
+            ${{ hashFiles('apps/web/tsconfig.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-
 
       - name: TypeScript type check
         working-directory: apps/web
@@ -792,6 +804,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Cache pip and pre-commit
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/pre-commit
+          key: ${{ runner.os }}-workflow-py-${{ hashFiles('scripts/validate_workflows.py', '.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-workflow-py-
 
       - name: Install PyYAML
         run: pip install pyyaml
