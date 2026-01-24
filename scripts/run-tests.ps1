@@ -52,6 +52,17 @@ if (-not $repoRoot) {
     $repoRoot = Split-Path -Parent $PSScriptRoot
 }
 
+$swaValidationScript = Join-Path $repoRoot "scripts\validate-swa-output.ps1"
+if (Test-Path $swaValidationScript) {
+    Write-Host "[SWA] Validating output_location configuration..." -ForegroundColor Cyan
+    try {
+        & $swaValidationScript
+    } catch {
+        Write-Host "[SWA] Validation failed: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+}
+
 # Auto-detect changes when Component is 'detect'
 if ($Component -eq 'detect') {
     try {

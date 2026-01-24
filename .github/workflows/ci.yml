@@ -784,6 +784,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate SWA output_location
+        shell: pwsh
+        run: ./scripts/validate-swa-output.ps1
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
