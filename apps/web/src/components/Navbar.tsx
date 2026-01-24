@@ -4,14 +4,19 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/common';
 import { AuthButton } from '@/components/auth/AuthButton';
+import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Main navigation bar component
  */
 export function Navbar() {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
+  
+  // Check if user has admin role
+  const isAdmin = user && (user as any)['https://yt-summarizer.com/role'] === 'admin';
 
   return (
     <nav className="sticky top-0 z-40 border-b border-gray-200/80 dark:border-gray-800/80 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md">
@@ -60,6 +65,18 @@ export function Navbar() {
               >
                 Jobs
               </Link>
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    isActive('/admin')
+                      ? 'bg-purple-600 text-white'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-purple-600/10 hover:text-purple-600 dark:hover:text-purple-400'
+                  }`}
+                >
+                  Admin
+                </Link>
+              )}
             </div>
           </div>
 
