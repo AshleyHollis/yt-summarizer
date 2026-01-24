@@ -79,34 +79,36 @@ jobs:
   # Used by all subsequent jobs to decide if they should run
   # ===========================================================================
   detect-changes:
-      name: Detect Changes
-      runs-on: ubuntu-latest
-      outputs:
-        changed_areas: ${{ steps.changes.outputs.changed_areas }}
-        has_code_changes: ${{ steps.changes.outputs.has_code_changes }}
-        is_main_branch: ${{ steps.check-branch.outputs.is_main_branch }}
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed_areas: ${{ steps.changes.outputs.changed_areas }}
+      has_code_changes: ${{ steps.changes.outputs.has_code_changes }}
+      is_main_branch: ${{ steps.check-branch.outputs.is_main_branch }}
+      force_full: ${{ steps.check-branch.outputs.force_full }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-        - name: Check if main branch
-          id: check-branch
-          shell: bash
-          env:
-            GITHUB_REF: ${{ github.ref }}
-            GITHUB_REF_NAME: ${{ github.ref_name }}
-            GITHUB_EVENT_NAME: ${{ github.event_name }}
-            FORCE_FULL: ${{ github.event.inputs.force_full || 'false' }}
-          run: scripts/workflows/ci-check-branch.sh
+      - name: Check if main branch
+        id: check-branch
+        shell: bash
+        env:
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          FORCE_FULL: ${{ github.event.inputs.force_full || 'false' }}
+        run: scripts/workflows/ci-check-branch.sh
 
-        - name: Detect changes
-          id: changes
-          shell: bash
-          env:
-            IS_MAIN_BRANCH: ${{ steps.check-branch.outputs.is_main_branch }}
-          run: scripts/workflows/ci-detect-changes.sh
+      - name: Detect changes
+        id: changes
+        shell: bash
+        env:
+          MAIN_BRANCH: ${{ steps.check-branch.outputs.is_main_branch }}
+          FORCE_FULL: ${{ steps.check-branch.outputs.force_full }}
+        run: scripts/workflows/ci-detect-changes.sh
 
   # ===========================================================================
   # PHASE 2: LINTING
@@ -123,6 +125,7 @@ jobs:
     # Main branch: Always run | PR: Run if Python services changed
     if: |
       needs.detect-changes.outputs.is_main_branch == 'true' ||
+      needs.detect-changes.outputs.force_full == 'true' ||
       contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')
@@ -146,6 +149,7 @@ jobs:
     # Main branch: Always run | PR: Run if frontend changed
     if: |
       needs.detect-changes.outputs.is_main_branch == 'true' ||
+      needs.detect-changes.outputs.force_full == 'true' ||
       contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
     steps:
       - name: Checkout code
@@ -631,6 +635,8 @@ jobs:
       always() &&
       needs.build-images-meta.result == 'success' &&
       vars.ACR_NAME != '' &&
+      (needs.detect-changes.outputs.force_full != 'true' ||
+       needs.detect-changes.outputs.is_main_branch == 'true') &&
       (needs.detect-changes.outputs.is_main_branch == 'true' ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
@@ -668,23 +674,25 @@ jobs:
           image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
           push: true
 
-
   # ---------------------------------------------------------------------------
   # BUILD VALIDATION (No ACR)
   # ---------------------------------------------------------------------------
   # FLOW: No ACR configured → Build images locally without pushing
   # PURPOSE: Validate Dockerfiles work without requiring Azure credentials
-  # WHEN: ACR_NAME is empty AND code changes require images
+  # WHEN: ACR_NAME is empty OR force_full on a non-main branch
   # ---------------------------------------------------------------------------
   build-images-validate:
     name: Build Images (Validate - parallel)
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python, lint-frontend]
-    # Only run if ACR is NOT configured (validation mode)
+    # Run when ACR is not configured or when forcing full validation on a branch
     # Main branch: Always validate | PR: Validate if code/docker changed
     if: |
-      vars.ACR_NAME == '' &&
+      (vars.ACR_NAME == '' ||
+       (needs.detect-changes.outputs.force_full == 'true' &&
+        needs.detect-changes.outputs.is_main_branch != 'true')) &&
       (needs.detect-changes.outputs.is_main_branch == 'true' ||
+       needs.detect-changes.outputs.force_full == 'true' ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
@@ -741,6 +749,9 @@ jobs:
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
+        if: |
+          needs.detect-changes.outputs.force_full != 'true' ||
+          needs.detect-changes.outputs.is_main_branch == 'true'
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -797,6 +808,7 @@ jobs:
     needs: [detect-changes]
     if: |
       needs.detect-changes.outputs.is_main_branch == 'true' ||
+      needs.detect-changes.outputs.force_full == 'true' ||
       contains(needs.detect-changes.outputs.changed_areas, 'ci')
     steps:
       - name: Checkout code

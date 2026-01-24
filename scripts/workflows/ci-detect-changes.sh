@@ -24,11 +24,18 @@
 
 set -e  # Exit on error
 
-if [[ "$MAIN_BRANCH" == "true" ]]; then
-  # Main branch: Force ALL areas to run full validation
-  echo "changed_areas=services/api services/workers services/shared apps/web k8s infra/terraform docker" >> $GITHUB_OUTPUT
-  echo "has_code_changes=true" >> $GITHUB_OUTPUT
-  echo "✓ Main branch: All validation jobs will run"
+main_branch="${MAIN_BRANCH:-${IS_MAIN_BRANCH:-false}}"
+force_full="${FORCE_FULL:-false}"
+
+if [[ "$main_branch" == "true" || "$force_full" == "true" ]]; then
+  # Main branch or forced full: Force ALL areas to run full validation
+  echo "changed_areas=services/api services/workers services/shared apps/web k8s infra/terraform docker" >> "$GITHUB_OUTPUT"
+  echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
+  if [[ "$force_full" == "true" && "$main_branch" != "true" ]]; then
+    echo "✓ Forced full validation: All validation jobs will run"
+  else
+    echo "✓ Main branch: All validation jobs will run"
+  fi
 else
   # PR branch: Use actual change detection
   echo "✓ PR branch: Running change detection"
