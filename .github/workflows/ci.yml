@@ -309,6 +309,7 @@ jobs:
         uses: ./.github/actions/run-pytest
         with:
           working-directory: services/shared
+          parallel: 'true'
 
       - name: Record tests finish
         id: finish
@@ -436,14 +437,13 @@ jobs:
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-frontend, test-frontend]
+    needs: [detect-changes, lint-frontend]
     # Main branch: Always run | PR: Run if frontend changed
-    # Requires lint and tests to pass
+    # Requires lint to pass (runs in parallel with tests)
     if: |
       (needs.detect-changes.outputs.is_main_branch == 'true' ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web')) &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
-      (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped')
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -569,7 +569,7 @@ jobs:
   build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, lint-frontend, scan-python-security, scan-javascript-security, test-shared, test-api, test-workers, test-frontend]
+    needs: [detect-changes]
     # IMAGE BUILDING CONDITIONS:
     # - ACR must be configured (vars.ACR_NAME != '')
     # - Main branch: Always build images after tests pass
@@ -585,15 +585,7 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
-      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped') &&
-      (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped') &&
-      (needs.test-shared.result == 'success' || needs.test-shared.result == 'skipped') &&
-      (needs.test-api.result == 'success' || needs.test-api.result == 'skipped') &&
-      (needs.test-workers.result == 'success' || needs.test-workers.result == 'skipped') &&
-      (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped')
+       contains(needs.detect-changes.outputs.changed_areas, 'docker'))
     outputs:
       image_tag: ${{ steps.tag.outputs.image-tag }}
     steps:
@@ -627,7 +619,15 @@ jobs:
   build-images:
     name: Build Images (parallel)
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-images-meta]
+    needs:
+      [
+        detect-changes,
+        build-images-meta,
+        lint-python,
+        lint-frontend,
+        scan-python-security,
+        scan-javascript-security,
+      ]
     # CRITICAL always() dependency:
     # - build-images-meta uses always() so it runs when some tests skip
     # - This job MUST use always() + check meta result, or it will skip
@@ -649,7 +649,11 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
        contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker'))
+       contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
+      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
+      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped') &&
+      (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped')
     strategy:
       matrix:
         include:
