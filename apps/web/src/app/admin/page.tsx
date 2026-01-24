@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+/**
+ * Admin Dashboard Page
+ *
+ * This page is protected by the backend Auth0 proxy and only accessible
+ * to users with the 'admin' role.
+ *
+ * Features:
+ * - User management overview
+ * - System statistics
+ * - Application settings
+ * - Video processing monitoring
+ */
+
 'use client';
 
 import Link from 'next/link';

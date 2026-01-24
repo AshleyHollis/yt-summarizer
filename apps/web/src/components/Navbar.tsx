@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/common';
-import { AuthButton } from '@/components/auth/AuthButton';
 
 /**
  * Main navigation bar component
@@ -60,12 +59,21 @@ export function Navbar() {
               >
                 Jobs
               </Link>
+              <Link
+                href="/admin"
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isActive('/admin')
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-purple-600/10 hover:text-purple-600 dark:hover:text-purple-400'
+                }`}
+              >
+                Admin
+              </Link>
             </div>
           </div>
 
-          {/* Right section: Auth and Theme toggle */}
-          <div className="flex items-center gap-4">
-            <AuthButton />
+          {/* Right Side: Theme Toggle */}
+          <div className="flex items-center space-x-3">
             <ThemeToggle />
           </div>
         </div>
