@@ -40,9 +40,9 @@ failed=0
 if [ -n "$hasFrontend" ]; then
     echo ""
     echo "📦 Frontend changes detected - running comprehensive checks..."
-    
+
     cd apps/web
-    
+
     echo "  ├─ Running ESLint..."
     if npm run lint; then
         echo "  │  ✅ ESLint passed"
@@ -50,7 +50,7 @@ if [ -n "$hasFrontend" ]; then
         echo "  │  ❌ ESLint failed!"
         failed=1
     fi
-    
+
     echo "  ├─ Running TypeScript check..."
     if npx tsc --noEmit; then
         echo "  │  ✅ TypeScript check passed"
@@ -58,7 +58,7 @@ if [ -n "$hasFrontend" ]; then
         echo "  │  ❌ TypeScript check failed!"
         failed=1
     fi
-    
+
     echo "  ├─ Running build..."
     if npm run build; then
         echo "  │  ✅ Build passed"
@@ -66,7 +66,7 @@ if [ -n "$hasFrontend" ]; then
         echo "  │  ❌ Build failed!"
         failed=1
     fi
-    
+
     echo "  └─ Running tests..."
     if npm run test:run; then
         echo "     ✅ Tests passed"
@@ -74,7 +74,7 @@ if [ -n "$hasFrontend" ]; then
         echo "     ❌ Tests failed!"
         failed=1
     fi
-    
+
     cd ../..
 fi
 
@@ -82,11 +82,11 @@ fi
 if [ -n "$hasBackend" ]; then
     echo ""
     echo "🐍 Backend changes detected - running checks..."
-    
+
     if echo "$changedFiles" | grep -q "^services/api/"; then
         echo "  ├─ Checking API..."
         cd services/api
-        
+
         echo "  │  ├─ Running Ruff..."
         if uv run ruff check .; then
             echo "  │  │  ✅ Ruff passed"
@@ -94,7 +94,7 @@ if [ -n "$hasBackend" ]; then
             echo "  │  │  ❌ Ruff failed!"
             failed=1
         fi
-        
+
         echo "  │  └─ Running tests..."
         if uv run pytest tests/ -v; then
             echo "  │     ✅ Tests passed"
@@ -102,14 +102,14 @@ if [ -n "$hasBackend" ]; then
             echo "  │     ❌ Tests failed!"
             failed=1
         fi
-        
+
         cd ../..
     fi
-    
+
     if echo "$changedFiles" | grep -q "^services/workers/"; then
         echo "  ├─ Checking Workers..."
         cd services/workers
-        
+
         echo "  │  ├─ Running Ruff..."
         if uv run ruff check .; then
             echo "  │  │  ✅ Ruff passed"
@@ -117,7 +117,7 @@ if [ -n "$hasBackend" ]; then
             echo "  │  │  ❌ Ruff failed!"
             failed=1
         fi
-        
+
         echo "  │  └─ Running tests..."
         if uv run pytest tests/ -v; then
             echo "  │     ✅ Tests passed"
@@ -125,14 +125,14 @@ if [ -n "$hasBackend" ]; then
             echo "  │     ❌ Tests failed!"
             failed=1
         fi
-        
+
         cd ../..
     fi
-    
+
     if echo "$changedFiles" | grep -q "^services/shared/"; then
         echo "  └─ Checking Shared..."
         cd services/shared
-        
+
         echo "     ├─ Running Ruff..."
         if uv run ruff check .; then
             echo "     │  ✅ Ruff passed"
@@ -140,7 +140,7 @@ if [ -n "$hasBackend" ]; then
             echo "     │  ❌ Ruff failed!"
             failed=1
         fi
-        
+
         echo "     └─ Running tests..."
         if uv run pytest tests/ -v; then
             echo "        ✅ Tests passed"
@@ -148,7 +148,7 @@ if [ -n "$hasBackend" ]; then
             echo "        ❌ Tests failed!"
             failed=1
         fi
-        
+
         cd ../..
     fi
 fi

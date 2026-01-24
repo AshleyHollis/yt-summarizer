@@ -148,7 +148,7 @@ describe('Video Detail Page - Reprocess Button', () => {
       vi.mocked(libraryApi.getVideoDetail).mockResolvedValue(
         createMockVideoDetail({ processing_status: 'failed', summary: null })
       );
-      vi.mocked(videoApi.reprocess).mockResolvedValue({ 
+      vi.mocked(videoApi.reprocess).mockResolvedValue({
         video_id: 'test-video-id',
         youtube_video_id: 'abc123',
         title: 'Test Video Title',
@@ -184,7 +184,7 @@ describe('Video Detail Page - Reprocess Button', () => {
 
       // Delay the reprocess response to test loading state
       vi.mocked(videoApi.reprocess).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ 
+        () => new Promise((resolve) => setTimeout(() => resolve({
           video_id: 'test-video-id',
           youtube_video_id: 'abc123',
           title: 'Test Video Title',
@@ -221,7 +221,7 @@ describe('Video Detail Page - Reprocess Button', () => {
       );
 
       vi.mocked(videoApi.reprocess).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ 
+        () => new Promise((resolve) => setTimeout(() => resolve({
           video_id: 'test-video-id',
           youtube_video_id: 'abc123',
           title: 'Test Video Title',
