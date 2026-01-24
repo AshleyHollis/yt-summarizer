@@ -572,6 +572,33 @@ gh run view 21313920600 --job <deploy-job-id> --log
 
 ---
 
+### Entry 10: Preview Workflow Verification and Frontend Health Checks
+**Date**: 2026-01-24
+**Phase**: 7
+**Changes**:
+- Added frontend health checks to preview and production workflows
+- Verified preview workflow deployment on latest main branch
+
+**Commit**: pending
+**Deployment**: Run #21314260453 (branch `preview/swa-stable`)
+**Result**: ✅ **SUCCESS**
+
+**Details**:
+- Preview workflow now validates frontend availability via HTTP 200 after SWA deploy.
+- Production workflow now validates frontend availability after SWA deploy.
+- Preview deployment completed in ~46 seconds and returned the expected preview URL.
+
+**Verification**:
+```bash
+gh run view 21314260453 --job <deploy-job-id> --log
+# Status: Succeeded
+# URL: https://white-meadow-0b8e2e000-previewswastable.eastasia.6.azurestaticapps.net
+```
+
+**Rollback**: Not needed - workflow verification added
+
+---
+
 ## Template for Future Entries
 
 ```markdown

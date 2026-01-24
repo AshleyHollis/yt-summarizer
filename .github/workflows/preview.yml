@@ -942,6 +942,17 @@ jobs:
           # Deploying to a PR creates a staging environment automatically
           production_branch: main
 
+      - name: Verify frontend preview
+        if: steps.deploy.outputs.static_web_app_url != ''
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ steps.deploy.outputs.static_web_app_url }}
+          max-attempts: '10'
+          interval-seconds: '10'
+          timeout-seconds: '5'
+          expected-status: '200'
+          service-name: 'Preview Web'
+
   # ===========================================================================
   # PHASE 8: POST PREVIEW COMMENT
   # ===========================================================================
