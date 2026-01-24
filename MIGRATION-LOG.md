@@ -541,6 +541,37 @@ cd apps/web && node test-auth-flow.mjs
 
 ---
 
+### Entry 9: Root Lockfile Regression (SWA Warm-up Timeout)
+**Date**: 2026-01-24
+**Phase**: Stabilization
+**Changes**:
+- Removed root `package.json` and `package-lock.json`
+- Added validation in `scripts/validate-swa-output.ps1` to block root lockfiles
+- Documented the constraint in `WORKING-BASELINE.md`
+
+**Commit**: `729b2a9` - "fix: remove root lockfiles to prevent SWA timeouts"  
+**Deployment**: Run #21313920600 (branch `test/swa-no-root-lockfile`)  
+**Result**: ✅ **SUCCESS**
+
+**Details**:
+- Root lockfiles caused Next.js output tracing to use the repo root, leading to SWA warm-up timeouts.
+- Removing root lockfiles restored successful preview deployments.
+- Validation now fails CI and local tests if root lockfiles are reintroduced.
+
+**Verification**:
+```bash
+gh run view 21313920600 --job <deploy-job-id> --log
+# Status: Succeeded
+```
+
+**Notes**:
+- Keep lockfiles scoped to `apps/web/package-lock.json` only.
+- Baseline deployments now require `next build --webpack` with no root lockfiles.
+
+**Rollback**: Not needed - regression fixed
+
+---
+
 ## Template for Future Entries
 
 ```markdown
