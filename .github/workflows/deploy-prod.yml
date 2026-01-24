@@ -692,7 +692,7 @@ jobs:
           # Configure proxy to talk to actual backend
           API_BASE_URL: ${{ vars.PRODUCTION_API_URL }}
         with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_PRODUCTION_TOKEN }}
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: apps/web
