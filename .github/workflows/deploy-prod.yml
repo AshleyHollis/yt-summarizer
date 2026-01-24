@@ -696,7 +696,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: apps/web
-          output_location: .next/standalone
+          output_location: .next
           skip_app_build: true
           production_branch: main
 
