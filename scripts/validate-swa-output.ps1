@@ -41,4 +41,23 @@ foreach ($check in $checks) {
     }
 }
 
-Write-Host "[SWA] output_location validated (expected empty string)." -ForegroundColor Green
+$packageJsonPath = Join-Path $repoRoot "apps\web\package.json"
+if (-not (Test-Path $packageJsonPath)) {
+    throw "Missing package.json: apps/web/package.json"
+}
+
+$packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
+$buildScript = $packageJson.scripts.build
+if (-not $buildScript) {
+    throw "Missing build script in apps/web/package.json"
+}
+
+if ($buildScript -match "--webpack") {
+    throw "Invalid build script in apps/web/package.json. Remove --webpack to match SWA baseline."
+}
+
+if (-not ($buildScript -match "^next build")) {
+    throw "Invalid build script in apps/web/package.json. Expected to start with 'next build'."
+}
+
+Write-Host "[SWA] output_location and build script validated." -ForegroundColor Green
