@@ -325,6 +325,7 @@ async def auth0_callback(
 
 
 @router.post("/logout", response_model=LogoutResponse)
+@router.get("/logout", response_model=LogoutResponse)
 async def logout(request: Request) -> JSONResponse:
     settings = get_settings()
 
