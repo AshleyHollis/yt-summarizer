@@ -33,6 +33,13 @@ export default function AdminDashboard() {
     );
   }
 
+  // Get user role from Auth0 custom claim
+  const userWithRole = user as Record<string, unknown> | null;
+  const userRole =
+    userWithRole && 'https://yt-summarizer.com/role' in userWithRole
+      ? String(userWithRole['https://yt-summarizer.com/role'])
+      : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8">
@@ -40,9 +47,9 @@ export default function AdminDashboard() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
           <p className="text-gray-600">Welcome, {user?.email || 'Administrator'}</p>
-          {user?.['https://yt-summarizer.com/role'] && (
+          {userRole && (
             <span className="inline-block mt-2 px-3 py-1 text-sm font-semibold text-white bg-purple-600 rounded-full">
-              {user['https://yt-summarizer.com/role'].toUpperCase()}
+              {userRole.toUpperCase()}
             </span>
           )}
         </div>
