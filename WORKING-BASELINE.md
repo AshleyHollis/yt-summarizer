@@ -51,6 +51,7 @@
    - **Build Command**: `next build --webpack` (via `npm run build`)
    - **Output Mode**: Standalone (`.next/standalone`)
    - **Config File**: `apps/web/staticwebapp.config.json` (used by SWA)
+   - **Lockfiles**: Only `apps/web/package-lock.json` (no root lockfiles)
 
 5. **Deployment Logs - Success Indicators**
    ```
@@ -74,6 +75,7 @@
 - ❌ Complex workflow with Auth0 config step after deployment
 - ❌ Job dependencies and orchestration (preview workflow)
 - ❌ Using `proud-smoke` SWA instance (platform rejected all deployments)
+- ❌ Adding root `package.json`/`package-lock.json` (Next.js output tracing root mismatch)
 
 ---
 
