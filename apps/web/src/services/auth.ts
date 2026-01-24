@@ -47,6 +47,15 @@ export function logout(): void {
  * Session cookie is automatically sent with request
  */
 export async function getSession(): Promise<Session> {
+  // Skip API calls during SSR/SSG (server-side rendering / static site generation)
+  // This prevents deployment timeouts when Next.js tries to pre-render pages
+  if (typeof window === 'undefined') {
+    return {
+      user: null,
+      isAuthenticated: false,
+    };
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/session`, {
       method: 'GET',
