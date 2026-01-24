@@ -39,16 +39,42 @@ failed=0
 # Frontend checks
 if [ -n "$hasFrontend" ]; then
     echo ""
-    echo "📦 Frontend changes detected - running checks..."
-    
+    echo "📦 Frontend changes detected - running comprehensive checks..."
+
     cd apps/web
+
     echo "  ├─ Running ESLint..."
     if npm run lint; then
-        echo "  └─ ✅ ESLint passed"
+        echo "  │  ✅ ESLint passed"
     else
-        echo "  └─ ❌ ESLint failed!"
+        echo "  │  ❌ ESLint failed!"
         failed=1
     fi
+
+    echo "  ├─ Running TypeScript check..."
+    if npx tsc --noEmit; then
+        echo "  │  ✅ TypeScript check passed"
+    else
+        echo "  │  ❌ TypeScript check failed!"
+        failed=1
+    fi
+
+    echo "  ├─ Running build..."
+    if npm run build; then
+        echo "  │  ✅ Build passed"
+    else
+        echo "  │  ❌ Build failed!"
+        failed=1
+    fi
+
+    echo "  └─ Running tests..."
+    if npm run test:run; then
+        echo "     ✅ Tests passed"
+    else
+        echo "     ❌ Tests failed!"
+        failed=1
+    fi
+
     cd ../..
 fi
 
@@ -56,40 +82,73 @@ fi
 if [ -n "$hasBackend" ]; then
     echo ""
     echo "🐍 Backend changes detected - running checks..."
-    
+
     if echo "$changedFiles" | grep -q "^services/api/"; then
-        echo "  ├─ Linting API code..."
+        echo "  ├─ Checking API..."
         cd services/api
+
+        echo "  │  ├─ Running Ruff..."
         if uv run ruff check .; then
-            echo "  └─ ✅ Ruff check passed for API"
+            echo "  │  │  ✅ Ruff passed"
         else
-            echo "  └─ ❌ Ruff check failed for API!"
+            echo "  │  │  ❌ Ruff failed!"
             failed=1
         fi
+
+        echo "  │  └─ Running tests..."
+        if uv run pytest tests/ -v; then
+            echo "  │     ✅ Tests passed"
+        else
+            echo "  │     ❌ Tests failed!"
+            failed=1
+        fi
+
         cd ../..
     fi
-    
+
     if echo "$changedFiles" | grep -q "^services/workers/"; then
-        echo "  ├─ Linting Workers code..."
+        echo "  ├─ Checking Workers..."
         cd services/workers
+
+        echo "  │  ├─ Running Ruff..."
         if uv run ruff check .; then
-            echo "  └─ ✅ Ruff check passed for Workers"
+            echo "  │  │  ✅ Ruff passed"
         else
-            echo "  └─ ❌ Ruff check failed for Workers!"
+            echo "  │  │  ❌ Ruff failed!"
             failed=1
         fi
+
+        echo "  │  └─ Running tests..."
+        if uv run pytest tests/ -v; then
+            echo "  │     ✅ Tests passed"
+        else
+            echo "  │     ❌ Tests failed!"
+            failed=1
+        fi
+
         cd ../..
     fi
-    
+
     if echo "$changedFiles" | grep -q "^services/shared/"; then
-        echo "  ├─ Linting Shared code..."
+        echo "  └─ Checking Shared..."
         cd services/shared
+
+        echo "     ├─ Running Ruff..."
         if uv run ruff check .; then
-            echo "  └─ ✅ Ruff check passed for Shared"
+            echo "     │  ✅ Ruff passed"
         else
-            echo "  └─ ❌ Ruff check failed for Shared!"
+            echo "     │  ❌ Ruff failed!"
             failed=1
         fi
+
+        echo "     └─ Running tests..."
+        if uv run pytest tests/ -v; then
+            echo "        ✅ Tests passed"
+        else
+            echo "        ❌ Tests failed!"
+            failed=1
+        fi
+
         cd ../..
     fi
 fi
@@ -98,9 +157,17 @@ fi
 if [ $failed -eq 1 ]; then
     echo ""
     echo "❌ Pre-push checks FAILED! Fix errors before pushing."
+    echo ""
     echo "💡 Tip: Run checks manually:"
-    echo "   Frontend: cd apps/web && npm run lint"
-    echo "   Backend:  cd services/<component> && uv run ruff check ."
+    echo "   Frontend:"
+    echo "     cd apps/web && npm run lint          # Lint check"
+    echo "     cd apps/web && npx tsc --noEmit      # Type check"
+    echo "     cd apps/web && npm run build         # Build check"
+    echo "     cd apps/web && npm run test:run      # Tests"
+    echo ""
+    echo "   Backend:"
+    echo "     cd services/<component> && uv run ruff check .  # Lint"
+    echo "     cd services/<component> && uv run pytest tests/ # Tests"
     exit 1
 fi
 
@@ -115,7 +182,7 @@ echo "✅ Git hooks installed successfully!"
 echo ""
 echo "Pre-push hook will now run automatically before every push."
 echo "It checks:"
-echo "  - Frontend: ESLint (npm run lint)"
-echo "  - Backend: Ruff linting for API, Workers, and Shared"
+echo "  - Frontend: ESLint, TypeScript, Build, and Tests"
+echo "  - Backend: Ruff linting and Tests for API, Workers, and Shared"
 echo ""
 echo "To bypass the hook (not recommended): git push --no-verify"

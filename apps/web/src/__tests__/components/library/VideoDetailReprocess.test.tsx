@@ -49,10 +49,17 @@ const createMockVideoDetail = (overrides = {}) => ({
     channel_id: 'channel-1',
     name: 'Test Channel',
     youtube_channel_id: 'UC12345',
+    thumbnail_url: 'https://example.com/channel-thumb.jpg',
   },
   facets: [],
   summary: 'This is a test summary with content.',
   transcript: 'Test transcript content',
+  summary_artifact: null,
+  transcript_artifact: null,
+  segment_count: 0,
+  relationship_count: 0,
+  created_at: '2024-01-15T10:00:00Z',
+  updated_at: '2024-01-15T10:00:00Z',
   ...overrides,
 });
 
@@ -141,7 +148,19 @@ describe('Video Detail Page - Reprocess Button', () => {
       vi.mocked(libraryApi.getVideoDetail).mockResolvedValue(
         createMockVideoDetail({ processing_status: 'failed', summary: null })
       );
-      vi.mocked(videoApi.reprocess).mockResolvedValue({ video_id: 'test-video-id' });
+      vi.mocked(videoApi.reprocess).mockResolvedValue({
+        video_id: 'test-video-id',
+        youtube_video_id: 'abc123',
+        title: 'Test Video Title',
+        channel: {
+          channel_id: 'channel-1',
+          name: 'Test Channel',
+          youtube_channel_id: 'UC12345',
+        },
+        processing_status: 'pending',
+        submitted_at: '2024-01-15T10:00:00Z',
+        jobs_queued: 4,
+      });
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
       render(<VideoDetailPage />);
@@ -165,7 +184,19 @@ describe('Video Detail Page - Reprocess Button', () => {
 
       // Delay the reprocess response to test loading state
       vi.mocked(videoApi.reprocess).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ video_id: 'test-video-id' }), 500))
+        () => new Promise((resolve) => setTimeout(() => resolve({
+          video_id: 'test-video-id',
+          youtube_video_id: 'abc123',
+          title: 'Test Video Title',
+          channel: {
+            channel_id: 'channel-1',
+            name: 'Test Channel',
+            youtube_channel_id: 'UC12345',
+          },
+          processing_status: 'pending',
+          submitted_at: '2024-01-15T10:00:00Z',
+          jobs_queued: 4,
+        }), 500))
       );
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
@@ -190,7 +221,19 @@ describe('Video Detail Page - Reprocess Button', () => {
       );
 
       vi.mocked(videoApi.reprocess).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ video_id: 'test-video-id' }), 500))
+        () => new Promise((resolve) => setTimeout(() => resolve({
+          video_id: 'test-video-id',
+          youtube_video_id: 'abc123',
+          title: 'Test Video Title',
+          channel: {
+            channel_id: 'channel-1',
+            name: 'Test Channel',
+            youtube_channel_id: 'UC12345',
+          },
+          processing_status: 'pending',
+          submitted_at: '2024-01-15T10:00:00Z',
+          jobs_queued: 4,
+        }), 500))
       );
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');

@@ -1,0 +1,38 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Frontend checks (if web app changed)
+echo "🔍 Running pre-push checks..."
+
+# Check if frontend files changed
+FRONTEND_CHANGED=$(git diff --name-only @{push}..HEAD | grep -c '^apps/web/' || true)
+
+if [ "$FRONTEND_CHANGED" -gt 0 ]; then
+  echo "📦 Frontend changes detected - running comprehensive checks..."
+
+  cd apps/web || exit 1
+
+  # Run lint
+  echo "  ├─ Running ESLint..."
+  npm run lint || { echo "  │  ❌ ESLint failed!"; exit 1; }
+  echo "  │  ✅ ESLint passed"
+
+  # Run TypeScript check
+  echo "  ├─ Running TypeScript check..."
+  npx tsc --noEmit || { echo "  │  ❌ TypeScript check failed!"; exit 1; }
+  echo "  │  ✅ TypeScript check passed"
+
+  # Run build
+  echo "  ├─ Running build..."
+  npm run build || { echo "  │  ❌ Build failed!"; exit 1; }
+  echo "  │  ✅ Build passed"
+
+  # Run tests
+  echo "  └─ Running tests..."
+  npm run test:run || { echo "     ❌ Tests failed!"; exit 1; }
+  echo "     ✅ Tests passed"
+
+  cd ../.. || exit 1
+fi
+
+echo "✅ All pre-push checks passed!"
