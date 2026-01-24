@@ -579,7 +579,7 @@ gh run view 21313920600 --job <deploy-job-id> --log
 - Added frontend health checks to preview and production workflows
 - Verified preview workflow deployment on latest main branch
 
-**Commit**: pending
+**Commit**: `7bc1e54`
 **Deployment**: Run #21314260453 (branch `preview/swa-stable`)
 **Result**: ✅ **SUCCESS**
 
