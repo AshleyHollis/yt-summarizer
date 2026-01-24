@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Install git hooks for the repository
 # Run this script to set up pre-push hooks that validate code before pushing
 
@@ -9,9 +9,19 @@ echo "📦 Installing git hooks..."
 # Create hooks directory if it doesn't exist
 mkdir -p .git/hooks
 
+# Ensure legacy hooks use env-resolved bash on Windows
+for legacy_hook in .git/hooks/*.legacy; do
+    if [ -f "$legacy_hook" ]; then
+        if [ "$(head -n 1 "$legacy_hook")" = "#!/bin/bash" ]; then
+            sed -i '1s|^#!/bin/bash$|#!/usr/bin/env bash|' "$legacy_hook"
+            chmod +x "$legacy_hook"
+        fi
+    fi
+done
+
 # Install pre-push hook
 cat > .git/hooks/pre-push << 'HOOKEOF'
-#!/bin/bash
+#!/usr/bin/env bash
 # Pre-push hook to run local checks before pushing code
 # This prevents broken code from being pushed to remote
 
