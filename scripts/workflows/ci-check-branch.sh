@@ -19,7 +19,10 @@
 set -e
 
 # Check if this is a push to main branch or PR targeting main
-if [[ "${GITHUB_REF}" == "refs/heads/main" ]] || [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "main" ]]; then
+if [[ "${FORCE_FULL}" == "true" ]]; then
+    echo "is_main_branch=true" >> $GITHUB_OUTPUT
+    echo "✓ Forced full validation mode"
+elif [[ "${GITHUB_REF}" == "refs/heads/main" ]] || [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" == "main" ]]; then
     echo "is_main_branch=true" >> $GITHUB_OUTPUT
     echo "✓ Main branch detected - FULL validation mode"
 else
