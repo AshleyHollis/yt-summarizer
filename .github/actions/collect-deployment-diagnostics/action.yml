@@ -23,7 +23,7 @@ runs:
       if: failure()
       shell: bash
       run: ./scripts/diagnose-argocd-deployment.sh ${{ inputs.app-name }} ${{ inputs.diagnostics-path }}
-    
+
     - name: Upload diagnostics artifact
       if: failure()
       uses: actions/upload-artifact@v4

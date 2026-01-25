@@ -9,7 +9,7 @@ These credentials are for the **TERRAFORM SERVICE ACCOUNT** - a dedicated M2M ap
 - **Application Name:** "Terraform Service Account"
 - **Client ID:** `Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6`
 - **Purpose:** Manage Auth0 resources via Terraform
-- **Storage:** 
+- **Storage:**
   - GitHub Secrets: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`
   - Azure Key Vault: For local Terraform runs
 

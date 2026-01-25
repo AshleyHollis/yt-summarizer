@@ -64,11 +64,11 @@ concurrency:
 env:
   # Shared variables are loaded from .github/config/shared.env via load-shared-env action
   # Only environment-specific overrides and GitHub variables are set here
-  
+
   # GitHub Variables (can override shared.env defaults)
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-  
+
   # Production-specific values
   ARGOCD_APP_NAME_PROD: 'yt-summarizer-prod'
   NAMESPACE_PROD: 'yt-summarizer'
