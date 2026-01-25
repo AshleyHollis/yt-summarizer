@@ -111,16 +111,14 @@ jobs:
   wait-for-ci:
     name: Wait for CI
     runs-on: ubuntu-latest
+    outputs:
+      ci_run_id: ${{ steps.wait.outputs.ci_run_id }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Skip wait on manual dispatch
-        if: github.event_name == 'workflow_dispatch'
-        run: echo "Skipping CI wait for manual dispatch."
-
       - name: Wait for CI workflow to complete
-        if: github.event_name != 'workflow_dispatch'
+        id: wait
         uses: ./.github/actions/wait-for-ci
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -674,30 +672,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          working-directory: apps/web
-
-      - name: Build frontend
-        uses: ./.github/actions/build-frontend
-        with:
-          api-url: ${{ vars.PRODUCTION_API_URL }}
-          environment: 'production'
-          working-directory: 'apps/web'
-
-      - name: Deploy to Static Web Apps
+      - name: Deploy frontend with CI artifact
         id: deploy-frontend
-        uses: Azure/static-web-apps-deploy@v1
+        uses: ./.github/actions/deploy-frontend-swa
         with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: upload
-          app_location: apps/web
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
+          api-url: ${{ vars.PRODUCTION_API_URL || env.PRODUCTION_URL }}
+          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          app-location: apps/web
+          runtime-config-path: apps/web/public/runtime-config.js
           output_location: ""
-          skip_app_build: true
-          production_branch: main
+          production-branch: main
 
       - name: Resolve frontend URL
         id: frontend-url
