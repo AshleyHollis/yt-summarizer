@@ -893,7 +893,7 @@ jobs:
           run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Replace apps/web with CI build
+      - name: Apply CI build artifact
         shell: bash
         run: |
           if [[ -d /tmp/frontend-build/apps/web ]]; then
@@ -906,11 +906,12 @@ jobs:
             ls -la /tmp/frontend-build || true
             exit 1
           fi
-          # Remove the source code version of apps/web
-          rm -rf apps/web
-          # Move the CI build to apps/web
-          mv "$source_dir" apps/web
-          # Verify the structure
+          rm -rf apps/web/.next apps/web/public
+          cp -R "$source_dir/.next" apps/web/.next
+          cp -R "$source_dir/public" apps/web/public
+          if [[ -f "$source_dir/staticwebapp.config.json" ]]; then
+            cp "$source_dir/staticwebapp.config.json" apps/web/staticwebapp.config.json
+          fi
           echo "=== apps/web structure ==="
           ls -la apps/web/
           echo "=== apps/web/.next structure ==="
