@@ -6,7 +6,7 @@
 #
 # This patch targets the `Deployment` named `api` and appends an env var that
 # sets API__CORS_ORIGINS (JSON array string) so the service allows the SWA origin.
-# The https://red-grass-06d413100-6.eastasia.6.azurestaticapps.net placeholder is replaced by CI during deployment.
+# The __SWA_URL__ placeholder is replaced by CI during deployment.
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -21,4 +21,4 @@ spec:
           env:
             - name: API__CORS_ORIGINS
               # JSON array string - keep no spaces after commas
-              value: '["https://red-grass-06d413100-6.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
+              value: '["__SWA_URL__","http://localhost:3000"]'
