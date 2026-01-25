@@ -121,6 +121,36 @@ patches:
       kind: Deployment
       labelSelector: app.kubernetes.io/component
 
+  # Resource limits patch - API deployment
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+    target:
+      kind: Deployment
+      name: api
+
+  # Resource limits patch - Worker deployments
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 150m
+            memory: 256Mi
+    target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component=worker
+
   # Migration job patch - service account
   - patch: |-
       apiVersion: batch/v1
