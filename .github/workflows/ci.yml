@@ -204,6 +204,11 @@ jobs:
           SKIP_STANDALONE: 'true'
         run: npm run build
 
+      - name: Remove standalone output for SWA
+        shell: bash
+        run: |
+          rm -rf apps/web/.next/standalone
+
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
         with:
