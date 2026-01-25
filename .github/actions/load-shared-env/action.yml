@@ -1,0 +1,15 @@
+name: Load Shared Environment Variables
+description: Loads shared environment variables from .github/config/shared.env into $GITHUB_ENV
+
+runs:
+  using: composite
+  steps:
+    - name: Load shared config
+      shell: bash
+      run: |
+        if [[ ! -f .github/config/shared.env ]]; then
+          echo "::error::Shared config file not found: .github/config/shared.env"
+          exit 1
+        fi
+        cat .github/config/shared.env >> "$GITHUB_ENV"
+        echo "✓ Loaded shared environment variables from .github/config/shared.env"
