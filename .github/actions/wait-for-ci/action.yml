@@ -26,6 +26,10 @@ inputs:
     description: Workflow file name to monitor
     required: false
     default: 'ci.yml'
+  workflow-event:
+    description: Workflow event to monitor (e.g., pull_request, push)
+    required: false
+    default: ''
 
 outputs:
   image_tag:
@@ -47,5 +51,6 @@ runs:
         TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
         INTERVAL_SECONDS: ${{ inputs.interval-seconds }}
         WORKFLOW_FILE: ${{ inputs.workflow-file }}
+        WORKFLOW_EVENT: ${{ inputs.workflow-event }}
         GITHUB_REPOSITORY: ${{ github.repository }}
       run: bash ${{ github.action_path }}/script.sh

@@ -34,6 +34,7 @@ COMMIT_SHA="${COMMIT_SHA:-}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-1800}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-30}"
 WORKFLOW_FILE="${WORKFLOW_FILE:-ci.yml}"
+WORKFLOW_EVENT="${WORKFLOW_EVENT:-}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}"
 
 if [[ -z "$GITHUB_TOKEN" ]] || [[ -z "$COMMIT_SHA" ]]; then
@@ -56,9 +57,13 @@ while [ $(date +%s) -lt $end_time ]; do
   echo "🔍 [$(date '+%H:%M:%S')] Attempt $attempt (elapsed: ${elapsed}s) - Checking CI status..."
 
   # Get CI workflow runs for this commit
+  query="head_sha=$COMMIT_SHA"
+  if [ -n "$WORKFLOW_EVENT" ]; then
+    query="$query&event=$WORKFLOW_EVENT"
+  fi
   response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
     -H "Accept: application/vnd.github.v3+json" \
-    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW_FILE/runs?head_sha=$COMMIT_SHA")
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW_FILE/runs?$query")
 
   # Debug: Show total workflow runs found
   total_runs=$(echo "$response" | jq -r '.total_count // 0')

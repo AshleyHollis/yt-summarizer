@@ -442,6 +442,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           timeout-seconds: '1800'
+          workflow-event: pull_request
 
       - name: Azure Login
         if: steps.wait.outputs.image_tag != ''
