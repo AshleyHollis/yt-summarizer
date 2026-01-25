@@ -26,22 +26,22 @@ declare -A PATTERNS=(
 for patch_file in "$PATCH_DIR"/*.yaml; do
     filename=$(basename "$patch_file")
     echo "Checking: $filename"
-    
+
     # Check for each pattern
     for pattern in "${!PATTERNS[@]}"; do
         message="${PATTERNS[$pattern]}"
-        
+
         if grep -qE "$pattern" "$patch_file"; then
             echo "  ❌ ERROR: Found hardcoded value matching pattern: $pattern"
             echo "     $message"
             echo "     File: $patch_file"
             echo ""
-            
+
             # Show the matching lines with context
             echo "     Matching lines:"
             grep -nE "$pattern" "$patch_file" | sed 's/^/       /'
             echo ""
-            
+
             ERRORS=$((ERRORS + 1))
         fi
     done
