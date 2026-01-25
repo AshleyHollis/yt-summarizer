@@ -33,6 +33,8 @@ GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 COMMIT_SHA="${COMMIT_SHA:-}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-1800}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-30}"
+WORKFLOW_FILE="${WORKFLOW_FILE:-ci.yml}"
+WORKFLOW_EVENT="${WORKFLOW_EVENT:-}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}"
 
 if [[ -z "$GITHUB_TOKEN" ]] || [[ -z "$COMMIT_SHA" ]]; then
@@ -54,22 +56,26 @@ while [ $(date +%s) -lt $end_time ]; do
   elapsed=$((current_time - start_time))
   echo "🔍 [$(date '+%H:%M:%S')] Attempt $attempt (elapsed: ${elapsed}s) - Checking CI status..."
 
-  # Get CI workflow runs for this commit (remove event filter to catch all triggers)
+  # Get CI workflow runs for this commit
+  query="head_sha=$COMMIT_SHA"
+  if [ -n "$WORKFLOW_EVENT" ]; then
+    query="$query&event=$WORKFLOW_EVENT"
+  fi
   response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
     -H "Accept: application/vnd.github.v3+json" \
-    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$COMMIT_SHA")
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW_FILE/runs?$query")
 
   # Debug: Show total workflow runs found
   total_runs=$(echo "$response" | jq -r '.total_count // 0')
   echo "   📊 Found $total_runs total workflow runs for commit $COMMIT_SHA"
 
-  # Extract CI workflow run (filter by workflow name "CI")
-  ci_run=$(echo "$response" | jq -r '.workflow_runs[] | select(.name == "CI") | .id' | head -1)
+  # Extract latest CI workflow run
+  ci_run=$(echo "$response" | jq -r '.workflow_runs[0].id // empty')
   if [ -z "$ci_run" ]; then
     echo "   ❌ No CI workflow run found yet for commit $COMMIT_SHA"
   else
-    ci_status=$(echo "$response" | jq -r ".workflow_runs[] | select(.id == ($ci_run | tonumber)) | .status")
-    ci_conclusion=$(echo "$response" | jq -r ".workflow_runs[] | select(.id == ($ci_run | tonumber)) | .conclusion")
+    ci_status=$(echo "$response" | jq -r ".workflow_runs[0].status // empty")
+    ci_conclusion=$(echo "$response" | jq -r ".workflow_runs[0].conclusion // empty")
     echo "   🔗 CI Run ID: $ci_run | Status: $ci_status | Conclusion: $ci_conclusion"
 
     if [ "$ci_status" = "completed" ]; then

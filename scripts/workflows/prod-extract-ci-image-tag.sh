@@ -22,10 +22,19 @@
 # Exit: Succeeds if tag generation works
 # =============================================================================
 
-set -e  # Exit on error
+set -euo pipefail
 
-COMMIT_SHA="${1:-$(git rev-parse HEAD)}"
-SHORT_SHA=$(git rev-parse --short=7 "$COMMIT_SHA")
+COMMIT_SHA="${1:-${COMMIT_SHA:-${GITHUB_SHA:-}}}"
+if [ -z "$COMMIT_SHA" ]; then
+  COMMIT_SHA=$(git rev-parse HEAD)
+fi
+
+SHORT_SHA="${COMMIT_SHA:0:7}"
+if [ -z "$SHORT_SHA" ]; then
+  echo "::error::Unable to determine short commit SHA for image tag"
+  exit 1
+fi
+
 IMAGE_TAG="sha-${SHORT_SHA}"
 
 echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"

@@ -20,7 +20,14 @@
 #   If workflow_dispatch AND inputs.run_preview != 'true':
 #     Set both flags to false (skip preview deployment)
 #   Otherwise:
-#     Always deploy all components (set both flags true)
+#     Always deploy (set both flags to true)
+#
+# RATIONALE:
+#   Workflow changes can cause deployment issues. Always deploying ensures:
+#   - Workflow changes are validated against real deployment
+#   - No edge cases from conditional skipping
+#   - Predictable, reliable behavior
+#   - CI always builds images, preview always deploys
 #
 # Exit: Always succeeds
 # =============================================================================
@@ -35,6 +42,7 @@ if [[ "${EVENT_NAME}" == "workflow_dispatch" ]] && [[ "${RUN_PREVIEW}" != "true"
   needs_image_build=false
   needs_deployment=false
 else
+  # Always build and deploy for PRs (avoid edge cases from conditional skipping)
   needs_image_build=true
   needs_deployment=true
 fi

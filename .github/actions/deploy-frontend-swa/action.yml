@@ -1,0 +1,93 @@
+name: Deploy Frontend to SWA
+description: Deploy frontend using CI build artifact
+inputs:
+  github-token:
+    description: GitHub token for artifact download
+    required: true
+  ci-run-id:
+    description: CI run ID containing frontend build artifact
+    required: true
+  api-url:
+    description: API base URL for runtime config
+    required: true
+  swa-token:
+    description: Azure Static Web Apps deployment token
+    required: true
+  artifact-name:
+    description: CI artifact name
+    default: frontend-build
+    required: false
+  artifact-path:
+    description: Path to download artifact
+    default: /tmp/frontend-build
+    required: false
+  app-location:
+    description: Path to Next.js app root
+    default: apps/web
+    required: false
+  runtime-config-path:
+    description: Path to runtime config file
+    default: apps/web/public/runtime-config.js
+    required: false
+  output_location:
+    description: SWA output location
+    default: ""
+    required: false
+  production-branch:
+    description: Production branch name
+    default: main
+    required: false
+outputs:
+  static_web_app_url:
+    description: Deployed Static Web App URL
+    value: ${{ steps.deploy.outputs.static_web_app_url }}
+runs:
+  using: composite
+  steps:
+    - name: Download frontend build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.artifact-path }}
+        run-id: ${{ inputs.ci-run-id }}
+        github-token: ${{ inputs.github-token }}
+
+    - name: Apply CI build artifact
+      shell: bash
+      run: |
+        source_dir="${{ inputs.artifact-path }}"
+        app_dir="${{ inputs.app-location }}"
+        if [[ ! -d "$source_dir" ]]; then
+          echo "::error::Expected CI build directory not found at $source_dir"
+          ls -la "$source_dir" || true
+          exit 1
+        fi
+        rm -rf "$app_dir/.next" "$app_dir/public"
+        cp -R "$source_dir/.next" "$app_dir/.next"
+        cp -R "$source_dir/public" "$app_dir/public"
+        if [[ -f "$source_dir/staticwebapp.config.json" ]]; then
+          cp "$source_dir/staticwebapp.config.json" "$app_dir/staticwebapp.config.json"
+        fi
+        echo "=== ${app_dir} structure ==="
+        ls -la "$app_dir/"
+        echo "=== ${app_dir}/.next structure ==="
+        ls -la "$app_dir/.next/" || echo "No .next directory"
+
+    - name: Write runtime config
+      shell: bash
+      run: |
+        bash scripts/workflows/write-runtime-config.sh \
+          "${{ inputs.runtime-config-path }}" \
+          "${{ inputs.api-url }}"
+
+    - name: Deploy to Static Web Apps
+      id: deploy
+      uses: Azure/static-web-apps-deploy@v1
+      with:
+        azure_static_web_apps_api_token: ${{ inputs.swa-token }}
+        repo_token: ${{ inputs.github-token }}
+        action: upload
+        app_location: ${{ inputs.app-location }}
+        output_location: ${{ inputs.output_location }}
+        skip_app_build: true
+        production_branch: ${{ inputs.production-branch }}
