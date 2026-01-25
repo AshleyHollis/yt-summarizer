@@ -156,11 +156,26 @@ patches:
       apiVersion: batch/v1
       kind: Job
       metadata:
-        name: db-migrate
+        name: db-migration
       spec:
         template:
           spec:
             serviceAccountName: db-migrate
     target:
       kind: Job
-      name: db-migrate
+      name: db-migration
+
+  # Migration job patch - resource limits
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 150m
+            memory: 256Mi
+    target:
+      kind: Job
+      name: db-migration
