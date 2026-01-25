@@ -7,11 +7,7 @@ title = "yt-summarizer gitleaks config"
 # Extend   default gitleaks config
 useDefault = true
 
-# Allowlist rules for false positives
-[allowlist]
-  description = "Allowlist for false positives"
-
-  # Terraform variable definitions (not actual secrets)
+  # Allowlist rules for false positives
   paths = [
     '''infra/terraform/modules/.*/variables\.tf''',
     '''infra/terraform/environments/.*/variables\.tf''',
@@ -30,6 +26,8 @@ useDefault = true
     '''\.md$''',
     # Development scripts with test credentials
     '''scripts/start-workers\.ps1''',
+    # Kubernetes overlays (contain image tags, not secrets)
+    '''k8s/overlays/.*/kustomization\.yaml''',
   ]
 
   # Regex patterns that are not secrets (matches in   secret value itself)
