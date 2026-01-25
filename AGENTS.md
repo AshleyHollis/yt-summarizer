@@ -141,6 +141,73 @@
 - **Deploy infra**: `./scripts/deploy-infra.ps1`
 - CI helpers live under `scripts/ci/`.
 
+## Validation Framework
+All infrastructure validation is centralized in the `.github/actions/validate` composite action for consistency and maintainability.
+
+### Available Validators
+The validate action supports these validators (use comma-separated list):
+
+- **yaml-syntax**: Validates YAML syntax for all K8s manifests
+- **kustomize-build**: Validates kustomize overlays and bases build successfully
+- **argocd-paths**: Validates Argo CD Application paths exist
+- **argocd-manifest**: Validates Argo CD manifests against server state
+- **terraform-config**: Validates Terraform configuration (fmt, validate, init)
+- **k8s-placeholders**: Validates K8s preview patches use placeholders (not hardcoded values)
+- **swa-config**: Validates Static Web Apps configuration (output_location, token, build script)
+- **kustomize-resources**: Validates resource requests/limits against AKS quotas
+- **all**: Runs all validators
+
+### Usage Examples
+
+```yaml
+# K8s validation
+- uses: ./.github/actions/validate
+  with:
+    validators: yaml-syntax,kustomize-build,k8s-placeholders
+    overlay-paths: k8s/overlays/preview,k8s/overlays/prod
+    k8s-preview-patch-dir: k8s/overlays/preview/patches
+
+# Terraform validation
+- uses: ./.github/actions/validate
+  with:
+    validators: terraform-config
+    terraform-directory: infra/terraform
+    terraform-backend-config: 'true'
+
+# Resource quota validation with AKS query
+- uses: ./.github/actions/validate
+  with:
+    validators: kustomize-resources
+    overlay-paths: k8s/overlays/prod
+    query-aks: 'true'
+    aks-resource-group: rg-yt-summarizer-prod
+    aks-cluster-name: aks-yt-summarizer-prod
+    aks-namespace: default
+
+# Manual limits (if not querying AKS)
+- uses: ./.github/actions/validate
+  with:
+    validators: kustomize-resources
+    overlay-paths: k8s/overlays/prod
+    max-cpu-millicores: '4000'
+    max-memory-mi: '8192'
+```
+
+### Validator Details
+
+**k8s-placeholders**: Ensures preview environment patches use placeholders that get substituted during deployment. Validates against hardcoded patterns like `api-pr-109`, `red-grass-xxx-109.eastasia.6.azurestaticapps.net`, etc. Required placeholders: `__PR_NUMBER__`, `__PREVIEW_HOST__`, `__TLS_SECRET__`, `__SWA_URL__`.
+
+**swa-config**: Validates Static Web Apps configuration consistency across workflow files. Checks: (1) `output_location: ""` in deploy workflows, (2) SWA token is `SWA_DEPLOYMENT_TOKEN`, (3) build script starts with `next build --webpack`, (4) no root package.json/package-lock.json.
+
+**kustomize-resources**: Validates total CPU/memory requests don't exceed AKS cluster quotas. Can query AKS for actual quotas (`query-aks: 'true'`) or use manual limits. Sums container requests across all Deployment/StatefulSet/DaemonSet resources (scaled by replicas).
+
+### Deprecated Scripts (Removed)
+These scripts have been migrated to the centralized validate action:
+- ~~`scripts/validate_workflows.py`~~ - Now covered by yaml-syntax validator + actionlint
+- ~~`scripts/validate-swa-output.ps1`~~ - Now `swa-config` validator
+- ~~`scripts/ci/validate-k8s-placeholders.sh`~~ - Now `k8s-placeholders` validator  
+- ~~`scripts/ci/validate_kustomize.py`~~ - Now `kustomize-resources` validator
+
 ## Queue Polling & Cost Optimization
 Workers poll Azure Storage queues at configurable intervals to balance latency vs. transaction costs:
 
