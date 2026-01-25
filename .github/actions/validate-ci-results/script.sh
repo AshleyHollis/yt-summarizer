@@ -17,7 +17,7 @@
 #   TEST_SHARED_RESULT  - Result of test-shared job (success/failure/skipped)
 #   TEST_API_RESULT     - Result of test-api job
 #   TEST_WORKERS_RESULT - Result of test-workers job
-#   TEST_FRONTEND_RESULT- Result of test-frontend job
+#   FRONTEND_QUALITY_RESULT- Result of frontend-quality job
 #   VALIDATE_TERRAFORM_RESULT  - Result of validate-terraform job
 #   KUBERNETES_VALIDATE_RESULT - Result of kubernetes-validate job
 #   SECRET_SCANNING_RESULT     - Result of secret-scanning job
@@ -53,7 +53,7 @@ should_run_job() {
     "test-workers")
       [[ "$CHANGED_AREAS" =~ services/workers ]] || [[ "$CHANGED_AREAS" =~ services/shared ]]
       ;;
-    "test-frontend")
+    "frontend-quality")
       [[ "$CHANGED_AREAS" =~ apps/web ]]
       ;;
     "validate-terraform")
@@ -116,7 +116,7 @@ echo ""
 check_job "test-shared" "${TEST_SHARED_RESULT}" || EXIT_CODE=1
 check_job "test-api" "${TEST_API_RESULT}" || EXIT_CODE=1
 check_job "test-workers" "${TEST_WORKERS_RESULT}" || EXIT_CODE=1
-check_job "test-frontend" "${TEST_FRONTEND_RESULT}" || EXIT_CODE=1
+check_job "frontend-quality" "${FRONTEND_QUALITY_RESULT}" || EXIT_CODE=1
 
 # Check validation jobs
 check_job "validate-terraform" "${VALIDATE_TERRAFORM_RESULT}" || EXIT_CODE=1

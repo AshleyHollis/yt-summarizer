@@ -147,8 +147,8 @@ jobs:
       - name: Run ruff checks
         uses: ./.github/actions/run-ruff-check
 
-  lint-frontend:
-    name: Lint Frontend
+  frontend-quality:
+    name: Frontend Quality
     runs-on: ubuntu-latest
     needs: [detect-changes]
     # Main branch: Always run | PR: Run if frontend changed
@@ -169,6 +169,37 @@ jobs:
       - name: Run ESLint
         working-directory: apps/web
         run: npm run lint
+
+      - name: Scan JavaScript dependencies
+        uses: ./.github/actions/scan-javascript-dependencies
+        with:
+          working-directory: apps/web
+          check-missing-deps: 'true'
+          check-security: 'true'
+          audit-level: 'high'
+
+      - name: Run Vitest
+        uses: ./.github/actions/run-frontend-tests
+
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: >-
+            ${{ runner.os }}-nextjs-
+            ${{ hashFiles('apps/web/package-lock.json') }}-
+            ${{ hashFiles('apps/web/next.config.*') }}-
+            ${{ hashFiles('apps/web/tsconfig.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-
+
+      - name: TypeScript type check
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
+      - name: Build Next.js application
+        working-directory: apps/web
+        run: npm run build
 
   # ===========================================================================
   # PHASE 3: SECURITY SCANNING
@@ -235,33 +266,6 @@ jobs:
           check-security: 'true'
           fail-on-warnings: 'false'
 
-  scan-javascript-security:
-    name: Scan JavaScript Security
-    runs-on: ubuntu-latest
-    needs: [detect-changes, lint-frontend]
-    # Main branch: Always run | PR: Run if frontend changed
-    # Requires lint-frontend to pass (or skip if not needed)
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'apps/web')) &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          working-directory: apps/web
-
-      - name: Scan JavaScript dependencies
-        uses: ./.github/actions/scan-javascript-dependencies
-        with:
-          working-directory: apps/web
-          check-missing-deps: 'true'
-          check-security: 'true'
-          audit-level: 'high'
 
   # ===========================================================================
   # PHASE 4: TESTING
@@ -411,70 +415,6 @@ jobs:
         with:
           start-time: ${{ steps.start.outputs.started_at }}
           test-name: Workers Tests
-
-  test-frontend:
-    name: Test Frontend
-    runs-on: ubuntu-latest
-    needs: [detect-changes, lint-frontend, scan-javascript-security]
-    # Main branch: Always run | PR: Run if frontend changed
-    # Requires lint and security scans to pass
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'apps/web')) &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
-      (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          working-directory: apps/web
-
-      - name: Run Vitest
-        uses: ./.github/actions/run-frontend-tests
-
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    needs: [detect-changes, lint-frontend]
-    # Main branch: Always run | PR: Run if frontend changed
-    # Requires lint to pass (runs in parallel with tests)
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'apps/web')) &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          working-directory: apps/web
-
-      - name: Restore Next.js build cache
-        uses: actions/cache@v4
-        with:
-          path: apps/web/.next/cache
-          key: >-
-            ${{ runner.os }}-nextjs-
-            ${{ hashFiles('apps/web/package-lock.json') }}-
-            ${{ hashFiles('apps/web/next.config.*') }}-
-            ${{ hashFiles('apps/web/tsconfig.json') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-
-
-      - name: TypeScript type check
-        working-directory: apps/web
-        run: npx tsc --noEmit
-
-      - name: Build Next.js application
-        working-directory: apps/web
-        run: npm run build
 
   # ===========================================================================
   # PHASE 5: KUBERNETES VALIDATION
@@ -626,9 +566,8 @@ jobs:
         detect-changes,
         build-images-meta,
         lint-python,
-        lint-frontend,
+        frontend-quality,
         scan-python-security,
-        scan-javascript-security,
       ]
     # CRITICAL always() dependency:
     # - build-images-meta uses always() so it runs when some tests skip
@@ -653,9 +592,8 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
        contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.lint-frontend.result == 'success' || needs.lint-frontend.result == 'skipped') &&
       (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped') &&
-      (needs.scan-javascript-security.result == 'success' || needs.scan-javascript-security.result == 'skipped')
+      (needs.frontend-quality.result == 'success' || needs.frontend-quality.result == 'skipped')
     strategy:
       matrix:
         include:
@@ -841,13 +779,11 @@ jobs:
     needs:
       - detect-changes
       - lint-python
-      - lint-frontend
+      - frontend-quality
       - scan-python-security
-      - scan-javascript-security
       - test-shared
       - test-api
       - test-workers
-      - test-frontend
       - build-images
       - build-images-meta
       - validate-terraform
@@ -868,9 +804,9 @@ jobs:
             echo "- Mode: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch (full validation)' || 'PR (change-based)' }}"
             echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
             echo "- Lint Python: ${{ needs.lint-python.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || (contains(needs.detect-changes.outputs.changed_areas, 'services/api') || contains(needs.detect-changes.outputs.changed_areas, 'services/workers') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) && 'python changes' || 'no python changes' }})"
-            echo "- Lint Frontend: ${{ needs.lint-frontend.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || contains(needs.detect-changes.outputs.changed_areas, 'apps/web') && 'frontend changes' || 'no frontend changes' }})"
-            echo "- Security Scans (Python/JS): ${{ needs.scan-python-security.result }}/${{ needs.scan-javascript-security.result }}"
-            echo "- Tests (shared/api/workers/frontend): ${{ needs.test-shared.result }}/${{ needs.test-api.result }}/${{ needs.test-workers.result }}/${{ needs.test-frontend.result }}"
+            echo "- Frontend Quality: ${{ needs.frontend-quality.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || contains(needs.detect-changes.outputs.changed_areas, 'apps/web') && 'frontend changes' || 'no frontend changes' }})"
+            echo "- Security Scans (Python): ${{ needs.scan-python-security.result }}"
+            echo "- Tests (shared/api/workers): ${{ needs.test-shared.result }}/${{ needs.test-api.result }}/${{ needs.test-workers.result }}"
             echo "- Build Images: ${{ needs.build-images.result }} (ACR: ${{ vars.ACR_NAME != '' && 'configured' || 'not configured' }})"
             echo "- Terraform Validate: ${{ needs.validate-terraform.result }}"
             echo "- K8s Validate: ${{ needs.kubernetes-validate.result }}"
@@ -885,9 +821,8 @@ jobs:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           pr-number: ${{ github.event.pull_request.number }}
           lint-python-result: ${{ needs.lint-python.result }}
-          lint-frontend-result: ${{ needs.lint-frontend.result }}
           scan-python-security-result: ${{ needs.scan-python-security.result }}
-          scan-javascript-security-result: ${{ needs.scan-javascript-security.result }}
+          frontend-quality-result: ${{ needs.frontend-quality.result }}
           secret-scanning-result: ${{ needs.secret-scanning.result }}
           test-shared-result: ${{ needs.test-shared.result }}
           test-shared-duration: ${{ needs.test-shared.outputs.test_duration }}
@@ -895,7 +830,6 @@ jobs:
           test-api-duration: ${{ needs.test-api.outputs.test_duration }}
           test-workers-result: ${{ needs.test-workers.result }}
           test-workers-duration: ${{ needs.test-workers.outputs.test_duration }}
-          test-frontend-result: ${{ needs.test-frontend.result }}
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           build-images-result: ${{ needs.build-images.result }}
@@ -912,7 +846,7 @@ jobs:
           test-shared-result: ${{ needs.test-shared.result }}
           test-api-result: ${{ needs.test-api.result }}
           test-workers-result: ${{ needs.test-workers.result }}
-          test-frontend-result: ${{ needs.test-frontend.result }}
+          frontend-quality-result: ${{ needs.frontend-quality.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
           secret-scanning-result: ${{ needs.secret-scanning.result }}

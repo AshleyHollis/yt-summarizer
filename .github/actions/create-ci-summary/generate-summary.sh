@@ -12,14 +12,12 @@
 #   COMMIT_SHA                           - Git commit SHA
 #   PR_NUMBER                            - Pull request number (empty for main)
 #   LINT_PYTHON_RESULT                   - Result of Python linting (success/failure/skipped)
-#   LINT_FRONTEND_RESULT                 - Result of frontend linting
+#   FRONTEND_QUALITY_RESULT              - Result of frontend quality checks
 #   SCAN_PYTHON_SECURITY_RESULT          - Result of Python security scanning
-#   SCAN_JAVASCRIPT_SECURITY_RESULT      - Result of JavaScript security scanning
 #   SECRET_SCANNING_RESULT               - Result of secret scanning
 #   TEST_SHARED_RESULT, DURATION         - Shared package test results + timing
 #   TEST_API_RESULT, DURATION            - API service test results + timing
 #   TEST_WORKERS_RESULT, DURATION        - Workers test results + timing
-#   TEST_FRONTEND_RESULT                 - Frontend test results
 #   KUBERNETES_VALIDATE_RESULT           - K8s manifest validation result
 #   VALIDATE_KUSTOMIZE_RESULT            - Kustomize overlay validation result
 #   VALIDATE_TERRAFORM_RESULT            - Terraform validation result
@@ -54,9 +52,8 @@ CHANGED_AREAS="${CHANGED_AREAS:-}"
 COMMIT_SHA="${COMMIT_SHA:?COMMIT_SHA not set}"
 PR_NUMBER="${PR_NUMBER:-}"
 LINT_PYTHON_RESULT="${LINT_PYTHON_RESULT:-skipped}"
-LINT_FRONTEND_RESULT="${LINT_FRONTEND_RESULT:-skipped}"
+FRONTEND_QUALITY_RESULT="${FRONTEND_QUALITY_RESULT:-skipped}"
 SCAN_PYTHON_SECURITY_RESULT="${SCAN_PYTHON_SECURITY_RESULT:-skipped}"
-SCAN_JAVASCRIPT_SECURITY_RESULT="${SCAN_JAVASCRIPT_SECURITY_RESULT:-skipped}"
 SECRET_SCANNING_RESULT="${SECRET_SCANNING_RESULT:-skipped}"
 TEST_SHARED_RESULT="${TEST_SHARED_RESULT:-skipped}"
 TEST_SHARED_DURATION="${TEST_SHARED_DURATION:-}"
@@ -64,7 +61,6 @@ TEST_API_RESULT="${TEST_API_RESULT:-skipped}"
 TEST_API_DURATION="${TEST_API_DURATION:-}"
 TEST_WORKERS_RESULT="${TEST_WORKERS_RESULT:-skipped}"
 TEST_WORKERS_DURATION="${TEST_WORKERS_DURATION:-}"
-TEST_FRONTEND_RESULT="${TEST_FRONTEND_RESULT:-skipped}"
 KUBERNETES_VALIDATE_RESULT="${KUBERNETES_VALIDATE_RESULT:-skipped}"
 VALIDATE_KUSTOMIZE_RESULT="${VALIDATE_KUSTOMIZE_RESULT:-skipped}"
 VALIDATE_TERRAFORM_RESULT="${VALIDATE_TERRAFORM_RESULT:-skipped}"
@@ -97,10 +93,10 @@ format_duration() {
 OVERALL_STATUS="✅ Success"
 HAS_FAILURES=false
 
-for result in "$LINT_PYTHON_RESULT" "$LINT_FRONTEND_RESULT" \
-              "$SCAN_PYTHON_SECURITY_RESULT" "$SCAN_JAVASCRIPT_SECURITY_RESULT" \
+for result in "$LINT_PYTHON_RESULT" "$FRONTEND_QUALITY_RESULT" \
+              "$SCAN_PYTHON_SECURITY_RESULT" \
               "$TEST_SHARED_RESULT" "$TEST_API_RESULT" \
-              "$TEST_WORKERS_RESULT" "$TEST_FRONTEND_RESULT" \
+              "$TEST_WORKERS_RESULT" \
               "$KUBERNETES_VALIDATE_RESULT" "$VALIDATE_KUSTOMIZE_RESULT" \
               "$BUILD_IMAGES_RESULT"; do
   if [ "$result" = "failure" ]; then
@@ -155,7 +151,7 @@ echo "" >> $GITHUB_STEP_SUMMARY
 echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
 echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
 echo "| Python (ruff) | $(format_status "$LINT_PYTHON_RESULT") |" >> $GITHUB_STEP_SUMMARY
-echo "| Frontend (ESLint) | $(format_status "$LINT_FRONTEND_RESULT") |" >> $GITHUB_STEP_SUMMARY
+echo "| Frontend Quality | $(format_status "$FRONTEND_QUALITY_RESULT") |" >> $GITHUB_STEP_SUMMARY
 echo "" >> $GITHUB_STEP_SUMMARY
 
 # Security section
@@ -164,7 +160,6 @@ echo "" >> $GITHUB_STEP_SUMMARY
 echo "| Scan | Status |" >> $GITHUB_STEP_SUMMARY
 echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
 echo "| Python (bandit/pip-audit) | $(format_status "$SCAN_PYTHON_SECURITY_RESULT") |" >> $GITHUB_STEP_SUMMARY
-echo "| JavaScript (npm audit) | $(format_status "$SCAN_JAVASCRIPT_SECURITY_RESULT") |" >> $GITHUB_STEP_SUMMARY
 echo "| Secrets (gitleaks) | $(format_status "$SECRET_SCANNING_RESULT") |" >> $GITHUB_STEP_SUMMARY
 echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -176,7 +171,6 @@ echo "|------------|--------|----------|" >> $GITHUB_STEP_SUMMARY
 echo "| Shared Package | $(format_status "$TEST_SHARED_RESULT") | $(format_duration "$TEST_SHARED_DURATION") |" >> $GITHUB_STEP_SUMMARY
 echo "| API Service | $(format_status "$TEST_API_RESULT") | $(format_duration "$TEST_API_DURATION") |" >> $GITHUB_STEP_SUMMARY
 echo "| Workers | $(format_status "$TEST_WORKERS_RESULT") | $(format_duration "$TEST_WORKERS_DURATION") |" >> $GITHUB_STEP_SUMMARY
-echo "| Frontend | $(format_status "$TEST_FRONTEND_RESULT") | - |" >> $GITHUB_STEP_SUMMARY
 echo "" >> $GITHUB_STEP_SUMMARY
 
 # Validation section
