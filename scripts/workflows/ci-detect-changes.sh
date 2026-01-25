@@ -38,7 +38,7 @@ if [[ "$main_branch" == "true" || "$force_full" == "true" || "$event_name" == "p
   # Force ALL areas to run full validation
   echo "changed_areas=services/api services/workers services/shared apps/web k8s infra/terraform docker" >> "$GITHUB_OUTPUT"
   echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
-  
+
   if [[ "$event_name" == "pull_request" ]]; then
     echo "✓ Pull request: All validation and build jobs will run (avoids workflow edge cases)"
   elif [[ "$force_full" == "true" && "$main_branch" != "true" ]]; then

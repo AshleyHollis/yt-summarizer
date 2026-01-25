@@ -17,6 +17,7 @@ Debug endpoints (mirrors worker debug endpoints for consistency):
 - /debug/trace-test: Generate a test trace span
 """
 
+import asyncio
 import os
 import sys
 import time
@@ -154,16 +155,37 @@ async def readiness_check(request: Request) -> ReadinessStatus:
 
     # Also verify we can actually connect to the database
     if db_initialized:
-        try:
-            from shared.db.connection import get_db
+        cache_ttl_seconds = int(os.environ.get("READINESS_DB_CACHE_TTL_SECONDS", "15"))
+        timeout_seconds = float(os.environ.get("READINESS_DB_TIMEOUT_SECONDS", "3"))
+        now = datetime.utcnow()
+        last_ok_at = getattr(request.app.state, "db_last_ok_at", None)
 
-            db = get_db()
-            await db.connect()
+        use_cache = False
+        if last_ok_at:
+            age_seconds = (now - last_ok_at).total_seconds()
+            use_cache = age_seconds <= cache_ttl_seconds
+
+        if use_cache:
             checks["database_connection"] = True
-        except Exception as e:
-            checks["database_connection"] = False
-            checks["database_error"] = str(e)[:100]  # Truncate error message
-            all_ready = False
+            checks["database_connection_cached"] = True
+        else:
+            try:
+                from shared.db.connection import get_db
+
+                db = get_db()
+                await asyncio.wait_for(db.connect(), timeout=timeout_seconds)
+                checks["database_connection"] = True
+                checks["database_connection_cached"] = False
+                request.app.state.db_last_ok_at = now
+                request.app.state.db_error = None
+            except Exception as e:
+                checks["database_connection"] = False
+                checks["database_connection_cached"] = False
+                request.app.state.db_error = str(e)[:200]
+                all_ready = False
+    else:
+        checks["database_connection"] = False
+        checks["database_connection_cached"] = False
 
     return ReadinessStatus(
         ready=all_ready,
