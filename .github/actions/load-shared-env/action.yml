@@ -11,5 +11,6 @@ runs:
           echo "::error::Shared config file not found: .github/config/shared.env"
           exit 1
         fi
-        cat .github/config/shared.env >> "$GITHUB_ENV"
+        # Filter out comments and blank lines before loading into GITHUB_ENV
+        grep -v '^\s*#' .github/config/shared.env | grep -v '^\s*$' >> "$GITHUB_ENV"
         echo "✓ Loaded shared environment variables from .github/config/shared.env"
