@@ -151,20 +151,6 @@ patches:
       kind: Deployment
       labelSelector: app.kubernetes.io/component=worker
 
-  # Migration job patch - service account
-  - patch: |-
-      apiVersion: batch/v1
-      kind: Job
-      metadata:
-        name: db-migration
-      spec:
-        template:
-          spec:
-            serviceAccountName: db-migrate
-    target:
-      kind: Job
-      name: db-migration
-
   # Migration job patch - resource limits
   - patch: |-
       - op: replace
