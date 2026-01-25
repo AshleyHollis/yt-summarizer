@@ -621,9 +621,9 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-           name: deployment-diagnostics-prod
-           path: diagnostics/
-           retention-days: 7
+          name: deployment-diagnostics-prod
+          path: diagnostics/
+          retention-days: 7
 
       - name: Verify TLS certificate
         uses: ./.github/actions/verify-certificate
