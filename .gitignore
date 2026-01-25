@@ -185,3 +185,9 @@ uv.lock
 *.tfstate.backup
 tfplan
 *.tfplan
+
+# -----------------------------------------------------------------------------
+# K8s Generated Overlays (CI-generated, not source controlled)
+# -----------------------------------------------------------------------------
+# PR-specific overlay directories created during preview deployments
+k8s/overlays/preview-pr-*/
