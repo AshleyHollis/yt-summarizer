@@ -108,6 +108,10 @@ jobs:
     name: Terraform
     uses: ./.github/workflows/terraform-deploy.yml
     needs: [wait-for-ci]
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write  # Required by terraform-plan job even when post-to-pr: false
     if: |
       needs.wait-for-ci.result == 'success' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_terraform != false) ||
