@@ -207,7 +207,11 @@ jobs:
         with:
           name: frontend-build
           include-hidden-files: true
-          path: apps/web/.next/standalone
+          path: |
+            apps/web/.next
+            apps/web/public
+            apps/web/package.json
+            apps/web/staticwebapp.config.json
 
   # ===========================================================================
   # PHASE 3: SECURITY SCANNING
