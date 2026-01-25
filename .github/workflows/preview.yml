@@ -889,19 +889,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-build
-          path: /tmp/frontend-standalone
+          path: /tmp/frontend-build
           run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Replace apps/web with standalone build
+      - name: Replace apps/web with CI build
         shell: bash
         run: |
           # Remove the source code version of apps/web
           rm -rf apps/web
-          # Move the standalone build to apps/web
-          mv /tmp/frontend-standalone apps/web
+          # Move the CI build to apps/web
+          mv /tmp/frontend-build/apps/web apps/web
           # Verify the structure
+          echo "=== apps/web structure ==="
           ls -la apps/web/
+          echo "=== apps/web/.next structure ==="
           ls -la apps/web/.next/ || echo "No .next directory"
 
       - name: Write runtime config

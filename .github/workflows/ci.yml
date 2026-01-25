@@ -198,26 +198,22 @@ jobs:
         working-directory: apps/web
         run: npx tsc --noEmit
 
-      - name: Build Next.js application
+      - name: Build Next.js application (standard output for SWA)
         working-directory: apps/web
+        env:
+          SKIP_STANDALONE: 'true'
         run: npm run build
-
-      - name: Prepare standalone deployment structure
-        shell: bash
-        run: |
-          # The standalone build is at apps/web/.next/standalone
-          # SWA needs the entire app structure with standalone output
-          cd apps/web
-          # Copy config files into standalone
-          cp package.json .next/standalone/
-          cp next.config.* .next/standalone/ 2>/dev/null || true
-          cp staticwebapp.config.json .next/standalone/ 2>/dev/null || true
 
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
-          path: apps/web/.next/standalone
+          path: |
+            apps/web/.next
+            apps/web/public
+            apps/web/package.json
+            apps/web/next.config.*
+            apps/web/staticwebapp.config.json
 
   # ===========================================================================
   # PHASE 3: SECURITY SCANNING

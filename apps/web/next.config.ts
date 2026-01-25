@@ -9,9 +9,10 @@ const withBundleAnalyzer = bundleAnalyzer({
 const isDev = process.env.NODE_ENV !== 'production';
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for Azure SWA deployment
-  // This reduces app size and is required for hybrid rendering on SWA
-  output: 'standalone',
+  // Enable standalone output for runtime deployments
+  // Disabled for CI artifact builds to create SWA-compatible build output
+  // SWA with skip_app_build needs standard .next directory, not standalone
+  output: process.env.SKIP_STANDALONE === 'true' ? undefined : 'standalone',
 
   // Enable React Compiler only in production (reduces dev memory ~15-20%)
   reactCompiler: !isDev,
