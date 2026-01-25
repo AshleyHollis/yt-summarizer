@@ -76,91 +76,11 @@ def main():
 
     generate_from_template(args.template, args.output, variables, header_comments)
 
-    # Create PR-specific overlay directory structure if it doesn't exist
-    pr_overlay_dir = f"k8s/overlays/preview-pr-{args.pr_number}"
-    pr_patches_dir = os.path.join(pr_overlay_dir, "patches")
-    os.makedirs(pr_patches_dir, exist_ok=True)
-    print(f"Created PR-specific overlay directory: {pr_overlay_dir}")
-
-    # Substitute placeholders in base-preview files (needed for HTTPRoute and other resources)
-    base_preview_dir = "k8s/base-preview"
-    try:
-        import shutil
-
-        for filename in os.listdir(base_preview_dir):
-            src_path = os.path.join(base_preview_dir, filename)
-            # Only process YAML files
-            if not os.path.isfile(src_path) or not filename.endswith((".yaml", ".yml")):
-                continue
-
-            # Copy to PR-specific directory
-            dst_path = os.path.join(pr_overlay_dir, filename)
-            shutil.copy2(src_path, dst_path)
-
-            # Read, substitute, and write to copy (not source)
-            with open(dst_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            # Global substitutions
-            content = content.replace("__PR_NUMBER__", args.pr_number)
-            # Optional values
-            if args.preview_host:
-                content = content.replace("__PREVIEW_HOST__", args.preview_host)
-            if args.tls_secret:
-                content = content.replace("__TLS_SECRET__", args.tls_secret)
-            # Always replace SWA URL (generated or provided)
-            if swa_url:
-                content = content.replace("__SWA_URL__", swa_url)
-            with open(dst_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"Copied and patched {src_path} -> {dst_path}")
-    except FileNotFoundError:
-        print(
-            f"Base preview directory not found: {base_preview_dir} (skipping base substitutions)"
-        )
-
-    # Copy and substitute placeholders in overlay patch files
-    # IMPORTANT: Copy to PR-specific directory, do NOT modify source patches
-    source_patch_dir = "k8s/overlays/preview/patches"
-    try:
-        import shutil
-
-        for filename in os.listdir(source_patch_dir):
-            src_path = os.path.join(source_patch_dir, filename)
-            # Only process regular files
-            if not os.path.isfile(src_path):
-                continue
-
-            # Copy to PR-specific patches directory
-            dst_path = os.path.join(pr_patches_dir, filename)
-            shutil.copy2(src_path, dst_path)
-
-            # Read, substitute, and write to copy (not source)
-            with open(dst_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            # Global substitutions
-            content = content.replace("__PR_NUMBER__", args.pr_number)
-            # Optional values
-            if args.preview_host:
-                content = content.replace("__PREVIEW_HOST__", args.preview_host)
-            if args.tls_secret:
-                content = content.replace("__TLS_SECRET__", args.tls_secret)
-            # Always replace SWA URL (generated or provided)
-            if swa_url:
-                content = content.replace("__SWA_URL__", swa_url)
-            with open(dst_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"Copied and patched {src_path} -> {dst_path}")
-    except FileNotFoundError:
-        print(
-            f"Source patch directory not found: {source_patch_dir} (skipping patch substitutions)"
-        )
-
     print(
         f"Generated {args.output} for PR #{args.pr_number} with image tag: {args.image_tag}"
     )
-    print(f"PR-specific overlay created at: {pr_overlay_dir}")
     print(
-        f"NOTE: Source template patches in {source_patch_dir} were NOT modified (they remain as templates)"
+        f"NOTE: Patches are generated inline in kustomization.yaml with substituted values"
     )
 
 

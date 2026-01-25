@@ -26,12 +26,136 @@ images:
     newTag: __IMAGE_TAG__
 
 patches:
-  - path: patches/externalsecret-db-patch.yaml
-  - path: patches/externalsecret-openai-patch.yaml
-  - path: patches/externalsecret-storage-patch.yaml
-  - path: patches/configmap-patch.yaml
-  - path: patches/api-deployment-patch.yaml
-  - path: patches/httproute-patch.yaml
-  - path: patches/resources-patch.yaml
-  - path: patches/replicas-patch.yaml
-  - path: patches/migration-job-patch.yaml
+  # ExternalSecret patches - reference ClusterSecretStore
+  - patch: |-
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: db-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+    target:
+      kind: ExternalSecret
+      name: db-credentials
+
+  - patch: |-
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: openai-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+    target:
+      kind: ExternalSecret
+      name: openai-credentials
+
+  - patch: |-
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: storage-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+    target:
+      kind: ExternalSecret
+      name: storage-credentials
+
+  # ConfigMap patch - CORS origins with SWA URL
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: shared-config
+      data:
+        CORS_ORIGINS: "__SWA_URL__"
+    target:
+      kind: ConfigMap
+      name: shared-config
+
+  # API Deployment patch - CORS origins env var
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        template:
+          spec:
+            containers:
+            - name: api
+              env:
+            - name: API__CORS_ORIGINS
+              # JSON array string - keep no spaces after commas
+              value: '["__SWA_URL__","http://localhost:3000"]'
+    target:
+      kind: Deployment
+      name: api
+
+  # HTTPRoute patch - preview hostname
+  - patch: |-
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: api-route
+        annotations:
+          external-dns.alpha.kubernetes.io/hostname: __PREVIEW_HOST__
+      spec:
+        hostnames:
+        - "__PREVIEW_HOST__"
+    target:
+      kind: HTTPRoute
+      name: api-route
+
+  # Resources patch - minimal limits for preview
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: not-used
+      spec:
+        template:
+          spec:
+            containers:
+            - name: not-used
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 150m
+                  memory: 256Mi
+    target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component
+
+  # Replicas patch - single replica for preview
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: not-used
+      spec:
+        replicas: 1
+    target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component
+
+  # Migration job patch - service account
+  - patch: |-
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: db-migrate
+      spec:
+        template:
+          spec:
+            serviceAccountName: db-migrate
+    target:
+      kind: Job
+      name: db-migrate
