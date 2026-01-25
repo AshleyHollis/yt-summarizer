@@ -21,6 +21,11 @@ IMAGE_TAG="${IMAGE_TAG:-}"
 COMMIT_SHA="${COMMIT_SHA:-}"
 PR_BRANCH="${PR_BRANCH:-}"
 
+if [[ -z "$PR_BRANCH" ]]; then
+  echo "::error::PR_BRANCH is empty; cannot push overlay updates"
+  exit 1
+fi
+
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
 
@@ -45,6 +50,6 @@ Commit: ${COMMIT_SHA}
 
 [skip ci]"
 
-  git push origin $PR_BRANCH
+  git push origin "HEAD:${PR_BRANCH}"
   echo "✅ Pushed overlay changes to $PR_BRANCH"
 fi

@@ -889,7 +889,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-build
-          path: apps/web
+          path: .
           run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -1144,6 +1144,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Write execution rationale
+        env:
+          PLAN_SUMMARY: ${{ needs.terraform-plan.outputs.plan_summary }}
         run: |
           {
             echo "## Preview Execution Rationale"
@@ -1152,8 +1154,8 @@ jobs:
             echo "- Needs image build: ${{ needs.detect-changes.outputs.needs_image_build }}"
             echo "- Infra changed: ${{ needs.detect-changes.outputs.infra_changed }}"
             terraform_plan_changes="n/a"
-            if [[ "${{ needs.terraform-plan.result }}" == 'success' ]]; then
-              terraform_plan_changes="${{ fromJson(needs.terraform-plan.outputs.plan_summary).has_changes }}"
+            if [[ -n "$PLAN_SUMMARY" ]]; then
+              terraform_plan_changes="$PLAN_SUMMARY"
             fi
             terraform_plan_reason="not requested"
             if [[ "${{ github.event_name }}" == 'workflow_dispatch' && "${{ inputs.run_terraform }}" == 'true' ]]; then
