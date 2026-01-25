@@ -102,8 +102,8 @@ class BaseWorker(ABC, Generic[T]):
 
     def __init__(
         self,
-        poll_interval: float = 1.0,
-        batch_size: int = 1,
+        poll_interval: float | None = None,
+        batch_size: int | None = None,
         visibility_timeout: int | None = None,
         max_retries: int | None = None,
         min_request_delay: float = 0.0,
@@ -113,17 +113,23 @@ class BaseWorker(ABC, Generic[T]):
         """Initialize the worker.
 
         Args:
-            poll_interval: Seconds between queue polls when empty.
-            batch_size: Number of messages to fetch per poll (1-32).
-            visibility_timeout: Seconds to hide message while processing.
-            max_retries: Maximum retry attempts before dead lettering.
+            poll_interval: Seconds between queue polls when empty (default: from settings).
+            batch_size: Number of messages to fetch per poll (default: from settings, max 32).
+            visibility_timeout: Seconds to hide message while processing (default: from settings).
+            max_retries: Maximum retry attempts before dead lettering (default: from settings).
             min_request_delay: Minimum seconds to wait after each request (rate limiting).
             request_delay_jitter: Random additional delay (0 to this value) to avoid patterns.
             health_port: Port for health/debug HTTP server. Uses HEALTH_PORT env var or default.
         """
-        self.poll_interval = poll_interval
-        self.batch_size = min(max(batch_size, 1), 32)
         self._settings = get_settings()
+
+        # Use parameter > environment (via settings) > default
+        self.poll_interval = (
+            poll_interval if poll_interval is not None else self._settings.queue.poll_interval
+        )
+        self.batch_size = batch_size if batch_size is not None else self._settings.queue.batch_size
+        self.batch_size = min(max(self.batch_size, 1), 32)  # Clamp to Azure limits (1-32)
+
         self.visibility_timeout = visibility_timeout or self._settings.queue.visibility_timeout
         self.max_retries = max_retries or self._settings.queue.max_retries
         self.min_request_delay = min_request_delay
@@ -582,6 +588,8 @@ class BaseWorker(ABC, Generic[T]):
             batch_size=self.batch_size,
             visibility_timeout=self.visibility_timeout,
             max_retries=self.max_retries,
+            min_request_delay=self.min_request_delay,
+            request_delay_jitter=self.request_delay_jitter,
         )
 
         # Ensure queue exists
