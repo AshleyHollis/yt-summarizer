@@ -198,28 +198,16 @@ jobs:
         working-directory: apps/web
         run: npx tsc --noEmit
 
-      - name: Build Next.js application (standard output for SWA)
+      - name: Build Next.js application (standalone for SWA)
         working-directory: apps/web
-        env:
-          SKIP_STANDALONE: 'true'
         run: npm run build
-
-      - name: Remove standalone output for SWA
-        shell: bash
-        run: |
-          rm -rf apps/web/.next/standalone
 
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           include-hidden-files: true
-          path: |
-            apps/web/.next
-            apps/web/public
-            apps/web/package.json
-            apps/web/next.config.*
-            apps/web/staticwebapp.config.json
+          path: apps/web/.next/standalone
 
   # ===========================================================================
   # PHASE 3: SECURITY SCANNING
