@@ -10,7 +10,7 @@ metadata:
   annotations:
     config.kubernetes.io/local-config: 'true'
 
-namespace: preview-pr-__PR_NUMBER__
+namespace: preview-pr-${PR_NUMBER}
 
 resources:
   - ../../base-preview
@@ -19,11 +19,11 @@ resources:
 
 images:
   - name: yt-summarizer-api
-    newName: __ACR_SERVER__/yt-summarizer-api
-    newTag: __IMAGE_TAG__
+    newName: ${ACR_SERVER}/yt-summarizer-api
+    newTag: ${IMAGE_TAG}
   - name: yt-summarizer-workers
-    newName: __ACR_SERVER__/yt-summarizer-workers
-    newTag: __IMAGE_TAG__
+    newName: ${ACR_SERVER}/yt-summarizer-workers
+    newTag: ${IMAGE_TAG}
 
 patches:
   # ExternalSecret patches - reference ClusterSecretStore
@@ -73,7 +73,7 @@ patches:
       metadata:
         name: shared-config
       data:
-        CORS_ORIGINS: "__SWA_URL__"
+        CORS_ORIGINS: "${SWA_URL}"
     target:
       kind: ConfigMap
       name: shared-config
@@ -92,7 +92,7 @@ patches:
               env:
             - name: API__CORS_ORIGINS
               # JSON array string - keep no spaces after commas
-              value: '["__SWA_URL__","http://localhost:3000"]'
+              value: '["${SWA_URL}","http://localhost:3000"]'
     target:
       kind: Deployment
       name: api
@@ -104,10 +104,10 @@ patches:
       metadata:
         name: api-route
         annotations:
-          external-dns.alpha.kubernetes.io/hostname: __PREVIEW_HOST__
+          external-dns.alpha.kubernetes.io/hostname: ${PREVIEW_HOST}
       spec:
         hostnames:
-        - "__PREVIEW_HOST__"
+        - "${PREVIEW_HOST}"
     target:
       kind: HTTPRoute
       name: api-route

@@ -17,10 +17,10 @@ resources:
 images:
   - name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: __IMAGE_TAG__
+    newTag: ${IMAGE_TAG}
   - name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: __IMAGE_TAG__
+    newTag: ${IMAGE_TAG}
 
 # Production-specific patches
 patches:
