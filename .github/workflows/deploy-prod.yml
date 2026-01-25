@@ -374,7 +374,7 @@ jobs:
       ((github.event_name == 'workflow_dispatch' && inputs.run_deploy != false) ||
        (github.event_name != 'workflow_dispatch'))
     outputs:
-      image_tag: ${{ steps.extract.outputs.image_tag }}
+      image_tag: ${{ steps.normalize-tag.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -383,6 +383,18 @@ jobs:
         id: extract
         shell: bash
         run: scripts/workflows/prod-extract-ci-image-tag.sh
+
+      - name: Normalize image tag
+        id: normalize-tag
+        shell: bash
+        run: |
+          image_tag="${{ steps.extract.outputs.image_tag }}"
+          if [ -z "$image_tag" ]; then
+            short_sha="${GITHUB_SHA:0:7}"
+            image_tag="sha-${short_sha}"
+            echo "::warning::Image tag output was empty; falling back to ${image_tag}"
+          fi
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
 
       - name: Azure Login
         uses: azure/login@v2
@@ -396,7 +408,7 @@ jobs:
         with:
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.extract.outputs.image_tag }}
+          tag: ${{ steps.normalize-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ---------------------------------------------------------------------------
