@@ -24,6 +24,9 @@ PR_BRANCH="${PR_BRANCH:-}"
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
 
+git fetch origin "${PR_BRANCH}"
+git checkout -B "${PR_BRANCH}" "origin/${PR_BRANCH}"
+
 # Sanity: ensure generated overlay contains a non-empty newTag
 if grep -q "newTag: \"\"" k8s/overlays/preview/kustomization.yaml; then
   echo "::error::Generated overlay has empty newTag - aborting commit"
