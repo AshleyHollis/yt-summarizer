@@ -293,36 +293,21 @@ jobs:
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     outputs:
-      test_duration: ${{ steps.finish.outputs.test_duration }}
+      test_duration: ${{ steps.tests.outputs.test-duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: ./.github/actions/setup-python-uv
+      - name: Run shared tests
+        id: tests
+        uses: ./.github/actions/run-python-tests
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           service-package: services/shared
-          install-pytest-xdist: 'true'
-
-      - name: Record tests start
-        id: start
-        uses: ./.github/actions/record-test-duration
-        with:
-          test-name: Shared Tests
-
-      - name: Run shared tests
-        uses: ./.github/actions/run-pytest
-        with:
           working-directory: services/shared
-          parallel: 'true'
-
-      - name: Record tests finish
-        id: finish
-        uses: ./.github/actions/record-test-duration
-        with:
-          start-time: ${{ steps.start.outputs.started_at }}
           test-name: Shared Tests
+          parallel: 'true'
+          install-pytest-xdist: 'true'
 
   test-api:
     name: Test API
@@ -338,38 +323,23 @@ jobs:
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     outputs:
-      test_duration: ${{ steps.finish.outputs.test_duration }}
+      test_duration: ${{ steps.tests.outputs.test-duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python with uv
-        uses: ./.github/actions/setup-python-uv
+      - name: Run API tests
+        id: tests
+        uses: ./.github/actions/run-python-tests
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           service-package: services/api
-          install-pytest-xdist: 'true'
-
-      - name: Record tests start
-        id: start
-        uses: ./.github/actions/record-test-duration
-        with:
-          test-name: API Tests
-
-      - name: Run API tests
-        uses: ./.github/actions/run-pytest
-        with:
           working-directory: services/api
+          test-name: API Tests
           parallel: 'true'
+          install-pytest-xdist: 'true'
           pytest-args: '-v --tb=short'
           markers: 'not integration and not live'
-
-      - name: Record tests finish
-        id: finish
-        uses: ./.github/actions/record-test-duration
-        with:
-          start-time: ${{ steps.start.outputs.started_at }}
-          test-name: API Tests
 
   test-workers:
     name: Test Workers
@@ -385,36 +355,21 @@ jobs:
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     outputs:
-      test_duration: ${{ steps.finish.outputs.test_duration }}
+      test_duration: ${{ steps.tests.outputs.test-duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python with uv
-        uses: ./.github/actions/setup-python-uv
+      - name: Run workers tests (parallel)
+        id: tests
+        uses: ./.github/actions/run-python-tests
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           service-package: services/workers
-          install-pytest-xdist: 'true'
-
-      - name: Record tests start
-        id: start
-        uses: ./.github/actions/record-test-duration
-        with:
-          test-name: Workers Tests
-
-      - name: Run workers tests (parallel)
-        uses: ./.github/actions/run-pytest
-        with:
           working-directory: services/workers
-          parallel: 'true'
-
-      - name: Record tests finish
-        id: finish
-        uses: ./.github/actions/record-test-duration
-        with:
-          start-time: ${{ steps.start.outputs.started_at }}
           test-name: Workers Tests
+          parallel: 'true'
+          install-pytest-xdist: 'true'
 
   # ===========================================================================
   # PHASE 5: KUBERNETES VALIDATION
@@ -566,7 +521,6 @@ jobs:
         detect-changes,
         build-images-meta,
         lint-python,
-        frontend-quality,
         scan-python-security,
       ]
     # CRITICAL always() dependency:
@@ -592,8 +546,7 @@ jobs:
        contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
        contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped') &&
-      (needs.frontend-quality.result == 'success' || needs.frontend-quality.result == 'skipped')
+      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
     strategy:
       matrix:
         include:
@@ -729,7 +682,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache pip and pre-commit
         uses: actions/cache@v4
