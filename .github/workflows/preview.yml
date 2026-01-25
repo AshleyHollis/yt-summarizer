@@ -896,10 +896,20 @@ jobs:
       - name: Replace apps/web with CI build
         shell: bash
         run: |
+          if [[ -d /tmp/frontend-build/apps/web ]]; then
+            source_dir="/tmp/frontend-build/apps/web"
+          else
+            source_dir="/tmp/frontend-build"
+          fi
+          if [[ ! -d "$source_dir" ]]; then
+            echo "::error::Expected CI build directory not found at $source_dir"
+            ls -la /tmp/frontend-build || true
+            exit 1
+          fi
           # Remove the source code version of apps/web
           rm -rf apps/web
           # Move the CI build to apps/web
-          mv /tmp/frontend-build/apps/web apps/web
+          mv "$source_dir" apps/web
           # Verify the structure
           echo "=== apps/web structure ==="
           ls -la apps/web/
