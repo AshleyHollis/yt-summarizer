@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useScope } from "@/app/providers";
+import { getClientApiUrl } from "@/services/runtimeConfig";
 
 interface TopicCount {
   facetId: string;
@@ -15,7 +16,7 @@ interface TopicsPanelProps {
   onTopicClick?: (facetId: string) => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = getClientApiUrl();
 
 export function TopicsPanel({ onTopicClick }: TopicsPanelProps) {
   const [topics, setTopics] = useState<TopicCount[]>([]);

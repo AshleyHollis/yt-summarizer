@@ -26,7 +26,9 @@ echo ""
 # CRITICAL PRE-CHECK: Verify overlay actually contains expected image tag
 # If APP_NAME not provided, derive it from namespace
 if [ -z "$APP_NAME" ]; then
-  if [[ "${NAMESPACE}" == "preview-"* ]]; then
+  if [[ "${NAMESPACE}" == "preview-pr-"* ]]; then
+    APP_NAME="${NAMESPACE}"
+  elif [[ "${NAMESPACE}" == "preview-"* ]]; then
     APP_NAME=$(echo ${NAMESPACE} | sed 's/^preview-/preview-pr-/')
   elif [[ "${NAMESPACE}" == "prod" ]]; then
     APP_NAME="yt-summarizer-prod"

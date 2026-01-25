@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -30,6 +31,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#fafafa] dark:bg-[#0f0f0f] text-gray-900 dark:text-gray-100`}
       >
+        <Script src="/runtime-config.js" strategy="beforeInteractive" />
         <Providers>
           <Navbar />
           {children}

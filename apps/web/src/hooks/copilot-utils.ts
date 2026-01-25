@@ -3,6 +3,7 @@
  */
 
 import { formatDuration } from '@/utils/formatDuration';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 // Re-export formatDuration as formatTime for backward compatibility
 export const formatTime = formatDuration;
@@ -10,7 +11,7 @@ export const formatTime = formatDuration;
 /**
  * API base URL from environment
  */
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_URL = getClientApiUrl();
 
 /**
  * Default minimum relevance threshold for filtering results

@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { ToolResultProvider } from "@/contexts/ToolResultContext";
 import { HealthStatusProvider, useHealthStatus } from "@/contexts/HealthStatusContext";
 import { WarmingUpIndicator, CopilotErrorBoundary } from "@/components/common";
+import { getClientApiUrl } from "@/services/runtimeConfig";
 
 // Types for scope management
 export interface DateRange {
@@ -279,7 +280,7 @@ export function Providers({ children }: ProvidersProps) {
 function ProvidersInner({ children }: ProvidersProps) {
   // Self-hosted runtime using Microsoft Agent Framework
   // Configure NEXT_PUBLIC_API_URL to point to your backend
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiUrl = getClientApiUrl();
   const runtimeUrl = `${apiUrl}/api/copilotkit`;
 
   // Debug logging for production troubleshooting
@@ -287,6 +288,7 @@ function ProvidersInner({ children }: ProvidersProps) {
     console.log('[CopilotKit Debug]', {
       apiUrl,
       runtimeUrl,
+      runtimeConfigApiUrl: window.__RUNTIME_CONFIG__?.apiUrl,
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
       NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
     });

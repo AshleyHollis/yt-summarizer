@@ -76,6 +76,8 @@ while [ $(date +%s) -lt $end_time ]; do
       if [ "$ci_conclusion" = "success" ]; then
         echo "✅ CI workflow completed successfully (took ${elapsed}s)"
 
+        echo "ci_run_id=$ci_run" >> $GITHUB_OUTPUT
+
         # Attempt to download the image-tag artifact from the CI run (if it exists)
         artifacts_response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
