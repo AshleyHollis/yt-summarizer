@@ -2,8 +2,9 @@
 # =============================================================================
 # K8s Placeholder Validator
 # =============================================================================
-# Validates that K8s preview patch files use placeholders instead of hardcoded values
-# This prevents deployment issues where patches reference wrong PR numbers or URLs
+# Validates that K8s patch files don't contain hardcoded environment-specific values
+# Note: Preview uses inline patches (no patch files), prod uses file-based patches
+# This validator only checks prod patches for hardcoded values
 
 set -uo pipefail
 
@@ -12,8 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./common.sh
 source "$SCRIPT_DIR/common.sh"
 
-# Configuration - support comma-separated list of directories
-K8S_PREVIEW_PATCH_DIR="${K8S_PREVIEW_PATCH_DIR:-k8s/overlays/preview/patches,k8s/overlays/prod/patches}"
+# Configuration - only check prod patches (preview uses inline patches)
+K8S_PREVIEW_PATCH_DIR="${K8S_PREVIEW_PATCH_DIR:-k8s/overlays/prod/patches}"
 
 # Validation header
 log_info "K8s Placeholder Validator"
@@ -35,12 +36,13 @@ echo ""
 
 ERRORS=0
 
-# Patterns to detect (hardcoded values that should use placeholders)
+# Patterns to detect (hardcoded environment-specific values)
+# These patterns check for values that should be environment-agnostic
 declare -A PATTERNS=(
-    ["api-pr-[0-9]+"]="Should use __PREVIEW_HOST__ instead of hardcoded 'api-pr-XXX'"
-    ["pr-[0-9]+\.yt-summarizer"]="Should use __PREVIEW_HOST__ instead of hardcoded PR URL"
-    ["red-grass-[0-9a-f]+-[0-9]+\.eastasia"]="Should use __SWA_URL__ instead of hardcoded SWA URL"
-    ["azurestaticapps\.net"]="Should use __SWA_URL__ placeholder for Azure Static Web Apps URLs"
+    ["api-pr-[0-9]+"]="Found PR-specific hostname (should be environment-agnostic)"
+    ["pr-[0-9]+\.yt-summarizer"]="Found PR-specific URL (should be environment-agnostic)"
+    ["red-grass-[0-9a-f]+-[0-9]+\.eastasia"]="Found hardcoded SWA URL (should be environment-agnostic)"
+    ["preview-pr-[0-9]+"]="Found PR-specific namespace (should be environment-agnostic)"
 )
 
 # Check each patch file in all directories
@@ -88,24 +90,20 @@ echo ""
 echo "=========================================="
 
 if [[ $ERRORS -eq 0 ]]; then
-    log_success "All patch files use proper placeholders"
+    log_success "All patch files are environment-agnostic"
     echo ""
-    echo "Valid placeholders:"
-    echo "  - __PR_NUMBER__    : PR number (e.g., 109)"
-    echo "  - __PREVIEW_HOST__ : Preview hostname (e.g., api-pr-109.yt-summarizer.apps.ashleyhollis.com)"
-    echo "  - __TLS_SECRET__   : TLS secret name"
-    echo "  - __SWA_URL__      : Static Web App URL"
+    echo "Note: Preview environment uses inline patches in kustomization template."
+    echo "      Production patches should not contain environment-specific values."
     exit 0
 else
-    log_error "Found $ERRORS hardcoded value(s) in patch files"
+    log_error "Found $ERRORS hardcoded environment-specific value(s) in patch files"
     echo ""
-    echo "These values should use placeholders that get substituted during deployment."
-    echo "See scripts/ci/generate_preview_kustomization.py for placeholder substitution logic."
+    echo "Patch files should be environment-agnostic and not contain:"
+    echo "  - PR numbers or PR-specific URLs"
+    echo "  - Hardcoded SWA URLs"
+    echo "  - Preview-specific namespaces"
     echo ""
-    echo "Valid placeholders:"
-    echo "  - __PR_NUMBER__    : PR number (e.g., 109)"
-    echo "  - __PREVIEW_HOST__ : Preview hostname (e.g., api-pr-109.yt-summarizer.apps.ashleyhollis.com)"
-    echo "  - __TLS_SECRET__   : TLS secret name"
-    echo "  - __SWA_URL__      : Static Web App URL"
+    echo "For preview environments, use inline patches with placeholders in the template."
+    echo "See scripts/ci/templates/preview-kustomization-template.yaml"
     exit 1
 fi
