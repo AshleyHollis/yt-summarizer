@@ -3,19 +3,18 @@
  */
 
 import { generateCorrelationId } from './correlation';
+import { getApiBaseUrl, getClientApiUrl } from './runtimeConfig';
 
 // API base URL
-// For SWA deployments, NEXT_PUBLIC_API_URL should be the full backend URL
-// For development, it defaults to localhost or can be left empty for rewrites
-const API_BASE_URL =
-  typeof window === 'undefined'
-    ? process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-    : process.env.NEXT_PUBLIC_API_URL || '';
+// For SWA deployments, runtime-config.js sets the API URL at deploy time
+// For development, it defaults to localhost or can be overridden via NEXT_PUBLIC_API_URL
+const API_BASE_URL = getApiBaseUrl();
 
 // Debug logging for production troubleshooting
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENVIRONMENT === 'preview') {
   console.log('[API Client Debug]', {
     API_BASE_URL,
+    RUNTIME_CONFIG_API_URL: window.__RUNTIME_CONFIG__?.apiUrl,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
   });
@@ -1097,7 +1096,7 @@ export const batchApi = {
   ): (() => void) => {
     // Build the SSE URL - use direct backend URL to avoid Next.js proxy buffering
     // SSE connections should bypass the rewrite proxy for proper streaming
-    const directApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const directApiUrl = getClientApiUrl();
     const sseUrl = `${directApiUrl}/api/v1/batches/${batchId}/stream`;
 
     const eventSource = new EventSource(sseUrl);

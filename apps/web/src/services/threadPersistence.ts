@@ -11,8 +11,10 @@
  * 4. Atomic operations - server handles ID generation to avoid conflicts
  */
 
+import { getApiBaseUrl } from './runtimeConfig';
+
 // API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBaseUrl();
 
 // ============================================================================
 // Types

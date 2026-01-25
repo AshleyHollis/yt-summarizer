@@ -27,6 +27,9 @@ outputs:
   image_tag:
     description: "Image tag fetched from CI artifacts (if available)"
     value: ${{ steps.wait.outputs.image_tag }}
+  ci_run_id:
+    description: "CI workflow run id for artifact downloads"
+    value: ${{ steps.wait.outputs.ci_run_id }}
 
 runs:
   using: composite

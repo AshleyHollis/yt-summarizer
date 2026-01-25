@@ -432,10 +432,10 @@ jobs:
         with:
           install-python: 'true'
 
-       # NOTE: CI has already validated prod overlay before this branch was created.
-       # This baseline check is kept as a safety net in case kustomization.yaml was
-       # modified after merge, though merge commits cannot modify files without
-       # triggering a new CI validation. Kept for defensive robustness.
+      # NOTE: CI has already validated prod overlay before this branch was created.
+      # This baseline check is kept as a safety net in case kustomization.yaml was
+      # modified after merge, though merge commits cannot modify files without
+      # triggering a new CI validation. Kept for defensive robustness.
       - name: Validate current production overlay (baseline)
         uses: ./.github/actions/validate
         with:
@@ -455,9 +455,9 @@ jobs:
         with:
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
 
-       # This validation is critical - it runs AFTER update-prod-kustomization
-       # inserts image tags. Ensures the modified manifest is still valid.
-       # This is where we catch errors introduced by the kustomization update action.
+      # This validation is critical - it runs AFTER update-prod-kustomization
+      # inserts image tags. Ensures the modified manifest is still valid.
+      # This is where we catch errors introduced by the kustomization update action.
       - name: Validate updated production overlay
         uses: ./.github/actions/validate
         with:
@@ -501,8 +501,10 @@ jobs:
           commit-message: |
             chore(prod): deploy ${{ steps.determine-tag.outputs.image_tag }} to production
 
-            API Image: ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ steps.determine-tag.outputs.image_tag }}
-            Workers Image: ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKERS_IMAGE_NAME }}:${{ steps.determine-tag.outputs.image_tag }}
+            API Image:
+              ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ steps.determine-tag.outputs.image_tag }}
+            Workers Image:
+              ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKERS_IMAGE_NAME }}:${{ steps.determine-tag.outputs.image_tag }}
 
             Commit: ${{ github.sha }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -697,10 +699,23 @@ jobs:
           skip_app_build: true
           production_branch: main
 
+      - name: Resolve frontend URL
+        id: frontend-url
+        shell: bash
+        run: |
+          frontend_url="${{ steps.deploy-frontend.outputs.static_web_app_url }}"
+          if [[ -z "$frontend_url" ]]; then
+            frontend_url="${{ vars.PRODUCTION_WEB_URL }}"
+          fi
+          if [[ -z "$frontend_url" ]]; then
+            frontend_url="https://web.yt-summarizer.apps.ashleyhollis.com"
+          fi
+          echo "url=$frontend_url" >> "$GITHUB_OUTPUT"
+
       - name: Verify frontend deployment
         uses: ./.github/actions/health-check
         with:
-          url: ${{ steps.deploy-frontend.outputs.static_web_app_url || vars.PRODUCTION_WEB_URL || 'https://web.yt-summarizer.apps.ashleyhollis.com' }}
+          url: ${{ steps.frontend-url.outputs.url }}
           max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
           interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
           timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
@@ -713,7 +728,15 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [get-image-tag, sync-argocd-manifests, update-overlay, verify-deployment, deploy-frontend, wait-for-ci, terraform-plan, terraform-apply]
+    needs:
+      - get-image-tag
+      - sync-argocd-manifests
+      - update-overlay
+      - verify-deployment
+      - deploy-frontend
+      - wait-for-ci
+      - terraform-plan
+      - terraform-apply
     if: always()
     steps:
       - name: Checkout code
@@ -725,7 +748,12 @@ jobs:
             echo "## Prod Deployment Summary"
             echo ""
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
-            echo "- Terraform plan: ${{ needs.terraform-plan.result }} (changes: ${{ needs.terraform-plan.result == 'success' && fromJson(needs.terraform-plan.outputs.plan_summary).has_changes || 'n/a' }})"
+            terraform_plan_changes="n/a"
+            if [[ "${{ needs.terraform-plan.result }}" == 'success' ]]; then
+              terraform_plan_changes="${{ fromJson(needs.terraform-plan.outputs.plan_summary).has_changes }}"
+            fi
+            echo "- Terraform plan: ${{ needs.terraform-plan.result }}"
+            echo "  changes: ${terraform_plan_changes}"
             echo "- Terraform apply: ${{ needs.terraform-apply.result }}"
             echo "- Argo CD manifests sync: ${{ needs.sync-argocd-manifests.result }}"
             echo "- Backend deploy tag: ${{ needs.get-image-tag.outputs.image_tag || 'n/a' }}"

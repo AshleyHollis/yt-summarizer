@@ -155,6 +155,7 @@ jobs:
     if: |
       needs.detect-changes.outputs.is_main_branch == 'true' ||
       needs.detect-changes.outputs.force_full == 'true' ||
+      github.event_name == 'pull_request' ||
       contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
     steps:
       - name: Checkout code
@@ -200,6 +201,17 @@ jobs:
       - name: Build Next.js application
         working-directory: apps/web
         run: npm run build
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: |
+            apps/web/.next
+            apps/web/public
+            apps/web/package.json
+            apps/web/next.config.*
+            apps/web/staticwebapp.config.json
 
   # ===========================================================================
   # PHASE 3: SECURITY SCANNING
@@ -752,19 +764,54 @@ jobs:
       - name: Write execution rationale
         run: |
           {
+            changed_areas="${{ needs.detect-changes.outputs.changed_areas }}"
+            mode="PR (change-based)"
+            if [[ "${{ needs.detect-changes.outputs.is_main_branch }}" == 'true' ]]; then
+              mode="main branch (full validation)"
+            fi
+            lint_reason="no python changes"
+            if [[ "${{ needs.detect-changes.outputs.is_main_branch }}" == 'true' ]]; then
+              lint_reason="main branch"
+            elif [[ "$changed_areas" == *"services/api"* ]] || \
+              [[ "$changed_areas" == *"services/workers"* ]] || \
+              [[ "$changed_areas" == *"services/shared"* ]]; then
+              lint_reason="python changes"
+            fi
+            frontend_reason="no frontend changes"
+            if [[ "${{ needs.detect-changes.outputs.is_main_branch }}" == 'true' ]]; then
+              frontend_reason="main branch"
+            elif [[ "$changed_areas" == *"apps/web"* ]]; then
+              frontend_reason="frontend changes"
+            fi
+            workflow_reason="no ci changes"
+            if [[ "${{ needs.detect-changes.outputs.is_main_branch }}" == 'true' ]]; then
+              workflow_reason="main branch"
+            elif [[ "$changed_areas" == *"ci"* ]]; then
+              workflow_reason="ci/workflow changes"
+            fi
+            acr_configured="${{ vars.ACR_NAME != '' }}"
+            acr_status="not configured"
+            if [[ "$acr_configured" == 'true' ]]; then
+              acr_status="configured"
+            fi
             echo "## CI Execution Rationale"
             echo ""
-            echo "- Mode: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch (full validation)' || 'PR (change-based)' }}"
-            echo "- Changed areas: ${{ needs.detect-changes.outputs.changed_areas }}"
-            echo "- Lint Python: ${{ needs.lint-python.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || (contains(needs.detect-changes.outputs.changed_areas, 'services/api') || contains(needs.detect-changes.outputs.changed_areas, 'services/workers') || contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) && 'python changes' || 'no python changes' }})"
-            echo "- Frontend Quality: ${{ needs.frontend-quality.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || contains(needs.detect-changes.outputs.changed_areas, 'apps/web') && 'frontend changes' || 'no frontend changes' }})"
+            echo "- Mode: ${mode}"
+            echo "- Changed areas: ${changed_areas}"
+            echo "- Lint Python: ${{ needs.lint-python.result }}"
+            echo "  reason: ${lint_reason}"
+            echo "- Frontend Quality: ${{ needs.frontend-quality.result }}"
+            echo "  reason: ${frontend_reason}"
             echo "- Security Scans (Python): ${{ needs.scan-python-security.result }}"
-            echo "- Tests (shared/api/workers): ${{ needs.test-shared.result }}/${{ needs.test-api.result }}/${{ needs.test-workers.result }}"
-            echo "- Build Images: ${{ needs.build-images.result }} (ACR: ${{ vars.ACR_NAME != '' && 'configured' || 'not configured' }})"
+            echo "- Tests (shared/api/workers): ${{ needs.test-shared.result }}"
+            echo "  api/workers: ${{ needs.test-api.result }}/${{ needs.test-workers.result }}"
+            echo "- Build Images: ${{ needs.build-images.result }}"
+            echo "  ACR: ${acr_status}"
             echo "- Terraform Validate: ${{ needs.validate-terraform.result }}"
             echo "- K8s Validate: ${{ needs.kubernetes-validate.result }}"
             echo "- Secret Scanning: ${{ needs.secret-scanning.result }}"
-            echo "- Workflow Validation: ${{ needs.validate-workflows.result }} (reason: ${{ needs.detect-changes.outputs.is_main_branch == 'true' && 'main branch' || contains(needs.detect-changes.outputs.changed_areas, 'ci') && 'ci/workflow changes' || 'no ci changes' }})"
+            echo "- Workflow Validation: ${{ needs.validate-workflows.result }}"
+            echo "  reason: ${workflow_reason}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create CI Summary

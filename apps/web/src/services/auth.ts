@@ -5,7 +5,9 @@
  * The backend API manages the Auth0 OAuth flow and session cookies.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { getClientApiUrl } from './runtimeConfig';
+
+const API_BASE_URL = getClientApiUrl();
 
 export interface User {
   id: string;
