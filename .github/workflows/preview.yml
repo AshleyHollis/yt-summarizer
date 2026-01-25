@@ -958,7 +958,7 @@ jobs:
           action: upload
           # For Next.js hybrid, app_location is the Next.js app root
           app_location: apps/web
-          app_artifact_location: apps/web/.next/standalone
+          app_artifact_location: .next/standalone
           # For Next.js hybrid, output_location MUST be empty
           # SWA handles the .next folder internally
           output_location: ""
