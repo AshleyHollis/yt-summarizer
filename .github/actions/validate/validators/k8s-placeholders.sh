@@ -46,14 +46,14 @@ declare -A PATTERNS=(
 # Check each patch file in all directories
 for patch_dir in "${PATCH_DIRS[@]}"; do
     [[ -z "$patch_dir" ]] && continue
-    
+
     log_info "Checking directory: $patch_dir"
-    
+
     found_files=false
     for patch_file in "$patch_dir"/*.yaml; do
         # Skip if no files found (glob doesn't match)
         [[ -e "$patch_file" ]] || continue
-        
+
         found_files=true
         filename=$(basename "$patch_file")
         log_verbose "Checking: $filename"
@@ -77,7 +77,7 @@ for patch_dir in "${PATCH_DIRS[@]}"; do
             fi
         done
     done
-    
+
     if [[ "$found_files" == "false" ]]; then
         log_warning "No .yaml files found in $patch_dir"
     fi

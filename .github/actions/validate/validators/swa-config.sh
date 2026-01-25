@@ -32,15 +32,15 @@ IFS=',' read -ra WORKFLOW_FILES <<< "$SWA_WORKFLOW_FILES"
 log_info "Checking output_location in SWA workflows..."
 for workflow_file in "${WORKFLOW_FILES[@]}"; do
     [[ -z "$workflow_file" ]] && continue
-    
+
     if [[ ! -f "$workflow_file" ]]; then
         log_error "Workflow file not found: $workflow_file"
         ERRORS=$((ERRORS + 1))
         continue
     fi
-    
+
     log_verbose "Checking: $workflow_file"
-    
+
     # Look for output_location lines and check they're empty strings
     # Match patterns like: output_location: "" or output_location: ''
     if grep -q "output_location:" "$workflow_file"; then
@@ -73,7 +73,7 @@ if [[ ! -f "$deploy_workflow" ]]; then
 else
     # Check for azure_static_web_apps_api_token and swa-token patterns
     token_found=false
-    
+
     # Pattern 1: azure_static_web_apps_api_token: ${{ secrets.XXX }}
     if grep -qE '^\s*azure_static_web_apps_api_token:\s*\$\{\{\s*secrets\.' "$deploy_workflow"; then
         token_name=$(grep -E '^\s*azure_static_web_apps_api_token:' "$deploy_workflow" | sed -E 's/.*secrets\.([A-Z_]+).*/\1/' | head -1)
@@ -84,7 +84,7 @@ else
             token_found=true
         fi
     fi
-    
+
     # Pattern 2: swa-token: ${{ secrets.XXX }}
     if grep -qE '^\s*swa-token:\s*\$\{\{\s*secrets\.' "$deploy_workflow"; then
         token_name=$(grep -E '^\s*swa-token:' "$deploy_workflow" | sed -E 's/.*secrets\.([A-Z_]+).*/\1/' | head -1)
@@ -95,7 +95,7 @@ else
             token_found=true
         fi
     fi
-    
+
     if [[ "$token_found" == "false" ]]; then
         log_error "Missing SWA deployment token configuration in $deploy_workflow"
         ERRORS=$((ERRORS + 1))
@@ -111,7 +111,7 @@ if [[ ! -f "$package_json" ]]; then
     ERRORS=$((ERRORS + 1))
 else
     build_script=$(jq -r '.scripts.build // empty' "$package_json")
-    
+
     if [[ -z "$build_script" ]]; then
         log_error "Missing build script in $package_json"
         ERRORS=$((ERRORS + 1))

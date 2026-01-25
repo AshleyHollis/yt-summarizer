@@ -32,28 +32,28 @@ require_command "kustomize" "https://kubectl.docs.kubernetes.io/installation/kus
 if [[ "$QUERY_AKS" == "true" ]]; then
     require_command "az" "https://docs.microsoft.com/en-us/cli/azure/install-azure-cli"
     require_command "kubectl" "https://kubernetes.io/docs/tasks/tools/"
-    
+
     if [[ -z "$AKS_RESOURCE_GROUP" ]] || [[ -z "$AKS_CLUSTER_NAME" ]]; then
         log_error "AKS_RESOURCE_GROUP and AKS_CLUSTER_NAME required when QUERY_AKS=true"
         exit 1
     fi
-    
+
     log_info "Querying AKS cluster for resource quotas..."
-    
+
     # Get AKS credentials
     if ! az aks get-credentials --resource-group "$AKS_RESOURCE_GROUP" --name "$AKS_CLUSTER_NAME" --overwrite-existing &>/dev/null; then
         log_error "Failed to get AKS credentials"
         exit 1
     fi
-    
+
     # Query ResourceQuota in namespace
     quota_output=$(kubectl get resourcequota -n "$AKS_NAMESPACE" -o json 2>/dev/null || echo "{}")
-    
+
     if [[ "$quota_output" != "{}" ]] && [[ -n "$quota_output" ]]; then
         # Extract CPU and memory limits (if set)
         cpu_limit=$(echo "$quota_output" | jq -r '.items[0].spec.hard["requests.cpu"] // empty' 2>/dev/null || echo "")
         memory_limit=$(echo "$quota_output" | jq -r '.items[0].spec.hard["requests.memory"] // empty' 2>/dev/null || echo "")
-        
+
         if [[ -n "$cpu_limit" ]]; then
             # Convert CPU limit to millicores
             if [[ "$cpu_limit" =~ ^([0-9]+)m$ ]]; then
@@ -63,7 +63,7 @@ if [[ "$QUERY_AKS" == "true" ]]; then
             fi
             log_info "AKS CPU quota: $cpu_limit (${MAX_CPU_MILLICORES}m)"
         fi
-        
+
         if [[ -n "$memory_limit" ]]; then
             # Convert memory limit to Mi
             if [[ "$memory_limit" =~ ^([0-9]+)Mi$ ]]; then
@@ -99,7 +99,7 @@ ERRORS=0
 parse_cpu() {
     local cpu_str="$1"
     [[ -z "$cpu_str" ]] && echo "0" && return
-    
+
     if [[ "$cpu_str" =~ ^([0-9]+)m$ ]]; then
         echo "${BASH_REMATCH[1]}"
     elif [[ "$cpu_str" =~ ^([0-9.]+)$ ]]; then
@@ -115,7 +115,7 @@ parse_cpu() {
 parse_memory() {
     local mem_str="$1"
     [[ -z "$mem_str" ]] && echo "0" && return
-    
+
     if [[ "$mem_str" =~ ^([0-9]+)Mi$ ]]; then
         echo "${BASH_REMATCH[1]}"
     elif [[ "$mem_str" =~ ^([0-9]+)Gi$ ]]; then
@@ -132,9 +132,9 @@ parse_memory() {
 # Validate each overlay
 for overlay_path in "${OVERLAY_PATHS[@]}"; do
     [[ -z "$overlay_path" ]] && continue
-    
+
     log_info "Validating resources: $overlay_path"
-    
+
     # Build kustomize manifest
     manifest_file="/tmp/kustomize_resources_$$.yaml"
     if ! kustomize build "$overlay_path" > "$manifest_file" 2>&1; then
@@ -143,11 +143,11 @@ for overlay_path in "${OVERLAY_PATHS[@]}"; do
         rm -f "$manifest_file"
         continue
     fi
-    
+
     # Parse YAML and sum resources
     total_cpu=0
     total_memory=0
-    
+
     # Use Python for YAML parsing (more reliable than bash)
     python3 - "$manifest_file" "$MAX_CPU_MILLICORES" "$MAX_MEMORY_MI" <<'EOF'
 import sys
@@ -186,39 +186,39 @@ resources = []
 
 with open(manifest_file, 'r') as f:
     docs = list(yaml.safe_load_all(f))
-    
+
 for doc in docs:
     if not isinstance(doc, dict):
         continue
-    
+
     kind = doc.get('kind')
     if kind not in ('Deployment', 'StatefulSet', 'DaemonSet', 'ReplicaSet'):
         continue
-    
+
     name = doc.get('metadata', {}).get('name', '<unnamed>')
     replicas = doc.get('spec', {}).get('replicas', 1)
-    
+
     template = doc.get('spec', {}).get('template', {})
     spec = template.get('spec', {})
     containers = spec.get('containers', [])
-    
+
     pod_cpu = 0
     pod_memory = 0
-    
+
     for container in containers:
         requests = container.get('resources', {}).get('requests', {})
         cpu = requests.get('cpu')
         memory = requests.get('memory')
-        
+
         pod_cpu += parse_cpu(cpu)
         pod_memory += parse_memory(memory)
-    
+
     resource_cpu = pod_cpu * replicas
     resource_memory = pod_memory * replicas
-    
+
     total_cpu += resource_cpu
     total_memory += resource_memory
-    
+
     resources.append({
         'kind': kind,
         'name': name,
@@ -250,16 +250,16 @@ if max_mem > 0 and total_memory > max_mem:
 
 sys.exit(exit_code)
 EOF
-    
+
     validation_exit=$?
-    
+
     if [[ $validation_exit -ne 0 ]]; then
         log_error "Resource validation failed for $overlay_path"
         ERRORS=$((ERRORS + 1))
     else
         log_success "Resource validation passed for $overlay_path"
     fi
-    
+
     rm -f "$manifest_file"
     echo ""
 done
