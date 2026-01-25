@@ -206,12 +206,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
-          path: |
-            apps/web/.next
-            apps/web/public
-            apps/web/package.json
-            apps/web/next.config.*
-            apps/web/staticwebapp.config.json
+          path: apps/web/.next/standalone
 
   # ===========================================================================
   # PHASE 3: SECURITY SCANNING
