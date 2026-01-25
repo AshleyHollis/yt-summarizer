@@ -62,42 +62,19 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Container Registry
+  # Shared variables are loaded from .github/config/shared.env via load-shared-env action
+  # Only environment-specific overrides and GitHub variables are set here
+
+  # GitHub Variables (can override shared.env defaults)
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
 
-  # Application Names
-  APP_NAME: 'yt-summarizer'
-  API_IMAGE_NAME: 'yt-summarizer-api'
-  WORKERS_IMAGE_NAME: 'yt-summarizer-workers'
+  # Production-specific values
   ARGOCD_APP_NAME_PROD: 'yt-summarizer-prod'
-
-  # Namespaces
   NAMESPACE_PROD: 'yt-summarizer'
-  NAMESPACE_ARGOCD: 'argocd'
-
-  # Worker List
-  WORKER_DEPLOYMENTS: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
-
-  # URLs
   PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
-  HEALTH_CHECK_PATH: '/health/ready'
-
-  # Timeouts (seconds)
-  ARGOCD_SYNC_TIMEOUT: '360'
-  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'
-  HEALTH_CHECK_MAX_ATTEMPTS: '10'
-  HEALTH_CHECK_INTERVAL: '15'
-  HEALTH_CHECK_TIMEOUT: '30'
-
-  # Paths
+  ARGOCD_SYNC_TIMEOUT: '360'  # Longer timeout for production
   KUSTOMIZE_OVERLAY_PROD: 'k8s/overlays/prod'
-  ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
-
-  # Tool Versions
-  TERRAFORM_VERSION: '1.5.7'
-  KUSTOMIZE_VERSION: '5.8.0'
-  NODE_VERSION: '20'
 
 permissions:
   id-token: write
@@ -126,225 +103,49 @@ jobs:
           timeout-seconds: '1800'
 
   # ---------------------------------------------------------------------------
-  # Plan and apply infrastructure changes (auto-apply)
+  # Terraform (Plan + Apply)
   # ---------------------------------------------------------------------------
-  terraform-plan:
-    name: Terraform Plan
-    runs-on: ubuntu-latest
+  terraform:
+    name: Terraform
+    uses: ./.github/workflows/terraform-deploy.yml
     needs: [wait-for-ci]
     if: |
       needs.wait-for-ci.result == 'success' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_terraform != false) ||
        (github.event_name != 'workflow_dispatch'))
-    outputs:
-      plan_summary: ${{ steps.plan.outputs.plan_summary }}
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      # =======================================================================
-      # Auth0 Terraform Service Account Credentials
-      # =======================================================================
-      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
-      # M2M application that allows Terraform to manage Auth0 resources.
-      #
-      # IMPORTANT: These are NOT the credentials for the user-facing application.
-      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
-      # application for end-user authentication. Those BFF credentials will be
-      # different and must be stored in Azure Key Vault after Terraform completes.
-      #
-      # Service Account Details:
-      #   - Application: "Terraform Service Account" (M2M)
-      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
-      #   - Purpose: Manage Auth0 resources via Terraform
-      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
-      #
-      # What Terraform Creates:
-      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
-      #   - Auth0 API: "yt-summarizer-api" (resource server)
-      #
-      # Documentation: docs/auth0-terraform-service-account.md
-      # =======================================================================
-      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_OIDC: true
-    defaults:
-      run:
-        working-directory: infra/terraform/environments/prod
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify Azure credentials are configured
-        uses: ./.github/actions/verify-azure-credentials
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
-        with:
-          validators: terraform-config
-          terraform-directory: infra/terraform/environments/prod
-          fail-fast: 'true'
-          timeout-seconds: '60'
-
-      - name: Terraform Plan
-        id: plan
-        uses: ./.github/actions/terraform-plan
-        with:
-          working-directory: 'infra/terraform/environments/prod'
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Upload Terraform plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: |
-            infra/terraform/environments/prod/tfplan
-            infra/terraform/environments/prod/plan_output.txt
-            infra/terraform/environments/prod/plan.json
-
-  terraform-apply:
-    name: Terraform Apply
-    runs-on: ubuntu-latest
-    needs: terraform-plan
-    if: |
-      needs.terraform-plan.result == 'success' &&
-      fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true
-    environment:
-      name: production
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      # =======================================================================
-      # Auth0 Terraform Service Account Credentials
-      # =======================================================================
-      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
-      # M2M application that allows Terraform to manage Auth0 resources.
-      #
-      # IMPORTANT: These are NOT the credentials for the user-facing application.
-      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
-      # application for end-user authentication. Those BFF credentials will be
-      # different and must be stored in Azure Key Vault after Terraform completes.
-      #
-      # Service Account Details:
-      #   - Application: "Terraform Service Account" (M2M)
-      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
-      #   - Purpose: Manage Auth0 resources via Terraform
-      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
-      #
-      # What Terraform Creates:
-      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
-      #   - Auth0 API: "yt-summarizer-api" (resource server)
-      #
-      # Documentation: docs/auth0-terraform-service-account.md
-      # =======================================================================
-      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_OIDC: true
-    defaults:
-      run:
-        working-directory: infra/terraform/environments/prod
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify Azure credentials are configured
-        uses: ./.github/actions/verify-azure-credentials
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Download Terraform plan artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-plan
-          path: infra/terraform/environments/prod
-
-      - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
-        with:
-          validators: terraform-config
-          terraform-directory: infra/terraform/environments/prod
-          fail-fast: 'true'
-          timeout-seconds: '60'
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
-
+    with:
+      environment: production
+      terraform-version: ${{ vars.TERRAFORM_VERSION || '1.5.7' }}
+      working-directory: infra/terraform/environments/prod
+      run-plan: true
+      run-apply: true
+      require-changes: true
+      post-to-pr: false
+    secrets: inherit
 
   # ---------------------------------------------------------------------------
   # Sync Argo CD Manifests
   # ---------------------------------------------------------------------------
-  # Apply Argo CD application manifests when they change.
-  # This ensures that:
-  #   - infra-apps.yaml updates automatically apply infrastructure apps
-  #   - prod-app.yaml updates automatically apply production app config
-  #   - preview-appset.yaml updates automatically apply preview ApplicationSet
-  #
-  # Runs after terraform-apply (infrastructure may create resources Argo CD needs)
-  # Runs before update-overlay (applications need to exist before we try to sync them)
-  # ---------------------------------------------------------------------------
   sync-argocd-manifests:
     name: Sync Argo CD Manifests
     runs-on: ubuntu-latest
-    needs: [terraform-apply]
+    needs: [terraform]
     if: |
       !cancelled() &&
-      needs.terraform-apply.result != 'failure'
+      needs.terraform.result != 'failure'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
-      - name: Set AKS Context
-        uses: azure/aks-set-context@v4
+      - name: Setup Azure and AKS
+        uses: ./.github/actions/setup-azure-aks
         with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
@@ -355,21 +156,17 @@ jobs:
           namespace: ${{ env.NAMESPACE_ARGOCD }}
           verbose: 'true'
 
-
   # ---------------------------------------------------------------------------
   # Get Image Tag from CI
-  # ---------------------------------------------------------------------------
-  # Always use the CI-built image for this commit (sha-{commit}).
-  # Simpler and more reliable than conditional logic.
   # ---------------------------------------------------------------------------
   get-image-tag:
     name: Get Image Tag
     runs-on: ubuntu-latest
-    needs: [wait-for-ci, terraform-apply, sync-argocd-manifests]
+    needs: [wait-for-ci, terraform, sync-argocd-manifests]
     if: |
       !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_deploy != false) ||
        (github.event_name != 'workflow_dispatch'))
@@ -378,6 +175,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
       - name: Extract image tag from CI
         id: extract
@@ -396,12 +196,13 @@ jobs:
           fi
           echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Azure Login and ACR authentication
+        uses: ./.github/actions/azure-acr-login
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate CI image exists in ACR
         uses: ./.github/actions/validate-acr-image
@@ -417,11 +218,11 @@ jobs:
   update-overlay:
     name: Update Production Overlay
     runs-on: ubuntu-latest
-    needs: [wait-for-ci, terraform-apply, sync-argocd-manifests, get-image-tag]
+    needs: [wait-for-ci, terraform, sync-argocd-manifests, get-image-tag]
     if: |
       always() && !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
-      needs.terraform-apply.result != 'failure' &&
+      needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       needs.get-image-tag.result == 'success'
     steps:
@@ -436,6 +237,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ steps.app-token.outputs.token }}
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
       - name: Setup Python with dependencies
         uses: ./.github/actions/setup-kustomize
@@ -476,16 +280,12 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '30'
 
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
+      - name: Setup Azure and AKS
+        uses: ./.github/actions/setup-azure-aks
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Set AKS context
-        uses: azure/aks-set-context@v4
-        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
@@ -544,16 +344,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
-      - name: Set AKS Context
-        uses: azure/aks-set-context@v4
+      - name: Setup Azure and AKS
+        uses: ./.github/actions/setup-azure-aks
         with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
@@ -622,18 +421,12 @@ jobs:
           workers: ${{ env.WORKER_DEPLOYMENTS }}
           fail-on-mismatch: 'true'
 
-      - name: Collect deployment diagnostics on failure
+      - name: Collect and upload diagnostics on failure
         if: failure()
-        shell: bash
-        run: ./scripts/diagnose-argocd-deployment.sh ${{ env.ARGOCD_APP_NAME_PROD }} ./diagnostics
-
-      - name: Upload diagnostics artifact
-        if: failure()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/collect-deployment-diagnostics
         with:
-          name: deployment-diagnostics-prod
-          path: diagnostics/
-          retention-days: 7
+          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
+          artifact-name: deployment-diagnostics-prod
 
       - name: Verify TLS certificate
         uses: ./.github/actions/verify-certificate
@@ -684,6 +477,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
       - name: Deploy frontend with CI artifact
         id: deploy-frontend
         uses: ./.github/actions/deploy-frontend-swa
@@ -697,23 +493,10 @@ jobs:
           output_location: ""
           production-branch: main
 
-      - name: Resolve frontend URL
-        id: frontend-url
-        shell: bash
-        run: |
-          frontend_url="${{ steps.deploy-frontend.outputs.static_web_app_url }}"
-          if [[ -z "$frontend_url" ]]; then
-            frontend_url="${{ vars.PRODUCTION_WEB_URL }}"
-          fi
-          if [[ -z "$frontend_url" ]]; then
-            frontend_url="https://web.yt-summarizer.apps.ashleyhollis.com"
-          fi
-          echo "url=$frontend_url" >> "$GITHUB_OUTPUT"
-
       - name: Verify frontend deployment
         uses: ./.github/actions/health-check
         with:
-          url: ${{ steps.frontend-url.outputs.url }}
+          url: ${{ steps.deploy-frontend.outputs.static_web_app_url || vars.PRODUCTION_WEB_URL || 'https://web.yt-summarizer.apps.ashleyhollis.com' }}
           max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
           interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
           timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
@@ -733,12 +516,14 @@ jobs:
       - verify-deployment
       - deploy-frontend
       - wait-for-ci
-      - terraform-plan
-      - terraform-apply
+      - terraform
     if: always()
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
       - name: Write execution rationale
         run: |
@@ -747,12 +532,12 @@ jobs:
             echo ""
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
             terraform_plan_changes="n/a"
-            if [[ "${{ needs.terraform-plan.result }}" == 'success' ]]; then
-              terraform_plan_changes="${{ fromJson(needs.terraform-plan.outputs.plan_summary).has_changes }}"
+            if [[ "${{ needs.terraform.result }}" == 'success' ]]; then
+              terraform_plan_changes="${{ fromJson(needs.terraform.outputs.plan-summary).has_changes }}"
             fi
-            echo "- Terraform plan: ${{ needs.terraform-plan.result }}"
+            echo "- Terraform plan: ${{ needs.terraform.result }}"
             echo "  changes: ${terraform_plan_changes}"
-            echo "- Terraform apply: ${{ needs.terraform-apply.result }}"
+            echo "- Terraform apply: ${{ needs.terraform.result }}"
             echo "- Argo CD manifests sync: ${{ needs.sync-argocd-manifests.result }}"
             echo "- Backend deploy tag: ${{ needs.get-image-tag.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"

@@ -1,15 +1,15 @@
 # Preview overlay - updated by GitHub Actions
-# PR: #105
-# Image Tag: pr-105-78704d7
-# Commit: 78704d755161f3c7e9b9f635503f7aeffa425966
-# Updated: 2026-01-25T06:32:49Z
+# PR: #106
+# Image Tag: pr-106-cc11a35
+# Commit: cc11a356b1c4caf9e78317573a15afe5a1e876eb
+# Updated: 2026-01-25T08:46:28Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 metadata:
   annotations:
     config.kubernetes.io/local-config: "true"
-namespace: preview-pr-105
+namespace: preview-pr-106
 resources:
   - ../../base-preview
   - resource-quota.yaml
@@ -28,8 +28,8 @@ images:
   - 
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: pr-105-78704d7
+    newTag: pr-106-cc11a35
   - 
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: pr-105-78704d7
+    newTag: pr-106-cc11a35

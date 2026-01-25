@@ -121,43 +121,18 @@ concurrency:
 
 
 env:
-  # Container Registry
+  # Shared variables are loaded from .github/config/shared.env via load-shared-env action
+  # Only environment-specific overrides and GitHub variables are set here
+
+  # GitHub Variables (can override shared.env defaults)
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
 
-  # Application Names
-  APP_NAME: 'yt-summarizer'
-  API_IMAGE_NAME: 'yt-summarizer-api'
-  WORKERS_IMAGE_NAME: 'yt-summarizer-workers'
-
-  # Namespaces
-  NAMESPACE_ARGOCD: 'argocd'
+  # Preview-specific values
   PREVIEW_NAMESPACE_PREFIX: 'preview-pr-'
-
-  # Worker List
-  WORKER_DEPLOYMENTS: 'transcribe-worker,summarize-worker,embed-worker,relationships-worker'
-
-  # URLs
   APPS_BASE_DOMAIN: 'yt-summarizer.apps.ashleyhollis.com'
-  HEALTH_CHECK_PATH: '/health/ready'
-
-  # Timeouts (seconds)
-  ARGOCD_SYNC_TIMEOUT: '180'
-  ARGOCD_OPERATION_TIMEOUT_THRESHOLD: '300'
-  HEALTH_CHECK_MAX_ATTEMPTS: '10'
-  HEALTH_CHECK_INTERVAL: '15'
-  HEALTH_CHECK_TIMEOUT: '30'
-
-  # Paths
+  ARGOCD_SYNC_TIMEOUT: '180'  # Faster timeout for preview
   KUSTOMIZE_OVERLAY_PREVIEW: 'k8s/overlays/preview'
-  ARGOCD_MANIFESTS_PATH: 'k8s/argocd'
-
-  # Tool Versions
-  TERRAFORM_VERSION: '1.5.7'
-  KUSTOMIZE_VERSION: '5.8.0'
-  NODE_VERSION: '20'
-
-  # Preview Limits
   MAX_PREVIEWS: 3
 
 permissions:
@@ -231,197 +206,7 @@ jobs:
         run: scripts/workflows/preview-detect-infra.sh
 
   # ===========================================================================
-  # PHASE 1B: TERRAFORM PLAN
-  # ===========================================================================
-  terraform-plan:
-    name: Terraform Plan
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: |
-      (github.event_name == 'workflow_dispatch' && inputs.run_terraform == true) ||
-      (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.infra_changed == 'true')
-    outputs:
-      plan_summary: ${{ steps.plan.outputs.plan_summary }}
-    permissions:
-      id-token: write
-      contents: read
-      pull-requests: write
-    env:
-      # =======================================================================
-      # Auth0 Terraform Service Account Credentials
-      # =======================================================================
-      # These credentials are for the TERRAFORM SERVICE ACCOUNT - a dedicated
-      # M2M application that allows Terraform to manage Auth0 resources.
-      #
-      # IMPORTANT: These are NOT the credentials for the user-facing application.
-      # When Terraform runs, it will CREATE a separate "yt-summarizer-api-bff"
-      # application for end-user authentication. Those BFF credentials will be
-      # different and must be stored in Azure Key Vault after Terraform completes.
-      #
-      # Service Account Details:
-      #   - Application: "Terraform Service Account" (M2M)
-      #   - Client ID: Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6
-      #   - Purpose: Manage Auth0 resources via Terraform
-      #   - Storage: GitHub Secrets (for CI/CD) + Azure Key Vault (for local runs)
-      #
-      # What Terraform Creates:
-      #   - Auth0 Application: "yt-summarizer-api-bff" (for end users)
-      #   - Auth0 API: "yt-summarizer-api" (resource server)
-      #
-      # Documentation: docs/auth0-terraform-service-account.md
-      # =======================================================================
-      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_OIDC: true
-    defaults:
-      run:
-        working-directory: infra/terraform/environments/prod
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify Azure credentials are configured
-        uses: ./.github/actions/verify-azure-credentials
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: '1.5.7'
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
-        with:
-          validators: terraform-config
-          terraform-directory: infra/terraform/environments/prod
-          fail-fast: 'true'
-          timeout-seconds: '60'
-
-      - name: Terraform Plan
-        id: plan
-        uses: ./.github/actions/terraform-plan
-        with:
-          working-directory: 'infra/terraform/environments/prod'
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        continue-on-error: true
-
-      - name: Post Plan to PR and Summary
-        if: github.event_name == 'pull_request'
-        uses: ./.github/actions/post-terraform-plan
-        with:
-          plan-summary: ${{ steps.plan.outputs.plan_summary }}
-          formatted-plan: ${{ steps.plan.outputs.formatted_plan }}
-          plan-outcome: ${{ steps.plan.outcome }}
-
-      - name: Plan Status
-        if: steps.plan.outcome == 'failure'
-        run: exit 1
-
-      - name: Upload Terraform plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: |
-            infra/terraform/environments/prod/tfplan
-            infra/terraform/environments/prod/plan_output.txt
-            infra/terraform/environments/prod/plan.json
-
-  # ===========================================================================
-  # PHASE 1C: TERRAFORM APPLY
-  # ===========================================================================
-  terraform-apply:
-    name: Terraform Apply
-    runs-on: ubuntu-latest
-    needs: terraform-plan
-    if: |
-      needs.terraform-plan.result == 'success' &&
-      fromJson(needs.terraform-plan.outputs.plan_summary).has_changes == true &&
-      (github.event_name != 'workflow_dispatch' || inputs.apply_terraform == true)
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_OIDC: true
-    defaults:
-      run:
-        working-directory: infra/terraform/environments/prod
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify Azure credentials are configured
-        uses: ./.github/actions/verify-azure-credentials
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: '1.5.7'
-
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Download Terraform plan artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-plan
-          path: infra/terraform/environments/prod
-
-      - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
-        with:
-          validators: terraform-config
-          terraform-directory: infra/terraform/environments/prod
-          fail-fast: 'true'
-          timeout-seconds: '60'
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
-
-
-  # ===========================================================================
-  # PHASE 2: WAIT FOR CI COMPLETION
-  # ===========================================================================
-  # ONLY runs when needs_deployment=true
-  # Waits for CI workflow to complete and retrieves image tag
-  #
-  # FLOW:
-  #   1. Find CI workflow run for same commit SHA
-  #   2. Wait up to 30min for completion
-  #   3. Extract image tag from CI artifacts (pr-<number>-<sha>)
-  #   4. Fail if CI fails (no fallback)
-  #
-  # CRITICAL: This enforces that CI must succeed before preview deploys
+  # PHASE 2B: WAIT FOR CI
   # ===========================================================================
   wait-for-ci:
     name: Wait for CI
@@ -435,6 +220,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
       - name: Wait for CI workflow to complete
         id: wait
         uses: ./.github/actions/wait-for-ci
@@ -444,13 +232,14 @@ jobs:
           timeout-seconds: '1800'
           workflow-event: pull_request
 
-      - name: Azure Login
+      - name: Azure Login and ACR authentication
         if: steps.wait.outputs.image_tag != ''
-        uses: azure/login@v2
+        uses: ./.github/actions/azure-acr-login
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate image exists in ACR
         if: steps.wait.outputs.image_tag != ''
@@ -462,7 +251,7 @@ jobs:
           fail-if-missing: 'true'
 
   # ===========================================================================
-  # PHASE 2B: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
+  # PHASE 2C: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
   # ===========================================================================
   # For K8s-only changes (needs_image_build=false), we need a deterministic
   # image tag. Strategy:
@@ -492,6 +281,9 @@ jobs:
           ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           fetch-depth: 0  # Need full history to walk commits
 
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
       - name: Find most recent image-building commit in PR
         id: find-tag
         shell: bash
@@ -499,12 +291,13 @@ jobs:
           scripts/workflows/preview-find-pr-image-tag.sh \
             "${{ needs.detect-changes.outputs.pr_number }}"
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Azure Login and ACR authentication
+        uses: ./.github/actions/azure-acr-login
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate image exists in ACR
         uses: ./.github/actions/validate-acr-image
@@ -513,6 +306,27 @@ jobs:
           repository: ${{ env.API_IMAGE_NAME }}
           tag: ${{ steps.find-tag.outputs.image_tag }}
           fail-if-missing: 'true'
+
+  # ===========================================================================
+  # PHASE 2D: TERRAFORM (INFRASTRUCTURE CHANGES ONLY)
+  # ===========================================================================
+  terraform:
+    name: Terraform
+    uses: ./.github/workflows/terraform-deploy.yml
+    needs: [detect-changes]
+    if: |
+      !cancelled() &&
+      ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == true) ||
+       (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.infra_changed == 'true'))
+    with:
+      environment: preview
+      terraform-version: ${{ vars.TERRAFORM_VERSION || '1.5.7' }}
+      working-directory: infra/terraform/environments/prod
+      run-plan: true
+      run-apply: ${{ github.event_name == 'workflow_dispatch' && inputs.apply_terraform == true }}
+      require-changes: false
+      post-to-pr: true
+    secrets: inherit
 
   # ===========================================================================
   # PHASE 3: CONCURRENCY LIMIT CHECK
@@ -547,6 +361,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
       - name: Check preview concurrency limit
         id: check
@@ -605,6 +422,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
       - name: Compute Preview URLs
         id: compute
         uses: ./.github/actions/compute-preview-urls
@@ -642,8 +462,8 @@ jobs:
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success' &&
-      (needs.terraform-apply.result != 'failure')
-    needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform-apply]
+      (needs.terraform.result != 'failure')
+    needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform]
     outputs:
       image_tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
     steps:
@@ -652,6 +472,9 @@ jobs:
         with:
           ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
       - name: Setup Kustomize
         uses: ./.github/actions/setup-kustomize
@@ -749,23 +572,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
-      - name: Set AKS Context
-        uses: azure/aks-set-context@v4
+      - name: Setup Azure and AKS
+        uses: ./.github/actions/setup-azure-aks
         with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Setup Kustomize
         uses: ./.github/actions/setup-kustomize
         with:
-          kustomize-version: '5.8.0'
+          kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
       - name: Cleanup stuck Argo CD operations
         uses: ./.github/actions/cleanup-argocd-operation
@@ -819,21 +641,12 @@ jobs:
           workers: ${{ env.WORKER_DEPLOYMENTS }}
           fail-on-mismatch: 'true'
 
-      - name: Collect deployment diagnostics on failure
+      - name: Collect and upload diagnostics on failure
         if: failure()
-        shell: bash
-        run: |
-          ./scripts/diagnose-argocd-deployment.sh \
-            ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }} \
-            ./diagnostics
-
-      - name: Upload diagnostics artifact
-        if: failure()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/collect-deployment-diagnostics
         with:
-          name: deployment-diagnostics-pr-${{ needs.detect-changes.outputs.pr_number }}
-          path: diagnostics/
-          retention-days: 7
+          app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
+          artifact-name: deployment-diagnostics-pr-${{ needs.detect-changes.outputs.pr_number }}
 
       - name: Run API health checks
         if: needs.get-ingress.outputs.preview_url != ''
@@ -883,6 +696,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
 
       - name: Verify SWA token is configured
         uses: ./.github/actions/verify-secret
@@ -972,6 +788,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
       - name: Post preview URL to PR
         uses: ./.github/actions/post-preview-comment
         with:
@@ -1034,6 +853,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
@@ -1053,7 +875,7 @@ jobs:
           expected-status: '200'
           service-name: 'Preview API (E2E)'
 
-      - name: Run E2E tests
+      - name: Determine E2E base URL
         id: base-url
         shell: bash
         run: |
@@ -1120,8 +942,7 @@ jobs:
       - deploy-frontend-preview
       - e2e-tests
       - get-ingress
-      - terraform-plan
-      - terraform-apply
+      - terraform
       - check-concurrency
     if: always()
     steps:
@@ -1129,9 +950,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
       - name: Write execution rationale
         env:
-          PLAN_SUMMARY: ${{ needs.terraform-plan.outputs.plan_summary }}
+          PLAN_SUMMARY: ${{ needs.terraform.outputs.plan-summary }}
         run: |
           {
             echo "## Preview Execution Rationale"
@@ -1153,10 +977,10 @@ jobs:
             if [[ "${{ needs.detect-changes.outputs.needs_deployment }}" == 'true' ]]; then
               wait_reason="deployment needed"
             fi
-            echo "- Terraform plan: ${{ needs.terraform-plan.result }}"
+            echo "- Terraform plan: ${{ needs.terraform.result }}"
             echo "  changes: ${terraform_plan_changes}"
             echo "  reason: ${terraform_plan_reason}"
-            echo "- Terraform apply: ${{ needs.terraform-apply.result }}"
+            echo "- Terraform apply: ${{ needs.terraform.result }}"
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
             echo "  reason: ${wait_reason}"
             echo "- Concurrency gate: ${{ needs.check-concurrency.outputs.can_deploy || 'n/a' }}"
