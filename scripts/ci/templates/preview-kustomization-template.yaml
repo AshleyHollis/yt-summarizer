@@ -90,9 +90,9 @@ patches:
             containers:
             - name: api
               env:
-            - name: API__CORS_ORIGINS
-              # JSON array string - keep no spaces after commas
-              value: '["${SWA_URL}","http://localhost:3000"]'
+              - name: API__CORS_ORIGINS
+                # JSON array string - keep no spaces after commas
+                value: '["${SWA_URL}","http://localhost:3000"]'
     target:
       kind: Deployment
       name: api
@@ -112,36 +112,11 @@ patches:
       kind: HTTPRoute
       name: api-httproute
 
-  # Resources patch - minimal limits for preview
+  # Replicas patch - single replica for all deployments
   - patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: not-used
-      spec:
-        template:
-          spec:
-            containers:
-            - name: not-used
-              resources:
-                requests:
-                  cpu: 25m
-                  memory: 64Mi
-                limits:
-                  cpu: 150m
-                  memory: 256Mi
-    target:
-      kind: Deployment
-      labelSelector: app.kubernetes.io/component
-
-  # Replicas patch - single replica for preview
-  - patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: not-used
-      spec:
-        replicas: 1
+      - op: replace
+        path: /spec/replicas
+        value: 1
     target:
       kind: Deployment
       labelSelector: app.kubernetes.io/component
