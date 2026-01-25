@@ -134,11 +134,11 @@ patches:
           spec:
             serviceAccountName: db-migrate
 images:
-  - 
+  -
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
     newTag: pr-110-a51c176
-  - 
+  -
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
     newTag: pr-110-a51c176
