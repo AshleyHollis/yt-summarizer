@@ -7,9 +7,9 @@ kind: HTTPRoute
 metadata:
   name: api-httproute
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: api-pr-103.yt-summarizer.apps.ashleyhollis.com
+    external-dns.alpha.kubernetes.io/hostname: __PREVIEW_HOST__
 spec:
   hostnames:
-  - "api-pr-103.yt-summarizer.apps.ashleyhollis.com"
+  - "__PREVIEW_HOST__"
   # Rules are inherited from base (PathPrefix: /)
   # This patch only updates the hostname for the preview environment
