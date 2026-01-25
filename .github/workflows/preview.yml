@@ -205,6 +205,13 @@ jobs:
         shell: bash
         run: scripts/workflows/preview-detect-infra.sh "${{ steps.set-pr.outputs.base_sha }}" "${{ steps.set-pr.outputs.pr_head_sha }}"
 
+      - name: Validate K8s placeholders
+        shell: bash
+        run: |
+          echo "::group::Validating K8s preview patch files"
+          bash scripts/ci/validate-k8s-placeholders.sh
+          echo "::endgroup::"
+
   # ===========================================================================
   # PHASE 2B: WAIT FOR CI
   # ===========================================================================

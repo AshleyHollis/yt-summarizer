@@ -156,6 +156,19 @@ Configuration is set in `services/aspire/AppHost/AppHost.cs` via environment var
 
 **Per-Worker Overrides**: Workers can override defaults in their `__init__` method if needed. For example, the transcribe worker already has rate limiting (5-10s delays) due to YouTube API constraints.
 
+## K8s Preview Patch Placeholders
+Preview environment K8s patches use placeholders that are substituted during deployment to ensure each PR gets unique resources:
+
+**Required Placeholders**:
+- `__PR_NUMBER__`: PR number (e.g., 109)
+- `__PREVIEW_HOST__`: Full preview hostname (e.g., api-pr-109.yt-summarizer.apps.ashleyhollis.com)
+- `__TLS_SECRET__`: TLS secret name for the preview
+- `__SWA_URL__`: Static Web App URL for CORS configuration
+
+**Validation**: The CI runs `scripts/ci/validate-k8s-placeholders.sh` to ensure patch files in `k8s/overlays/preview/patches/` don't contain hardcoded PR numbers or URLs. This prevents deployment issues where patches reference wrong resources.
+
+**Substitution**: During deployment, `scripts/ci/generate_preview_kustomization.py` replaces placeholders with actual values for the current PR.
+
 ## Tooling & Automation Rules (Copilot Instructions)
 - Use **PowerShell** for scripts on Windows.
 - Use `gh` (GitHub CLI) for any GitHub operations (PRs, issues, runs).
