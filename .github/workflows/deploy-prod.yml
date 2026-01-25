@@ -679,12 +679,11 @@ jobs:
           working-directory: apps/web
 
       - name: Build frontend
-        working-directory: apps/web
-        env:
-          # Use full backend URL for client-side requests (SWA doesn't support Next.js rewrites)
-          NEXT_PUBLIC_API_URL: ${{ vars.PRODUCTION_API_URL }}
-          NEXT_PUBLIC_ENVIRONMENT: production
-        run: npm run build
+        uses: ./.github/actions/build-frontend
+        with:
+          api-url: ${{ vars.PRODUCTION_API_URL }}
+          environment: 'production'
+          working-directory: 'apps/web'
 
       - name: Deploy to Static Web Apps
         id: deploy-frontend

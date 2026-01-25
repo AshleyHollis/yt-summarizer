@@ -37,7 +37,7 @@ runs:
         path: |
           ~/.cache/pip
           ~/.cache/uv
-        key: ${{ runner.os }}-pip-uv-${{ hashFiles('**/pyproject.toml') }}
+        key: ${{ runner.os }}-pip-uv-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
         restore-keys: |
           ${{ runner.os }}-pip-uv-
 
@@ -45,7 +45,9 @@ runs:
       uses: astral-sh/setup-uv@v5
       with:
         enable-cache: true
-        cache-dependency-glob: "**/pyproject.toml"
+        cache-dependency-glob: |
+          **/pyproject.toml
+          **/uv.lock
 
     - name: Install shared package
       if: inputs.shared-package == 'true'

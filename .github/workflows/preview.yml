@@ -1048,15 +1048,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node
         with:
-          node-version: "22"
-          cache: 'npm'
-          cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci
+          node-version: '22'
+          working-directory: apps/web
 
       # No need to wait for Argo CD sync again - verify-deployment job already did this
       # and this job depends on verify-deployment, so we know the sync completed successfully

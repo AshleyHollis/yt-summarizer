@@ -17,13 +17,12 @@
 #   TEST_SHARED_RESULT  - Result of test-shared job (success/failure/skipped)
 #   TEST_API_RESULT     - Result of test-api job
 #   TEST_WORKERS_RESULT - Result of test-workers job
-#   TEST_FRONTEND_RESULT- Result of test-frontend job
+#   FRONTEND_QUALITY_RESULT- Result of frontend-quality job
 #   VALIDATE_TERRAFORM_RESULT  - Result of validate-terraform job
 #   KUBERNETES_VALIDATE_RESULT - Result of kubernetes-validate job
 #   SECRET_SCANNING_RESULT     - Result of secret-scanning job
 #   SECRET_SCANNING_SHOULD_RUN - Whether secret-scanning should have run
 #   BUILD_IMAGES_RESULT        - Result of build-images job
-#   BUILD_IMAGES_VALIDATE_RESULT - Result of build-images-validate job
 #
 # Logic:
 #   1. Check if each job should have run based on changed areas
@@ -54,7 +53,7 @@ should_run_job() {
     "test-workers")
       [[ "$CHANGED_AREAS" =~ services/workers ]] || [[ "$CHANGED_AREAS" =~ services/shared ]]
       ;;
-    "test-frontend")
+    "frontend-quality")
       [[ "$CHANGED_AREAS" =~ apps/web ]]
       ;;
     "validate-terraform")
@@ -117,7 +116,7 @@ echo ""
 check_job "test-shared" "${TEST_SHARED_RESULT}" || EXIT_CODE=1
 check_job "test-api" "${TEST_API_RESULT}" || EXIT_CODE=1
 check_job "test-workers" "${TEST_WORKERS_RESULT}" || EXIT_CODE=1
-check_job "test-frontend" "${TEST_FRONTEND_RESULT}" || EXIT_CODE=1
+check_job "frontend-quality" "${FRONTEND_QUALITY_RESULT}" || EXIT_CODE=1
 
 # Check validation jobs
 check_job "validate-terraform" "${VALIDATE_TERRAFORM_RESULT}" || EXIT_CODE=1
@@ -135,15 +134,12 @@ else
   echo "⏭️  secret-scanning skipped (no code changes)"
 fi
 
-# Check build jobs - one must succeed if builds are required
+# Check build jobs
 if should_run_job "build-images"; then
-  BUILD_PUSH="${BUILD_IMAGES_RESULT}"
-  BUILD_VALIDATE="${BUILD_IMAGES_VALIDATE_RESULT}"
-
-  if [ "$BUILD_PUSH" = "success" ] || [ "$BUILD_PUSH" = "skipped" -a "$BUILD_VALIDATE" = "success" ]; then
-    echo "✅ Build validation passed"
+  if [ "${BUILD_IMAGES_RESULT}" = "success" ]; then
+    echo "✅ Build images passed"
   else
-    echo "❌ Build jobs failed: build-images=$BUILD_PUSH, build-images-validate=$BUILD_VALIDATE"
+    echo "❌ Build images failed: build-images=${BUILD_IMAGES_RESULT}"
     EXIT_CODE=1
   fi
 else

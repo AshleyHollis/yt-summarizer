@@ -17,17 +17,13 @@ inputs:
     description: 'Result of lint-python job'
     required: false
     default: 'skipped'
-  lint-frontend-result:
-    description: 'Result of lint-frontend job'
+  frontend-quality-result:
+    description: 'Result of frontend-quality job'
     required: false
     default: 'skipped'
   # Security results
   scan-python-security-result:
     description: 'Result of scan-python-security job'
-    required: false
-    default: 'skipped'
-  scan-javascript-security-result:
-    description: 'Result of scan-javascript-security job'
     required: false
     default: 'skipped'
   secret-scanning-result:
@@ -59,10 +55,6 @@ inputs:
     description: 'Duration of test-workers job'
     required: false
     default: ''
-  test-frontend-result:
-    description: 'Result of test-frontend job'
-    required: false
-    default: 'skipped'
   # Validation results
   kubernetes-validate-result:
     description: 'Result of kubernetes-validate job'
@@ -103,9 +95,8 @@ runs:
         COMMIT_SHA: ${{ inputs.commit-sha }}
         PR_NUMBER: ${{ inputs.pr-number }}
         LINT_PYTHON_RESULT: ${{ inputs.lint-python-result }}
-        LINT_FRONTEND_RESULT: ${{ inputs.lint-frontend-result }}
+        FRONTEND_QUALITY_RESULT: ${{ inputs.frontend-quality-result }}
         SCAN_PYTHON_SECURITY_RESULT: ${{ inputs.scan-python-security-result }}
-        SCAN_JAVASCRIPT_SECURITY_RESULT: ${{ inputs.scan-javascript-security-result }}
         SECRET_SCANNING_RESULT: ${{ inputs.secret-scanning-result }}
         TEST_SHARED_RESULT: ${{ inputs.test-shared-result }}
         TEST_SHARED_DURATION: ${{ inputs.test-shared-duration }}
@@ -113,7 +104,6 @@ runs:
         TEST_API_DURATION: ${{ inputs.test-api-duration }}
         TEST_WORKERS_RESULT: ${{ inputs.test-workers-result }}
         TEST_WORKERS_DURATION: ${{ inputs.test-workers-duration }}
-        TEST_FRONTEND_RESULT: ${{ inputs.test-frontend-result }}
         KUBERNETES_VALIDATE_RESULT: ${{ inputs.kubernetes-validate-result }}
         VALIDATE_KUSTOMIZE_RESULT: ${{ inputs.validate-kustomize-result }}
         VALIDATE_TERRAFORM_RESULT: ${{ inputs.validate-terraform-result }}
