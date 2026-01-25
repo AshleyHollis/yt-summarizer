@@ -10,4 +10,4 @@ data:
   # Use 'staging' since app only allows development/staging/production
   ENVIRONMENT: "staging"
   LOG_LEVEL: "DEBUG"
-  CORS_ORIGINS: "__SWA_URL__"
+  CORS_ORIGINS: "https://red-grass-06d413100-109.eastasia.6.azurestaticapps.net"
