@@ -32,7 +32,6 @@ on:
       - "docs/**"
       - "specs/**"
       - "k8s/overlays/previews/**"
-      - ".github/workflows/preview*.yml"
   workflow_dispatch:
     inputs:
       run_terraform:
