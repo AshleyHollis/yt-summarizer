@@ -20,7 +20,7 @@
 #   If workflow_dispatch AND inputs.run_preview != 'true':
 #     Set both flags to false (skip preview deployment)
 #   Otherwise:
-#     Always deploy all components (set both flags true)
+#     Pass through the values from detect-pr-code-changes (respect upstream detection)
 #
 # Exit: Always succeeds
 # =============================================================================
@@ -34,10 +34,10 @@ needs_deployment="${INITIAL_NEEDS_DEPLOYMENT}"
 if [[ "${EVENT_NAME}" == "workflow_dispatch" ]] && [[ "${RUN_PREVIEW}" != "true" ]]; then
   needs_image_build=false
   needs_deployment=false
-else
-  needs_image_build=true
-  needs_deployment=true
 fi
+
+# Otherwise, respect the change detection from detect-pr-code-changes
+# Don't force both flags to true - let the upstream detection determine them
 
 echo "needs_image_build=$needs_image_build" >> "$GITHUB_OUTPUT"
 echo "needs_deployment=$needs_deployment" >> "$GITHUB_OUTPUT"
