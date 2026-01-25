@@ -902,18 +902,24 @@ jobs:
             ls -la /tmp/frontend-build || true
             exit 1
           fi
-          rm -rf apps/web
-          mv "$source_dir" apps/web
+          mkdir -p apps/web/.next
+          rm -rf apps/web/.next/standalone
+          cp -R "$source_dir" apps/web/.next/standalone
           echo "=== apps/web structure ==="
           ls -la apps/web/
           echo "=== apps/web/.next structure ==="
           ls -la apps/web/.next/ || echo "No .next directory"
+          echo "=== apps/web/.next/standalone structure ==="
+          ls -la apps/web/.next/standalone/ || echo "No standalone directory"
 
       - name: Write runtime config
         shell: bash
         run: |
           bash scripts/workflows/write-runtime-config.sh \
             "apps/web/public/runtime-config.js" \
+            "${{ needs.get-ingress.outputs.preview_url }}"
+          bash scripts/workflows/write-runtime-config.sh \
+            "apps/web/.next/standalone/public/runtime-config.js" \
             "${{ needs.get-ingress.outputs.preview_url }}"
 
       - name: Azure Login for SWA cleanup
@@ -952,7 +958,7 @@ jobs:
           action: upload
           # For Next.js hybrid, app_location is the Next.js app root
           app_location: apps/web
-          app_artifact_location: .
+          app_artifact_location: .next/standalone
           # For Next.js hybrid, output_location MUST be empty
           # SWA handles the .next folder internally
           output_location: ""
