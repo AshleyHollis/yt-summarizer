@@ -1,8 +1,8 @@
 # Preview overlay - updated by GitHub Actions
 # PR: #110
-# Image Tag: pr-110-9270357
-# Commit: 9270357890137db798c785516b0d305bca7adc3c
-# Updated: 2026-01-25T13:51:41Z
+# Image Tag: pr-110-a51c176
+# Commit: a51c176f3ae82cecedd5a63c239fbf7b153685c2
+# Updated: 2026-01-25T13:59:42Z
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -15,21 +15,130 @@ resources:
   - resource-quota.yaml
   - limit-range.yaml
 patches:
-  - path: patches/externalsecret-db-patch.yaml
-  - path: patches/externalsecret-openai-patch.yaml
-  - path: patches/externalsecret-storage-patch.yaml
-  - path: patches/configmap-patch.yaml
-  - path: patches/api-deployment-patch.yaml
-  - path: patches/httproute-patch.yaml
-  - path: patches/resources-patch.yaml
-  - path: patches/replicas-patch.yaml
-  - path: patches/migration-job-patch.yaml
+  - target:
+      kind: ExternalSecret
+      name: db-credentials
+    patch: |
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: db-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+  - target:
+      kind: ExternalSecret
+      name: openai-credentials
+    patch: |
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: openai-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+  - target:
+      kind: ExternalSecret
+      name: storage-credentials
+    patch: |
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: storage-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+  - target:
+      kind: ConfigMap
+      name: shared-config
+    patch: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: shared-config
+      data:
+        CORS_ORIGINS: "https://red-grass-06d413100-110.eastasia.6.azurestaticapps.net"
+  - target:
+      kind: Deployment
+      name: api
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        template:
+          spec:
+            containers:
+            - name: api
+              env:
+            - name: API__CORS_ORIGINS
+              # JSON array string - keep no spaces after commas
+              value: '["https://red-grass-06d413100-110.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
+  - target:
+      kind: HTTPRoute
+      name: api-route
+    patch: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: api-route
+        annotations:
+          external-dns.alpha.kubernetes.io/hostname: api-pr-110.yt-summarizer.apps.ashleyhollis.com
+      spec:
+        hostnames:
+        - "api-pr-110.yt-summarizer.apps.ashleyhollis.com"
+  - target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: not-used
+      spec:
+        template:
+          spec:
+            containers:
+            - name: not-used
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 150m
+                  memory: 256Mi
+  - target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: not-used
+      spec:
+        replicas: 1
+  - target:
+      kind: Job
+      name: db-migrate
+    patch: |
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: db-migrate
+      spec:
+        template:
+          spec:
+            serviceAccountName: db-migrate
 images:
-  -
+  - 
     name: yt-summarizer-api
     newName: acrytsummprd.azurecr.io/yt-summarizer-api
-    newTag: pr-110-9270357
-  -
+    newTag: pr-110-a51c176
+  - 
     name: yt-summarizer-workers
     newName: acrytsummprd.azurecr.io/yt-summarizer-workers
-    newTag: pr-110-9270357
+    newTag: pr-110-a51c176
