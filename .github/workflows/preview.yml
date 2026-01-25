@@ -479,7 +479,9 @@ jobs:
     needs: [detect-changes, wait-for-ci]
     if: |
       needs.detect-changes.outputs.needs_deployment == 'true' &&
-      (needs.detect-changes.outputs.needs_image_build == 'false' || github.event_name == 'workflow_dispatch')
+      (needs.detect-changes.outputs.needs_image_build == 'false' ||
+       needs.wait-for-ci.outputs.image_tag == '' ||
+       github.event_name == 'workflow_dispatch')
     outputs:
       image_tag: ${{ steps.find-tag.outputs.image_tag }}
     steps:
@@ -492,7 +494,9 @@ jobs:
       - name: Find most recent image-building commit in PR
         id: find-tag
         shell: bash
-        run: scripts/workflows/preview-find-pr-image-tag.sh
+        run: |
+          scripts/workflows/preview-find-pr-image-tag.sh \
+            "${{ needs.detect-changes.outputs.pr_number }}"
 
       - name: Azure Login
         uses: azure/login@v2
