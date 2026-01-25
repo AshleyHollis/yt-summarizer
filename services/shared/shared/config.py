@@ -305,6 +305,17 @@ class QueueSettings(BaseSettings):
         ge=0,
         description="Max retries for failed jobs",
     )
+    poll_interval: float = Field(
+        default=10.0,
+        gt=0,
+        description="Seconds between queue polls when empty",
+    )
+    batch_size: int = Field(
+        default=32,
+        ge=1,
+        le=32,
+        description="Number of messages to fetch per poll (Azure max: 32)",
+    )
 
 
 class LoggingSettings(BaseSettings):

@@ -72,6 +72,8 @@ var transcribeWorker = builder.AddExecutable("transcribe-worker",
     .WithReference(queues)
     .WithReference(sql)
     .WithEnvironment("HEALTH_PORT", "8091")
+    .WithEnvironment("QUEUE_POLL_INTERVAL", "10.0")
+    .WithEnvironment("QUEUE_BATCH_SIZE", "32")
     .WithHttpEndpoint(port: 8091, targetPort: 8091, name: "health", isProxied: false)
     .WithOtlpExporter();
 
@@ -88,6 +90,8 @@ var summarizeWorker = builder.AddExecutable("summarize-worker",
     .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
     .WithEnvironment("AZURE_OPENAI_DEPLOYMENT", azureOpenAiDeployment)
     .WithEnvironment("HEALTH_PORT", "8092")
+    .WithEnvironment("QUEUE_POLL_INTERVAL", "10.0")
+    .WithEnvironment("QUEUE_BATCH_SIZE", "32")
     .WithHttpEndpoint(port: 8092, targetPort: 8092, name: "health", isProxied: false)
     .WithOtlpExporter();
 
@@ -104,6 +108,8 @@ var embedWorker = builder.AddExecutable("embed-worker",
     .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
     .WithEnvironment("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", azureOpenAiEmbeddingDeployment)
     .WithEnvironment("HEALTH_PORT", "8093")
+    .WithEnvironment("QUEUE_POLL_INTERVAL", "10.0")
+    .WithEnvironment("QUEUE_BATCH_SIZE", "32")
     .WithHttpEndpoint(port: 8093, targetPort: 8093, name: "health", isProxied: false)
     .WithOtlpExporter();
 
@@ -116,6 +122,8 @@ var relationshipsWorker = builder.AddExecutable("relationships-worker",
     .WithReference(queues)
     .WithReference(sql)
     .WithEnvironment("HEALTH_PORT", "8094")
+    .WithEnvironment("QUEUE_POLL_INTERVAL", "10.0")
+    .WithEnvironment("QUEUE_BATCH_SIZE", "32")
     .WithHttpEndpoint(port: 8094, targetPort: 8094, name: "health", isProxied: false)
     .WithOtlpExporter();
 

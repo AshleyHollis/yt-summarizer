@@ -422,6 +422,13 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '90'
 
+      - name: Validate K8s preview placeholders
+        shell: bash
+        run: |
+          echo "::group::Validating K8s preview patch files don't have hardcoded values"
+          bash scripts/ci/validate-k8s-placeholders.sh
+          echo "::endgroup::"
+
       - name: Validate Argo CD manifest syntax
         if: contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
         shell: bash

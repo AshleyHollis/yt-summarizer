@@ -83,6 +83,8 @@
 - `OPENAI_API_KEY`: Required for summarization workers.
 - `NEXT_PUBLIC_API_URL`: Public API URL for browser clients.
 - `API_URL`: Internal API URL for SSR calls.
+- `QUEUE_POLL_INTERVAL`: Seconds between queue polls when empty (default: 10.0). Configured per-worker in Aspire.
+- `QUEUE_BATCH_SIZE`: Number of messages to fetch per poll, range 1-32 (default: 32). Configured per-worker in Aspire.
 
 ## Lint / Format
 - **Frontend lint**: `cd apps/web && npm run lint`
@@ -138,6 +140,34 @@
 - **Start workers**: `./scripts/start-workers.ps1`
 - **Deploy infra**: `./scripts/deploy-infra.ps1`
 - CI helpers live under `scripts/ci/`.
+
+## Queue Polling & Cost Optimization
+Workers poll Azure Storage queues at configurable intervals to balance latency vs. transaction costs:
+
+- **Poll Interval**: 10 seconds (default) - Time to wait between queue polls when empty
+- **Batch Size**: 32 messages (default, Azure max) - Messages fetched per poll
+- **Cost Impact**: ~98% reduction in queue transactions vs. 1-second polling with batch_size=1
+
+Configuration is set in `services/aspire/AppHost/AppHost.cs` via environment variables:
+- `QUEUE_POLL_INTERVAL`: Adjust for latency vs. cost tradeoff (default: 10.0 seconds)
+- `QUEUE_BATCH_SIZE`: Increase for high-volume workloads, decrease for memory-constrained workers (default: 32)
+
+**Latency Trade-off**: Messages may wait up to 10 seconds before processing starts (avg: 5 seconds). For video processing workflows that take minutes to hours, this is negligible.
+
+**Per-Worker Overrides**: Workers can override defaults in their `__init__` method if needed. For example, the transcribe worker already has rate limiting (5-10s delays) due to YouTube API constraints.
+
+## K8s Preview Patch Placeholders
+Preview environment K8s patches use placeholders that are substituted during deployment to ensure each PR gets unique resources:
+
+**Required Placeholders**:
+- `__PR_NUMBER__`: PR number (e.g., 109)
+- `__PREVIEW_HOST__`: Full preview hostname (e.g., api-pr-109.yt-summarizer.apps.ashleyhollis.com)
+- `__TLS_SECRET__`: TLS secret name for the preview
+- `__SWA_URL__`: Static Web App URL for CORS configuration
+
+**Validation**: The CI runs `scripts/ci/validate-k8s-placeholders.sh` to ensure patch files in `k8s/overlays/preview/patches/` don't contain hardcoded PR numbers or URLs. This prevents deployment issues where patches reference wrong resources.
+
+**Substitution**: During deployment, `scripts/ci/generate_preview_kustomization.py` replaces placeholders with actual values for the current PR.
 
 ## Tooling & Automation Rules (Copilot Instructions)
 - Use **PowerShell** for scripts on Windows.
