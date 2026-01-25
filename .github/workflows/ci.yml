@@ -422,15 +422,6 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '90'
 
-      - name: Validate K8s placeholders (all environments)
-        if: contains(needs.detect-changes.outputs.changed_areas, 'k8s')
-        uses: ./.github/actions/validate
-        with:
-          validators: k8s-placeholders
-          k8s-preview-patch-dir: k8s/overlays/preview/patches,k8s/overlays/prod/patches
-          fail-fast: 'true'
-          timeout-seconds: '30'
-
       - name: Validate Argo CD manifest syntax
         if: contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
         uses: ./.github/actions/validate

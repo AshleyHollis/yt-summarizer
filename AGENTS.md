@@ -152,7 +152,6 @@ The validate action supports these validators (use comma-separated list):
 - **argocd-paths**: Validates Argo CD Application paths exist
 - **argocd-manifest**: Validates Argo CD manifests against server state
 - **terraform-config**: Validates Terraform configuration (fmt, validate, init)
-- **k8s-placeholders**: Validates K8s preview patches use placeholders (not hardcoded values)
 - **swa-config**: Validates Static Web Apps configuration (output_location, token, build script)
 - **kustomize-resources**: Validates resource requests/limits against AKS quotas
 - **all**: Runs all validators
@@ -163,9 +162,8 @@ The validate action supports these validators (use comma-separated list):
 # K8s validation
 - uses: ./.github/actions/validate
   with:
-    validators: yaml-syntax,kustomize-build,k8s-placeholders
+    validators: yaml-syntax,kustomize-build
     overlay-paths: k8s/overlays/preview,k8s/overlays/prod
-    k8s-preview-patch-dir: k8s/overlays/preview/patches
 
 # Terraform validation
 - uses: ./.github/actions/validate
@@ -195,8 +193,6 @@ The validate action supports these validators (use comma-separated list):
 
 ### Validator Details
 
-**k8s-placeholders**: Ensures preview environment patches use placeholders that get substituted during deployment. Validates against hardcoded patterns like `api-pr-109`, `red-grass-xxx-109.eastasia.6.azurestaticapps.net`, etc. Required placeholders: `__PR_NUMBER__`, `__PREVIEW_HOST__`, `__TLS_SECRET__`, `__SWA_URL__`.
-
 **swa-config**: Validates Static Web Apps configuration consistency across workflow files. Checks: (1) `output_location: ""` in deploy workflows, (2) SWA token is `SWA_DEPLOYMENT_TOKEN`, (3) build script starts with `next build --webpack`, (4) no root package.json/package-lock.json.
 
 **kustomize-resources**: Validates total CPU/memory requests don't exceed AKS cluster quotas. Can query AKS for actual quotas (`query-aks: 'true'`) or use manual limits. Sums container requests across all Deployment/StatefulSet/DaemonSet resources (scaled by replicas).
@@ -205,7 +201,6 @@ The validate action supports these validators (use comma-separated list):
 These scripts have been migrated to the centralized validate action:
 - ~~`scripts/validate_workflows.py`~~ - Now covered by yaml-syntax validator + actionlint
 - ~~`scripts/validate-swa-output.ps1`~~ - Now `swa-config` validator
-- ~~`scripts/ci/validate-k8s-placeholders.sh`~~ - Now `k8s-placeholders` validator  
 - ~~`scripts/ci/validate_kustomize.py`~~ - Now `kustomize-resources` validator
 
 ## Queue Polling & Cost Optimization
