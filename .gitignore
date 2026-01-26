@@ -18,6 +18,7 @@ eggs/
 .eggs/
 lib/
 !apps/web/lib/
+!scripts/ci/lib/
 lib64/
 parts/
 sdist/

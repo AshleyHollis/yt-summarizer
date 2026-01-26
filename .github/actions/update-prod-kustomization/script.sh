@@ -22,9 +22,7 @@ set -euo pipefail
 
 cd "${KUSTOMIZATION_PATH}"
 
-python ../../../scripts/ci/update_prod_kustomization.py \
-  --template "../../../${TEMPLATE_PATH}" \
-  --output kustomization.yaml \
+bash ../../../scripts/ci/update_prod_kustomization.sh \
   --image-tag "${IMAGE_TAG}"
 
 echo "✅ Updated production kustomization with tag: ${IMAGE_TAG}"

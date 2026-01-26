@@ -10,7 +10,7 @@ metadata:
   annotations:
     config.kubernetes.io/local-config: 'true'
 
-namespace: preview-pr-__PR_NUMBER__
+namespace: preview-pr-${PR_NUMBER}
 
 resources:
   - ../../base-preview
@@ -19,19 +19,149 @@ resources:
 
 images:
   - name: yt-summarizer-api
-    newName: __ACR_SERVER__/yt-summarizer-api
-    newTag: __IMAGE_TAG__
+    newName: ${ACR_SERVER}/yt-summarizer-api
+    newTag: ${IMAGE_TAG}
   - name: yt-summarizer-workers
-    newName: __ACR_SERVER__/yt-summarizer-workers
-    newTag: __IMAGE_TAG__
+    newName: ${ACR_SERVER}/yt-summarizer-workers
+    newTag: ${IMAGE_TAG}
 
 patches:
-  - path: patches/externalsecret-db-patch.yaml
-  - path: patches/externalsecret-openai-patch.yaml
-  - path: patches/externalsecret-storage-patch.yaml
-  - path: patches/configmap-patch.yaml
-  - path: patches/api-deployment-patch.yaml
-  - path: patches/httproute-patch.yaml
-  - path: patches/resources-patch.yaml
-  - path: patches/replicas-patch.yaml
-  - path: patches/migration-job-patch.yaml
+  # ExternalSecret patches - reference ClusterSecretStore
+  - patch: |-
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: db-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+    target:
+      kind: ExternalSecret
+      name: db-credentials
+
+  - patch: |-
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: openai-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+    target:
+      kind: ExternalSecret
+      name: openai-credentials
+
+  - patch: |-
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: storage-credentials
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: azure-keyvault-cluster
+    target:
+      kind: ExternalSecret
+      name: storage-credentials
+
+  # ConfigMap patch - CORS origins with SWA URL
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: shared-config
+      data:
+        CORS_ORIGINS: "${SWA_URL}"
+    target:
+      kind: ConfigMap
+      name: shared-config
+
+  # API Deployment patch - CORS origins env var
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        template:
+          spec:
+            containers:
+            - name: api
+              env:
+              - name: API__CORS_ORIGINS
+                # JSON array string - keep no spaces after commas
+                value: '["${SWA_URL}","http://localhost:3000"]'
+    target:
+      kind: Deployment
+      name: api
+
+  # HTTPRoute patch - preview hostname
+  - patch: |-
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: api-httproute
+        annotations:
+          external-dns.alpha.kubernetes.io/hostname: ${PREVIEW_HOST}
+      spec:
+        hostnames:
+        - "${PREVIEW_HOST}"
+    target:
+      kind: HTTPRoute
+      name: api-httproute
+
+  # Replicas patch - single replica for all deployments
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component
+
+  # Resource limits patch - API deployment
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+    target:
+      kind: Deployment
+      name: api
+
+  # Resource limits patch - Worker deployments
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 150m
+            memory: 256Mi
+    target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component=worker
+
+  # Migration job patch - resource limits
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 150m
+            memory: 256Mi
+    target:
+      kind: Job
+      name: db-migration

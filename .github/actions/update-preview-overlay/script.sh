@@ -43,10 +43,10 @@ if [ ! -f "${OVERLAY_FILE}" ]; then
   exit 1
 fi
 
-# Generate preview overlay using Python script
+# Generate preview overlay using shell script
 echo "Using IMAGE_TAG=${IMAGE_TAG}"
 
-python scripts/ci/generate_preview_kustomization.py \
+bash scripts/ci/generate_preview_kustomization.sh \
   --template scripts/ci/templates/preview-kustomization-template.yaml \
   --output "${OVERLAY_FILE}" \
   --pr-number "${PR_NUMBER}" \

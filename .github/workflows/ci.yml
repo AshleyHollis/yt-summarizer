@@ -422,40 +422,25 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '90'
 
-      - name: Validate K8s preview placeholders
-        shell: bash
-        run: |
-          echo "::group::Validating K8s preview patch files don't have hardcoded values"
-          bash scripts/ci/validate-k8s-placeholders.sh
-          echo "::endgroup::"
-
       - name: Validate Argo CD manifest syntax
         if: contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
-        shell: bash
-        run: |
-          echo "Validating Argo CD manifest files..."
+        uses: ./.github/actions/validate
+        with:
+          validators: yaml-syntax
+          k8s-directory: k8s/argocd
+          fail-fast: 'true'
+          timeout-seconds: '30'
 
-          # Validate YAML syntax
-          for file in k8s/argocd/*.yaml; do
-            if [[ -f "$file" ]]; then
-              echo "Checking $file..."
-              if ! yq eval '.' "$file" > /dev/null 2>&1; then
-                echo "::error::Invalid YAML syntax in $file"
-                exit 1
-              fi
-
-              # Check for Application/ApplicationSet kind
-              kind=$(yq eval '.kind' "$file" 2>/dev/null || echo "")
-              if [[ -n "$kind" ]] && [[ "$kind" != "Application" ]] && [[ "$kind" != "ApplicationSet" ]]; then
-                echo "::warning::Unexpected kind '$kind' in $file (expected Application or ApplicationSet)"
-              fi
-
-              echo "  ✓ $file is valid"
-            fi
-          done
-
-          echo ""
-          echo "All Argo CD manifests passed validation!"
+      - name: Validate preview deployment manifests
+        if: contains(needs.detect-changes.outputs.changed_areas, 'k8s')
+        uses: ./.github/actions/deployment-validate
+        with:
+          overlay-path: k8s/overlays/preview
+          target-namespace: preview-pr-test
+          skip-image-validation: 'true'
+          skip-secret-validation: 'true'
+          max-cpu-millicores: '1500'
+          max-memory-mi: '2560'
 
 
   # ===========================================================================
@@ -694,9 +679,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Validate SWA output_location
-        shell: pwsh
-        run: ./scripts/validate-swa-output.ps1
+      - name: Validate SWA configuration
+        uses: ./.github/actions/validate
+        with:
+          validators: swa-config
+          swa-workflow-files: '.github/workflows/deploy-prod.yml,.github/workflows/swa-baseline-deploy.yml'
+          swa-app-dir: 'apps/web'
+          fail-fast: 'true'
+          timeout-seconds: '30'
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -709,15 +699,9 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/pre-commit
-          key: ${{ runner.os }}-workflow-py-${{ hashFiles('scripts/validate_workflows.py', '.pre-commit-config.yaml') }}
+          key: ${{ runner.os }}-workflow-py-${{ hashFiles('.pre-commit-config.yaml') }}
           restore-keys: |
             ${{ runner.os }}-workflow-py-
-
-      - name: Install PyYAML
-        run: pip install pyyaml
-
-      - name: Validate workflow YAML syntax
-        run: python scripts/validate_workflows.py
 
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
