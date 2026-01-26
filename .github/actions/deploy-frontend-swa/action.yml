@@ -38,7 +38,7 @@ inputs:
     default: main
     required: false
   deployment-environment:
-    description: SWA deployment environment (production for production, pr-{number} for previews)
+    description: SWA deployment environment (default for production, pr-{number} for previews)
     default: preview
     required: false
   verbose:

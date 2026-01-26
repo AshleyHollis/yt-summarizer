@@ -473,7 +473,7 @@ jobs:
           runtime-config-path: apps/web/public/runtime-config.js
           output_location: ""
           production-branch: main
-          deployment-environment: production
+          deployment-environment: default
 
       - name: Verify frontend deployment
         uses: ./.github/actions/health-check
