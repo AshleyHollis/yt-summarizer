@@ -587,7 +587,6 @@ jobs:
           image-name: yt-summarizer
           wait-for-ready: 'true'
           timeout-seconds: '300'
-          workers: ${{ env.WORKER_DEPLOYMENTS }}
           fail-on-mismatch: 'true'
 
       - name: Collect and upload diagnostics on failure
