@@ -49,6 +49,12 @@ validate_yaml_structure() {
 
     log_info "Validating YAML structure..."
 
+    # Skip kubectl validation in CI (no K8s API server available)
+    if [[ "${SKIP_SECRET_VALIDATION:-false}" == "true" ]]; then
+        log_info "⏩ Skipping kubectl validation (CI environment)"
+        return 0
+    fi
+
     # Check for common YAML issues
     local errors=$(kubectl apply --dry-run=client -f "$manifests_file" 2>&1 | grep -i "error\|invalid" || true)
 

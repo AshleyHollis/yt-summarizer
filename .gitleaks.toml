@@ -53,3 +53,9 @@ useDefault = true
     # ACR image references (not secrets, just image tags)
     '''acrytsummprd\.azurecr\.io/[a-z0-9-]+:pr-[0-9]+-[a-z0-9]+''',
   ]
+
+  # Allowlist specific commits that contain false positives
+  commits = [
+    # CI-generated kustomization with ACR image tag (before regex was added)
+    "3a5dc2e4fc59cbc0784001f7f59a386f7314a88f",
+  ]
