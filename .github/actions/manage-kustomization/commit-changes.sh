@@ -81,7 +81,7 @@ if git rev-parse "origin/$BRANCH" > /dev/null 2>&1; then
     git checkout --ours "$FILE_TO_COMMIT"
     git add "$FILE_TO_COMMIT"
     git rebase --continue
-    
+
     # If rebase still fails, abort and try force push with lease
     if [ $? -ne 0 ]; then
       echo "⚠️  Rebase failed, using force-with-lease push instead..."
