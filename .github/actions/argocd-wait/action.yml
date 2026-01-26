@@ -52,6 +52,10 @@ name: Wait for Argo CD Sync
 description: Smart wait-for-sync with automatic failure detection and recovery
 
 inputs:
+  github-token:
+    description: 'GitHub token for PR state checks (optional)'
+    required: false
+    default: ''
   app-name:
     description: 'Argo CD Application name (e.g., preview-pr-110)'
     required: true
@@ -167,6 +171,7 @@ runs:
       id: wait
       shell: bash
       env:
+        GH_TOKEN: ${{ inputs.github-token }}
         APP_NAME: ${{ inputs.app-name }}
         NAMESPACE: ${{ inputs.namespace }}
         ARGOCD_NAMESPACE: ${{ inputs.argocd-namespace }}

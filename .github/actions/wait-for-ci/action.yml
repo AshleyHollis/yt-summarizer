@@ -14,6 +14,10 @@ inputs:
   commit-sha:
     description: Commit SHA to check
     required: true
+  pr-number:
+    description: Pull request number (optional; if provided, checks PR state during wait)
+    required: false
+    default: ''
   timeout-seconds:
     description: Maximum time to wait in seconds
     required: false
@@ -48,6 +52,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         COMMIT_SHA: ${{ inputs.commit-sha }}
+        PR_NUMBER: ${{ inputs.pr-number }}
         TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
         INTERVAL_SECONDS: ${{ inputs.interval-seconds }}
         WORKFLOW_FILE: ${{ inputs.workflow-file }}

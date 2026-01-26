@@ -206,6 +206,8 @@ jobs:
         run: scripts/workflows/preview-detect-infra.sh "${{ steps.set-pr.outputs.base_sha }}" "${{ steps.set-pr.outputs.pr_head_sha }}"
 
   # ===========================================================================
+  # PHASE 2: BUILD OR FETCH IMAGE TAGS
+  # ===========================================================================
   # PHASE 2B: WAIT FOR CI
   # ===========================================================================
   wait-for-ci:
@@ -229,6 +231,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           timeout-seconds: '1800'
           workflow-event: pull_request
 
@@ -585,6 +588,8 @@ jobs:
           app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           cleanup-stuck-operations: 'true'
           auto-recovery: 'true'
           max-wait-seconds: '300'

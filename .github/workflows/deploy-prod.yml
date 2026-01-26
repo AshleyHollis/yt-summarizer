@@ -378,6 +378,7 @@ jobs:
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           namespace: ${{ env.NAMESPACE_PROD }}
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           cleanup-stuck-operations: 'true'
           auto-recovery: 'false'
           max-wait-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
