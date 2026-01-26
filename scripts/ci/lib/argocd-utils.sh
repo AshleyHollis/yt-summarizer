@@ -282,23 +282,23 @@ wait_for_sync() {
         # Early detection: OutOfSync + Healthy + Running for 60s suggests stuck refresh
         if [ "$sync_status" = "OutOfSync" ] && [ "$health_status" = "Healthy" ] && [ "$operation_state" = "Running" ] && [ $elapsed -ge 60 ]; then
             log_warn "⚠️  Detected potentially stuck refresh: OutOfSync + Healthy + Running for ${elapsed}s"
-            
+
             # Check if refresh annotation is already present
             local has_refresh=$(kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" \
                 -o jsonpath='{.metadata.annotations.argocd\.argoproj\.io/refresh}' 2>/dev/null || echo "")
-            
+
             if [ -n "$has_refresh" ] && [ $((elapsed - last_recovery_attempt)) -gt 30 ] && [ $recovery_attempts -lt $max_recovery_attempts ]; then
                 log_warn "Hard refresh annotation present but not progressing - triggering recovery..."
-                
+
                 # Clear stuck operation and re-trigger refresh
                 if auto_recover "$app_name" "UNKNOWN"; then
                     recovery_attempts=$((recovery_attempts + 1))
                     last_recovery_attempt=$elapsed
-                    
+
                     # Extend timeout for recovery
                     timeout=$((timeout + RECOVERY_TIMEOUT_EXTENSION))
                     log_info "Timeout extended to ${timeout}s for recovery"
-                    
+
                     sleep 10
                     continue
                 fi
@@ -324,12 +324,12 @@ wait_for_sync() {
                     if auto_recover "$app_name" "$pattern"; then
                         recovery_attempts=$((recovery_attempts + 1))
                         last_recovery_attempt=$elapsed
-                        
+
                         # Extend timeout to give recovery time to complete
                         log_info "Extending timeout by ${RECOVERY_TIMEOUT_EXTENSION}s to allow recovery to complete..."
                         timeout=$((timeout + RECOVERY_TIMEOUT_EXTENSION))
                         log_info "New timeout: ${timeout}s"
-                        
+
                         sleep 10
                         continue
                     else
