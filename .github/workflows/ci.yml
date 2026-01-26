@@ -138,9 +138,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: ./.github/actions/setup-python-uv
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          install-mode: service
           service-package: services/shared
           install-pytest-xdist: 'true'
 
@@ -237,9 +238,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python with uv
-        uses: ./.github/actions/setup-python-uv
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          install-mode: service
           service-package: services/api
 
       - name: Scan API security

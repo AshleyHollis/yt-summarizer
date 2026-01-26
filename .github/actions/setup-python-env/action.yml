@@ -1,23 +1,31 @@
-# Reusable Python setup with uv for test jobs
-# Sets up Python, pip/uv cache, and installs dependencies
-# Optimized for test jobs that need shared and service-specific packages
+# Reusable Python setup action for CI/CD pipelines
+# Configures Python, uv package manager, and dependency caching
+# Consolidates setup-python and setup-python-uv functionality
 
-name: 'Setup Python with uv'
-description: 'Setup Python with uv package manager, caching, and dependency installation'
+name: 'Setup Python Environment'
+description: 'Setup Python with uv, caching, and optional package installation'
 
 inputs:
   python-version:
     description: 'Python version to use'
     required: false
     default: '3.11'
-  shared-package:
-    description: 'Install shared package'
+  
+  install-mode:
+    description: 'Installation mode: none|shared|service|both'
     required: false
-    default: 'true'
+    default: 'none'
+  
   service-package:
     description: 'Service package path to install (e.g., services/api)'
     required: false
     default: ''
+  
+  working-directory:
+    description: 'Working directory for installation (for legacy mode)'
+    required: false
+    default: '.'
+  
   install-pytest-xdist:
     description: 'Install pytest-xdist for parallel testing'
     required: false
@@ -37,7 +45,7 @@ runs:
         path: |
           ~/.cache/pip
           ~/.cache/uv
-        key: ${{ runner.os }}-pip-uv-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
+        key: ${{ runner.os }}-pip-uv-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/uv.lock') }}
         restore-keys: |
           ${{ runner.os }}-pip-uv-
 
@@ -47,17 +55,24 @@ runs:
         enable-cache: true
         cache-dependency-glob: |
           **/pyproject.toml
+          **/requirements*.txt
           **/uv.lock
 
     - name: Install shared package
-      if: inputs.shared-package == 'true'
+      if: inputs.install-mode == 'shared' || inputs.install-mode == 'both'
       shell: bash
       run: uv pip install --system --prerelease=allow -e "services/shared[dev]"
 
     - name: Install service package
-      if: inputs.service-package != ''
+      if: (inputs.install-mode == 'service' || inputs.install-mode == 'both') && inputs.service-package != ''
       shell: bash
       run: uv pip install --system --prerelease=allow -e "${{ inputs.service-package }}[dev]"
+
+    - name: Install dependencies (legacy mode)
+      if: inputs.install-mode == 'none' && inputs.working-directory != '.'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: uv pip install --system -e ".[dev]"
 
     - name: Install pytest-xdist
       if: inputs.install-pytest-xdist == 'true'
