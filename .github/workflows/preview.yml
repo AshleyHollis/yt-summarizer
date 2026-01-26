@@ -243,11 +243,12 @@ jobs:
 
       - name: Validate image exists in ACR
         if: steps.wait.outputs.image_tag != ''
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ steps.wait.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.wait.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ===========================================================================
@@ -300,11 +301,12 @@ jobs:
           acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate image exists in ACR
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ steps.find-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.find-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ===========================================================================
@@ -497,48 +499,36 @@ jobs:
 
       - name: Verify cluster can pull image
         # Runs after AKS context + ACR login are configured
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           run-k8s-pull-test: 'true'
 
       - name: Validate CI image tag for PR
         if: needs.detect-changes.outputs.needs_image_build == 'true'
-        uses: ./.github/actions/validate-image-tag
+        uses: ./.github/actions/validate-docker-image
         with:
-          ci-image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
+          validation-type: tag-format
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
 
-      - name: Update preview overlay with image tags
-        id: overlay
-        uses: ./.github/actions/update-preview-overlay
+      - name: Update preview kustomization overlay
+        uses: ./.github/actions/manage-kustomization
         with:
+          operation: update-preview
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          acr-server: ${{ env.ACR_LOGIN_SERVER }}
+          acr-server: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           preview-host: ${{ needs.get-ingress.outputs.preview_host }}
           tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
-          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-
-      - name: Validate generated overlay (kustomize + dry-run)
-        uses: ./.github/actions/validate
-        with:
-          validators: kustomize-build
-          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PREVIEW }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
-
-      - name: Commit and push overlay update
-        uses: ./.github/actions/commit-overlay-changes
-        with:
-          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
-          pr-branch: ${{ needs.detect-changes.outputs.pr_head_ref || github.ref_name }}
+          auto-commit: 'true'
+          pr-branch: ${{ github.head_ref }}
 
   # ===========================================================================
   # PHASE 6: VERIFY DEPLOYMENT
@@ -589,58 +579,28 @@ jobs:
         with:
           kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
-      - name: Cleanup stuck Argo CD operations
-        uses: ./.github/actions/cleanup-argocd-operation
-        with:
-          app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          namespace: argocd
-          timeout-threshold: '300'
-        continue-on-error: false
-
-      - name: Pre-deployment validation
-        uses: ./.github/actions/validate
-        with:
-          validators: kustomize-build,argocd-manifest
-          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PREVIEW }}
-          argocd-app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
-          target-namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          timeout-seconds: '60'
-
-      - name: Check Argo CD application readiness
-        uses: ./.github/actions/check-argocd-readiness
-        with:
-          app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout: '60'
-
-      - name: Wait for Argo CD sync with auto-recovery
+      - name: Cleanup and wait for Argo CD sync with auto-recovery
         uses: ./.github/actions/argocd-wait
         with:
           app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          cleanup-stuck-operations: 'true'
+          auto-recovery: 'true'
           max-wait-seconds: '300'
           poll-interval-seconds: '10'
           max-recovery-attempts: '3'
 
-      - name: Verify API deployment image
-        uses: ./.github/actions/verify-deployment
+      - name: Verify deployments are using correct image tag
+        uses: ./.github/actions/verify-k8s-deployment
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          deployment-name: api
+          deployments: api,transcribe-worker,summarize-worker
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: ${{ env.API_IMAGE_NAME }}
-
-      - name: Verify workers deployment image
-        uses: ./.github/actions/verify-workers
-        with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: ${{ env.WORKERS_IMAGE_NAME }}
-          workers: ${{ env.WORKER_DEPLOYMENTS }}
+          image-name: yt-summarizer
+          wait-for-ready: 'true'
+          timeout-seconds: '300'
           fail-on-mismatch: 'true'
 
       - name: Collect and upload diagnostics on failure
@@ -806,8 +766,9 @@ jobs:
           repository: ${{ github.repository }}
 
       - name: Create deployment summary
-        uses: ./.github/actions/create-preview-summary
+        uses: ./.github/actions/create-pipeline-summary
         with:
+          summary-type: preview
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
           image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}

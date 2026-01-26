@@ -208,11 +208,12 @@ jobs:
           acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate CI image exists in ACR
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ steps.normalize-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.normalize-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ---------------------------------------------------------------------------
@@ -268,9 +269,14 @@ jobs:
           echo "image_tag=${{ needs.get-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Update production kustomization
-        uses: ./.github/actions/update-prod-kustomization
+        uses: ./.github/actions/manage-kustomization
         with:
+          operation: update-prod
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
+          kustomization-path: k8s/overlays/prod
+          template-path: scripts/ci/templates/prod-kustomization-template.yaml
+          auto-commit: 'true'
+          git-branch: main
 
       # This validation is critical - it runs AFTER update-prod-kustomization
       # inserts image tags. Ensures the modified manifest is still valid.
@@ -293,18 +299,20 @@ jobs:
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Verify cluster can pull image
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.determine-tag.outputs.image_tag }}
           run-k8s-pull-test: 'true'
 
       - name: Validate image tag format
         if: needs.get-image-tag.result == 'success'
-        uses: ./.github/actions/validate-image-tag
+        uses: ./.github/actions/validate-docker-image
         with:
-          ci-image-tag: ${{ steps.determine-tag.outputs.image_tag }}
+          validation-type: tag-format
+          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
           commit-sha: ${{ github.sha }}
 
       - name: Commit and push changes
@@ -364,39 +372,17 @@ jobs:
         with:
           kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
-      - name: Cleanup stuck Argo CD operations
-        uses: ./.github/actions/cleanup-argocd-operation
-        with:
-          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-          namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout-threshold: ${{ env.ARGOCD_OPERATION_TIMEOUT_THRESHOLD }}
-        continue-on-error: false
-
-      - name: Pre-deployment validation
-        uses: ./.github/actions/validate
-        with:
-          validators: kustomize-build,argocd-manifest
-          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
-          argocd-app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
-          target-namespace: ${{ env.NAMESPACE_PROD }}
-          timeout-seconds: '60'
-
-      - name: Validate Argo CD readiness (fail-fast)
-        uses: ./.github/actions/check-argocd-readiness
-        with:
-          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-          namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout: '60'
-          verbose: 'true'
-        continue-on-error: false
-      - name: Wait for Argo CD to sync
-        uses: ./.github/actions/wait-for-argocd
+      - name: Cleanup and wait for Argo CD to sync
+        uses: ./.github/actions/argocd-wait
         with:
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           namespace: ${{ env.NAMESPACE_PROD }}
+          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          cleanup-stuck-operations: 'true'
+          auto-recovery: 'false'
+          max-wait-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
+          poll-interval-seconds: '5'
           pr-number: '0'
-          timeout-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
 
       - name: Set expected image tag
         id: expected-tag
@@ -404,25 +390,16 @@ jobs:
         run: |
           echo "image_tag=${{ needs.get-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify API deployment image
-        uses: ./.github/actions/verify-deployment
+      - name: Verify deployments are using correct image tag
+        uses: ./.github/actions/verify-k8s-deployment
         with:
           namespace: ${{ env.NAMESPACE_PROD }}
-          deployment-name: api
+          deployments: api,transcribe-worker,summarize-worker
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: ${{ env.API_IMAGE_NAME }}
-          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-
-      - name: Verify workers deployment image
-        uses: ./.github/actions/verify-workers
-        with:
-          namespace: ${{ env.NAMESPACE_PROD }}
-          expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: ${{ env.WORKERS_IMAGE_NAME }}
-          workers: ${{ env.WORKER_DEPLOYMENTS }}
-          fail-on-mismatch: 'true'
+          image-name: yt-summarizer
+          wait-for-ready: 'true'
+          timeout-seconds: '300'
 
       - name: Collect and upload diagnostics on failure
         if: failure()
@@ -549,8 +526,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate summary
-        uses: ./.github/actions/create-prod-summary
+        uses: ./.github/actions/create-pipeline-summary
         with:
+          summary-type: prod
           image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
           commit-sha: ${{ github.sha }}
           update-overlay-result: ${{ needs.update-overlay.result }}

@@ -2,34 +2,7 @@
 # CI Workflow - Automated Testing and Image Building
 # =============================================================================
 # TRIGGERS: PR opened/updated, push to main, manual dispatch
-#
-# EXECUTION FLOWS:
-#
-# MAIN BRANCH (push to main):
-#   → ALWAYS runs FULL validation (all tests, all checks, all builds)
-#   → Purpose: Ensure merged code is always in a validated state
-#   → No conditional skipping based on changes
-#
-# PR BRANCHES (pull_request):
-#   1. Code Changes → Lint → Test → Build Images (if ACR configured)
-#   2. K8s Only Changes → Validate manifests (no images built)
-#   3. Docs/CI Changes → Validate YAML/workflows (no tests or builds)
-#   4. Smart skipping: Only run jobs for changed areas
-#
-# BUILD MODES:
-#   - ACR configured → Build and push images to Azure Container Registry
-#
-# KEY PATTERN - always() for conditional dependencies:
-#   Jobs with always() run even when dependencies skip/fail
-#   Used when job needs to evaluate complex conditions based on multiple dependency results
-#   Downstream jobs depending on always() jobs must also use always() + check result
-#
-# EXTRACTED SCRIPTS:
-#   - scripts/workflows/ci-check-branch.sh: Detect if main branch or PR
-#   - scripts/workflows/ci-detect-changes.sh: Detect what areas changed
-#   - scripts/workflows/ci-write-rationale.sh: Write job execution summary
-#
-# For details on adding new workflow scripts, see: REFACTORING.md
+# EXECUTION: Full validation - all tests, checks, and builds run on every trigger
 # =============================================================================
 
 name: CI
@@ -41,11 +14,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      force_full:
-        description: 'Force full CI validation regardless of change detection'
-        required: false
-        default: 'false'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -63,84 +31,20 @@ defaults:
 
 jobs:
   # ===========================================================================
-  # PHASE 1: CHANGE DETECTION
-  # ===========================================================================
-  # Analyzes diff to determine what changed, enabling smart job execution
-  #
-  # MAIN BRANCH: Always outputs ALL areas (forces full validation)
-  # PR BRANCHES: Outputs only changed areas (smart skipping)
-  #
-  # Outputs:
-  #   - changed_areas: Space-separated list (e.g., "services/api k8s")
-  #   - has_code_changes: Boolean for security scanning
-  #   - is_main_branch: Boolean to indicate main branch (full validation mode)
-  #
-  # Used by all subsequent jobs to decide if they should run
-  # ===========================================================================
-  detect-changes:
-    name: Detect Changes
-    runs-on: ubuntu-latest
-    outputs:
-      changed_areas: ${{ steps.changes.outputs.changed_areas }}
-      has_code_changes: ${{ steps.changes.outputs.has_code_changes }}
-      is_main_branch: ${{ steps.check-branch.outputs.is_main_branch }}
-      force_full: ${{ steps.check-branch.outputs.force_full }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check if main branch
-        id: check-branch
-        shell: bash
-        env:
-          GITHUB_REF: ${{ github.ref }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          FORCE_FULL: >-
-            ${{
-              (github.event.inputs.force_full == 'true' && github.ref_name == 'main') ||
-              (github.event_name == 'pull_request' &&
-                contains(github.event.pull_request.labels.*.name, 'ci-full'))
-            }}
-        run: scripts/workflows/ci-check-branch.sh
-
-      - name: Detect changes
-        id: changes
-        shell: bash
-        env:
-          MAIN_BRANCH: ${{ steps.check-branch.outputs.is_main_branch }}
-          FORCE_FULL: ${{ steps.check-branch.outputs.force_full }}
-        run: scripts/workflows/ci-detect-changes.sh
-
-  # ===========================================================================
-  # PHASE 2: LINTING
-  # ===========================================================================
-  # Runs only when relevant code areas change
-  # Python: services/api, services/workers, services/shared
-  # Frontend: apps/web
-  # Blocks tests if lint fails (fail-fast pattern)
+  # PHASE 1: LINTING
   # ===========================================================================
   lint-python:
     name: Lint Python
     runs-on: ubuntu-latest
-    needs: [detect-changes]
-    # Main branch: Always run | PR: Run if Python services changed
-    if: |
-      needs.detect-changes.outputs.is_main_branch == 'true' ||
-      needs.detect-changes.outputs.force_full == 'true' ||
-      contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-      contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-      contains(needs.detect-changes.outputs.changed_areas, 'services/shared')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: ./.github/actions/setup-python-uv
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          install-mode: service
           service-package: services/shared
           install-pytest-xdist: 'true'
 
@@ -150,13 +54,6 @@ jobs:
   frontend-quality:
     name: Frontend Quality
     runs-on: ubuntu-latest
-    needs: [detect-changes]
-    # Main branch: Always run | PR: Run if frontend changed
-    if: |
-      needs.detect-changes.outputs.is_main_branch == 'true' ||
-      needs.detect-changes.outputs.force_full == 'true' ||
-      github.event_name == 'pull_request' ||
-      contains(needs.detect-changes.outputs.changed_areas, 'apps/web')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -214,36 +111,24 @@ jobs:
             apps/web/staticwebapp.config.json
 
   # ===========================================================================
-  # PHASE 3: SECURITY SCANNING
-  # ===========================================================================
-  # Runs after linting passes, before tests
-  # Provides security feedback early in pipeline
-  # Scans: bandit (code security), pip-audit (dependency vulnerabilities), deptry (dependency consistency)
+  # PHASE 2: SECURITY SCANNING
   # ===========================================================================
   scan-python-security:
     name: Scan Python Security
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python]
-    # Main branch: Always run | PR: Run if Python services changed
-    # Requires lint-python to pass (or skip if not needed)
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped')
+    needs: [lint-python]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Python with uv
-        uses: ./.github/actions/setup-python-uv
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          install-mode: service
           service-package: services/api
 
       - name: Scan API security
-        if: contains(needs.detect-changes.outputs.changed_areas, 'services/api')
         uses: ./.github/actions/scan-python-security
         with:
           service-path: services/api
@@ -251,7 +136,6 @@ jobs:
           check-types: 'false'
 
       - name: Scan Workers security
-        if: contains(needs.detect-changes.outputs.changed_areas, 'services/workers')
         uses: ./.github/actions/scan-python-security
         with:
           service-path: services/workers
@@ -259,7 +143,6 @@ jobs:
           check-types: 'false'
 
       - name: Validate API dependencies
-        if: contains(needs.detect-changes.outputs.changed_areas, 'services/api')
         uses: ./.github/actions/validate-python-dependencies
         with:
           service-path: services/api
@@ -269,7 +152,6 @@ jobs:
           fail-on-warnings: 'false'
 
       - name: Validate Workers dependencies
-        if: contains(needs.detect-changes.outputs.changed_areas, 'services/workers')
         uses: ./.github/actions/validate-python-dependencies
         with:
           service-path: services/workers
@@ -280,129 +162,61 @@ jobs:
 
 
   # ===========================================================================
-  # PHASE 4: TESTING
+  # PHASE 3: PYTHON UNIT TESTS (MATRIX)
   # ===========================================================================
-  # Runs only when relevant code changes
-  # Dependencies: lint AND security must pass (fail-fast)
-  #
-  # Test Execution Rules:
-  # - test-shared: runs if services/shared changed
-  # - test-api: runs if services/api OR services/shared changed
-  # - test-workers: runs if services/workers OR services/shared changed
-  # - test-frontend: runs if apps/web changed
-  #
-  # Shared changes trigger API + Workers tests (they depend on shared code)
-  # ===========================================================================
-  test-shared:
-    name: Test Shared Package
+  test-python:
+    name: Test ${{ matrix.service.name }}
     runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, scan-python-security]
-    # Main branch: Always run | PR: Run if shared package changed
-    # Requires lint and security scans to pass
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
+    needs: [lint-python, scan-python-security]
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: Shared
+            path: shared
+            package: services/shared
+            markers: ''
+            pytest-args: ''
+            install-mode: shared
+          - name: API
+            path: api
+            package: services/api
+            markers: not integration and not live
+            pytest-args: '-v --tb=short'
+            install-mode: both
+          - name: Workers
+            path: workers
+            package: services/workers
+            markers: ''
+            pytest-args: ''
+            install-mode: both
+
     outputs:
       test_duration: ${{ steps.tests.outputs.test-duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run shared tests
+      - name: Run ${{ matrix.service.name }} tests
         id: tests
         uses: ./.github/actions/run-python-tests
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          service-package: services/shared
-          working-directory: services/shared
-          test-name: Shared Tests
+          service-package: ${{ matrix.service.package }}
+          working-directory: ${{ matrix.service.package }}
+          test-name: ${{ matrix.service.name }} Tests
           parallel: 'true'
           install-pytest-xdist: 'true'
-
-  test-api:
-    name: Test API
-    runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, scan-python-security]
-    # Main branch: Always run | PR: Run if API or shared changed
-    # Note: Shared changes trigger API tests (dependency)
-    # Requires lint and security scans to pass
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
-    outputs:
-      test_duration: ${{ steps.tests.outputs.test-duration }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run API tests
-        id: tests
-        uses: ./.github/actions/run-python-tests
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          service-package: services/api
-          working-directory: services/api
-          test-name: API Tests
-          parallel: 'true'
-          install-pytest-xdist: 'true'
-          pytest-args: '-v --tb=short'
-          markers: 'not integration and not live'
-
-  test-workers:
-    name: Test Workers
-    runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, scan-python-security]
-    # Main branch: Always run | PR: Run if workers or shared changed
-    # Note: Shared changes trigger workers tests (dependency)
-    # Requires lint and security scans to pass
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
-    outputs:
-      test_duration: ${{ steps.tests.outputs.test-duration }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run workers tests (parallel)
-        id: tests
-        uses: ./.github/actions/run-python-tests
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          service-package: services/workers
-          working-directory: services/workers
-          test-name: Workers Tests
-          parallel: 'true'
-          install-pytest-xdist: 'true'
+          pytest-args: ${{ matrix.service.pytest-args }}
+          markers: ${{ matrix.service.markers }}
+          install-mode: ${{ matrix.service.install-mode }}
 
   # ===========================================================================
-  # PHASE 5: KUBERNETES VALIDATION
-  # ===========================================================================
-  # Runs only when k8s/ directory changes
-  # Validates:
-  #   1. YAML syntax (all manifests)
-  #   2. Kustomize builds (base + overlays)
-  #   3. ArgoCD Application paths exist
-  # Catches k8s config errors before they reach cluster
-  #
-  # Uses consolidated validate action for all checks
+  # PHASE 4: KUBERNETES VALIDATION
   # ===========================================================================
   kubernetes-validate:
     name: Kubernetes Validation
     runs-on: ubuntu-latest
-    needs: [detect-changes]
-    # Main branch: Always run | PR: Run if k8s changed
-    if: |
-      needs.detect-changes.outputs.is_main_branch == 'true' ||
-      contains(needs.detect-changes.outputs.changed_areas, 'k8s')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -423,7 +237,6 @@ jobs:
           timeout-seconds: '90'
 
       - name: Validate Argo CD manifest syntax
-        if: contains(needs.detect-changes.outputs.changed_areas, 'k8s/argocd')
         uses: ./.github/actions/validate
         with:
           validators: yaml-syntax
@@ -432,7 +245,6 @@ jobs:
           timeout-seconds: '30'
 
       - name: Validate preview deployment manifests
-        if: contains(needs.detect-changes.outputs.changed_areas, 'k8s')
         uses: ./.github/actions/deployment-validate
         with:
           overlay-path: k8s/overlays/preview
@@ -444,49 +256,12 @@ jobs:
 
 
   # ===========================================================================
-  # PHASE 6: IMAGE BUILDING (Conditional)
-  # ===========================================================================
-  # WHEN: Only when code requiring images changes (services/, apps/web, docker/)
-  # WHY: Avoid rebuilding images for k8s manifest or docs changes
-  #
-  # TWO-STAGE PROCESS:
-  # 1. build-images-meta: Generate image tag (pr-123-abc123f)
-  # 2. build-images: Build and push images with that tag
-  #
-  # CRITICAL always() PATTERN:
-  # - build-images-meta uses always() to run when lint/security/test jobs skip
-  # - build-images MUST also use always() + check meta result == 'success'
-  # - Without this, build-images skips even when meta succeeds
-  #
-  # FLOW 1 (ACR configured):
-  #   Lint → Security → Tests pass → build-images-meta generates tag → build-images builds + pushes
-  # FLOW 2 (No ACR):
-  #   Lint → Security → Tests pass → build-images-validate builds without pushing (validation only)
-  #
-  # Image Tags:
-  # - PRs: pr-<number>-<sha> (e.g., pr-42-abc123f)
-  # - Main: sha-<sha> (e.g., sha-abc123f)
+  # PHASE 5: IMAGE BUILDING
   # ===========================================================================
   build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
-    needs: [detect-changes]
-    # IMAGE BUILDING CONDITIONS:
-    # - ACR must be configured (vars.ACR_NAME != '')
-    # - Main branch: Always build images after tests pass
-    # - PR branch: Build if code/docker areas changed or full run is forced
-    # - All lint, security scans, and tests must pass (or skip if not run)
-    # - always(): Run even if some dependencies were skipped, then check their results
-    if: |
-      always() &&
-      vars.ACR_NAME != '' &&
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       needs.detect-changes.outputs.force_full == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker'))
+    if: vars.ACR_NAME != ''
     outputs:
       image_tag: ${{ steps.tag.outputs.image-tag }}
     steps:
@@ -501,56 +276,15 @@ jobs:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Publish image tag artifact
-        if: steps.tag.outputs.image-tag != ''
         uses: ./.github/actions/publish-image-tag
         with:
           image-tag: ${{ steps.tag.outputs.image-tag }}
 
-      - name: Verify image-tag artifact is available
-        if: steps.tag.outputs.image-tag != ''
-        uses: actions/download-artifact@v4
-        with:
-          name: image-tag
-          path: ./downloaded-artifacts
-
-      - name: Assert downloaded image tag
-        if: steps.tag.outputs.image-tag != ''
-        uses: ./.github/actions/assert-image-tag-artifact
-
   build-images:
     name: Build Images (parallel)
     runs-on: ubuntu-latest
-    needs:
-      [
-        detect-changes,
-        build-images-meta,
-        lint-python,
-        scan-python-security,
-      ]
-    # CRITICAL always() dependency:
-    # - build-images-meta uses always() so it runs when some tests skip
-    # - This job MUST use always() + check meta result, or it will skip
-    # - GitHub Actions won't run jobs depending on always() jobs unless they also use always()
-    #
-    # IMAGE BUILDING:
-    # - Main branch: Always build after meta succeeds
-    # - PR branch: Build if code/docker areas changed or full run is forced
-    if: |
-      always() &&
-      needs.build-images-meta.result == 'success' &&
-      vars.ACR_NAME != '' &&
-      (needs.detect-changes.outputs.force_full != 'true' ||
-       needs.detect-changes.outputs.is_main_branch == 'true' ||
-       github.event_name == 'pull_request') &&
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       needs.detect-changes.outputs.force_full == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'apps/web') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'docker')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
+    needs: [build-images-meta, lint-python, scan-python-security]
+    if: needs.build-images-meta.result == 'success'
     strategy:
       matrix:
         include:
@@ -583,40 +317,20 @@ jobs:
           push: true
 
   # ===========================================================================
-  # E2E TESTING - Runs in Preview Workflow
-  # ===========================================================================
-  # E2E tests run against live preview environments (preview.yml workflow)
-  # Not run in CI because they require full deployed environment
-  # Local testing: npm run e2e (with Aspire running)
-  # ===========================================================================
-
-  # ===========================================================================
   # PHASE 6: INFRASTRUCTURE VALIDATION
-  # ===========================================================================
-  # Terraform: Validates HCL syntax and plan (when infra/terraform/ changes)
-  # Note: Kustomize validation moved to Phase 5 (kubernetes-validate)
   # ===========================================================================
   validate-terraform:
     name: Validate Terraform
     runs-on: ubuntu-latest
-    needs: [detect-changes]
     permissions:
       id-token: write
       contents: read
-    # Main branch: Always run | PR: Run if terraform changed
-    if: |
-      needs.detect-changes.outputs.is_main_branch == 'true' ||
-      contains(needs.detect-changes.outputs.changed_areas, 'infra/terraform')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
-        if: |
-          needs.detect-changes.outputs.force_full != 'true' ||
-          needs.detect-changes.outputs.is_main_branch == 'true' ||
-          github.event_name == 'pull_request'
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -638,17 +352,9 @@ jobs:
   # ===========================================================================
   # PHASE 7: SECRET SCANNING
   # ===========================================================================
-  # Runs gitleaks to detect secrets in code
-  # Only runs when has_code_changes == true (skips for pure k8s/docs changes)
-  # ===========================================================================
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
-    needs: [detect-changes]
-    # Main branch: Always run | PR: Run if code changed (not just docs)
-    if: |
-      needs.detect-changes.outputs.is_main_branch == 'true' ||
-      needs.detect-changes.outputs.has_code_changes == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -664,17 +370,9 @@ jobs:
   # ===========================================================================
   # PHASE 8: WORKFLOW VALIDATION
   # ===========================================================================
-  # Validates GitHub Actions workflow syntax and linting
-  # Runs when workflow/CI files change (or always on main)
-  # ===========================================================================
   validate-workflows:
     name: Validate Workflows
     runs-on: ubuntu-latest
-    needs: [detect-changes]
-    if: |
-      needs.detect-changes.outputs.is_main_branch == 'true' ||
-      needs.detect-changes.outputs.force_full == 'true' ||
-      contains(needs.detect-changes.outputs.changed_areas, 'ci')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -719,34 +417,20 @@ jobs:
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK
   # ===========================================================================
-
-  # always() ensures this runs regardless of job results
-  # Validates that:
-  #   1. Required jobs ran (based on changed_areas)
-  #   2. All jobs that ran passed (result == 'success')
-  #   3. Jobs that should skip did skip (result == 'skipped')
-  #
-  # Replicates job conditions to ensure pipeline executed correctly
-  # Fails if expected jobs didn't run or ran when they shouldn't
-  # ===========================================================================
   ci-status:
     name: CI Status
     runs-on: ubuntu-latest
     needs:
-      - detect-changes
       - lint-python
-      - frontend-quality
       - scan-python-security
-      - test-shared
-      - test-api
-      - test-workers
+      - frontend-quality
+      - secret-scanning
+      - test-python
+      - kubernetes-validate
+      - validate-terraform
       - build-images
       - build-images-meta
-      - validate-terraform
-      - kubernetes-validate
-      - secret-scanning
       - validate-workflows
-
     if: always()
     steps:
       - name: Checkout code
@@ -755,72 +439,38 @@ jobs:
       - name: Write execution rationale
         run: |
           {
-            changed_areas="${{ needs.detect-changes.outputs.changed_areas }}"
-            mode="PR (change-based)"
-            if [[ "${{ needs.detect-changes.outputs.is_main_branch }}" == 'true' ]]; then
-              mode="main branch (full validation)"
-            fi
-            lint_reason="no python changes"
-            if [[ "${{ needs.detect-changes.outputs.is_main_branch }}" == 'true' ]]; then
-              lint_reason="main branch"
-            elif [[ "$changed_areas" == *"services/api"* ]] || \
-              [[ "$changed_areas" == *"services/workers"* ]] || \
-              [[ "$changed_areas" == *"services/shared"* ]]; then
-              lint_reason="python changes"
-            fi
-            frontend_reason="no frontend changes"
-            if [[ "${{ needs.detect-changes.outputs.is_main_branch }}" == 'true' ]]; then
-              frontend_reason="main branch"
-            elif [[ "$changed_areas" == *"apps/web"* ]]; then
-              frontend_reason="frontend changes"
-            fi
-            workflow_reason="no ci changes"
-            if [[ "${{ needs.detect-changes.outputs.is_main_branch }}" == 'true' ]]; then
-              workflow_reason="main branch"
-            elif [[ "$changed_areas" == *"ci"* ]]; then
-              workflow_reason="ci/workflow changes"
-            fi
-            acr_configured="${{ vars.ACR_NAME != '' }}"
-            acr_status="not configured"
-            if [[ "$acr_configured" == 'true' ]]; then
-              acr_status="configured"
-            fi
             echo "## CI Execution Rationale"
             echo ""
-            echo "- Mode: ${mode}"
-            echo "- Changed areas: ${changed_areas}"
+            echo "- Mode: Full validation (all jobs always run)"
             echo "- Lint Python: ${{ needs.lint-python.result }}"
-            echo "  reason: ${lint_reason}"
             echo "- Frontend Quality: ${{ needs.frontend-quality.result }}"
-            echo "  reason: ${frontend_reason}"
             echo "- Security Scans (Python): ${{ needs.scan-python-security.result }}"
-            echo "- Tests (shared/api/workers): ${{ needs.test-shared.result }}"
-            echo "  api/workers: ${{ needs.test-api.result }}/${{ needs.test-workers.result }}"
+            echo "- Tests (Python Matrix): ${{ needs.test-python.result }}"
             echo "- Build Images: ${{ needs.build-images.result }}"
-            echo "  ACR: ${acr_status}"
+            echo "  ACR: ${{ vars.ACR_NAME != '' && 'configured' || 'not configured' }}"
             echo "- Terraform Validate: ${{ needs.validate-terraform.result }}"
             echo "- K8s Validate: ${{ needs.kubernetes-validate.result }}"
             echo "- Secret Scanning: ${{ needs.secret-scanning.result }}"
             echo "- Workflow Validation: ${{ needs.validate-workflows.result }}"
-            echo "  reason: ${workflow_reason}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create CI Summary
-        uses: ./.github/actions/create-ci-summary
+        uses: ./.github/actions/create-pipeline-summary
         with:
-          changed-areas: ${{ needs.detect-changes.outputs.changed_areas }}
+          summary-type: ci
+          changed-areas: ''
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           pr-number: ${{ github.event.pull_request.number }}
           lint-python-result: ${{ needs.lint-python.result }}
           scan-python-security-result: ${{ needs.scan-python-security.result }}
           frontend-quality-result: ${{ needs.frontend-quality.result }}
           secret-scanning-result: ${{ needs.secret-scanning.result }}
-          test-shared-result: ${{ needs.test-shared.result }}
-          test-shared-duration: ${{ needs.test-shared.outputs.test_duration }}
-          test-api-result: ${{ needs.test-api.result }}
-          test-api-duration: ${{ needs.test-api.outputs.test_duration }}
-          test-workers-result: ${{ needs.test-workers.result }}
-          test-workers-duration: ${{ needs.test-workers.outputs.test_duration }}
+          test-shared-result: ${{ needs.test-python.result }}
+          test-shared-duration: ${{ needs.test-python.outputs.test_duration }}
+          test-api-result: ${{ needs.test-python.result }}
+          test-api-duration: ''
+          test-workers-result: ${{ needs.test-python.result }}
+          test-workers-duration: ''
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           build-images-result: ${{ needs.build-images.result }}
@@ -828,19 +478,18 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ github.run_id }}
 
-
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results
         with:
-          changed-areas: ${{ needs.detect-changes.outputs.changed_areas }}
-          is-main-branch: ${{ needs.detect-changes.outputs.is_main_branch }}
-          test-shared-result: ${{ needs.test-shared.result }}
-          test-api-result: ${{ needs.test-api.result }}
-          test-workers-result: ${{ needs.test-workers.result }}
+          changed-areas: ''
+          is-main-branch: 'false'
+          test-shared-result: ${{ needs.test-python.result }}
+          test-api-result: ${{ needs.test-python.result }}
+          test-workers-result: ${{ needs.test-python.result }}
           frontend-quality-result: ${{ needs.frontend-quality.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
           secret-scanning-result: ${{ needs.secret-scanning.result }}
-          secret-scanning-should-run: ${{ needs.detect-changes.outputs.has_code_changes }}
+          secret-scanning-should-run: 'true'
           build-images-result: ${{ needs.build-images.result }}
           acr-configured: ${{ vars.ACR_NAME != '' }}

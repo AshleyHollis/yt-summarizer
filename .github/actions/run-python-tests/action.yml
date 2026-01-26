@@ -30,6 +30,10 @@ inputs:
     description: Install pytest-xdist in the environment
     required: false
     default: 'false'
+  install-mode:
+    description: 'Installation mode: none|shared|service|both (default: both for API/Workers, shared for Shared)'
+    required: false
+    default: 'both'
 
 outputs:
   test-duration:
@@ -40,9 +44,10 @@ runs:
   using: composite
   steps:
     - name: Setup Python with uv
-      uses: ./.github/actions/setup-python-uv
+      uses: ./.github/actions/setup-python-env
       with:
         python-version: ${{ inputs.python-version }}
+        install-mode: ${{ inputs.install-mode }}
         service-package: ${{ inputs.service-package }}
         install-pytest-xdist: ${{ inputs.install-pytest-xdist }}
 
