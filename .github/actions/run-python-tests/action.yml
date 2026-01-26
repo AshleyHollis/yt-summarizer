@@ -40,9 +40,10 @@ runs:
   using: composite
   steps:
     - name: Setup Python with uv
-      uses: ./.github/actions/setup-python-uv
+      uses: ./.github/actions/setup-python-env
       with:
         python-version: ${{ inputs.python-version }}
+        install-mode: service
         service-package: ${{ inputs.service-package }}
         install-pytest-xdist: ${{ inputs.install-pytest-xdist }}
 
