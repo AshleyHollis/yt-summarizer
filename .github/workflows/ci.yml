@@ -2,16 +2,7 @@
 # CI Workflow - Automated Testing and Image Building
 # =============================================================================
 # TRIGGERS: PR opened/updated, push to main, manual dispatch
-#
-# EXECUTION FLOW:
-#   → ALWAYS runs FULL validation (all tests, all checks, all builds)
-#   → Purpose: Ensure all code is always in a validated state
-#   → No conditional skipping based on changes
-#
-# BUILD MODES:
-#   - ACR configured → Build and push images to Azure Container Registry
-#
-# For details on adding new workflow scripts, see: REFACTORING.md
+# EXECUTION: Full validation - all tests, checks, and builds run on every trigger
 # =============================================================================
 
 name: CI
@@ -42,12 +33,8 @@ jobs:
   # ===========================================================================
   # PHASE 1: LINTING
   # ===========================================================================
-  # Python: services/api, services/workers, services/shared
-  # Frontend: apps/web
-  # Blocks tests if lint fails (fail-fast pattern)
-  # ===========================================================================
-  00-lint-python:
-    name: 00 · Lint Python
+  lint-python:
+    name: Lint Python
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -64,7 +51,7 @@ jobs:
       - name: Run ruff checks
         uses: ./.github/actions/run-ruff-check
 
-  01-frontend-quality:
+  frontend-quality:
     name: Frontend Quality
     runs-on: ubuntu-latest
     steps:
@@ -126,14 +113,10 @@ jobs:
   # ===========================================================================
   # PHASE 2: SECURITY SCANNING
   # ===========================================================================
-  # Runs after linting passes, before tests
-  # Provides security feedback early in pipeline
-  # Scans: bandit (code security), pip-audit (dependency vulnerabilities), deptry (dependency consistency)
-  # ===========================================================================
-  01-scan-python-security:
+  scan-python-security:
     name: Scan Python Security
     runs-on: ubuntu-latest
-    needs: [00-01-lint-python]
+    needs: [lint-python]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -181,18 +164,10 @@ jobs:
   # ===========================================================================
   # PHASE 3: PYTHON UNIT TESTS (MATRIX)
   # ===========================================================================
-  # All tests run in parallel for every PR/push
-  # Dependencies: lint AND security must pass (fail-fast)
-  #
-  # Matrix runs all services in parallel:
-  # - Shared: Base library tests
-  # - API: FastAPI backend tests
-  # - Workers: Background worker tests
-  # ===========================================================================
-  02-test-python:
+  test-python:
     name: Test ${{ matrix.service.name }}
     runs-on: ubuntu-latest
-    needs: [00-01-lint-python, 01-scan-python-security]
+    needs: [lint-python, scan-python-security]
     strategy:
       fail-fast: false
       matrix:
@@ -235,15 +210,7 @@ jobs:
   # ===========================================================================
   # PHASE 4: KUBERNETES VALIDATION
   # ===========================================================================
-  # Validates:
-  #   1. YAML syntax (all manifests)
-  #   2. Kustomize builds (base + overlays)
-  #   3. ArgoCD Application paths exist
-  # Catches k8s config errors before they reach cluster
-  #
-  # Uses consolidated validate action for all checks
-  # ===========================================================================
-  03-kubernetes-validate:
+  kubernetes-validate:
     name: Kubernetes Validation
     runs-on: ubuntu-latest
     steps:
@@ -287,18 +254,7 @@ jobs:
   # ===========================================================================
   # PHASE 5: IMAGE BUILDING
   # ===========================================================================
-  # TWO-STAGE PROCESS:
-  # 1. 04-build-images-meta: Generate image tag (pr-123-abc123f)
-  # 2. 04-build-images: Build and push images with that tag
-  #
-  # FLOW (ACR configured):
-  #   Lint → Security → Tests pass → build-images-meta generates tag → build-images builds + pushes
-  #
-  # Image Tags:
-  # - PRs: pr-<number>-<sha> (e.g., pr-42-abc123f)
-  # - Main: sha-<sha> (e.g., sha-abc123f)
-  # ===========================================================================
-  03-build-images-meta:
+  build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
     if: vars.ACR_NAME != ''
@@ -316,29 +272,15 @@ jobs:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Publish image tag artifact
-        if: steps.tag.outputs.image-tag != ''
         uses: ./.github/actions/publish-image-tag
         with:
           image-tag: ${{ steps.tag.outputs.image-tag }}
 
-      - name: Verify image-tag artifact is available
-        if: steps.tag.outputs.image-tag != ''
-        uses: actions/download-artifact@v4
-        with:
-          name: image-tag
-          path: ./downloaded-artifacts
-
-      - name: Assert downloaded image tag
-        if: steps.tag.outputs.image-tag != ''
-        uses: ./.github/actions/assert-image-tag-artifact
-
-  03-build-images:
+  build-images:
     name: Build Images (parallel)
     runs-on: ubuntu-latest
-    needs: [04-build-images-meta, 00-01-lint-python, 01-scan-python-security]
-    if: |
-      needs.04-build-images-meta.result == 'success' &&
-      vars.ACR_NAME != ''
+    needs: [build-images-meta, lint-python, scan-python-security]
+    if: needs.build-images-meta.result == 'success'
     strategy:
       matrix:
         include:
@@ -367,24 +309,13 @@ jobs:
         uses: ./.github/actions/build-images
         with:
           service: ${{ matrix.service }}
-          image-tag: ${{ needs.04-build-images-meta.outputs.image_tag }}
+          image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
           push: true
-
-  # ===========================================================================
-  # E2E TESTING - Runs in Preview Workflow
-  # ===========================================================================
-  # E2E tests run against live preview environments (preview.yml workflow)
-  # Not run in CI because they require full deployed environment
-  # Local testing: npm run e2e (with Aspire running)
-  # ===========================================================================
 
   # ===========================================================================
   # PHASE 6: INFRASTRUCTURE VALIDATION
   # ===========================================================================
-  # Terraform: Validates HCL syntax and plan
-  # Note: Kustomize validation moved to Phase 4 (kubernetes-validate)
-  # ===========================================================================
-  04-validate-terraform:
+  validate-terraform:
     name: Validate Terraform
     runs-on: ubuntu-latest
     permissions:
@@ -417,9 +348,7 @@ jobs:
   # ===========================================================================
   # PHASE 7: SECRET SCANNING
   # ===========================================================================
-  # Runs gitleaks to detect secrets in code
-  # ===========================================================================
-  05-secret-scanning:
+  secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
     steps:
@@ -437,9 +366,7 @@ jobs:
   # ===========================================================================
   # PHASE 8: WORKFLOW VALIDATION
   # ===========================================================================
-  # Validates GitHub Actions workflow syntax and linting
-  # ===========================================================================
-  06-validate-workflows:
+  validate-workflows:
     name: Validate Workflows
     runs-on: ubuntu-latest
     steps:
@@ -486,27 +413,20 @@ jobs:
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK
   # ===========================================================================
-
-  # always() ensures this runs regardless of job results
-  # Validates that:
-  #   1. All jobs ran
-  #   2. All jobs that ran passed (result == 'success')
-  # ===========================================================================
-  07-ci-status:
+  ci-status:
     name: CI Status
     runs-on: ubuntu-latest
     needs:
-      - 00-01-lint-python
-      - 01-scan-python-security
-      - 00-frontend-quality
-      - 06-secret-scanning
-      - 02-test-python
-      - 03-kubernetes-validate
-      - 05-validate-terraform
-      - 04-build-images
-      - 04-build-images-meta
-      - 07-validate-workflows
-
+      - lint-python
+      - scan-python-security
+      - frontend-quality
+      - secret-scanning
+      - test-python
+      - kubernetes-validate
+      - validate-terraform
+      - build-images
+      - build-images-meta
+      - validate-workflows
     if: always()
     steps:
       - name: Checkout code
@@ -518,16 +438,16 @@ jobs:
             echo "## CI Execution Rationale"
             echo ""
             echo "- Mode: Full validation (all jobs always run)"
-            echo "- Lint Python: ${{ needs.00-01-lint-python.result }}"
-            echo "- Frontend Quality: ${{ needs.00-frontend-quality.result }}"
-            echo "- Security Scans (Python): ${{ needs.01-scan-python-security.result }}"
-            echo "- Tests (Python Matrix): ${{ needs.02-test-python.result }}"
-            echo "- Build Images: ${{ needs.04-build-images.result }}"
+            echo "- Lint Python: ${{ needs.lint-python.result }}"
+            echo "- Frontend Quality: ${{ needs.frontend-quality.result }}"
+            echo "- Security Scans (Python): ${{ needs.scan-python-security.result }}"
+            echo "- Tests (Python Matrix): ${{ needs.test-python.result }}"
+            echo "- Build Images: ${{ needs.build-images.result }}"
             echo "  ACR: ${{ vars.ACR_NAME != '' && 'configured' || 'not configured' }}"
-            echo "- Terraform Validate: ${{ needs.05-validate-terraform.result }}"
-            echo "- K8s Validate: ${{ needs.03-kubernetes-validate.result }}"
-            echo "- Secret Scanning: ${{ needs.06-secret-scanning.result }}"
-            echo "- Workflow Validation: ${{ needs.07-validate-workflows.result }}"
+            echo "- Terraform Validate: ${{ needs.validate-terraform.result }}"
+            echo "- K8s Validate: ${{ needs.kubernetes-validate.result }}"
+            echo "- Secret Scanning: ${{ needs.secret-scanning.result }}"
+            echo "- Workflow Validation: ${{ needs.validate-workflows.result }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create CI Summary
@@ -537,36 +457,35 @@ jobs:
           changed-areas: ''
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           pr-number: ${{ github.event.pull_request.number }}
-          lint-python-result: ${{ needs.00-01-lint-python.result }}
-          scan-python-security-result: ${{ needs.01-scan-python-security.result }}
-          frontend-quality-result: ${{ needs.00-frontend-quality.result }}
-          secret-scanning-result: ${{ needs.06-secret-scanning.result }}
-          test-shared-result: ${{ needs.02-test-python.result }}
-          test-shared-duration: ${{ needs.02-test-python.outputs.test_duration }}
-          test-api-result: ${{ needs.02-test-python.result }}
+          lint-python-result: ${{ needs.lint-python.result }}
+          scan-python-security-result: ${{ needs.scan-python-security.result }}
+          frontend-quality-result: ${{ needs.frontend-quality.result }}
+          secret-scanning-result: ${{ needs.secret-scanning.result }}
+          test-shared-result: ${{ needs.test-python.result }}
+          test-shared-duration: ${{ needs.test-python.outputs.test_duration }}
+          test-api-result: ${{ needs.test-python.result }}
           test-api-duration: ''
-          test-workers-result: ${{ needs.02-test-python.result }}
+          test-workers-result: ${{ needs.test-python.result }}
           test-workers-duration: ''
-          kubernetes-validate-result: ${{ needs.03-kubernetes-validate.result }}
-          validate-terraform-result: ${{ needs.05-validate-terraform.result }}
-          build-images-result: ${{ needs.04-build-images.result }}
-          image-tag: ${{ needs.04-build-images-meta.outputs.image_tag }}
+          kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
+          validate-terraform-result: ${{ needs.validate-terraform.result }}
+          build-images-result: ${{ needs.build-images.result }}
+          image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
           repository: ${{ github.repository }}
           run-id: ${{ github.run_id }}
-
 
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results
         with:
           changed-areas: ''
           is-main-branch: 'false'
-          test-shared-result: ${{ needs.02-test-python.result }}
-          test-api-result: ${{ needs.02-test-python.result }}
-          test-workers-result: ${{ needs.02-test-python.result }}
-          frontend-quality-result: ${{ needs.00-frontend-quality.result }}
-          validate-terraform-result: ${{ needs.05-validate-terraform.result }}
-          kubernetes-validate-result: ${{ needs.03-kubernetes-validate.result }}
-          secret-scanning-result: ${{ needs.06-secret-scanning.result }}
+          test-shared-result: ${{ needs.test-python.result }}
+          test-api-result: ${{ needs.test-python.result }}
+          test-workers-result: ${{ needs.test-python.result }}
+          frontend-quality-result: ${{ needs.frontend-quality.result }}
+          validate-terraform-result: ${{ needs.validate-terraform.result }}
+          kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
+          secret-scanning-result: ${{ needs.secret-scanning.result }}
           secret-scanning-should-run: 'true'
-          build-images-result: ${{ needs.04-build-images.result }}
+          build-images-result: ${{ needs.build-images.result }}
           acr-configured: ${{ vars.ACR_NAME != '' }}
