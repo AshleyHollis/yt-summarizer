@@ -177,16 +177,19 @@ jobs:
             package: services/shared
             markers: ''
             pytest-args: ''
+            install-mode: shared
           - name: API
             path: api
             package: services/api
             markers: not integration and not live
             pytest-args: '-v --tb=short'
+            install-mode: both
           - name: Workers
             path: workers
             package: services/workers
             markers: ''
             pytest-args: ''
+            install-mode: both
 
     outputs:
       test_duration: ${{ steps.tests.outputs.test-duration }}
@@ -206,6 +209,7 @@ jobs:
           install-pytest-xdist: 'true'
           pytest-args: ${{ matrix.service.pytest-args }}
           markers: ${{ matrix.service.markers }}
+          install-mode: ${{ matrix.service.install-mode }}
 
   # ===========================================================================
   # PHASE 4: KUBERNETES VALIDATION
