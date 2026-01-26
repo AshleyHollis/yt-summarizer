@@ -6,8 +6,10 @@ set -euo pipefail
 
 # Configuration
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-argocd}"
-MAX_SYNC_DURATION="${MAX_SYNC_DURATION:-300}"  # 5 minutes
+MAX_SYNC_DURATION="${MAX_SYNC_DURATION:-300}"  # 5 minutes - overall timeout
+STUCK_OPERATION_THRESHOLD="${STUCK_OPERATION_THRESHOLD:-120}"  # 2 minutes - detect stuck operations faster
 OPERATION_CHECK_INTERVAL="${OPERATION_CHECK_INTERVAL:-10}"  # 10 seconds
+RECOVERY_TIMEOUT_EXTENSION="${RECOVERY_TIMEOUT_EXTENSION:-120}"  # 2 minutes - extra time after recovery
 
 # Colors for output
 RED='\033[0;31m'
@@ -277,11 +279,37 @@ wait_for_sync() {
             return 0
         fi
 
+        # Early detection: OutOfSync + Healthy + Running for 60s suggests stuck refresh
+        if [ "$sync_status" = "OutOfSync" ] && [ "$health_status" = "Healthy" ] && [ "$operation_state" = "Running" ] && [ $elapsed -ge 60 ]; then
+            log_warn "⚠️  Detected potentially stuck refresh: OutOfSync + Healthy + Running for ${elapsed}s"
+            
+            # Check if refresh annotation is already present
+            local has_refresh=$(kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" \
+                -o jsonpath='{.metadata.annotations.argocd\.argoproj\.io/refresh}' 2>/dev/null || echo "")
+            
+            if [ -n "$has_refresh" ] && [ $((elapsed - last_recovery_attempt)) -gt 30 ] && [ $recovery_attempts -lt $max_recovery_attempts ]; then
+                log_warn "Hard refresh annotation present but not progressing - triggering recovery..."
+                
+                # Clear stuck operation and re-trigger refresh
+                if auto_recover "$app_name" "UNKNOWN"; then
+                    recovery_attempts=$((recovery_attempts + 1))
+                    last_recovery_attempt=$elapsed
+                    
+                    # Extend timeout for recovery
+                    timeout=$((timeout + RECOVERY_TIMEOUT_EXTENSION))
+                    log_info "Timeout extended to ${timeout}s for recovery"
+                    
+                    sleep 10
+                    continue
+                fi
+            fi
+        fi
+
         # Check for stuck operation
         if [ "$operation_state" = "Running" ]; then
-            local is_stuck=$(is_operation_stuck "$app_name" "$MAX_SYNC_DURATION")
+            local is_stuck=$(is_operation_stuck "$app_name" "$STUCK_OPERATION_THRESHOLD")
             if [ "$is_stuck" = "true" ]; then
-                log_error "❌ Operation has been running for more than ${MAX_SYNC_DURATION}s - likely stuck!"
+                log_error "❌ Operation has been running for more than ${STUCK_OPERATION_THRESHOLD}s - likely stuck!"
 
                 # Collect diagnostics
                 collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-stuck.log"
@@ -296,6 +324,12 @@ wait_for_sync() {
                     if auto_recover "$app_name" "$pattern"; then
                         recovery_attempts=$((recovery_attempts + 1))
                         last_recovery_attempt=$elapsed
+                        
+                        # Extend timeout to give recovery time to complete
+                        log_info "Extending timeout by ${RECOVERY_TIMEOUT_EXTENSION}s to allow recovery to complete..."
+                        timeout=$((timeout + RECOVERY_TIMEOUT_EXTENSION))
+                        log_info "New timeout: ${timeout}s"
+                        
                         sleep 10
                         continue
                     else
