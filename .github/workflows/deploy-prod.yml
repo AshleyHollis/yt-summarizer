@@ -385,25 +385,16 @@ jobs:
         run: |
           echo "image_tag=${{ needs.get-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify API deployment image
-        uses: ./.github/actions/verify-deployment
+      - name: Verify deployments are using correct image tag
+        uses: ./.github/actions/verify-k8s-deployment
         with:
           namespace: ${{ env.NAMESPACE_PROD }}
-          deployment-name: api
+          deployments: api,transcribe-worker,summarize-worker
           expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: ${{ env.API_IMAGE_NAME }}
-          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-
-      - name: Verify workers deployment image
-        uses: ./.github/actions/verify-workers
-        with:
-          namespace: ${{ env.NAMESPACE_PROD }}
-          expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: ${{ env.WORKERS_IMAGE_NAME }}
-          workers: ${{ env.WORKER_DEPLOYMENTS }}
-          fail-on-mismatch: 'true'
+          image-name: yt-summarizer
+          wait-for-ready: 'true'
+          timeout-seconds: '300'
 
       - name: Collect and upload diagnostics on failure
         if: failure()

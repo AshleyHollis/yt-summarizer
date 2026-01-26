@@ -577,22 +577,16 @@ jobs:
           poll-interval-seconds: '10'
           max-recovery-attempts: '3'
 
-      - name: Verify API deployment image
-        uses: ./.github/actions/verify-deployment
+      - name: Verify deployments are using correct image tag
+        uses: ./.github/actions/verify-k8s-deployment
         with:
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          deployment-name: api
+          deployments: api,transcribe-worker,summarize-worker
           expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: ${{ env.API_IMAGE_NAME }}
-
-      - name: Verify workers deployment image
-        uses: ./.github/actions/verify-workers
-        with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: ${{ env.WORKERS_IMAGE_NAME }}
+          image-name: yt-summarizer
+          wait-for-ready: 'true'
+          timeout-seconds: '300'
           workers: ${{ env.WORKER_DEPLOYMENTS }}
           fail-on-mismatch: 'true'
 
