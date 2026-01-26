@@ -58,12 +58,18 @@ if git diff --quiet "$FILE_TO_COMMIT"; then
   exit 0
 fi
 
-# Add, commit, and push
+# Add and commit
 git add "$FILE_TO_COMMIT"
 git commit -m "$MESSAGE"
 
+# Handle detached HEAD - checkout branch if needed
+if ! git symbolic-ref HEAD > /dev/null 2>&1; then
+  echo "ℹ️  Detached HEAD detected, checking out branch..."
+  git checkout -B "$BRANCH"
+fi
+
 echo "🚀 Pushing to $BRANCH..."
-git push origin "$BRANCH"
+git push origin "HEAD:$BRANCH"
 
 echo "✅ Changes committed and pushed"
 echo "committed=true" >> "$GITHUB_OUTPUT"
