@@ -7,6 +7,7 @@ title = "yt-summarizer gitleaks config"
 # Extend   default gitleaks config
 useDefault = true
 
+[allowlist]
   # Allowlist rules for false positives
   paths = [
     '''infra/terraform/modules/.*/variables\.tf''',
@@ -30,7 +31,7 @@ useDefault = true
     '''k8s/overlays/.*/kustomization\.yaml''',
   ]
 
-  # Regex patterns that are not secrets (matches in   secret value itself)
+  # Regex patterns that are not secrets (matches in secret value itself)
   regexes = [
     # Variable placeholder patterns
     '''var\.(sql_admin_password|admin_password|api_key)''',
