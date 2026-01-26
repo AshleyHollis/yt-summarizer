@@ -80,11 +80,10 @@ runs:
           "${{ inputs.runtime-config-path }}" \
           "${{ inputs.api-url }}"
 
-    # Initial deployment attempt with 4-minute timeout (2x normal preview time for safety margin)
+    # Initial deployment attempt
     - name: Deploy to Static Web Apps (attempt 1)
       id: deploy
       continue-on-error: true
-      timeout-minutes: 4
       uses: Azure/static-web-apps-deploy@v1
       with:
         azure_static_web_apps_api_token: ${{ inputs.swa-token }}
@@ -94,13 +93,12 @@ runs:
         output_location: ${{ inputs.output_location }}
         skip_app_build: true
         production_branch: ${{ inputs.production-branch }}
-
-    # Retry attempt 1 with 4-minute timeout (only if first attempt failed)
+    
+    # Retry attempt 1 (only if first attempt failed)
     - name: Deploy to Static Web Apps (retry 1)
       id: retry-1
       if: steps.deploy.outcome == 'failure'
       continue-on-error: true
-      timeout-minutes: 4
       uses: Azure/static-web-apps-deploy@v1
       with:
         azure_static_web_apps_api_token: ${{ inputs.swa-token }}
@@ -110,12 +108,11 @@ runs:
         output_location: ${{ inputs.output_location }}
         skip_app_build: true
         production_branch: ${{ inputs.production-branch }}
-
-    # Retry attempt 2 with full 10-minute timeout (only if both previous attempts failed)
-    - name: Deploy to Static Web Apps (retry 2 - final, full timeout)
+    
+    # Retry attempt 2 (only if both previous attempts failed)
+    - name: Deploy to Static Web Apps (retry 2 - final)
       id: retry-2
       if: steps.deploy.outcome == 'failure' && steps.retry-1.outcome == 'failure'
-      timeout-minutes: 10
       uses: Azure/static-web-apps-deploy@v1
       with:
         azure_static_web_apps_api_token: ${{ inputs.swa-token }}
@@ -125,7 +122,7 @@ runs:
         output_location: ${{ inputs.output_location }}
         skip_app_build: true
         production_branch: ${{ inputs.production-branch }}
-
+    
     # Final check - ensure at least one attempt succeeded
     - name: Verify deployment success
       shell: bash
@@ -133,10 +130,10 @@ runs:
         if [[ "${{ steps.deploy.outcome }}" == "success" ]]; then
           echo "::notice::Deployment succeeded on attempt 1"
         elif [[ "${{ steps.retry-1.outcome }}" == "success" ]]; then
-          echo "::notice::Deployment succeeded on attempt 2 (after 4min timeout)"
+          echo "::notice::Deployment succeeded on attempt 2 (retry 1)"
         elif [[ "${{ steps.retry-2.outcome }}" == "success" ]]; then
-          echo "::notice::Deployment succeeded on attempt 3 (after 8min timeouts)"
+          echo "::notice::Deployment succeeded on attempt 3 (retry 2)"
         else
-          echo "::error::All deployment attempts failed after 18 minutes total"
+          echo "::error::All deployment attempts failed after 3 attempts"
           exit 1
         fi

@@ -447,6 +447,7 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [wait-for-ci]
     if: |
       !cancelled() &&

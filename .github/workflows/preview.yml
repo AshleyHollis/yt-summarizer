@@ -644,6 +644,7 @@ jobs:
   deploy-frontend-preview:
     name: Deploy Frontend Preview
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
