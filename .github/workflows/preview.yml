@@ -243,11 +243,12 @@ jobs:
 
       - name: Validate image exists in ACR
         if: steps.wait.outputs.image_tag != ''
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ steps.wait.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.wait.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ===========================================================================
@@ -300,11 +301,12 @@ jobs:
           acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate image exists in ACR
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ steps.find-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.find-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ===========================================================================
@@ -497,46 +499,21 @@ jobs:
 
       - name: Verify cluster can pull image
         # Runs after AKS context + ACR login are configured
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           run-k8s-pull-test: 'true'
 
       - name: Validate CI image tag for PR
         if: needs.detect-changes.outputs.needs_image_build == 'true'
-        uses: ./.github/actions/validate-image-tag
+        uses: ./.github/actions/validate-docker-image
         with:
-          ci-image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-
-      - name: Update preview overlay with image tags
-        id: overlay
-        uses: ./.github/actions/update-preview-overlay
-        with:
-          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
+          validation-type: tag-format
           image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          acr-server: ${{ env.ACR_LOGIN_SERVER }}
-          preview-host: ${{ needs.get-ingress.outputs.preview_host }}
-          tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
-          preview-url: ${{ needs.get-ingress.outputs.preview_url }}
-          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-
-      - name: Validate generated overlay (kustomize + dry-run)
-        uses: ./.github/actions/validate
-        with:
-          validators: kustomize-build
-          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PREVIEW }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
-
-      - name: Commit and push overlay update
-        uses: ./.github/actions/commit-overlay-changes
-        with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
           pr-branch: ${{ needs.detect-changes.outputs.pr_head_ref || github.ref_name }}
 
