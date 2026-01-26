@@ -13,6 +13,16 @@ set -euo pipefail
 : "${MAX_ATTEMPTS:=3}"
 : "${TIMEOUT_SECONDS:=300}"  # 5 minutes per attempt
 
+# Export GitHub context for SWA CLI (fixes "Could not get repository branch/url" warnings)
+# These are automatically available in GitHub Actions but need to be explicitly exported
+export GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}"
+export GITHUB_REF="${GITHUB_REF:-}"
+export GITHUB_SHA="${GITHUB_SHA:-}"
+export GITHUB_HEAD_REF="${GITHUB_HEAD_REF:-}"
+export GITHUB_BASE_REF="${GITHUB_BASE_REF:-}"
+export GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME:-}"
+export GITHUB_ACTOR="${GITHUB_ACTOR:-}"
+
 # Determine SWA CLI verbosity flags
 VERBOSE_FLAGS=""
 if [[ "${VERBOSE}" == "true" ]]; then
