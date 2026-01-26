@@ -566,37 +566,14 @@ jobs:
         with:
           kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
-      - name: Cleanup stuck Argo CD operations
-        uses: ./.github/actions/cleanup-argocd-operation
-        with:
-          app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          namespace: argocd
-          timeout-threshold: '300'
-        continue-on-error: false
-
-      - name: Pre-deployment validation
-        uses: ./.github/actions/validate
-        with:
-          validators: kustomize-build,argocd-manifest
-          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PREVIEW }}
-          argocd-app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
-          target-namespace: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          timeout-seconds: '60'
-
-      - name: Check Argo CD application readiness
-        uses: ./.github/actions/check-argocd-readiness
-        with:
-          app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout: '60'
-
-      - name: Wait for Argo CD sync with auto-recovery
+      - name: Cleanup and wait for Argo CD sync with auto-recovery
         uses: ./.github/actions/argocd-wait
         with:
           app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          cleanup-stuck-operations: 'true'
+          auto-recovery: 'true'
           max-wait-seconds: '300'
           poll-interval-seconds: '10'
           max-recovery-attempts: '3'

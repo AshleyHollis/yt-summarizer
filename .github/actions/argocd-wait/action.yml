@@ -83,6 +83,21 @@ inputs:
     required: false
     default: 'true'
 
+  cleanup-stuck-operations:
+    description: 'Cleanup stuck operations before waiting (absorbs cleanup-argocd-operation)'
+    required: false
+    default: 'false'
+
+  auto-recovery:
+    description: 'Enable auto-recovery features (disable for simple wait behavior)'
+    required: false
+    default: 'true'
+
+  pr-number:
+    description: 'Pull request number for diagnostics (legacy wait-for-argocd compat, use "0" for prod)'
+    required: false
+    default: ''
+
 outputs:
   sync-status:
     description: 'Final sync status (Synced, OutOfSync, Failed, Unknown)'
@@ -103,6 +118,29 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Cleanup stuck operations (optional)
+      if: inputs.cleanup-stuck-operations == 'true'
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app-name }}
+        ARGOCD_NAMESPACE: ${{ inputs.argocd-namespace }}
+        TIMEOUT_THRESHOLD: ${{ inputs.max-wait-seconds }}
+      run: |
+        echo "🔍 Checking for stuck operations on $APP_NAME..."
+        
+        OPERATION_STATE=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
+          -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
+        
+        if [[ "$OPERATION_STATE" == "Running" ]]; then
+          echo "⚠️  Cleaning up stuck operation..."
+          kubectl patch application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
+            --type merge -p '{"operation":null}' 2>/dev/null || true
+          sleep 3
+          echo "✅ Cleanup complete"
+        else
+          echo "✅ No stuck operations"
+        fi
+
     - name: Wait for Argo CD sync with auto-recovery
       id: wait
       shell: bash
@@ -116,6 +154,8 @@ runs:
         RECOVERY_COOLDOWN_SECONDS: ${{ inputs.recovery-cooldown-seconds }}
         FAIL_ON_QUOTA_EXCEEDED: ${{ inputs.fail-on-quota-exceeded }}
         FAIL_ON_INVALID_YAML: ${{ inputs.fail-on-invalid-yaml }}
+        AUTO_RECOVERY: ${{ inputs.auto-recovery }}
+        PR_NUMBER: ${{ inputs.pr-number }}
       run: |
         set -euo pipefail
 
@@ -125,8 +165,11 @@ runs:
         echo "Argo CD Namespace: $ARGOCD_NAMESPACE"
         echo "Max wait: ${MAX_WAIT_SECONDS}s"
         echo "Poll interval: ${POLL_INTERVAL_SECONDS}s"
-        echo "Max recovery attempts: $MAX_RECOVERY_ATTEMPTS"
-        echo "Recovery cooldown: ${RECOVERY_COOLDOWN_SECONDS}s"
+        echo "Auto-recovery: $AUTO_RECOVERY"
+        if [[ "$AUTO_RECOVERY" == "true" ]]; then
+          echo "Max recovery attempts: $MAX_RECOVERY_ATTEMPTS"
+          echo "Recovery cooldown: ${RECOVERY_COOLDOWN_SECONDS}s"
+        fi
         echo "::endgroup::"
         echo ""
 
