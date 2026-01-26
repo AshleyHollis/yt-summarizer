@@ -59,70 +59,76 @@ This class of timeout/processing failures is a **known reliability issue** with 
 
 ### 1. Automatic Retry with Aggressive Timeouts ✅
 
-**Implementation:** `.github/actions/deploy-frontend-swa/action.yml`
+### 1. Automatic Retry with Per-Attempt Timeouts ✅
+
+**Implementation:** `.github/actions/deploy-frontend-swa/` (action.yml + deploy-with-retry.sh)
 
 **Strategy:**
 - **3 total attempts:** Initial + 2 retries
-- **4-minute timeout on first 2 attempts:** ~2x normal preview deployment time (safety margin)
-- **Full 10-minute timeout on final attempt:** Safety net for legitimate slow deploys
-- **No backoff delays:** Retry immediately after timeout
-- **Clear logging:** Annotates which attempt succeeded
+- **5-minute timeout per attempt:** 2x normal preview deployment time (2.5min)
+- **15-minute worst case:** 5min × 3 attempts (fits within 20-minute job timeout)
+- **No backoff delays:** Retry immediately after timeout/failure
+- **Uses SWA CLI directly:** Shell `timeout` command for timeout control
+- **Clear logging:** Annotates which attempt succeeded with elapsed time
 
 **Actual Deployment Times (measured from successful runs):**
 - Production: ~1.5 minutes (1m19s to 1m35s observed)
 - Preview: ~2.5 minutes (2m29s observed)
 
 **Timeout Rationale:**
-- 4-minute timeout = 2.5min typical + 1.5min safety margin (60% buffer)
+- 5-minute timeout = 2.5min typical + 2.5min safety margin (100% buffer)
 - Avoids false failures on normal deployments
-- Still much faster than Azure's default ~8-minute timeout
-- Final 10-minute timeout catches edge cases
+- Much faster than Azure's default ~8-minute timeout
+- All 3 attempts guaranteed to complete within 20-minute job timeout
 
 **Benefits:**
-- ✅ **Fast recovery:** 4-minute timeout instead of 8-minute wait on transient failures
+- ✅ **Fast recovery:** 5-minute timeout instead of 8-minute wait on transient failures
 - ✅ **No false positives:** Won't timeout on normal preview deployments (2.5min typical)
-- ✅ **Worst-case time:** 18 minutes max (4min + 4min + 10min) vs 24 minutes (8min × 3)
-- ✅ **Best-case unchanged:** Normal deployments complete in ~2.5 minutes on attempt 1
+- ✅ **Guaranteed completion:** 15min max (3 × 5min) fits in 20min job timeout
+- ✅ **Normal deployments:** ~2.5 minutes (unchanged)
 - ✅ Handles 90%+ of transient Azure failures automatically
 - ✅ No manual intervention required
 
 **How it works:**
+```bash
+# deploy-with-retry.sh script
+MAX_ATTEMPTS=3
+TIMEOUT_SECONDS=300  # 5 minutes
+
+for attempt in $(seq 1 $MAX_ATTEMPTS); do
+  # Run SWA CLI with timeout
+  if timeout ${TIMEOUT_SECONDS}s npx @azure/static-web-apps-cli deploy ...; then
+    echo "Success on attempt $attempt"
+    exit 0
+  else
+    echo "Attempt $attempt failed/timed out, retrying..."
+  fi
+done
+
+echo "All attempts failed"
+exit 1
+```
+
+**Action.yml:**
 ```yaml
-# Attempt 1 - Fast fail with 4-minute timeout (2x normal time)
-- name: Deploy to Static Web Apps (attempt 1)
+- name: Deploy to Static Web Apps with retry
   id: deploy
-  continue-on-error: true
-  timeout-minutes: 4
-  uses: Azure/static-web-apps-deploy@v1
-
-# Retry 1 - Fast fail with 4-minute timeout (only if first failed)
-- name: Deploy to Static Web Apps (retry 1)
-  id: retry-1
-  if: steps.deploy.outcome == 'failure'
-  continue-on-error: true
-  timeout-minutes: 4
-  uses: Azure/static-web-apps-deploy@v1
-
-# Retry 2 - Full 10-minute timeout (only if both previous failed)
-- name: Deploy to Static Web Apps (retry 2 - final, full timeout)
-  id: retry-2
-  if: steps.deploy.outcome == 'failure' && steps.retry-1.outcome == 'failure'
-  timeout-minutes: 10
-  uses: Azure/static-web-apps-deploy@v1
-
-# Final verification
-- name: Verify deployment success
+  shell: bash
+  env:
+    AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ inputs.swa-token }}
+    APP_LOCATION: ${{ inputs.app-location }}
+    OUTPUT_LOCATION: ${{ inputs.output_location }}
+    MAX_ATTEMPTS: "3"
+    TIMEOUT_SECONDS: "300"
   run: |
-    if [[ "${{ steps.deploy.outcome }}" == "success" ]]; then
-      echo "::notice::Deployment succeeded on attempt 1"
-    elif [[ "${{ steps.retry-1.outcome }}" == "success" ]]; then
-      echo "::notice::Deployment succeeded on attempt 2 (after 4min timeout)"
-    elif [[ "${{ steps.retry-2.outcome }}" == "success" ]]; then
-      echo "::notice::Deployment succeeded on attempt 3 (after 8min timeouts)"
-    else
-      echo "::error::All deployment attempts failed after 18 minutes total"
-      exit 1
-    fi
+    chmod +x .github/actions/deploy-frontend-swa/deploy-with-retry.sh
+    .github/actions/deploy-frontend-swa/deploy-with-retry.sh
+```
+
+**Workflow-level timeout:**
+```yaml
+deploy-frontend-preview:
+  timeout-minutes: 20  # Job-level timeout as safety net
 ```
 
 ### 2. Pre-Deployment Cleanup (Already Implemented) ✅
@@ -223,8 +229,9 @@ This class of timeout/processing failures is a **known reliability issue** with 
 **After Timeout & Retry Implementation:**
 - 🟢 Target: >95% success rate with automatic retry
 - 🟢 **Normal deployments: ~2.5 minutes (unchanged)**
-- 🟢 **Fast recovery on transient failures: 4 minutes (vs 8 minutes)**
-- 🟢 Worst-case: 18 minutes total (4 + 4 + 10) vs 24 minutes (8 × 3)
+- 🟢 **Fast recovery on transient failures: 5 minutes (vs 8 minutes)**
+- 🟢 Worst-case: 15 minutes total (5 × 3) vs 24 minutes (8 × 3)
+- 🟢 Guaranteed to fit within 20-minute job timeout
 - 🟢 Manual intervention only for persistent failures (<5% of cases)
 
 ## Related Documentation
