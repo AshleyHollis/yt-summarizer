@@ -11,7 +11,7 @@ set -euo pipefail
 : "${DEPLOYMENT_ENVIRONMENT:=preview}"  # Default to preview, override for production or pr-{number}
 : "${VERBOSE:=false}"
 : "${MAX_ATTEMPTS:=3}"
-: "${TIMEOUT_SECONDS:=300}"  # 5 minutes per attempt
+: "${TIMEOUT_SECONDS:=480}"  # 8 minutes per attempt (SWA binary has 15min internal timeout)
 
 # Export GitHub context for SWA CLI (fixes "Could not get repository branch/url" warnings)
 # These are automatically available in GitHub Actions but need to be explicitly exported
@@ -22,6 +22,16 @@ export GITHUB_HEAD_REF="${GITHUB_HEAD_REF:-}"
 export GITHUB_BASE_REF="${GITHUB_BASE_REF:-}"
 export GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME:-}"
 export GITHUB_ACTOR="${GITHUB_ACTOR:-}"
+
+# Set REPOSITORY_BASE for SWA CLI to detect branch (fixes "Could not get repository branch" warning)
+# Format: owner/repo#branch
+if [ -n "${GITHUB_REPOSITORY}" ] && [ -n "${GITHUB_HEAD_REF}" ]; then
+  export REPOSITORY_BASE="${GITHUB_REPOSITORY}#${GITHUB_HEAD_REF}"
+  echo "::debug::Set REPOSITORY_BASE=${REPOSITORY_BASE}"
+elif [ -n "${GITHUB_REPOSITORY}" ] && [ -n "${GITHUB_REF##*/}" ]; then
+  export REPOSITORY_BASE="${GITHUB_REPOSITORY}#${GITHUB_REF##*/}"
+  echo "::debug::Set REPOSITORY_BASE=${REPOSITORY_BASE}"
+fi
 
 # Determine SWA CLI verbosity flags
 VERBOSE_FLAGS=""

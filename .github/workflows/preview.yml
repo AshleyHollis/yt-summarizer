@@ -669,21 +669,6 @@ jobs:
           secret-name: 'SWA_DEPLOYMENT_TOKEN'
           secret-value: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
 
-      - name: Deploy frontend with CI artifact
-        id: deploy-frontend
-        uses: ./.github/actions/deploy-frontend-swa
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
-          api-url: ${{ needs.get-ingress.outputs.preview_url }}
-          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          app-location: apps/web
-          runtime-config-path: apps/web/public/runtime-config.js
-          output_location: ""
-          production-branch: main
-          deployment-environment: pr-${{ github.event.pull_request.number }}
-          verbose: "true"
-
       - name: Azure Login for SWA cleanup
         uses: azure/login@v2
         with:
@@ -709,6 +694,21 @@ jobs:
         run: |
           echo "✅ Cleaned up ${{ steps.cleanup-stale.outputs.deleted-count }} stale SWA environment(s)"
           echo "💡 Deleted environments for PRs: ${{ steps.cleanup-stale.outputs.stale-prs }}"
+
+      - name: Deploy frontend with CI artifact
+        id: deploy-frontend
+        uses: ./.github/actions/deploy-frontend-swa
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
+          api-url: ${{ needs.get-ingress.outputs.preview_url }}
+          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          app-location: apps/web
+          runtime-config-path: apps/web/public/runtime-config.js
+          output_location: ""
+          production-branch: main
+          deployment-environment: pr-${{ github.event.pull_request.number }}
+          verbose: "true"
 
       - name: Verify frontend preview
         if: steps.deploy-frontend.outputs.static_web_app_url != ''
