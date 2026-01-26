@@ -4,12 +4,25 @@
 
 set -euo pipefail
 
+# Validate required tools
+for tool in kubectl jq curl; do
+  if ! command -v "$tool" &>/dev/null; then
+    echo "::error::Required tool '$tool' not found in PATH" >&2
+    exit 1
+  fi
+done
+
 # Configuration
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-argocd}"
 MAX_SYNC_DURATION="${MAX_SYNC_DURATION:-300}"  # 5 minutes - overall timeout
 STUCK_OPERATION_THRESHOLD="${STUCK_OPERATION_THRESHOLD:-120}"  # 2 minutes - detect stuck operations faster
 OPERATION_CHECK_INTERVAL="${OPERATION_CHECK_INTERVAL:-10}"  # 10 seconds
 RECOVERY_TIMEOUT_EXTENSION="${RECOVERY_TIMEOUT_EXTENSION:-120}"  # 2 minutes - extra time after recovery
+MISSING_APP_TIMEOUT="${MISSING_APP_TIMEOUT:-180}"  # 3 minutes - wait for app to appear
+
+# GitHub API configuration
+GITHUB_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -29,10 +42,67 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $*"
 }
 
+# Check if PR is still open
+# Usage: check_pr_open <pr_number>
+# Returns: 0 if open/unknown/no-pr, 1 if closed
+# Note: Caller should handle return code appropriately (e.g., exit gracefully if PR closed)
+check_pr_open() {
+    local pr_number="$1"
+    
+    # Skip check if no PR number or production deployment
+    if [[ -z "$pr_number" || "$pr_number" == "0" ]]; then
+        return 0
+    fi
+
+    # Skip check if GitHub API not configured
+    if [[ -z "$GITHUB_TOKEN" || -z "$GITHUB_REPOSITORY" ]]; then
+        log_warn "Cannot check PR state: GITHUB_TOKEN or GITHUB_REPOSITORY not set"
+        return 0
+    fi
+
+    # Query GitHub API with error handling
+    local http_code
+    local response
+    response=$(curl -s -w "\n%{http_code}" \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$pr_number" 2>&1)
+    
+    http_code=$(echo "$response" | tail -n1)
+    local body=$(echo "$response" | head -n-1)
+
+    # Handle HTTP errors (assume open on error to avoid false positives)
+    if [[ "$http_code" != "200" ]]; then
+        log_warn "Failed to check PR $pr_number state (HTTP $http_code), assuming open"
+        return 0
+    fi
+
+    # Parse PR state safely
+    local pr_state=$(echo "$body" | jq -r '.state // empty' 2>/dev/null || echo "")
+    
+    if [[ "$pr_state" == "closed" ]]; then
+        log_info "PR $pr_number is closed"
+        return 1
+    fi
+    
+    return 0
+}
+
 # Get Argo CD application status
 get_app_status() {
     local app_name="$1"
     kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" -o json 2>/dev/null || echo "{}"
+}
+
+# Check if application exists
+app_exists() {
+    local app_name="$1"
+    local app_found=$(get_app_status "$app_name" | jq -r '.metadata.name // ""')
+    if [ -n "$app_found" ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
 }
 
 # Get sync status (Synced, OutOfSync, Unknown)
@@ -262,11 +332,52 @@ wait_for_sync() {
     log_info "Waiting for Argo CD sync: $app_name (timeout: ${timeout}s)"
 
     local elapsed=0
+    local missing_elapsed=0
     local last_recovery_attempt=0
     local recovery_attempts=0
     local max_recovery_attempts=3
 
     while [ $elapsed -lt "$timeout" ]; do
+        # Check if PR is still open (for preview deployments)
+        # If PR is closed, exit gracefully as deployment is no longer needed
+        if [[ -n "${PR_NUMBER:-}" ]]; then
+            if ! check_pr_open "${PR_NUMBER}"; then
+                echo "::notice::PR ${PR_NUMBER} closed during sync - deployment no longer needed"
+                log_info "✅ Deployment skipped (PR closed)"
+                return 0
+            fi
+        fi
+
+        local app_present=$(app_exists "$app_name")
+        if [ "$app_present" = "false" ]; then
+            log_warn "[missing ${missing_elapsed}/${MISSING_APP_TIMEOUT}s] Application $app_name not found yet"
+
+            if [ $missing_elapsed -ge "$MISSING_APP_TIMEOUT" ]; then
+                # Before failing, check if PR was closed (common cause of app disappearance)
+                if [[ -n "${PR_NUMBER:-}" ]]; then
+                    if ! check_pr_open "${PR_NUMBER}"; then
+                        echo "::notice::PR ${PR_NUMBER} closed - app removal expected"
+                        log_info "✅ Deployment skipped (PR closed, app not found)"
+                        return 0
+                    fi
+                fi
+                
+                log_error "❌ Application $app_name not found after ${MISSING_APP_TIMEOUT}s"
+                collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-missing.log"
+                return 1
+            fi
+
+            sleep "$check_interval"
+            missing_elapsed=$((missing_elapsed + check_interval))
+            elapsed=$((elapsed + check_interval))
+            continue
+        fi
+
+        if [ $missing_elapsed -gt 0 ]; then
+            log_info "Application $app_name detected after ${missing_elapsed}s"
+            missing_elapsed=0
+        fi
+
         local sync_status=$(get_sync_status "$app_name")
         local health_status=$(get_health_status "$app_name")
         local operation_state=$(get_operation_state "$app_name")

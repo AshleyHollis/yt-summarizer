@@ -21,9 +21,11 @@ done
 # Validate required argument
 : "${IMAGE_TAG:?Missing --image-tag argument}"
 
-# Define paths
-TEMPLATE_FILE="scripts/ci/templates/prod-kustomization-template.yaml"
-OUTPUT_FILE="k8s/overlays/prod/kustomization.yaml"
+# Define paths relative to repository root (script can run from any CWD)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+TEMPLATE_FILE="${REPO_ROOT}/scripts/ci/templates/prod-kustomization-template.yaml"
+OUTPUT_FILE="${REPO_ROOT}/k8s/overlays/prod/kustomization.yaml"
 
 # Generate metadata header
 TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
