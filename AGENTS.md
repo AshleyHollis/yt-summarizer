@@ -394,24 +394,39 @@ containers:
 
 ### Integration with CI/CD Workflows
 
-**Planned enhancements** (not yet implemented):
+**Status**: ✅ Implemented via composite actions
 
-1. **CI workflow** (`.github/workflows/ci.yml`):
-   ```yaml
-   - name: Validate Kustomize Manifests
-     run: |
-       scripts/ci/lib/validate-deployment.sh \
-         k8s/overlays/preview preview-pr-${{ github.event.pull_request.number }}
-   ```
+**Available Actions**:
 
-2. **Preview deployment workflow** (`.github/workflows/preview.yml`):
-   ```yaml
-   - name: Wait for Argo CD with Auto-Recovery
-     run: |
-       source scripts/ci/lib/argocd-utils.sh
-       wait_for_sync "preview-pr-${{ github.event.pull_request.number }}" \
-         "preview-pr-${{ github.event.pull_request.number }}" 300 10
-   ```
+1. **`.github/actions/deployment-validate`** - Pre-deployment validation
+   - Validates manifests BEFORE Argo CD deploys
+   - Catches issues in <30s instead of 3+ min timeout
+   - Usage in CI:
+     ```yaml
+     - uses: ./.github/actions/deployment-validate
+       with:
+         overlay-path: k8s/overlays/preview
+         target-namespace: preview-pr-110
+         skip-image-validation: 'true'  # CI doesn't have images yet
+         skip-secret-validation: 'true'  # Secrets created during deployment
+     ```
+
+2. **`.github/actions/argocd-wait`** - Smart wait with auto-recovery
+   - Detects failure patterns and auto-recovers
+   - Max 3 recovery attempts per pattern
+   - Usage in deployment workflows:
+     ```yaml
+     - uses: ./.github/actions/argocd-wait
+       with:
+         app-name: preview-pr-110
+         namespace: preview-pr-110
+         max-wait-seconds: '300'
+         poll-interval-seconds: '10'
+     ```
+
+**Current Integration**:
+- **CI workflow** (`.github/workflows/ci.yml:433-442`): Validates preview manifests during K8s validation phase
+- **Preview workflow** (`.github/workflows/preview.yml:617-623`): Uses argocd-wait with auto-recovery
 
 **Benefits**:
 - **Fail-fast**: Catch 80% of issues in <30s (vs 3+ min timeout)

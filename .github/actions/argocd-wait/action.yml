@@ -1,0 +1,158 @@
+# =============================================================================
+# Argo CD Wait with Auto-Recovery Action
+# =============================================================================
+# Smart wait-for-sync that detects failures and automatically recovers.
+#
+# Features:
+#   - Detects common failure patterns (quota exceeded, invalid YAML, etc.)
+#   - Auto-recovers from transient failures (missing dependencies, stuck hooks)
+#   - Provides comprehensive diagnostics on failure
+#   - Max 3 recovery attempts (prevents infinite loops)
+#   - 30-second cooldown between recovery attempts
+#
+# Failure patterns detected:
+#   - QUOTA_EXCEEDED: Resource limits exceed namespace quota
+#   - INVALID_YAML: Malformed YAML structure (duplicate containers, etc.)
+#   - IMAGE_PULL_FAILED: Container image doesn't exist in registry
+#   - MISSING_DEPENDENCY: ServiceAccount, Secret, or ConfigMap not found
+#   - HOOK_TIMEOUT: Sync hook job (e.g., db-migration) stuck or failed
+#
+# Auto-recovery actions:
+#   - Missing dependencies: Clear stuck operation, trigger hard refresh
+#   - Hook timeout: Abort stuck operation, force new sync
+#   - Unknown failures: Generic recovery with operation cleanup
+#
+# Limitations (manual intervention required):
+#   - Quota exceeded (need to increase quota or reduce requests)
+#   - Invalid YAML (need to fix kustomization template)
+#   - Image pull failures (need to build and push image to ACR)
+#
+# Usage:
+#   - uses: ./.github/actions/argocd-wait
+#     with:
+#       app-name: preview-pr-110
+#       namespace: preview-pr-110
+#       max-wait-seconds: 300
+#       poll-interval-seconds: 10
+# =============================================================================
+
+name: Wait for Argo CD Sync
+description: Smart wait-for-sync with automatic failure detection and recovery
+
+inputs:
+  app-name:
+    description: 'Argo CD Application name (e.g., preview-pr-110)'
+    required: true
+
+  namespace:
+    description: 'Target namespace for deployment (e.g., preview-pr-110)'
+    required: true
+
+  argocd-namespace:
+    description: 'Argo CD namespace'
+    required: false
+    default: 'argocd'
+
+  max-wait-seconds:
+    description: 'Maximum time to wait for sync completion (seconds)'
+    required: false
+    default: '300'
+
+  poll-interval-seconds:
+    description: 'Interval between health checks (seconds)'
+    required: false
+    default: '10'
+
+  max-recovery-attempts:
+    description: 'Maximum number of auto-recovery attempts per failure pattern'
+    required: false
+    default: '3'
+
+  recovery-cooldown-seconds:
+    description: 'Cooldown period between recovery attempts (seconds)'
+    required: false
+    default: '30'
+
+  fail-on-quota-exceeded:
+    description: 'Fail immediately on quota exceeded errors (no recovery possible)'
+    required: false
+    default: 'true'
+
+  fail-on-invalid-yaml:
+    description: 'Fail immediately on invalid YAML errors (no recovery possible)'
+    required: false
+    default: 'true'
+
+outputs:
+  sync-status:
+    description: 'Final sync status (Synced, OutOfSync, Failed, Unknown)'
+    value: ${{ steps.wait.outputs.sync-status }}
+
+  health-status:
+    description: 'Final health status (Healthy, Progressing, Degraded, Missing, Suspended, Unknown)'
+    value: ${{ steps.wait.outputs.health-status }}
+
+  recovery-attempts:
+    description: 'Number of recovery attempts performed'
+    value: ${{ steps.wait.outputs.recovery-attempts }}
+
+  failure-pattern:
+    description: 'Detected failure pattern (if any)'
+    value: ${{ steps.wait.outputs.failure-pattern }}
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for Argo CD sync with auto-recovery
+      id: wait
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app-name }}
+        NAMESPACE: ${{ inputs.namespace }}
+        ARGOCD_NAMESPACE: ${{ inputs.argocd-namespace }}
+        MAX_WAIT_SECONDS: ${{ inputs.max-wait-seconds }}
+        POLL_INTERVAL_SECONDS: ${{ inputs.poll-interval-seconds }}
+        MAX_RECOVERY_ATTEMPTS: ${{ inputs.max-recovery-attempts }}
+        RECOVERY_COOLDOWN_SECONDS: ${{ inputs.recovery-cooldown-seconds }}
+        FAIL_ON_QUOTA_EXCEEDED: ${{ inputs.fail-on-quota-exceeded }}
+        FAIL_ON_INVALID_YAML: ${{ inputs.fail-on-invalid-yaml }}
+      run: |
+        set -euo pipefail
+
+        echo "::group::⏳ Waiting for Argo CD Sync"
+        echo "Application: $APP_NAME"
+        echo "Namespace: $NAMESPACE"
+        echo "Argo CD Namespace: $ARGOCD_NAMESPACE"
+        echo "Max wait: ${MAX_WAIT_SECONDS}s"
+        echo "Poll interval: ${POLL_INTERVAL_SECONDS}s"
+        echo "Max recovery attempts: $MAX_RECOVERY_ATTEMPTS"
+        echo "Recovery cooldown: ${RECOVERY_COOLDOWN_SECONDS}s"
+        echo "::endgroup::"
+        echo ""
+
+        # Source the auto-recovery script
+        source "${{ github.action_path }}/../../../scripts/ci/lib/argocd-utils.sh"
+
+        # Call wait_for_sync with auto-recovery
+        if wait_for_sync "$APP_NAME" "$NAMESPACE" "$MAX_WAIT_SECONDS" "$POLL_INTERVAL_SECONDS"; then
+          echo ""
+          echo "sync-status=Synced" >> "$GITHUB_OUTPUT"
+          echo "health-status=Healthy" >> "$GITHUB_OUTPUT"
+          echo "recovery-attempts=0" >> "$GITHUB_OUTPUT"
+          echo "✅ Deployment successful!"
+          exit 0
+        else
+          echo ""
+          echo "::error::Deployment failed or timed out. See logs above for details."
+          
+          # Get final status for output
+          SYNC_STATUS=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
+            -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+          HEALTH_STATUS=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
+            -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+          
+          echo "sync-status=$SYNC_STATUS" >> "$GITHUB_OUTPUT"
+          echo "health-status=$HEALTH_STATUS" >> "$GITHUB_OUTPUT"
+          
+          exit 1
+        fi

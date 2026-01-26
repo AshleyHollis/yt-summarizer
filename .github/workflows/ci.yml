@@ -431,6 +431,17 @@ jobs:
           fail-fast: 'true'
           timeout-seconds: '30'
 
+      - name: Validate preview deployment manifests
+        if: contains(needs.detect-changes.outputs.changed_areas, 'k8s')
+        uses: ./.github/actions/deployment-validate
+        with:
+          overlay-path: k8s/overlays/preview
+          target-namespace: preview-pr-test
+          skip-image-validation: 'true'
+          skip-secret-validation: 'true'
+          max-cpu-millicores: '1500'
+          max-memory-mi: '2560'
+
 
   # ===========================================================================
   # PHASE 6: IMAGE BUILDING (Conditional)

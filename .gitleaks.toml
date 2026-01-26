@@ -50,4 +50,6 @@ useDefault = true
     '''fake-''',
     # Azurite well-known development key (NOT production keys)
     '''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
+    # ACR image references (not secrets, just image tags)
+    '''acrytsummprd\.azurecr\.io/[a-z0-9-]+:pr-[0-9]+-[a-z0-9]+''',
   ]
