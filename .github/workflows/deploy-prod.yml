@@ -549,8 +549,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate summary
-        uses: ./.github/actions/create-prod-summary
+        uses: ./.github/actions/create-pipeline-summary
         with:
+          summary-type: prod
           image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
           commit-sha: ${{ github.sha }}
           update-overlay-result: ${{ needs.update-overlay.result }}

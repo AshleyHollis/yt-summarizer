@@ -806,8 +806,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create CI Summary
-        uses: ./.github/actions/create-ci-summary
+        uses: ./.github/actions/create-pipeline-summary
         with:
+          summary-type: ci
           changed-areas: ${{ needs.detect-changes.outputs.changed_areas }}
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           pr-number: ${{ github.event.pull_request.number }}
