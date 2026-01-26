@@ -68,6 +68,20 @@ if ! git symbolic-ref HEAD > /dev/null 2>&1; then
   git checkout -B "$BRANCH"
 fi
 
+# Fetch latest changes and rebase our commit on top
+echo "📥 Fetching latest changes..."
+git fetch origin "$BRANCH"
+
+# Check if remote branch exists and has diverged
+if git rev-parse "origin/$BRANCH" > /dev/null 2>&1; then
+  echo "🔄 Rebasing on latest changes..."
+  if ! git rebase "origin/$BRANCH"; then
+    echo "::error::Rebase failed. The kustomization file may have been updated by another workflow."
+    git rebase --abort
+    exit 1
+  fi
+fi
+
 echo "🚀 Pushing to $BRANCH..."
 git push origin "HEAD:$BRANCH"
 
