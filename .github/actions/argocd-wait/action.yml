@@ -127,10 +127,10 @@ runs:
         TIMEOUT_THRESHOLD: ${{ inputs.max-wait-seconds }}
       run: |
         echo "🔍 Checking for stuck operations on $APP_NAME..."
-        
+
         OPERATION_STATE=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
           -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "None")
-        
+
         if [[ "$OPERATION_STATE" == "Running" ]]; then
           echo "⚠️  Cleaning up stuck operation..."
           kubectl patch application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \

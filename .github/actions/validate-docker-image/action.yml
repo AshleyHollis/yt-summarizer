@@ -5,11 +5,11 @@ inputs:
   validation-type:
     description: 'Validation type: tag-format|acr-exists|both'
     required: true
-  
+
   image-tag:
     description: 'Image tag to validate'
     required: true
-  
+
   # For tag-format validation
   pr-number:
     description: 'PR number (for tag format validation)'
@@ -19,7 +19,7 @@ inputs:
     description: 'Commit SHA (for tag format validation)'
     required: false
     default: ''
-  
+
   # For acr-exists validation
   registry:
     description: 'ACR registry name (without .azurecr.io suffix)'
@@ -69,10 +69,10 @@ runs:
           echo "::error::Either pr-number or commit-sha must be provided for tag-format validation"
           exit 1
         fi
-        
+
         # Run validation
         bash ${{ github.action_path }}/validate-tag-format.sh "$CI_TAG" "$EXPECTED_TAG"
-    
+
     - name: Check if image exists in ACR
       id: check-acr
       if: inputs.validation-type == 'acr-exists' || inputs.validation-type == 'both'
@@ -83,7 +83,7 @@ runs:
         TAG: ${{ inputs.image-tag }}
         FAIL_IF_MISSING: ${{ inputs.fail-if-missing }}
       run: bash ${{ github.action_path }}/check-acr-image.sh
-    
+
     - name: Test Kubernetes image pull capability
       id: k8s-pull-test
       if: (inputs.validation-type == 'acr-exists' || inputs.validation-type == 'both') && steps.check-acr.outputs.exists == 'true' && inputs.run-k8s-pull-test == 'true'

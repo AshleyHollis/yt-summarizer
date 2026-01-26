@@ -18,7 +18,7 @@ if [ "$WAIT_FOR_READY" = "true" ]; then
   for deployment in "${DEPLOYMENT_ARRAY[@]}"; do
     deployment=$(echo "$deployment" | xargs)  # trim whitespace
     echo "  - Waiting for $deployment..."
-    
+
     if ! kubectl rollout status deployment/"$deployment" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"; then
       echo "::warning::Deployment $deployment is not ready after ${TIMEOUT_SECONDS}s"
     fi
@@ -30,25 +30,25 @@ fi
 MISMATCH_FOUND=false
 for deployment in "${DEPLOYMENT_ARRAY[@]}"; do
   deployment=$(echo "$deployment" | xargs)  # trim whitespace
-  
+
   echo "🔍 Verifying $deployment..."
-  
+
   # Get the image from the deployment
   ACTUAL_IMAGE=$(kubectl get deployment "$deployment" -n "$NAMESPACE" \
     -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
-  
+
   if [ -z "$ACTUAL_IMAGE" ]; then
     echo "::error::Deployment $deployment not found in namespace $NAMESPACE"
     MISMATCH_FOUND=true
     continue
   fi
-  
+
   # Extract tag from image
   ACTUAL_TAG="${ACTUAL_IMAGE##*:}"
-  
+
   echo "  Actual image: $ACTUAL_IMAGE"
   echo "  Actual tag: $ACTUAL_TAG"
-  
+
   if [ "$ACTUAL_TAG" != "$EXPECTED_TAG" ]; then
     echo "::error::❌ Image tag mismatch for $deployment: expected $EXPECTED_TAG, got $ACTUAL_TAG"
     MISMATCH_FOUND=true

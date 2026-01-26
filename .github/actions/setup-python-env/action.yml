@@ -10,22 +10,22 @@ inputs:
     description: 'Python version to use'
     required: false
     default: '3.11'
-  
+
   install-mode:
     description: 'Installation mode: none|shared|service|both'
     required: false
     default: 'none'
-  
+
   service-package:
     description: 'Service package path to install (e.g., services/api)'
     required: false
     default: ''
-  
+
   working-directory:
     description: 'Working directory for installation (for legacy mode)'
     required: false
     default: '.'
-  
+
   install-pytest-xdist:
     description: 'Install pytest-xdist for parallel testing'
     required: false

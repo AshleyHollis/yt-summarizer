@@ -5,7 +5,7 @@ inputs:
   summary-type:
     description: 'Type of summary: ci|preview|prod|cleanup'
     required: true
-  
+
   # Common inputs (all types)
   commit-sha:
     description: 'Git commit SHA'
@@ -16,7 +16,7 @@ inputs:
   run-id:
     description: 'GitHub Actions run ID'
     required: false
-  
+
   # CI-specific inputs
   changed-areas:
     description: 'CI: Space-separated list of changed areas'
@@ -80,12 +80,12 @@ inputs:
   image-tag:
     description: 'CI/Preview/Prod: Docker image tag'
     required: false
-  
+
   # Preview-specific inputs
   preview-url:
     description: 'Preview: Preview environment URL'
     required: false
-  
+
   # Production-specific inputs
   update-overlay-result:
     description: 'Prod: Result of update-overlay job'
@@ -96,7 +96,7 @@ inputs:
   verify-deployment-result:
     description: 'Prod: Result of verify-deployment job'
     required: false
-  
+
   # Cleanup-specific inputs
   pr-merged:
     description: 'Cleanup: Whether the PR was merged (true/false)'

@@ -336,14 +336,14 @@ jobs:
           SERVICE_NAME="${{ matrix.service.name }}"
           IS_MAIN="${{ needs.00-detect-changes.outputs.is_main_branch }}"
           CHANGED_AREAS="${{ needs.00-detect-changes.outputs.changed_areas }}"
-          
+
           # Always run on main branch
           if [[ "$IS_MAIN" == "true" ]]; then
             echo "should-run=true" >> $GITHUB_OUTPUT
             echo "Running tests on main branch"
             exit 0
           fi
-          
+
           # Check if relevant areas changed
           case "$SERVICE_NAME" in
             "Shared")

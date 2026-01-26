@@ -5,7 +5,7 @@ inputs:
   operation:
     description: 'Operation mode: update-preview|update-prod|commit-only'
     required: true
-  
+
   # Common inputs
   image-tag:
     description: 'Docker image tag to deploy'
@@ -14,7 +14,7 @@ inputs:
     description: 'Path to kustomization overlay directory'
     required: false
     default: ''
-  
+
   # Preview-specific inputs
   pr-number:
     description: 'Pull request number (for preview)'
@@ -34,7 +34,7 @@ inputs:
   commit-sha:
     description: 'Commit SHA (for preview and commit operations)'
     required: false
-  
+
   # Production-specific inputs
   kustomization-path:
     description: 'Path to kustomization overlay (for prod)'
@@ -44,7 +44,7 @@ inputs:
     description: 'Path to kustomization template (for prod)'
     required: false
     default: 'scripts/ci/templates/prod-kustomization-template.yaml'
-  
+
   # Commit-specific inputs
   file-path:
     description: 'Path to file to commit (for commit-only)'
@@ -59,7 +59,7 @@ inputs:
   pr-branch:
     description: 'PR branch name (for preview commit)'
     required: false
-  
+
   auto-commit:
     description: 'Automatically commit and push changes'
     required: false
@@ -101,15 +101,15 @@ runs:
           echo "::error::image-tag is required for update-preview operation"
           exit 1
         fi
-        
+
         # Generate preview overlay
         bash ${{ github.action_path }}/update-preview.sh
-        
+
         # Set outputs
         echo "preview_url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
         echo "preview_host=$PREVIEW_HOST" >> "$GITHUB_OUTPUT"
         echo "tls_secret=$TLS_SECRET" >> "$GITHUB_OUTPUT"
-    
+
     # Production operation: Update prod kustomization
     - name: Update production kustomization
       if: inputs.operation == 'update-prod'
@@ -123,9 +123,9 @@ runs:
           echo "::error::image-tag is required for update-prod operation"
           exit 1
         fi
-        
+
         bash ${{ github.action_path }}/update-prod.sh
-    
+
     # Commit operation (all modes if auto-commit enabled)
     - name: Commit and push changes
       id: commit
