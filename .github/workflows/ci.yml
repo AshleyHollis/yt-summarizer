@@ -323,32 +323,61 @@ jobs:
             package: services/workers
             markers: ''
             pytest-args: ''
-        include:
-          - service:
-              name: Shared
-            run-condition: |
-              needs.00-detect-changes.outputs.is_main_branch == 'true' ||
-              contains(needs.00-detect-changes.outputs.changed_areas, 'services/shared')
-          - service:
-              name: API
-            run-condition: |
-              needs.00-detect-changes.outputs.is_main_branch == 'true' ||
-              contains(needs.00-detect-changes.outputs.changed_areas, 'services/api') ||
-              contains(needs.00-detect-changes.outputs.changed_areas, 'services/shared')
-          - service:
-              name: Workers
-            run-condition: |
-              needs.00-detect-changes.outputs.is_main_branch == 'true' ||
-              contains(needs.00-detect-changes.outputs.changed_areas, 'services/workers') ||
-              contains(needs.00-detect-changes.outputs.changed_areas, 'services/shared')
+
     outputs:
       test_duration: ${{ steps.tests.outputs.test-duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check if tests should run
+        id: should-run
+        run: |
+          SERVICE_NAME="${{ matrix.service.name }}"
+          IS_MAIN="${{ needs.00-detect-changes.outputs.is_main_branch }}"
+          CHANGED_AREAS="${{ needs.00-detect-changes.outputs.changed_areas }}"
+          
+          # Always run on main branch
+          if [[ "$IS_MAIN" == "true" ]]; then
+            echo "should-run=true" >> $GITHUB_OUTPUT
+            echo "Running tests on main branch"
+            exit 0
+          fi
+          
+          # Check if relevant areas changed
+          case "$SERVICE_NAME" in
+            "Shared")
+              if echo "$CHANGED_AREAS" | grep -q "services/shared"; then
+                echo "should-run=true" >> $GITHUB_OUTPUT
+                echo "Running tests: services/shared changed"
+              else
+                echo "should-run=false" >> $GITHUB_OUTPUT
+                echo "Skipping tests: services/shared not changed"
+              fi
+              ;;
+            "API")
+              if echo "$CHANGED_AREAS" | grep -qE "services/api|services/shared"; then
+                echo "should-run=true" >> $GITHUB_OUTPUT
+                echo "Running tests: services/api or services/shared changed"
+              else
+                echo "should-run=false" >> $GITHUB_OUTPUT
+                echo "Skipping tests: services/api and services/shared not changed"
+              fi
+              ;;
+            "Workers")
+              if echo "$CHANGED_AREAS" | grep -qE "services/workers|services/shared"; then
+                echo "should-run=true" >> $GITHUB_OUTPUT
+                echo "Running tests: services/workers or services/shared changed"
+              else
+                echo "should-run=false" >> $GITHUB_OUTPUT
+                echo "Skipping tests: services/workers and services/shared not changed"
+              fi
+              ;;
+          esac
+
       - name: Run ${{ matrix.service.name }} tests
         id: tests
+        if: steps.should-run.outputs.should-run == 'true'
         uses: ./.github/actions/run-python-tests
         with:
           python-version: ${{ env.PYTHON_VERSION }}
