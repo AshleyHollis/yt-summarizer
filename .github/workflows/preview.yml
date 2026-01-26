@@ -516,6 +516,20 @@ jobs:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
 
+      - name: Update preview kustomization overlay
+        uses: ./.github/actions/manage-kustomization
+        with:
+          operation: update-preview
+          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
+          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
+          acr-server: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          preview-host: ${{ needs.get-ingress.outputs.preview_host }}
+          tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
+          preview-url: ${{ needs.get-ingress.outputs.preview_url }}
+          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
+          auto-commit: 'true'
+          pr-branch: ${{ github.head_ref }}
+
   # ===========================================================================
   # PHASE 6: VERIFY DEPLOYMENT
   # ===========================================================================

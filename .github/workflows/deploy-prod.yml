@@ -269,9 +269,14 @@ jobs:
           echo "image_tag=${{ needs.get-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Update production kustomization
-        uses: ./.github/actions/update-prod-kustomization
+        uses: ./.github/actions/manage-kustomization
         with:
+          operation: update-prod
           image-tag: ${{ steps.determine-tag.outputs.image_tag }}
+          kustomization-path: k8s/overlays/prod
+          template-path: scripts/ci/templates/prod-kustomization-template.yaml
+          auto-commit: 'true'
+          git-branch: main
 
       # This validation is critical - it runs AFTER update-prod-kustomization
       # inserts image tags. Ensures the modified manifest is still valid.
