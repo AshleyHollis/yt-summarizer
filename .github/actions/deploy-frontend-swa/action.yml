@@ -38,8 +38,12 @@ inputs:
     default: main
     required: false
   deployment-environment:
-    description: SWA deployment environment (preview or production)
+    description: SWA deployment environment (production for production, pr-{number} for previews)
     default: preview
+    required: false
+  verbose:
+    description: Enable verbose logging
+    default: "false"
     required: false
 outputs:
   static_web_app_url:
@@ -93,6 +97,7 @@ runs:
         APP_LOCATION: ${{ inputs.app-location }}
         OUTPUT_LOCATION: ${{ inputs.output_location }}
         DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment-environment }}
+        VERBOSE: ${{ inputs.verbose }}
         MAX_ATTEMPTS: "3"
         TIMEOUT_SECONDS: "300"
       run: |
