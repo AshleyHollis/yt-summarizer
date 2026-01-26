@@ -375,10 +375,9 @@ jobs:
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
           cleanup-stuck-operations: 'true'
           auto-recovery: 'false'
-          max-wait-seconds: '180'
+          max-wait-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
           poll-interval-seconds: '5'
           pr-number: '0'
-          timeout-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
 
       - name: Set expected image tag
         id: expected-tag

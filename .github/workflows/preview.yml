@@ -515,7 +515,6 @@ jobs:
           image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
-          pr-branch: ${{ needs.detect-changes.outputs.pr_head_ref || github.ref_name }}
 
   # ===========================================================================
   # PHASE 6: VERIFY DEPLOYMENT
