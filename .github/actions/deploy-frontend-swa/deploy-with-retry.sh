@@ -24,14 +24,14 @@ fi
 run_deploy_with_timeout() {
   local attempt=$1
   local timeout=$2
-  
+
   echo "::group::Deployment attempt $attempt of $MAX_ATTEMPTS to '${DEPLOYMENT_ENVIRONMENT}' environment (${timeout}s timeout)"
   echo "::debug::App location: ${APP_LOCATION}"
   echo "::debug::Output location: ${OUTPUT_LOCATION}"
   echo "::debug::Environment: ${DEPLOYMENT_ENVIRONMENT}"
-  
+
   local start_time=$(date +%s)
-  
+
   # Build SWA CLI command with optional verbose flag
   local swa_cmd=(
     npx --yes @azure/static-web-apps-cli deploy
@@ -41,18 +41,18 @@ run_deploy_with_timeout() {
     --env "${DEPLOYMENT_ENVIRONMENT}"
     --no-use-keychain
   )
-  
+
   # Add verbose flag if enabled
   if [[ -n "${VERBOSE_FLAGS}" ]]; then
     swa_cmd+=(${VERBOSE_FLAGS})
   fi
-  
+
   echo "::debug::Running command: ${swa_cmd[*]}"
-  
+
   # Run SWA CLI with timeout
   # Note: timeout command is available in GitHub Actions runners (both Linux and macOS)
   if timeout "${timeout}s" "${swa_cmd[@]}"; then
-    
+
     local elapsed=$(($(date +%s) - start_time))
     echo "::notice::Deployment to '${DEPLOYMENT_ENVIRONMENT}' succeeded on attempt $attempt (${elapsed}s elapsed)"
     echo "::endgroup::"
@@ -60,13 +60,13 @@ run_deploy_with_timeout() {
   else
     local exit_code=$?
     local elapsed=$(($(date +%s) - start_time))
-    
+
     if [ $exit_code -eq 124 ]; then
       echo "::warning::Deployment attempt $attempt timed out after ${timeout}s"
     else
       echo "::warning::Deployment attempt $attempt failed with exit code $exit_code (${elapsed}s elapsed)"
     fi
-    
+
     echo "::endgroup::"
     return $exit_code
   fi
@@ -80,14 +80,14 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     echo "DEPLOY_ENVIRONMENT=${DEPLOYMENT_ENVIRONMENT}" >> "${GITHUB_OUTPUT:-/dev/stdout}"
     exit 0
   fi
-  
+
   # If this was the last attempt, fail
   if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
     echo "::error::All $MAX_ATTEMPTS deployment attempts to '${DEPLOYMENT_ENVIRONMENT}' failed"
     echo "DEPLOY_SUCCESS=false" >> "${GITHUB_OUTPUT:-/dev/stdout}"
     exit 1
   fi
-  
+
   # Otherwise, log and continue to next attempt
   echo "Retrying immediately (attempt $((attempt + 1))/$MAX_ATTEMPTS)..."
 done
