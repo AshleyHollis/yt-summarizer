@@ -157,9 +157,9 @@ This class of timeout/processing failures is a **known reliability issue** with 
     if [[ "${{ steps.retry-2.outcome }}" != "skipped" ]]; then
       attempt_count=3
     fi
-    
+
     echo "::notice::Deployment completed after $attempt_count attempt(s)"
-    
+
     # Optional: Send to monitoring system
     # curl -X POST $MONITORING_WEBHOOK \
     #   -d "deployment_attempts=$attempt_count" \
