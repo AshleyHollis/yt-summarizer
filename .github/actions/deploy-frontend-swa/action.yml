@@ -93,7 +93,7 @@ runs:
         output_location: ${{ inputs.output_location }}
         skip_app_build: true
         production_branch: ${{ inputs.production-branch }}
-    
+
     # Retry attempt 1 (only if first attempt failed)
     - name: Deploy to Static Web Apps (retry 1)
       id: retry-1
@@ -108,7 +108,7 @@ runs:
         output_location: ${{ inputs.output_location }}
         skip_app_build: true
         production_branch: ${{ inputs.production-branch }}
-    
+
     # Retry attempt 2 (only if both previous attempts failed)
     - name: Deploy to Static Web Apps (retry 2 - final)
       id: retry-2
@@ -122,7 +122,7 @@ runs:
         output_location: ${{ inputs.output_location }}
         skip_app_build: true
         production_branch: ${{ inputs.production-branch }}
-    
+
     # Final check - ensure at least one attempt succeeded
     - name: Verify deployment success
       shell: bash
