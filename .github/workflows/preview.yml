@@ -681,6 +681,8 @@ jobs:
           runtime-config-path: apps/web/public/runtime-config.js
           output_location: ""
           production-branch: main
+          deployment-environment: pr-${{ github.event.pull_request.number }}
+          verbose: "true"
 
       - name: Azure Login for SWA cleanup
         uses: azure/login@v2
