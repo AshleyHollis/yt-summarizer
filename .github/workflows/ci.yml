@@ -46,7 +46,7 @@ jobs:
   # Frontend: apps/web
   # Blocks tests if lint fails (fail-fast pattern)
   # ===========================================================================
-  00-01-lint-python:
+  00-lint-python:
     name: 00 · Lint Python
     runs-on: ubuntu-latest
     steps:
@@ -64,7 +64,7 @@ jobs:
       - name: Run ruff checks
         uses: ./.github/actions/run-ruff-check
 
-  00-frontend-quality:
+  01-frontend-quality:
     name: Frontend Quality
     runs-on: ubuntu-latest
     steps:
@@ -298,7 +298,7 @@ jobs:
   # - PRs: pr-<number>-<sha> (e.g., pr-42-abc123f)
   # - Main: sha-<sha> (e.g., sha-abc123f)
   # ===========================================================================
-  04-build-images-meta:
+  03-build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
     if: vars.ACR_NAME != ''
@@ -332,7 +332,7 @@ jobs:
         if: steps.tag.outputs.image-tag != ''
         uses: ./.github/actions/assert-image-tag-artifact
 
-  04-build-images:
+  03-build-images:
     name: Build Images (parallel)
     runs-on: ubuntu-latest
     needs: [04-build-images-meta, 00-01-lint-python, 01-scan-python-security]
@@ -384,7 +384,7 @@ jobs:
   # Terraform: Validates HCL syntax and plan
   # Note: Kustomize validation moved to Phase 4 (kubernetes-validate)
   # ===========================================================================
-  05-validate-terraform:
+  04-validate-terraform:
     name: Validate Terraform
     runs-on: ubuntu-latest
     permissions:
@@ -419,7 +419,7 @@ jobs:
   # ===========================================================================
   # Runs gitleaks to detect secrets in code
   # ===========================================================================
-  06-secret-scanning:
+  05-secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
     steps:
@@ -439,7 +439,7 @@ jobs:
   # ===========================================================================
   # Validates GitHub Actions workflow syntax and linting
   # ===========================================================================
-  07-validate-workflows:
+  06-validate-workflows:
     name: Validate Workflows
     runs-on: ubuntu-latest
     steps:
@@ -492,7 +492,7 @@ jobs:
   #   1. All jobs ran
   #   2. All jobs that ran passed (result == 'success')
   # ===========================================================================
-  99-ci-status:
+  07-ci-status:
     name: CI Status
     runs-on: ubuntu-latest
     needs:
