@@ -144,15 +144,15 @@ runs:
         else
           echo ""
           echo "::error::Deployment failed or timed out. See logs above for details."
-          
+
           # Get final status for output
           SYNC_STATUS=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
             -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
           HEALTH_STATUS=$(kubectl get application "$APP_NAME" -n "$ARGOCD_NAMESPACE" \
             -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
-          
+
           echo "sync-status=$SYNC_STATUS" >> "$GITHUB_OUTPUT"
           echo "health-status=$HEALTH_STATUS" >> "$GITHUB_OUTPUT"
-          
+
           exit 1
         fi
