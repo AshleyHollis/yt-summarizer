@@ -48,7 +48,7 @@ log_error() {
 # Note: Caller should handle return code appropriately (e.g., exit gracefully if PR closed)
 check_pr_open() {
     local pr_number="$1"
-    
+
     # Skip check if no PR number or production deployment
     if [[ -z "$pr_number" || "$pr_number" == "0" ]]; then
         return 0
@@ -67,7 +67,7 @@ check_pr_open() {
         -H "Authorization: token $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$pr_number" 2>&1)
-    
+
     http_code=$(echo "$response" | tail -n1)
     local body=$(echo "$response" | head -n-1)
 
@@ -79,12 +79,12 @@ check_pr_open() {
 
     # Parse PR state safely
     local pr_state=$(echo "$body" | jq -r '.state // empty' 2>/dev/null || echo "")
-    
+
     if [[ "$pr_state" == "closed" ]]; then
         log_info "PR $pr_number is closed"
         return 1
     fi
-    
+
     return 0
 }
 
@@ -361,7 +361,7 @@ wait_for_sync() {
                         return 0
                     fi
                 fi
-                
+
                 log_error "❌ Application $app_name not found after ${MISSING_APP_TIMEOUT}s"
                 collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-missing.log"
                 return 1

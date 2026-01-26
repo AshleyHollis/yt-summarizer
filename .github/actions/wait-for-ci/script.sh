@@ -59,7 +59,7 @@ fi
 # Function to check PR state (returns 0=open/unknown, 1=closed)
 check_pr_state() {
   local pr_number="$1"
-  
+
   # Skip check if no PR number provided
   if [[ -z "$pr_number" ]]; then
     return 0
@@ -72,7 +72,7 @@ check_pr_state() {
     -H "Authorization: token $GITHUB_TOKEN" \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$pr_number")
-  
+
   http_code=$(echo "$response" | tail -n1)
   local body=$(echo "$response" | head -n-1)
 
@@ -84,11 +84,11 @@ check_pr_state() {
 
   # Parse PR state
   local pr_state=$(echo "$body" | jq -r '.state // empty')
-  
+
   if [[ "$pr_state" == "closed" ]]; then
     return 1
   fi
-  
+
   return 0
 }
 
@@ -119,12 +119,12 @@ while [ $(date +%s) -lt $end_time ]; do
   if [ -n "$WORKFLOW_EVENT" ]; then
     query="$query&event=$WORKFLOW_EVENT"
   fi
-  
+
   response=$(curl -s -w "\n%{http_code}" \
     -H "Authorization: token $GITHUB_TOKEN" \
     -H "Accept: application/vnd.github.v3+json" \
     "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW_FILE/runs?$query")
-  
+
   http_code=$(echo "$response" | tail -n1)
   body=$(echo "$response" | head -n-1)
 
@@ -160,7 +160,7 @@ while [ $(date +%s) -lt $end_time ]; do
           -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$ci_run/artifacts")
-        
+
         artifacts_http_code=$(echo "$artifacts_response" | tail -n1)
         artifacts_body=$(echo "$artifacts_response" | head -n-1)
 
@@ -169,7 +169,7 @@ while [ $(date +%s) -lt $end_time ]; do
           if [ -n "$artifact_id" ]; then
             echo "   🔽 Found image-tag artifact (id: $artifact_id), downloading..."
             archive_url=$(echo "$artifacts_body" | jq -r ".artifacts[] | select(.id == ($artifact_id | tonumber)) | .archive_download_url")
-            
+
             if curl -s -L -H "Authorization: token $GITHUB_TOKEN" -o /tmp/artifacts.zip "$archive_url"; then
               mkdir -p /tmp/artifacts && unzip -o /tmp/artifacts.zip -d /tmp/artifacts >/dev/null 2>&1
 
