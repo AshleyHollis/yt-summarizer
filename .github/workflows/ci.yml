@@ -295,95 +295,70 @@ jobs:
   #
   # Shared changes trigger API + Workers tests (they depend on shared code)
   # ===========================================================================
-  test-shared:
-    name: Test Shared Package
+  test-python:
+    name: Test ${{ matrix.service.name }}
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-python, scan-python-security]
-    # Main branch: Always run | PR: Run if shared package changed
+    # Matrix runs on main branch, or if service/shared changed
     # Requires lint and security scans to pass
     if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
       (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
       (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: Shared
+            path: shared
+            package: services/shared
+            markers: ''
+            pytest-args: ''
+          - name: API
+            path: api
+            package: services/api
+            markers: not integration and not live
+            pytest-args: '-v --tb=short'
+          - name: Workers
+            path: workers
+            package: services/workers
+            markers: ''
+            pytest-args: ''
+        include:
+          - service:
+              name: Shared
+            run-condition: |
+              needs.detect-changes.outputs.is_main_branch == 'true' ||
+              contains(needs.detect-changes.outputs.changed_areas, 'services/shared')
+          - service:
+              name: API
+            run-condition: |
+              needs.detect-changes.outputs.is_main_branch == 'true' ||
+              contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
+              contains(needs.detect-changes.outputs.changed_areas, 'services/shared')
+          - service:
+              name: Workers
+            run-condition: |
+              needs.detect-changes.outputs.is_main_branch == 'true' ||
+              contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
+              contains(needs.detect-changes.outputs.changed_areas, 'services/shared')
     outputs:
       test_duration: ${{ steps.tests.outputs.test-duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run shared tests
+      - name: Run ${{ matrix.service.name }} tests
         id: tests
         uses: ./.github/actions/run-python-tests
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          service-package: services/shared
-          working-directory: services/shared
-          test-name: Shared Tests
+          service-package: ${{ matrix.service.package }}
+          working-directory: ${{ matrix.service.package }}
+          test-name: ${{ matrix.service.name }} Tests
           parallel: 'true'
           install-pytest-xdist: 'true'
-
-  test-api:
-    name: Test API
-    runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, scan-python-security]
-    # Main branch: Always run | PR: Run if API or shared changed
-    # Note: Shared changes trigger API tests (dependency)
-    # Requires lint and security scans to pass
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/api') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
-    outputs:
-      test_duration: ${{ steps.tests.outputs.test-duration }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run API tests
-        id: tests
-        uses: ./.github/actions/run-python-tests
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          service-package: services/api
-          working-directory: services/api
-          test-name: API Tests
-          parallel: 'true'
-          install-pytest-xdist: 'true'
-          pytest-args: '-v --tb=short'
-          markers: 'not integration and not live'
-
-  test-workers:
-    name: Test Workers
-    runs-on: ubuntu-latest
-    needs: [detect-changes, lint-python, scan-python-security]
-    # Main branch: Always run | PR: Run if workers or shared changed
-    # Note: Shared changes trigger workers tests (dependency)
-    # Requires lint and security scans to pass
-    if: |
-      (needs.detect-changes.outputs.is_main_branch == 'true' ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/workers') ||
-       contains(needs.detect-changes.outputs.changed_areas, 'services/shared')) &&
-      (needs.lint-python.result == 'success' || needs.lint-python.result == 'skipped') &&
-      (needs.scan-python-security.result == 'success' || needs.scan-python-security.result == 'skipped')
-    outputs:
-      test_duration: ${{ steps.tests.outputs.test-duration }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run workers tests (parallel)
-        id: tests
-        uses: ./.github/actions/run-python-tests
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          service-package: services/workers
-          working-directory: services/workers
-          test-name: Workers Tests
-          parallel: 'true'
-          install-pytest-xdist: 'true'
+          pytest-args: ${{ matrix.service.pytest-args }}
+          markers: ${{ matrix.service.markers }}
 
   # ===========================================================================
   # PHASE 5: KUBERNETES VALIDATION
@@ -737,11 +712,12 @@ jobs:
     needs:
       - detect-changes
       - lint-python
-      - frontend-quality
       - scan-python-security
-      - test-shared
-      - test-api
-      - test-workers
+      - frontend-quality
+      - secret-scanning
+      - test-python # Matrix job replaces test-shared, test-api, test-workers
+      - kubernetes-validate
+      - validate-terraform
       - build-images
       - build-images-meta
       - validate-terraform
@@ -796,8 +772,7 @@ jobs:
             echo "- Frontend Quality: ${{ needs.frontend-quality.result }}"
             echo "  reason: ${frontend_reason}"
             echo "- Security Scans (Python): ${{ needs.scan-python-security.result }}"
-            echo "- Tests (shared/api/workers): ${{ needs.test-shared.result }}"
-            echo "  api/workers: ${{ needs.test-api.result }}/${{ needs.test-workers.result }}"
+            echo "- Tests (Python Matrix): ${{ needs.test-python.result }}"
             echo "- Build Images: ${{ needs.build-images.result }}"
             echo "  ACR: ${acr_status}"
             echo "- Terraform Validate: ${{ needs.validate-terraform.result }}"
@@ -818,12 +793,12 @@ jobs:
           scan-python-security-result: ${{ needs.scan-python-security.result }}
           frontend-quality-result: ${{ needs.frontend-quality.result }}
           secret-scanning-result: ${{ needs.secret-scanning.result }}
-          test-shared-result: ${{ needs.test-shared.result }}
-          test-shared-duration: ${{ needs.test-shared.outputs.test_duration }}
-          test-api-result: ${{ needs.test-api.result }}
-          test-api-duration: ${{ needs.test-api.outputs.test_duration }}
-          test-workers-result: ${{ needs.test-workers.result }}
-          test-workers-duration: ${{ needs.test-workers.outputs.test_duration }}
+          test-shared-result: ${{ needs.test-python.result }}
+          test-shared-duration: ${{ needs.test-python.outputs.test_duration }}
+          test-api-result: ${{ needs.test-python.result }}
+          test-api-duration: ''
+          test-workers-result: ${{ needs.test-python.result }}
+          test-workers-duration: ''
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           build-images-result: ${{ needs.build-images.result }}
@@ -837,9 +812,9 @@ jobs:
         with:
           changed-areas: ${{ needs.detect-changes.outputs.changed_areas }}
           is-main-branch: ${{ needs.detect-changes.outputs.is_main_branch }}
-          test-shared-result: ${{ needs.test-shared.result }}
-          test-api-result: ${{ needs.test-api.result }}
-          test-workers-result: ${{ needs.test-workers.result }}
+          test-shared-result: ${{ needs.test-python.result }}
+          test-api-result: ${{ needs.test-python.result }}
+          test-workers-result: ${{ needs.test-python.result }}
           frontend-quality-result: ${{ needs.frontend-quality.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
