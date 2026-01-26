@@ -208,11 +208,12 @@ jobs:
           acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate CI image exists in ACR
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ steps.normalize-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.normalize-tag.outputs.image_tag }}
           fail-if-missing: 'true'
 
   # ---------------------------------------------------------------------------
@@ -293,18 +294,20 @@ jobs:
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Verify cluster can pull image
-        uses: ./.github/actions/validate-acr-image
+        uses: ./.github/actions/validate-docker-image
         with:
+          validation-type: acr-exists
+          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          tag: ${{ steps.determine-tag.outputs.image_tag }}
           run-k8s-pull-test: 'true'
 
       - name: Validate image tag format
         if: needs.get-image-tag.result == 'success'
-        uses: ./.github/actions/validate-image-tag
+        uses: ./.github/actions/validate-docker-image
         with:
-          ci-image-tag: ${{ steps.determine-tag.outputs.image_tag }}
+          validation-type: tag-format
+          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
           commit-sha: ${{ github.sha }}
 
       - name: Commit and push changes
