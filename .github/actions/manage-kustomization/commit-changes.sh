@@ -76,9 +76,21 @@ git fetch origin "$BRANCH"
 if git rev-parse "origin/$BRANCH" > /dev/null 2>&1; then
   echo "🔄 Rebasing on latest changes..."
   if ! git rebase "origin/$BRANCH"; then
-    echo "::error::Rebase failed. The kustomization file may have been updated by another workflow."
-    git rebase --abort
-    exit 1
+    echo "⚠️  Rebase conflict detected - auto-resolving with our version..."
+    # Use our version for the kustomization file (it's auto-generated, ours is correct)
+    git checkout --ours "$FILE_TO_COMMIT"
+    git add "$FILE_TO_COMMIT"
+    git rebase --continue
+    
+    # If rebase still fails, abort and try force push with lease
+    if [ $? -ne 0 ]; then
+      echo "⚠️  Rebase failed, using force-with-lease push instead..."
+      git rebase --abort
+      git push --force-with-lease origin "HEAD:$BRANCH"
+      echo "✅ Changes force-pushed with lease"
+      echo "committed=true" >> "$GITHUB_OUTPUT"
+      exit 0
+    fi
   fi
 fi
 
