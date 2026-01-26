@@ -806,8 +806,9 @@ jobs:
           repository: ${{ github.repository }}
 
       - name: Create deployment summary
-        uses: ./.github/actions/create-preview-summary
+        uses: ./.github/actions/create-pipeline-summary
         with:
+          summary-type: preview
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
           image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
