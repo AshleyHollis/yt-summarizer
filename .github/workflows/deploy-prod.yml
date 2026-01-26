@@ -364,37 +364,16 @@ jobs:
         with:
           kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
-      - name: Cleanup stuck Argo CD operations
-        uses: ./.github/actions/cleanup-argocd-operation
-        with:
-          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-          namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout-threshold: ${{ env.ARGOCD_OPERATION_TIMEOUT_THRESHOLD }}
-        continue-on-error: false
-
-      - name: Pre-deployment validation
-        uses: ./.github/actions/validate
-        with:
-          validators: kustomize-build,argocd-manifest
-          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
-          argocd-app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
-          target-namespace: ${{ env.NAMESPACE_PROD }}
-          timeout-seconds: '60'
-
-      - name: Validate Argo CD readiness (fail-fast)
-        uses: ./.github/actions/check-argocd-readiness
-        with:
-          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-          namespace: ${{ env.NAMESPACE_ARGOCD }}
-          timeout: '60'
-          verbose: 'true'
-        continue-on-error: false
-      - name: Wait for Argo CD to sync
-        uses: ./.github/actions/wait-for-argocd
+      - name: Cleanup and wait for Argo CD to sync
+        uses: ./.github/actions/argocd-wait
         with:
           app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
           namespace: ${{ env.NAMESPACE_PROD }}
+          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          cleanup-stuck-operations: 'true'
+          auto-recovery: 'false'
+          max-wait-seconds: '180'
+          poll-interval-seconds: '5'
           pr-number: '0'
           timeout-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
 
