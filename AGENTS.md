@@ -96,6 +96,26 @@ When you need implementation details:
 2. Explore code using glob/grep
 3. Check scripts/ for automation examples
 4. Read docs/ for architecture patterns
+5. **Reference `docs/ai-skills.md` for available CLIs and tools**
 
 This file provides rules; codebase provides details.
 </discovery>
+
+## Available Skills
+
+<skills>
+**Reference**: `docs/ai-skills.md` - Complete list of available CLIs and tools
+
+**Key tools available**:
+- Azure CLI (az) - Azure resource management
+- kubectl - Kubernetes operations
+- Terraform - Infrastructure as Code
+- GitHub CLI (gh) - GitHub operations
+- Kustomize - K8s manifest management
+- npm - Node.js/frontend tooling
+- uv - Python package management
+- PowerShell - Windows automation scripts
+- Playwright MCP - Browser automation
+
+**Guideline**: Use these CLIs directly instead of asking users to run commands manually.
+</skills>
