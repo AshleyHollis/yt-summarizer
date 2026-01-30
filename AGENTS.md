@@ -101,13 +101,34 @@ When you need implementation details:
 This file provides rules; codebase provides details.
 </discovery>
 
-## Available Skills
+## AI Skills System
 
 <skills>
-**Reference**: `docs/ai-skills.md` - Complete list of available CLIs and tools
+**Location**: `.agents/skills/` - AI skills for OpenCode/Copilot
 
-**Key tools available**:
-- Azure CLI (az) - Azure resource management
+**Custom Skills** (in repo):
+- `aspire-orchestration` - .NET Aspire patterns and AppHost configuration
+- `azure-cli-operations` - Azure CLI for ACR, AKS, Storage, Key Vault
+- `fastapi-patterns` - FastAPI backend patterns and testing
+- `yt-summarizer-testing` - Testing patterns (pytest, Vitest, Playwright)
+
+**Installed Skills** (from skills.sh):
+```bash
+npx skills add https://github.com/hashicorp/agent-skills --skill terraform-style-guide
+npx skills add https://github.com/rmyndharis/antigravity-skills --skill kubernetes-architect
+npx skills add https://github.com/404kidwiz/claude-supercode-skills --skill devops-engineer
+```
+
+**Usage**: Load skills via `skill` tool when needed for specific tasks
+</skills>
+
+## Available CLIs
+
+<clis>
+**Reference**: `docs/ai-skills.md` - Complete CLI reference with examples
+
+**Key tools**:
+- Azure CLI (az) - Resource management
 - kubectl - Kubernetes operations
 - Terraform - Infrastructure as Code
 - GitHub CLI (gh) - GitHub operations
@@ -117,5 +138,5 @@ This file provides rules; codebase provides details.
 - PowerShell - Windows automation scripts
 - Playwright MCP - Browser automation
 
-**Guideline**: Use these CLIs directly instead of asking users to run commands manually.
-</skills>
+**Guideline**: Use CLIs directly instead of asking users to run commands manually.
+</clis>
