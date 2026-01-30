@@ -33,7 +33,7 @@ const STAGE_LABELS: Record<JobType, string> = {
 /**
  * Stage icons (using simple SVG)
  */
-const StageIcon = ({ status }: { stage: JobType; status: JobStatus; jobStage?: JobStage }) => {
+const StageIcon = ({ status, jobStage }: { stage: JobType; status: JobStatus; jobStage?: JobStage }) => {
   const baseClass = 'w-6 h-6';
 
   // Completed checkmark

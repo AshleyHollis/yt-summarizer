@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
 import { WhyThisButton } from "./WhyThisButton";
@@ -36,7 +37,6 @@ export function CopilotVideoCard({
   youTubeVideoId,
   title,
   channelName,
-  thumbnailUrl,
   duration,
   relevanceScore,
   primaryReason,
@@ -44,19 +44,18 @@ export function CopilotVideoCard({
 }: CopilotVideoCardProps) {
   const [isExplanationExpanded, setIsExplanationExpanded] = useState(false);
 
-  const defaultThumbnail = `https://img.youtube.com/vi/${youTubeVideoId}/mqdefault.jpg`;
-
   return (
     <div className="w-full group rounded-xl border border-[var(--copilot-kit-separator-color)] p-3 hover:border-[var(--copilot-kit-primary-color)] bg-[var(--copilot-kit-background-color)] transition-all duration-150 cursor-pointer">
       <div className="flex gap-2.5">
         {/* Thumbnail */}
         <Link href={`/videos/${videoId}`} className="flex-shrink-0">
           <div className="relative w-28 h-16 rounded-lg overflow-hidden bg-[var(--copilot-kit-secondary-color)] shadow-sm group-hover:shadow transition-shadow">
-            <img
-              src={thumbnailUrl || defaultThumbnail}
-              alt={title}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
+          <Image
+            src={`https://img.youtube.com/vi/${youTubeVideoId}/mqdefault.jpg`}
+            alt={title}
+            fill
+            className="object-cover"
+          />
             {duration && (
               <span className="absolute bottom-1 right-1 bg-black/85 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
                 {formatDuration(duration)}
@@ -88,7 +87,7 @@ export function CopilotVideoCard({
           </p>
           <div className="mt-2">
             <p className="text-xs text-[var(--copilot-kit-muted-color)] line-clamp-1 italic">
-              "{primaryReason}"
+              {"\u201C"}{primaryReason}{"\u201D"}
             </p>
             {/* US5: "Why this?" button - only show if explanation available */}
             {explanation && (

@@ -251,7 +251,7 @@ export function useThreadPersistence({
         if (initialThreadId && !validatedId) {
           onThreadIdChange?.(null);
         }
-      } catch (error) {
+      } catch {
         if (!mounted) return;
         setState(prev => ({
           ...prev,
@@ -264,6 +264,7 @@ export function useThreadPersistence({
     loadInitialThreads();
 
     return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount - don't depend on initialThreadId to avoid re-fetching
 
   /**
