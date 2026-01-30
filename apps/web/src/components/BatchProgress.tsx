@@ -162,7 +162,7 @@ export function BatchProgress({
               timeoutId = setTimeout(fetchBatch, pollInterval);
             }
           }
-        } catch (err) {
+        } catch {
           if (!cancelled) {
             setError('Failed to fetch batch status');
             setIsLoading(false);

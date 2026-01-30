@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { use, useState } from 'react';
 import { BatchProgress } from '@/components/BatchProgress';
@@ -17,7 +16,6 @@ interface BatchPageProps {
  */
 export default function BatchPage({ params }: BatchPageProps) {
   const { batchId } = use(params);
-  const router = useRouter();
   const [isComplete, setIsComplete] = useState(false);
   const [completedBatch, setCompletedBatch] = useState<BatchDetailResponse | null>(null);
 

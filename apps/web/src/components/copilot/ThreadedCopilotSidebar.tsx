@@ -33,11 +33,8 @@ import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { MessageCircle, X } from "lucide-react";
-import type { Message } from "@copilotkit/shared";
 import { useThreadPersistence } from "@/hooks/useThreadPersistence";
-import { prepareMessagesForDisplay, copilotToThreadMessages, ChatThread } from "@/services/threadPersistence";
 import { CustomHeader } from "./subcomponents/CustomHeader";
-import { Thread } from "./ThreadList";
 import { useScope, useAISettings } from "@/app/providers";
 import styles from "./ThreadedCopilotSidebar.module.css";
 

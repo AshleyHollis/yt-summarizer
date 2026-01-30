@@ -4,7 +4,6 @@ import { useState, FormEvent } from 'react';
 import {
   channelApi,
   ChannelVideosResponse,
-  ChannelVideo,
   ApiClientError,
 } from '@/services/api';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { jobApi, VideoJobsProgress, JobType, JobStatus, JobStage, ETAInfo } from '@/services/api';
 import { formatTimeShort } from '@/utils/formatDate';
 
@@ -33,7 +33,7 @@ const STAGE_LABELS: Record<JobType, string> = {
 /**
  * Stage icons (using simple SVG)
  */
-const StageIcon = ({ stage, status, jobStage }: { stage: JobType; status: JobStatus; jobStage?: JobStage }) => {
+const StageIcon = ({ status }: { stage: JobType; status: JobStatus; jobStage?: JobStage }) => {
   const baseClass = 'w-6 h-6';
 
   // Completed checkmark

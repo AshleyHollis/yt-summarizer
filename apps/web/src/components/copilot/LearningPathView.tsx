@@ -75,12 +75,10 @@ function formatTimestamp(seconds: number): string {
  */
 function LearningPathItemCard({
   item,
-  isFirst,
   isLast,
   onVideoClick,
 }: {
   item: LearningPathItem;
-  isFirst: boolean;
   isLast: boolean;
   onVideoClick?: (videoId: string) => void;
 }) {
@@ -272,7 +270,7 @@ export function LearningPathView({ learningPath, onVideoClick }: LearningPathVie
           <LearningPathItemCard
             key={item.videoId}
             item={item}
-            isFirst={index === 0}
+
             isLast={index === learningPath.items.length - 1}
             onVideoClick={onVideoClick}
           />
