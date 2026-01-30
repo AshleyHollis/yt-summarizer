@@ -18,8 +18,29 @@ import httpx
 
 # Import Agent Framework components
 try:
-    from agent_framework import BaseChatClient, ChatAgent, ai_function
+    from agent_framework import BaseChatClient, ChatAgent, AIFunction
     from agent_framework.openai import OpenAIChatClient
+    import inspect
+    from typing import Callable, TypeVar
+
+    F = TypeVar("F", bound=Callable)
+
+    # Support both old and new API for backward compatibility
+    # New API uses AIFunction class, old API had ai_function decorator
+    # Create a decorator wrapper for backward compatibility
+    def ai_function(func: F) -> F:
+        """Backward-compatible decorator for AIFunction.
+
+        Wraps a function with AIFunction, inferring name and description from docstring.
+        """
+        name = func.__name__
+        doc = inspect.getdoc(func) or ""
+        # Use first line of docstring as description
+        description = doc.split("\n")[0] if doc else f"Tool: {name}"
+
+        ai_func = AIFunction(name=name, description=description, func=func)
+        # Return the AIFunction instance but preserve attributes for type checking
+        return ai_func  # type: ignore
 
     AGENT_FRAMEWORK_AVAILABLE = True
 except ImportError:
