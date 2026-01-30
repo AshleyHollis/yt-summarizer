@@ -4,7 +4,7 @@
 
 ```yaml
 # CI/CD Requirements Checklist
-Deployment Frequency: 
+Deployment Frequency:
   - How often? (hourly/daily/weekly)
   - Peak deployment time? (business hours/off-hours)
 
@@ -45,12 +45,12 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  
+
   source:
     repoURL: https://github.com/company/infrastructure
     targetRevision: main
     path: k8s/production
-    
+
     # Helm values override
     helm:
       valueFiles:
@@ -58,29 +58,29 @@ spec:
       parameters:
         - name: image.tag
           value: "v1.2.3"
-  
+
   destination:
     server: https://kubernetes.default.svc
     namespace: production
-  
+
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
       allowEmpty: false
-    
+
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
-    
+
     retry:
       limit: 5
       backoff:
         duration: 5s
         factor: 2
         maxDuration: 3m
-  
+
   # Health checks
   ignoreDifferences:
     - group: apps
@@ -135,11 +135,11 @@ spec:
                 - -c
                 - |
                   ERROR_RATE=$(curl -s "http://prometheus/api/v1/query?query=rate(http_errors[5m])" | jq -r '.data.result[0].value[1]')
-                  
+
                   if (( $(echo "$ERROR_RATE > 0.05" | bc -l) )); then
                     echo "ERROR RATE CRITICAL: $ERROR_RATE"
                     kubectl rollout undo deployment/webapp
-                    
+
                     curl -X POST $SLACK_WEBHOOK \
                       -H 'Content-Type: application/json' \
                       -d "{\"text\":\"🚨 Auto-rollback triggered! Error rate: $ERROR_RATE\"}"
@@ -211,12 +211,12 @@ alertmanager:
   config:
     global:
       slack_api_url: "${SLACK_WEBHOOK_URL}"
-    
+
     route:
       group_by: ['alertname', 'cluster', 'service']
       group_wait: 10s
       receiver: 'slack'
-    
+
     receivers:
       - name: 'slack'
         slack_configs:

@@ -254,7 +254,7 @@ test('authenticated user sees library', async ({ page }) => {
   await page.request.post('/api/auth/login', {
     data: { email: 'test@example.com', password: 'password' }
   })
-  
+
   await page.goto('/library')
   await expect(page.locator('.video-list')).toBeVisible()
 })

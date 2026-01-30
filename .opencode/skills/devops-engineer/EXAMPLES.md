@@ -22,33 +22,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run linting
         run: npm run lint
-      
+
       - name: Run unit tests
         run: npm test -- --coverage
-      
+
       - name: Upload coverage
         uses: codecov/codecov-action@v3
-      
+
       - name: Build application
         run: npm run build
-      
+
       - name: Build Docker image
         run: |
           docker build -t ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
           docker build -t ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest .
-      
+
       - name: Push Docker image
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -66,7 +66,7 @@ jobs:
           image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           severity: 'CRITICAL,HIGH'
           exit-code: '1'
-      
+
       - name: Run SAST with SonarQube
         uses: sonarsource/sonarqube-scan-action@master
         env:
@@ -85,13 +85,13 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-      
+
       - name: Deploy to EKS staging
         run: |
           aws eks update-kubeconfig --name staging-cluster --region us-east-1
           kubectl set image deployment/app app=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -n staging
           kubectl rollout status deployment/app -n staging --timeout=5m
-      
+
       - name: Run smoke tests
         run: |
           curl -f https://staging.example.com/health || exit 1
@@ -109,11 +109,11 @@ jobs:
           aws eks update-kubeconfig --name production-cluster --region us-east-1
           kubectl set image deployment/app app=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -n production
           kubectl rollout status deployment/app -n production --timeout=10m
-      
+
       - name: Verify deployment
         run: |
           curl -f https://api.example.com/health || (kubectl rollback deployment/app -n production && exit 1)
-      
+
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1
         with:
@@ -140,7 +140,7 @@ jobs:
 # terraform/main.tf
 terraform {
   required_version = ">= 1.0"
-  
+
   backend "s3" {
     bucket = "company-terraform-state"
     key    = "production/eks-cluster.tfstate"
@@ -148,7 +148,7 @@ terraform {
     encrypt = true
     dynamodb_table = "terraform-lock"
   }
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -163,7 +163,7 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
-  
+
   default_tags {
     tags = {
       Environment = var.environment
@@ -177,17 +177,17 @@ provider "aws" {
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
-  
+
   name = "${var.environment}-vpc"
   cidr = "10.0.0.0/16"
-  
+
   azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
   private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
-  
+
   enable_nat_gateway = true
   enable_dns_hostnames = true
-  
+
   tags = {
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
@@ -197,13 +197,13 @@ module "vpc" {
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 19.0"
-  
+
   cluster_name    = var.cluster_name
   cluster_version = "1.27"
-  
+
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
-  
+
   eks_managed_node_groups = {
     general = {
       min_size     = 2
@@ -212,7 +212,7 @@ module "eks" {
       instance_types = ["t3.medium"]
       capacity_type  = "ON_DEMAND"
     }
-    
+
     spot = {
       min_size     = 1
       max_size     = 5
@@ -249,22 +249,22 @@ sudo systemctl restart nginx
 - name: Configure Nginx web server
   hosts: webservers
   become: yes
-  
+
   vars:
     nginx_version: "1.24"
-  
+
   tasks:
     - name: Install Nginx
       apt:
         name: nginx={{ nginx_version }}*
         state: present
-      
+
     - name: Configure Nginx
       template:
         src: templates/nginx.conf.j2
         dest: /etc/nginx/nginx.conf
       notify: Reload Nginx
-  
+
   handlers:
     - name: Reload Nginx
       systemd:
