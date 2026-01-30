@@ -111,6 +111,7 @@ This file provides rules; codebase provides details.
 - `azure-cli-operations` - Azure CLI for ACR, AKS, Storage, Key Vault
 - `fastapi-patterns` - FastAPI backend patterns and testing
 - `yt-summarizer-testing` - Testing patterns (pytest, Vitest, Playwright)
+- `github-actions-pipelines` - GitHub Actions workflows and CI/CD pipelines
 
 **Installed Skills** (from skills.sh):
 ```bash
