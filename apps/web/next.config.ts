@@ -87,7 +87,7 @@ const nextConfig: NextConfig = {
             console.log(`[Next.js] Loaded backend URL from ${configPath}: ${backendUrl}`);
         }
       }
-    } catch (e) {
+    } catch {
       // Ignore errors in dev environment
     }
 

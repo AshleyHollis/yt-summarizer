@@ -62,7 +62,7 @@ test.describe('User Story 3: Browse the Library', () => {
       await expect(videoGrid.first().or(noVideosMessage)).toBeVisible({ timeout: 10000 });
     });
 
-    test('library stats endpoint returns valid data', async ({ page, request }) => {
+    test('library stats endpoint returns valid data', async ({ request }) => {
       // Direct API test to ensure backend is working
       const response = await request.get('http://localhost:8000/api/v1/library/stats', {
         headers: { 'X-Correlation-ID': 'e2e-test' }

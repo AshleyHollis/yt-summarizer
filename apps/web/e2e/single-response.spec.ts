@@ -51,8 +51,10 @@ function countAssistantMessageBlocks(page: Page) {
   return page.locator('text="Limited Information"').count();
 }
 
-function countToolInProgressIndicators(page: Page) {
-  return page.locator('text="Searching your video library..."').count();
+// Helper function for counting tool progress indicators - reserved for future use
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _countToolInProgressIndicators(_page: Page) {
+  return _page.locator('text="Searching your video library..."').count();
 }
 
 test.describe("Single Response Per Message", () => {
@@ -66,7 +68,8 @@ test.describe("Single Response Per Message", () => {
     await page.waitForTimeout(3000);
 
     // Count user messages (should be 1)
-    const userMessages = page.locator('[class*="UserMessage"], [class*="userMessage"]');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _userMessages = page.locator('[class*="UserMessage"], [class*="userMessage"]');
     // The message text should appear exactly once as a user message
     const greetingTexts = page.locator('text="Hello, how are you?"');
     const greetingCount = await greetingTexts.count();
