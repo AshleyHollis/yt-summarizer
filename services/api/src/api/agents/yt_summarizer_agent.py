@@ -18,10 +18,12 @@ import httpx
 
 # Import Agent Framework components
 try:
-    from agent_framework import BaseChatClient, ChatAgent, AIFunction
-    from agent_framework.openai import OpenAIChatClient
     import inspect
-    from typing import Callable, TypeVar
+    from collections.abc import Callable
+    from typing import TypeVar
+
+    from agent_framework import AIFunction, BaseChatClient, ChatAgent
+    from agent_framework.openai import OpenAIChatClient
 
     F = TypeVar("F", bound=Callable)
 
