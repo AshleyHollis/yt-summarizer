@@ -102,7 +102,8 @@ test.describe('Processing History', () => {
 
     // The Expected card should show rate limit delay breakdown
     // Format: "incl. Xm rate limit delay" or similar
-    const delayInfo = page.locator('text=/rate limit|delay/i');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _delayInfo = page.locator('text=/rate limit|delay/i');
 
     // This may or may not be visible depending on if delays are tracked
     // Just verify the summary cards are present

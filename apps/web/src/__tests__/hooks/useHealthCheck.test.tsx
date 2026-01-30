@@ -34,7 +34,9 @@ describe('useHealthCheck', () => {
     started_at: '2026-01-06T11:59:50Z',
   };
 
-  const mockUnhealthyResponse: HealthStatus = {
+  // Mock unhealthy response - reserved for future unhealthy state testing
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _mockUnhealthyResponse: HealthStatus = {
     status: 'unhealthy',
     timestamp: '2026-01-06T12:00:00Z',
     version: '1.0.0',

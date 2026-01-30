@@ -48,7 +48,8 @@ test.describe('Copilot Feature', () => {
       await page.waitForLoadState('networkidle');
 
       // Look for copilot elements
-      const copilotElements = page.locator('[class*="copilot" i], [class*="Copilot" i], [data-copilot]');
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _copilotElements = page.locator('[class*="copilot" i], [class*="Copilot" i], [data-copilot]');
 
       // May or may not be visible on submit page depending on implementation
       // Just verify page loads correctly
@@ -130,7 +131,7 @@ test.describe('Copilot Feature', () => {
         headers: {
           'Content-Type': 'application/json',
         },
-      }).catch(e => null);
+      }).catch(() => null);
 
       // API might not be running, but if it is, should not be 404
       if (coverageResponse) {
@@ -144,7 +145,7 @@ test.describe('Copilot Feature', () => {
         headers: {
           'Content-Type': 'application/json',
         },
-      }).catch(e => null);
+      }).catch(() => null);
 
       if (topicsResponse) {
         expect([200, 500, 503]).toContain(topicsResponse.status());
@@ -159,7 +160,7 @@ test.describe('Copilot Feature', () => {
         headers: {
           'Content-Type': 'application/json',
         },
-      }).catch(e => null);
+      }).catch(() => null);
 
       if (queryResponse) {
         // Should not be 404 or 405

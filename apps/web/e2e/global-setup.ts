@@ -403,7 +403,8 @@ async function waitForVideoProcessing(): Promise<boolean> {
   return false;
 }
 
-async function globalSetup(config: FullConfig) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function globalSetup(_config: FullConfig) {
   // Only run when using external server (Aspire)
   if (!process.env.USE_EXTERNAL_SERVER) {
     console.log('[global-setup] Skipping video seeding (USE_EXTERNAL_SERVER not set)');

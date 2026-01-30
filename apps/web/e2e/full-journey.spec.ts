@@ -23,8 +23,9 @@ import { test, expect, Page } from '@playwright/test';
 
 // Use a short, known video for faster processing
 const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-// Alternative video for citation tests (has known content)
-const CITATION_TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=jNQXAC9IVRw'; // "Me at the zoo"
+// Alternative video for citation tests (has known content) - reserved for future citation testing
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _CITATION_TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=jNQXAC9IVRw'; // "Me at the zoo"
 // Maximum time to wait for video processing to complete
 const PROCESSING_TIMEOUT = 180_000; // 3 minutes
 // Time to wait for copilot agent response
@@ -347,8 +348,9 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     await submitButton.click();
 
     await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
-    const videoUrl = page.url();
-    const videoId = videoUrl.split('/videos/')[1];
+    // Video ID extracted for potential future use
+    // const _videoUrl = page.url();
+    // const _videoId = _videoUrl.split('/videos/')[1];
 
     await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
 
@@ -439,7 +441,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     console.log('✅ Response quality check passed');
   });
 
-  test('agent uses search tools before answering factual questions', async ({ page, request }) => {
+  test('agent uses search tools before answering factual questions', async ({ request }) => {
     test.setTimeout(AGENT_RESPONSE_TIMEOUT + 30_000);
 
     // This test verifies the agent's behavior via API to check tool usage

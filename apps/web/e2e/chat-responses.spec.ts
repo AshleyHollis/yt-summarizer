@@ -46,9 +46,11 @@ async function waitForResponse(page: Page, timeout = 60000): Promise<void> {
   ]);
 }
 
-async function getResponseText(page: Page): Promise<string> {
+// Helper function to get response text - kept for potential future use
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function getResponseText(_page: Page): Promise<string> {
   // Get all paragraph text from the copilot response area
-  const paragraphs = page.locator('.copilot-sidebar p, [class*="copilot"] p, [class*="Copilot"] p');
+  const paragraphs = _page.locator('.copilot-sidebar p, [class*="copilot"] p, [class*="Copilot"] p');
   const texts: string[] = [];
   const count = await paragraphs.count();
   for (let i = 0; i < count; i++) {

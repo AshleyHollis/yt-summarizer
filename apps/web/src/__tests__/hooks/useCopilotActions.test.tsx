@@ -7,7 +7,7 @@
  * 3. Proper handling of uncertainty field
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Test utilities for the filtering logic
 // We test the filtering logic directly since hooks require complex mocking
