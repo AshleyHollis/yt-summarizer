@@ -78,7 +78,8 @@ class TestAgentFrameworkAvailability:
         import agent_framework
 
         assert hasattr(agent_framework, "ChatAgent")
-        assert hasattr(agent_framework, "ai_function")
+        # Check for AIFunction (new API) - old API had ai_function (lowercase)
+        assert hasattr(agent_framework, "AIFunction") or hasattr(agent_framework, "ai_function")
 
     @requires_agent_framework_ag_ui
     def test_agent_framework_ag_ui_package_installed(self):
