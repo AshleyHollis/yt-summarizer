@@ -34,7 +34,7 @@ on:
       - "*.md"
       - "docs/**"
       - "specs/**"
-      - "k8s/overlays/previews/**"
+      - "k8s/overlays/**"
   workflow_dispatch:
     inputs:
       run_terraform:
