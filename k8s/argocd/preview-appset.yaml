@@ -66,8 +66,8 @@ spec:
   # Template for each discovered preview overlay directory
   template:
     metadata:
-      # Extract PR number from directory path: k8s/overlays/preview-pr-127 -> 127
-      name: 'preview-pr-{{path.basename}}'
+      # Directory path.basename is already 'preview-pr-127', use it directly
+      name: '{{path.basename}}'
       namespace: argocd
       labels:
         app.kubernetes.io/name: yt-summarizer

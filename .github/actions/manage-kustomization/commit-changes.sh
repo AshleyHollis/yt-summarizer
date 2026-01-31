@@ -60,16 +60,28 @@ if [ "$OPERATION" == "update-preview" ]; then
   ORIGINAL_REF=$(git rev-parse HEAD)
   ORIGINAL_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "detached")
 
-  # The overlay file was generated in the current branch but needs to be committed to preview-overlays
+  # The overlay directory was generated in the current branch but needs to be committed to preview-overlays
   # Move it to a temp location before switching branches to avoid git conflicts
-  TEMP_FILE="/tmp/preview-overlay-${PR_NUMBER}.yaml"
-  if [ -f "$FILE_TO_COMMIT" ]; then
-    echo "📦 Saving generated overlay to temp location..."
-    cp "$FILE_TO_COMMIT" "$TEMP_FILE"
+  OVERLAY_DIR="$(dirname "$FILE_TO_COMMIT")"
+  TEMP_OVERLAY_DIR="/tmp/preview-overlay-dir-${PR_NUMBER}"
+  TEMP_BASE_DIR="/tmp/preview-base-${PR_NUMBER}"
+
+  if [ -d "$OVERLAY_DIR" ]; then
+    echo "📦 Saving generated overlay directory to temp location..."
+    cp -r "$OVERLAY_DIR" "$TEMP_OVERLAY_DIR"
+    # Also copy the base-preview directory - required for kustomization to work
+    # The overlay references ../../base-preview which must exist on preview-overlays branch
+    if [ -d "k8s/base-preview" ]; then
+      echo "📦 Saving base-preview directory to temp location..."
+      cp -r "k8s/base-preview" "$TEMP_BASE_DIR"
+    else
+      echo "::error::base-preview directory not found at k8s/base-preview"
+      exit 1
+    fi
     # Remove the directory to avoid checkout conflicts
-    rm -rf "$(dirname "$FILE_TO_COMMIT")"
+    rm -rf "$OVERLAY_DIR"
   else
-    echo "::error::Preview overlay file not found at $FILE_TO_COMMIT. Was update-preview.sh run first?"
+    echo "::error::Preview overlay directory not found at $OVERLAY_DIR. Was update-preview.sh run first?"
     exit 1
   fi
 
@@ -88,14 +100,20 @@ if [ "$OPERATION" == "update-preview" ]; then
     git rm -rf . 2>/dev/null || true
   fi
 
-  # Ensure the PR-specific overlay directory exists
-  OVERLAY_DIR="$(dirname "$FILE_TO_COMMIT")"
-  mkdir -p "$OVERLAY_DIR"
+  # Ensure the k8s/overlays directory structure exists
+  mkdir -p "$(dirname "$OVERLAY_DIR")"
 
-  # Restore the overlay file from temp location
-  echo "📥 Restoring overlay file to preview-overlays branch..."
-  cp "$TEMP_FILE" "$FILE_TO_COMMIT"
-  rm "$TEMP_FILE"
+  # Restore the entire overlay directory from temp location
+  echo "📥 Restoring overlay directory to preview-overlays branch..."
+  cp -r "$TEMP_OVERLAY_DIR" "$OVERLAY_DIR"
+  rm -rf "$TEMP_OVERLAY_DIR"
+
+  # Restore the base-preview directory
+  # This is needed because kustomization.yaml references ../../base-preview
+  echo "📥 Restoring base-preview directory to preview-overlays branch..."
+  mkdir -p "k8s"
+  cp -r "$TEMP_BASE_DIR" "k8s/base-preview"
+  rm -rf "$TEMP_BASE_DIR"
 fi
 
 # Check if file exists (should exist by now)
@@ -113,6 +131,12 @@ fi
 
 # Add and commit
 git add "$FILE_TO_COMMIT"
+# For preview overlays, also add the entire overlay directory and base-preview directory
+if [ "$OPERATION" == "update-preview" ]; then
+  OVERLAY_DIR="$(dirname "$FILE_TO_COMMIT")"
+  git add "$OVERLAY_DIR"
+  git add "k8s/base-preview"
+fi
 git commit -m "$MESSAGE"
 
 # For non-preview operations, handle the original branch logic
