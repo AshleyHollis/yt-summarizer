@@ -213,6 +213,38 @@ jobs:
           auto-commit: 'true'
           pr-branch: ${{ inputs.pr-branch }}
 
+      # Trigger ArgoCD to refresh preview Application after overlay update
+      # The Pull Request Generator watches PR branches, not preview-overlays branch
+      # So we need to manually trigger a hard refresh to pick up the new overlay
+      - name: Trigger ArgoCD refresh for preview
+        if: inputs.environment == 'preview'
+        uses: ./.github/actions/setup-azure-aks
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
+      - name: Hard refresh ArgoCD Application
+        if: inputs.environment == 'preview'
+        shell: bash
+        env:
+          APP_NAME: preview-pr-${{ inputs.pr-number }}
+          ARGOCD_NAMESPACE: argocd
+        run: |
+          echo "🔄 Triggering hard refresh for ArgoCD Application: ${APP_NAME}"
+          
+          # Hard refresh forces ArgoCD to re-check the Git repo and update to latest commit
+          kubectl patch app "${APP_NAME}" -n "${ARGOCD_NAMESPACE}" \
+            --type merge \
+            -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' || true
+          
+          # Alternative: Use argocd CLI if available
+          # argocd app refresh "${APP_NAME}" --hard || true
+          
+          echo "✅ Triggered hard refresh for ${APP_NAME}"
+
       # Post-update validation
       # NOTE: For preview, validation happens inside manage-kustomization action
       # before committing to preview-overlays branch (while file is still on disk)
