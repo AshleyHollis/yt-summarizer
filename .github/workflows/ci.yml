@@ -386,7 +386,7 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: swa-config
-          swa-workflow-files: '.github/workflows/deploy-prod.yml,.github/workflows/swa-baseline-deploy.yml'
+          swa-workflow-files: '.github/workflows/deploy-frontend-swa.yml,.github/workflows/swa-baseline-deploy.yml'
           swa-app-dir: 'apps/web'
           fail-fast: 'true'
           timeout-seconds: '30'
