@@ -32,9 +32,24 @@ The AKS cluster's API server is not accessible from GitHub Actions hosted runner
 
 ### Impact
 
-- Preview deployments cannot validate image pull capability
-- K8s pull test step fails, blocking entire preview workflow
-- Cannot deploy to preview environments for PR testing
+**CRITICAL: Preview deployments are completely non-functional**
+
+- ❌ **All kubectl operations fail** (cannot communicate with AKS API server)
+- ❌ **ArgoCD application management impossible** (relies on kubectl)
+- ❌ **Cannot verify deployments** (kubectl get deployments/pods fails)
+- ❌ **Cannot create/update preview environments** (entire workflow blocked)
+- ❌ **PR preview testing completely unavailable**
+
+**Affected workflow steps:**
+1. Update Preview Overlay: ✅ Succeeds (only updates Git, no K8s access needed)
+2. Verify cluster can pull image: ❌ Fails (kubectl run cannot connect) - DISABLED as workaround
+3. Verify Deployment: ❌ **FAILS** (ArgoCD CLI uses kubectl, all queries fail)
+   - Waits 180s for ArgoCD app `preview-pr-124` but never finds it
+   - Every kubectl command: `Unable to connect to the server: dial tcp: lookup ytsumm-prd-3jclj263.hcp.eastasia.azmk8s.io... no such host`
+4. Deploy Frontend Preview: Unknown (likely affected if it uses kubectl)
+5. Preview Status Check: ❌ Fails (depends on deployment verification)
+
+**This is not just a test failure - preview deployments cannot function at all without AKS access.**
 
 ### Recommended Fixes (Priority Order)
 
@@ -94,12 +109,21 @@ If cluster must remain private/restricted, use self-hosted GitHub Actions runner
 
 ### Temporary Workaround
 
-For unblocking preview deployments while infrastructure is fixed:
+**UPDATE: No viable workaround exists - preview deployments remain fully blocked**
 
-1. Disable K8s pull test (validates image exists in ACR but skips connectivity test)
-2. Continue with deployment - ArgoCD will verify actual pull capability
+Attempted workaround:
+1. ✅ Disabled K8s pull test - "Update Preview Overlay" step now succeeds
+2. ❌ "Verify Deployment" step still fails - ALL kubectl operations affected, not just image pull test
 
-**Note**: This is a temporary measure. The underlying infrastructure issue MUST be resolved for production reliability.
+**Why the workaround failed:**
+- ArgoCD CLI uses kubectl to check application status
+- Workflow waits 180s for ArgoCD application `preview-pr-124` but never finds it (cannot query K8s)
+- Every kubectl command in the workflow fails with identical DNS error
+- Frontend deployment may also be affected (status unknown)
+
+**Conclusion:** Preview deployments cannot proceed until AKS cluster API server is accessible from GitHub Actions runners. There is no code-level workaround.
+
+**REQUIRED ACTION:** Azure administrator MUST resolve AKS cluster accessibility. This is a hard infrastructure blocker.
 
 ### Files Modified
 
