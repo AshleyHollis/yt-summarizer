@@ -213,7 +213,9 @@ jobs:
           auto-commit: 'true'
           pr-branch: ${{ inputs.pr-branch }}
 
+      # Validate overlay after update (skip for preview - overlay is on different branch)
       - name: Validate updated overlay
+        if: inputs.environment == 'prod'
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
