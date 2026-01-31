@@ -275,7 +275,7 @@ jobs:
     # - Main branch pushes (have ACR credentials via federated identity)
     # Skip for workflow_dispatch on feature branches (no federated identity configured)
     if: |
-      vars.ACR_NAME != '' && 
+      vars.ACR_NAME != '' &&
       (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
     outputs:
       image_tag: ${{ steps.tag.outputs.image-tag }}
