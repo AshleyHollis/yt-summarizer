@@ -51,18 +51,13 @@ spec:
     - git:
         repoURL: https://github.com/AshleyHollis/yt-summarizer.git
         revision: preview-overlays
-
-        # AUTHENTICATION: GitHub App for Git Generator
-        # Git Generator uses github.appSecretName (not githubAppSecretRef)
-        github:
-          appSecretName: github-app
-
+        
         # Discover preview overlays by directory pattern
         # Each PR gets a directory: k8s/overlays/preview-pr-{number}/
         directories:
           - path: k8s/overlays/preview-pr-*
             exclude: false
-
+        
         # Poll every 15s to quickly detect overlay commits
         # Fast polling ensures changes are picked up within 15s
         requeueAfterSeconds: 15
