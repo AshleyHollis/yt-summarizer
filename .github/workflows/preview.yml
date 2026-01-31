@@ -812,8 +812,9 @@ jobs:
       - check-concurrency
     if: >-
       always() && !cancelled() &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
-      (github.event_name != 'workflow_dispatch' || inputs.run_e2e == true) &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_preview == true &&
+      inputs.run_e2e == true &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.post-preview-comment.result == 'success' &&
