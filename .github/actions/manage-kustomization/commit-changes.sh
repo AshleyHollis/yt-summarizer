@@ -103,6 +103,10 @@ if [ "$OPERATION" == "update-preview" ]; then
   # Ensure the k8s/overlays directory structure exists
   mkdir -p "$(dirname "$OVERLAY_DIR")"
 
+  # Remove any existing overlay directory to avoid nested copy issues
+  # cp -r source dest will copy source AS a subdirectory if dest exists
+  rm -rf "$OVERLAY_DIR"
+
   # Restore the entire overlay directory from temp location
   echo "📥 Restoring overlay directory to preview-overlays branch..."
   cp -r "$TEMP_OVERLAY_DIR" "$OVERLAY_DIR"
@@ -110,8 +114,10 @@ if [ "$OPERATION" == "update-preview" ]; then
 
   # Restore the base-preview directory
   # This is needed because kustomization.yaml references ../../base-preview
+  # Remove first to ensure clean copy
   echo "📥 Restoring base-preview directory to preview-overlays branch..."
   mkdir -p "k8s"
+  rm -rf "k8s/base-preview"
   cp -r "$TEMP_BASE_DIR" "k8s/base-preview"
   rm -rf "$TEMP_BASE_DIR"
 fi
