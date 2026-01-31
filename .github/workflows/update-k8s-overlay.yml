@@ -158,7 +158,9 @@ jobs:
         with:
           install-python: 'true'
 
+      # Only validate existing overlays (prod). Preview overlays are generated dynamically.
       - name: Validate current overlay (baseline)
+        if: inputs.environment == 'prod'
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
