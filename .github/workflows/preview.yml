@@ -14,63 +14,16 @@
 # - Frontend: Azure Static Web Apps (ephemeral preview per PR)
 # - DNS: Cloudflare with Gateway API + TLS certificates
 #
-# DEPENDENCIES:
-# - CI workflow MUST complete and build images before deployment
-# - Image tags from CI: pr-<number>-<sha>
-# - No fallback to existing images if CI fails (fail fast)
-#
-# IMAGE BUILD STRATEGY:
-# ---------------------
-# Two-path strategy based on change detection (similar to production):
-#
-# Path 1: CODE CHANGES (wait for CI to build images)
-#   - Triggers: services/api, services/workers, services/shared, apps/web, docker
-#   - CI Builds: pr-{number}-{sha} tag (e.g., pr-42-abc1234)
-#   - wait-for-ci: Waits for CI workflow, extracts image tag
-#   - Validates: Image exists in ACR and is pullable by AKS
-#   - Updates: Preview overlay with new PR-scoped tag
-#   - Result: ArgoCD deploys new code to preview namespace
-#
-# Path 2: K8S-ONLY CHANGES (use existing PR image)
-#   - Triggers: k8s manifests (no code changes in PR)
-#   - get-production-tag: Searches PR git history backwards
-#   - Finds: Most recent commit in THIS PR that changed code
-#   - Fallback: If no code changes in PR, uses production SHA tag
-#   - Validates: Image exists in ACR
-#   - Updates: Preview overlay with found tag (same image, new config)
-#   - Result: ArgoCD deploys config changes only
+# REUSABLE WORKFLOWS:
+# - update-k8s-overlay.yml: Updates and validates kustomization
+# - verify-k8s-deployment.yml: ArgoCD sync + health checks
+# - deploy-frontend-swa.yml: SWA deployment with health verification
 #
 # IMAGE TAG FORMAT:
 #   - Preview: pr-{number}-{7-char-sha} (PR-scoped, deterministic)
-#   - Example: pr-42-abc1234 (PR #42, commit abc1234)
 #   - Fallback: sha-{commit} (production tag, if no PR code changes)
 #
-# KEY DIFFERENCES FROM PRODUCTION:
-#   - Preview: Waits for CI (images built in separate workflow)
-#   - Production: Builds images inline (in same workflow)
-#   - Preview: PR-scoped tags (pr-42-*)
-#   - Production: SHA tags (sha-*)
-#   - Preview: Searches PR history for last code change
-#   - Production: Reads current prod kustomization
-#   - Preview: Deploys to preview-pr-{number} namespace
-#   - Production: Deploys to yt-summarizer namespace
-#
-# RATIONALE:
-#   - Deterministic: Each preview traceable to specific PR commit
-#   - Efficient: Don't rebuild images for K8s-only changes
-#   - Safe: Image validation ensures ACR has required tags
-#   - Isolated: Each PR gets its own namespace + image tags
-#   - Fast: CI builds in parallel, preview waits and deploys
-#
-# EXTRACTED SCRIPTS:
-#   - scripts/workflows/preview-finalize-flags.sh: Finalize deployment decision
-#   - scripts/workflows/preview-detect-infra.sh: Detect infrastructure changes
-#   - scripts/workflows/preview-find-pr-image-tag.sh: Find most recent code-building commit
-#
 # See also: deploy-prod.yml for production image strategy
-#           docs/preview-image-build-strategy.md for full details
-#           REFACTORING.md for adding new workflow scripts
-#
 # =============================================================================
 
 name: Preview Deployment
@@ -79,11 +32,10 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-  # Allow manual triggering for testing from any branch
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to deploy preview for (optional - will use latest commit)'
+        description: 'PR number to deploy preview for (optional)'
         required: false
         type: string
       force_deploy:
@@ -97,16 +49,15 @@ on:
         type: boolean
         default: true
       run_terraform:
-        description: 'Run terraform plan (workflow_dispatch only)'
+        description: 'Run terraform plan'
         required: false
         type: boolean
         default: true
       apply_terraform:
-        description: 'Apply terraform changes (workflow_dispatch only)'
+        description: 'Apply terraform changes'
         required: false
         type: boolean
         default: true
-
       run_e2e:
         description: 'Run E2E tests'
         required: false
@@ -114,24 +65,15 @@ on:
         default: true
 
 concurrency:
-  # One preview deployment per PR at a time
-  # Cancels in-progress runs when new commits pushed
   group: preview-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-
 env:
-  # Shared variables are loaded from .github/config/shared.env via load-shared-env action
-  # Only environment-specific overrides and GitHub variables are set here
-
-  # GitHub Variables (can override shared.env defaults)
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-
-  # Preview-specific values
   PREVIEW_NAMESPACE_PREFIX: 'preview-pr-'
   APPS_BASE_DOMAIN: 'yt-summarizer.apps.ashleyhollis.com'
-  ARGOCD_SYNC_TIMEOUT: '180'  # Faster timeout for preview
+  ARGOCD_SYNC_TIMEOUT: '180'
   KUSTOMIZE_OVERLAY_PREVIEW: 'k8s/overlays/preview'
   MAX_PREVIEWS: 3
 
@@ -144,17 +86,6 @@ permissions:
 jobs:
   # ===========================================================================
   # PHASE 1: CHANGE DETECTION & PR METADATA
-  # ===========================================================================
-  # Determines WHAT changed and WHETHER deployment is needed
-  # Outputs:
-  #   - needs_image_build: true if services/apps/docker changed (requires CI images)
-  #   - needs_deployment: true if any deployment required (code or k8s changes)
-  #   - pr_number, pr_head_ref, pr_head_sha: PR metadata for downstream jobs
-  #
-  # DECISION TREE:
-  #   Code changes (services/apps/docker) → needs_image_build=true, needs_deployment=true
-  #   K8s only changes → needs_image_build=false, needs_deployment=true
-  #   No relevant changes → both false (workflow stops)
   # ===========================================================================
   detect-changes:
     name: Detect Changes
@@ -171,7 +102,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for git diff
+          fetch-depth: 0
 
       - name: Get PR metadata
         id: set-pr
@@ -205,8 +136,6 @@ jobs:
         shell: bash
         run: scripts/workflows/preview-detect-infra.sh "${{ steps.set-pr.outputs.base_sha }}" "${{ steps.set-pr.outputs.pr_head_sha }}"
 
-  # ===========================================================================
-  # PHASE 2: BUILD OR FETCH IMAGE TAGS
   # ===========================================================================
   # PHASE 2B: WAIT FOR CI
   # ===========================================================================
@@ -257,16 +186,6 @@ jobs:
   # ===========================================================================
   # PHASE 2C: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
   # ===========================================================================
-  # For K8s-only changes (needs_image_build=false), we need a deterministic
-  # image tag. Strategy:
-  #   1. Walk backwards through PR's git history
-  #   2. Find most recent commit that changed code (services/apps/docker)
-  #   3. Use that commit's image tag: pr-<number>-<sha>
-  #   4. If no commits in PR built images, fallback to production tag (read prod kustomization.yaml)
-  #
-  # This ensures K8s changes are tested with the PR's own code, not random
-  # production code. Fully deterministic as it's tied to git history.
-  # ===========================================================================
   get-production-tag:
     name: Find PR Image Tag
     runs-on: ubuntu-latest
@@ -283,7 +202,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-          fetch-depth: 0  # Need full history to walk commits
+          fetch-depth: 0
 
       - name: Load shared environment
         uses: ./.github/actions/load-shared-env
@@ -335,16 +254,6 @@ jobs:
 
   # ===========================================================================
   # PHASE 3: CONCURRENCY LIMIT CHECK
-  # ===========================================================================
-  # ONLY runs when both detect-changes and wait-for-ci succeed
-  # Enforces MAX_PREVIEWS limit to prevent resource exhaustion
-  #
-  # FLOW:
-  #   1. Count currently deployed previews
-  #   2. If count < MAX_PREVIEWS → can_deploy=true
-  #   3. If count >= MAX_PREVIEWS → can_deploy=false, post queue message
-  #
-  # Downstream jobs check can_deploy=true before running
   # ===========================================================================
   check-concurrency:
     name: Check Preview Limit
@@ -399,17 +308,6 @@ jobs:
   # ===========================================================================
   # PHASE 4: COMPUTE PREVIEW URLS
   # ===========================================================================
-  # ONLY runs when can_deploy=true
-  # Generates preview URLs using Gateway API pattern
-  #
-  # URL PATTERN: pr-<number>.yt-summarizer.apps.ashleyhollis.com
-  # Example: pr-42.yt-summarizer.apps.ashleyhollis.com
-  #
-  # Outputs:
-  #   - preview_url: Full URL for API (https://pr-42.yt-summarizer...)
-  #   - preview_host: Just hostname (pr-42.yt-summarizer...)
-  #   - tls_secret: Secret name for TLS cert
-  # ===========================================================================
   get-ingress:
     name: Prepare Preview URLs
     runs-on: ubuntu-latest
@@ -439,28 +337,11 @@ jobs:
           base-domain: ${{ env.APPS_BASE_DOMAIN }}
 
   # ===========================================================================
-  # PHASE 5: UPDATE KUBERNETES OVERLAY
-  # ===========================================================================
-  # ONLY runs when can_deploy=true and get-ingress succeeds
-  #
-  # CRITICAL FLOW:
-  #   1. Checkout PR branch (not main)
-  #   2. Update k8s/overlays/preview/kustomization.yaml with:
-  #      - Image tags from CI (pr-<number>-<sha>)
-  #      - Preview hostname for ingress
-  #      - TLS secret for certificate
-  #   3. Validate kustomize build + kubectl dry-run
-  #   4. Commit and push to PR branch
-  #   5. Argo CD auto-detects commit and syncs to cluster
-  #
-  # WHY COMMIT TO PR BRANCH:
-  #   - Argo CD watches PR branches for preview overlays
-  #   - GitOps: Cluster state matches git (no out-of-band changes)
-  #   - Reviewable: Preview config visible in PR diff
+  # PHASE 5: UPDATE KUBERNETES OVERLAY (Reusable Workflow)
   # ===========================================================================
   update-overlay:
     name: Update Preview Overlay
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/update-k8s-overlay.yml
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
@@ -469,188 +350,60 @@ jobs:
       needs.get-ingress.result == 'success' &&
       (needs.terraform.result != 'failure')
     needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform]
-    outputs:
-      image_tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-    steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
-
-      - name: Setup Kustomize
-        uses: ./.github/actions/setup-kustomize
-        with:
-          install-python: 'true'
-
-      - name: Azure ACR Login
-        uses: ./.github/actions/azure-acr-login
-        with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          acr-name: ${{ env.ACR_NAME }}
-
-      - name: Set AKS Context
-        uses: azure/aks-set-context@v4
-        with:
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Verify cluster can pull image
-        # Runs after AKS context + ACR login are configured
-        # Re-enabled after fixing AKS cluster (was stopped, now running)
-        uses: ./.github/actions/validate-docker-image
-        with:
-          validation-type: acr-exists
-          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          run-k8s-pull-test: 'true'
-
-      - name: Validate CI image tag for PR
-        if: needs.detect-changes.outputs.needs_image_build == 'true'
-        uses: ./.github/actions/validate-docker-image
-        with:
-          validation-type: tag-format
-          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
-
-      - name: Update preview kustomization overlay
-        uses: ./.github/actions/manage-kustomization
-        with:
-          operation: update-preview
-          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          acr-server: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          preview-host: ${{ needs.get-ingress.outputs.preview_host }}
-          tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
-          preview-url: ${{ needs.get-ingress.outputs.preview_url }}
-          commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
-          auto-commit: 'true'
-          pr-branch: ${{ github.head_ref }}
+    with:
+      environment: preview
+      overlay-path: k8s/overlays/preview
+      image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
+      commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
+      pr-number: ${{ needs.detect-changes.outputs.pr_number }}
+      pr-branch: ${{ github.head_ref }}
+      pr-head-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
+      preview-host: ${{ needs.get-ingress.outputs.preview_host }}
+      preview-url: ${{ needs.get-ingress.outputs.preview_url }}
+      tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
+      run-k8s-pull-test: true
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ===========================================================================
-  # PHASE 6: VERIFY DEPLOYMENT
-  # ===========================================================================
-  # ONLY runs when update-overlay succeeds
-  #
-  # VERIFICATION STEPS:
-  #   1. Wait for Argo CD to sync (detects overlay commit)
-  #   2. Verify API deployment has correct image tag
-  #   3. Verify worker deployments have correct image tag
-  #   4. Run health checks against preview URL
-  #   5. Verify TLS certificate is valid
-  #
-  # FAILURE SCENARIOS:
-  #   - Argo CD sync timeout → likely image pull failure
-  #   - Wrong image tag → overlay update didn't propagate
-  #   - Health check fails → application startup error
-  #   - TLS check fails → certificate provisioning issue
+  # PHASE 6: VERIFY DEPLOYMENT (Reusable Workflow)
   # ===========================================================================
   verify-deployment:
     name: Verify Deployment
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/verify-k8s-deployment.yml
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.update-overlay.result == 'success'
-    needs: [update-overlay, check-concurrency, wait-for-ci, get-ingress, detect-changes]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
-
-      - name: Setup Azure and AKS
-        uses: ./.github/actions/setup-azure-aks
-        with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Setup Kustomize
-        uses: ./.github/actions/setup-kustomize
-        with:
-          kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
-
-      - name: Cleanup and wait for Argo CD sync with auto-recovery
-        uses: ./.github/actions/argocd-wait
-        with:
-          app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          cleanup-stuck-operations: 'true'
-          auto-recovery: 'true'
-          max-wait-seconds: '300'
-          poll-interval-seconds: '10'
-          max-recovery-attempts: '3'
-
-      - name: Verify deployments are using correct image tag
-        uses: ./.github/actions/verify-k8s-deployment
-        with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          deployments: api,transcribe-worker,summarize-worker
-          expected-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: yt-summarizer
-          wait-for-ready: 'true'
-          timeout-seconds: '300'
-          fail-on-mismatch: 'true'
-
-      - name: Collect and upload diagnostics on failure
-        if: failure()
-        uses: ./.github/actions/collect-deployment-diagnostics
-        with:
-          app-name: ${{ env.PREVIEW_NAMESPACE_PREFIX }}${{ needs.detect-changes.outputs.pr_number }}
-          artifact-name: deployment-diagnostics-pr-${{ needs.detect-changes.outputs.pr_number }}
-
-      - name: Run API health checks
-        if: needs.get-ingress.outputs.preview_url != ''
-        uses: ./.github/actions/health-check-preview
-        with:
-          namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
-          external-url: ${{ needs.get-ingress.outputs.preview_url }}
-          max-attempts: '10'
-          interval-seconds: '10'
-
-      - name: Verify API Certificate
-        uses: ./.github/actions/verify-certificate
-        with:
-          host: ${{ needs.get-ingress.outputs.preview_host }}
+    needs: [update-overlay, check-concurrency, get-ingress, detect-changes]
+    with:
+      environment: preview
+      namespace: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+      argocd-app-name: preview-pr-${{ needs.detect-changes.outputs.pr_number }}
+      expected-image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
+      api-url: ${{ needs.get-ingress.outputs.preview_url }}
+      host: ${{ needs.get-ingress.outputs.preview_host }}
+      pr-number: ${{ needs.detect-changes.outputs.pr_number }}
+      max-wait-seconds: '300'
+      auto-recovery: true
+      run-preview-health-check: true
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ===========================================================================
-  # PHASE 7: DEPLOY FRONTEND (PARALLEL with verify-deployment)
-  # ===========================================================================
-  # ONLY runs when can_deploy=true and get-ingress succeeds
-  # Runs in parallel with verify-deployment (no dependency)
-  #
-  # FLOW:
-  #   1. Build Next.js app with preview API URL
-  #   2. Cleanup stale SWA environments (old closed PRs)
-  #   3. Deploy to Azure Static Web Apps
-  #   4. SWA creates ephemeral preview environment
-  #
-  # SWA CLEANUP:
-  #   - Runs before deploy to free up slots
-  #   - Deletes environments for closed/merged PRs
-  #   - Min age: 1 hour (prevents accidental deletions)
+  # PHASE 7: DEPLOY FRONTEND (Reusable Workflow)
   # ===========================================================================
   deploy-frontend-preview:
     name: Deploy Frontend Preview
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    uses: ./.github/workflows/deploy-frontend-swa.yml
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
@@ -658,84 +411,23 @@ jobs:
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success'
     needs: [get-ingress, detect-changes, check-concurrency, wait-for-ci]
-    outputs:
-      frontend_preview_url: ${{ steps.deploy-frontend.outputs.static_web_app_url }}
-    steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-
-      - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
-
-      - name: Verify SWA token is configured
-        uses: ./.github/actions/verify-secret
-        with:
-          secret-name: 'SWA_DEPLOYMENT_TOKEN'
-          secret-value: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-
-      - name: Azure Login for SWA cleanup
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Cleanup stale SWA environments
-        id: cleanup-stale
-        continue-on-error: true
-        uses: ./.github/actions/cleanup-stale-swa-environments
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          swa-name: ${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          dry-run: 'false'
-          min-age-hours: '1'
-          max-prs-to-check: '50'
-
-      - name: Report cleanup results
-        if: steps.cleanup-stale.outputs.deleted-count != '0'
-        run: |
-          echo "✅ Cleaned up ${{ steps.cleanup-stale.outputs.deleted-count }} stale SWA environment(s)"
-          echo "💡 Deleted environments for PRs: ${{ steps.cleanup-stale.outputs.stale-prs }}"
-
-      - name: Deploy frontend with CI artifact
-        id: deploy-frontend
-        uses: ./.github/actions/deploy-frontend-swa
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
-          api-url: ${{ needs.get-ingress.outputs.preview_url }}
-          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          app-location: apps/web
-          runtime-config-path: apps/web/public/runtime-config.js
-          output_location: ""
-          production-branch: main
-          deployment-environment: pr-${{ github.event.pull_request.number }}
-          verbose: "true"
-
-      - name: Verify frontend preview
-        if: steps.deploy-frontend.outputs.static_web_app_url != ''
-        uses: ./.github/actions/health-check
-        with:
-          url: ${{ steps.deploy-frontend.outputs.static_web_app_url }}
-          max-attempts: '10'
-          interval-seconds: '10'
-          timeout-seconds: '5'
-          expected-status: '200'
-          service-name: 'Preview Web'
+    with:
+      environment: preview
+      ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
+      api-url: ${{ needs.get-ingress.outputs.preview_url }}
+      deployment-environment: pr-${{ needs.detect-changes.outputs.pr_number }}
+      pr-number: ${{ needs.detect-changes.outputs.pr_number }}
+      pr-head-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
+      cleanup-stale-environments: true
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      SWA_DEPLOYMENT_TOKEN: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ===========================================================================
   # PHASE 8: POST PREVIEW COMMENT
-  # ===========================================================================
-  # ONLY runs when BOTH verify-deployment AND deploy-frontend succeed
-  # Posts comment to PR with:
-  #   - Backend API URL
-  #   - Frontend SWA URL
-  #   - Image tag used
-  #   - Commit SHA
   # ===========================================================================
   post-preview-comment:
     name: Post Preview Comment
@@ -770,7 +462,7 @@ jobs:
           preview-url: ${{ needs.get-ingress.outputs.preview_url }}
           image-tag: ${{ needs.wait-for-ci.outputs.image_tag }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
-          frontend-url: ${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}
+          frontend-url: ${{ needs.deploy-frontend-preview.outputs.static_web_app_url }}
           run-id: ${{ github.run_id }}
           repository: ${{ github.repository }}
 
@@ -785,20 +477,6 @@ jobs:
 
   # ===========================================================================
   # PHASE 9: E2E TESTS (OPTIONAL)
-  # ===========================================================================
-  # ONLY runs when post-preview-comment succeeds AND preview_url is set
-  #
-  # FLOW:
-  #   1. Wait for Argo CD sync (double-check deployment ready)
-  #   2. Wait for API health check (ensure startup complete)
-  #   3. Run Playwright E2E tests against preview environment
-  #   4. Upload test report artifact
-  #   5. Post results to PR
-  #
-  # TEST ENVIRONMENT:
-  #   - Frontend: SWA preview URL
-  #   - Backend: Gateway API preview URL
-  #   - Full integration test of real environment
   # ===========================================================================
   e2e-tests:
     name: E2E Tests
@@ -835,9 +513,6 @@ jobs:
           node-version: '22'
           working-directory: apps/web
 
-      # No need to wait for Argo CD sync again - verify-deployment job already did this
-      # and this job depends on verify-deployment, so we know the sync completed successfully
-
       - name: Wait for API to be ready
         uses: ./.github/actions/health-check
         with:
@@ -852,7 +527,7 @@ jobs:
         id: base-url
         shell: bash
         run: |
-          base_url="${{ needs.deploy-frontend-preview.outputs.frontend_preview_url }}"
+          base_url="${{ needs.deploy-frontend-preview.outputs.static_web_app_url }}"
           if [[ -z "$base_url" ]]; then
             base_url="${{ needs.get-ingress.outputs.preview_url }}"
           fi
@@ -890,20 +565,6 @@ jobs:
   # ===========================================================================
   # PHASE 10: FINAL STATUS CHECK
   # ===========================================================================
-  # always() ensures this runs regardless of job results
-  #
-  # VALIDATES:
-  #   1. If deployment needed, did all steps succeed?
-  #   2. If no deployment needed, did workflow skip appropriately?
-  #   3. Are all URLs configured correctly?
-  #
-  # FAIL CONDITIONS:
-  #   - needs_deployment=true but verify-deployment failed
-  #   - needs_deployment=true but deploy-frontend failed
-  #   - preview_url missing when deployment succeeded
-  #
-  # This is the required status check for PR merging
-  # ===========================================================================
   preview-status-check:
     name: Preview Status Check
     runs-on: ubuntu-latest
@@ -919,7 +580,6 @@ jobs:
       - check-concurrency
     if: always()
     steps:
-
       - name: Checkout code
         uses: actions/checkout@v4
 

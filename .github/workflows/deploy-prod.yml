@@ -1,9 +1,9 @@
 # =============================================================================
 # Deploy to Production Workflow
 # =============================================================================
-# Automatically deploys to production when a PR is merged to main
-# Updates prod overlay with image digests, Argo CD syncs automatically
-# NO manual approval gates - relies on PR review process
+# Automatically deploys to production when a PR is merged to main.
+# Uses reusable workflows for common operations to ensure consistency
+# with preview deployments and reduce maintenance burden.
 #
 # SIMPLIFIED STRATEGY:
 # -------------------
@@ -16,11 +16,14 @@
 #   - Production waits for CI and uses those tested images
 #   - Each deployment is traceable to a specific git commit
 #
-# EXTRACTED SCRIPTS:
-#   - scripts/workflows/prod-extract-ci-image-tag.sh: Get image tag from CI workflow
+# REUSABLE WORKFLOWS:
+#   - update-k8s-overlay.yml: Updates and validates kustomization
+#   - verify-k8s-deployment.yml: ArgoCD sync + health checks
+#   - deploy-frontend-swa.yml: SWA deployment with health verification
 #
 # See also: preview.yml for PR-scoped image strategy
 #           ci.yml for image building logic
+# =============================================================================
 
 name: Deploy to Production
 
@@ -72,13 +75,12 @@ env:
   ARGOCD_APP_NAME_PROD: 'yt-summarizer-prod'
   NAMESPACE_PROD: 'yt-summarizer'
   PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
-  ARGOCD_SYNC_TIMEOUT: '360'  # Longer timeout for production
+  ARGOCD_SYNC_TIMEOUT: '360'
   KUSTOMIZE_OVERLAY_PROD: 'k8s/overlays/prod'
 
 permissions:
   id-token: write
   contents: write
-
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -109,9 +111,9 @@ jobs:
     uses: ./.github/workflows/terraform-deploy.yml
     needs: [wait-for-ci]
     permissions:
-      id-token: write       # For Azure OIDC authentication
-      contents: read        # For checking out code
-      pull-requests: write  # Required by terraform-plan job (even when post-to-pr: false)
+      id-token: write
+      contents: read
+      pull-requests: write
     if: |
       needs.wait-for-ci.result == 'success' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_terraform != false) ||
@@ -217,11 +219,11 @@ jobs:
           fail-if-missing: 'true'
 
   # ---------------------------------------------------------------------------
-  # Update Production Overlay
+  # Update Production Overlay (Reusable Workflow)
   # ---------------------------------------------------------------------------
   update-overlay:
     name: Update Production Overlay
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/update-k8s-overlay.yml
     needs: [wait-for-ci, terraform, sync-argocd-manifests, get-image-tag]
     if: |
       always() && !cancelled() &&
@@ -229,262 +231,70 @@ jobs:
       needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
       needs.get-image-tag.result == 'success'
-    steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.DEPLOY_APP_ID }}
-          private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-
-      - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
-
-      - name: Setup Python with dependencies
-        uses: ./.github/actions/setup-kustomize
-        with:
-          install-python: 'true'
-
-      # NOTE: CI has already validated prod overlay before this branch was created.
-      # This baseline check is kept as a safety net in case kustomization.yaml was
-      # modified after merge, though merge commits cannot modify files without
-      # triggering a new CI validation. Kept for defensive robustness.
-      - name: Validate current production overlay (baseline)
-        uses: ./.github/actions/validate
-        with:
-          validators: kustomize-build
-          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
-
-      - name: Set image tag
-        id: determine-tag
-        shell: bash
-        run: |
-          echo "image_tag=${{ needs.get-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
-
-      - name: Update production kustomization
-        uses: ./.github/actions/manage-kustomization
-        with:
-          operation: update-prod
-          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
-          kustomization-path: k8s/overlays/prod
-          template-path: scripts/ci/templates/prod-kustomization-template.yaml
-          auto-commit: 'true'
-          git-branch: main
-
-      # This validation is critical - it runs AFTER update-prod-kustomization
-      # inserts image tags. Ensures the modified manifest is still valid.
-      # This is where we catch errors introduced by the kustomization update action.
-      - name: Validate updated production overlay
-        uses: ./.github/actions/validate
-        with:
-          validators: kustomize-build
-          overlay-paths: ${{ env.KUSTOMIZE_OVERLAY_PROD }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
-
-      - name: Setup Azure and AKS
-        uses: ./.github/actions/setup-azure-aks
-        with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Verify cluster can pull image
-        uses: ./.github/actions/validate-docker-image
-        with:
-          validation-type: acr-exists
-          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
-          registry: ${{ env.ACR_NAME }}
-          repository: ${{ env.API_IMAGE_NAME }}
-          run-k8s-pull-test: 'true'
-
-      - name: Validate image tag format
-        if: needs.get-image-tag.result == 'success'
-        uses: ./.github/actions/validate-docker-image
-        with:
-          validation-type: tag-format
-          image-tag: ${{ steps.determine-tag.outputs.image_tag }}
-          commit-sha: ${{ github.sha }}
-
-      - name: Commit and push changes
-        uses: ./.github/actions/commit-kustomization
-        with:
-          file-path: '${{ env.KUSTOMIZE_OVERLAY_PROD }}/kustomization.yaml'
-          commit-message: |
-            chore(prod): deploy ${{ steps.determine-tag.outputs.image_tag }} to production
-
-            API Image:
-              ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ steps.determine-tag.outputs.image_tag }}
-            Workers Image:
-              ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKERS_IMAGE_NAME }}:${{ steps.determine-tag.outputs.image_tag }}
-
-            Commit: ${{ github.sha }}
-            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            [skip ci]
-          git-branch: 'main'
-
+    with:
+      environment: prod
+      overlay-path: k8s/overlays/prod
+      image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
+      commit-sha: ${{ github.sha }}
+      git-branch: main
+      template-path: scripts/ci/templates/prod-kustomization-template.yaml
+      run-k8s-pull-test: true
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      DEPLOY_APP_ID: ${{ secrets.DEPLOY_APP_ID }}
+      DEPLOY_APP_PRIVATE_KEY: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
-  # Verify Deployment
-  # ---------------------------------------------------------------------------
-  # Comprehensive deployment verification after overlay update
-  # - Validate Argo CD manifest before sync (early error detection)
-  # - Wait for ArgoCD sync with fail-fast manifest error detection
-  # - Verify API and worker deployment images
-  # - Run health checks
-  # - Verify TLS certificate
+  # Verify Deployment (Reusable Workflow)
   # ---------------------------------------------------------------------------
   verify-deployment:
     name: Verify Deployment
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/verify-k8s-deployment.yml
     needs: [update-overlay, get-image-tag]
     if: |
       !cancelled() &&
       needs.update-overlay.result == 'success'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
-
-      - name: Setup Azure and AKS
-        uses: ./.github/actions/setup-azure-aks
-        with:
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
-
-      - name: Setup Kustomize
-        uses: ./.github/actions/setup-kustomize
-        with:
-          kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
-
-      - name: Cleanup and wait for Argo CD to sync
-        uses: ./.github/actions/argocd-wait
-        with:
-          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-          namespace: ${{ env.NAMESPACE_PROD }}
-          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          cleanup-stuck-operations: 'true'
-          auto-recovery: 'false'
-          max-wait-seconds: ${{ env.ARGOCD_SYNC_TIMEOUT }}
-          poll-interval-seconds: '5'
-          pr-number: '0'
-
-      - name: Set expected image tag
-        id: expected-tag
-        shell: bash
-        run: |
-          echo "image_tag=${{ needs.get-image-tag.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
-
-      - name: Verify deployments are using correct image tag
-        uses: ./.github/actions/verify-k8s-deployment
-        with:
-          namespace: ${{ env.NAMESPACE_PROD }}
-          deployments: api,transcribe-worker,summarize-worker
-          expected-tag: ${{ steps.expected-tag.outputs.image_tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-          image-name: yt-summarizer
-          wait-for-ready: 'true'
-          timeout-seconds: '300'
-
-      - name: Collect and upload diagnostics on failure
-        if: failure()
-        uses: ./.github/actions/collect-deployment-diagnostics
-        with:
-          app-name: ${{ env.ARGOCD_APP_NAME_PROD }}
-          artifact-name: deployment-diagnostics-prod
-
-      - name: Verify TLS certificate
-        uses: ./.github/actions/verify-certificate
-        with:
-          host: api.yt-summarizer.apps.ashleyhollis.com
-
-      - name: Run external API health check
-        uses: ./.github/actions/health-check
-        with:
-          url: ${{ env.PRODUCTION_URL }}${{ env.HEALTH_CHECK_PATH }}
-          max-attempts: '20'
-          interval-seconds: '10'
-          timeout-seconds: '5'
-          expected-status: '200'
-          service-name: 'Production API (External)'
-
-      - name: Run API health checks
-        uses: ./.github/actions/health-check
-        with:
-          url: ${{ env.PRODUCTION_URL }}/health
-          max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
-          interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
-          timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
-          expected-status: '200'
-          service-name: 'Production API'
+    with:
+      environment: prod
+      namespace: yt-summarizer
+      argocd-app-name: yt-summarizer-prod
+      expected-image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
+      api-url: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
+      host: api.yt-summarizer.apps.ashleyhollis.com
+      max-wait-seconds: '360'
+      auto-recovery: false
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
-  # Deploy Frontend to SWA
-  # ---------------------------------------------------------------------------
-  # DECOUPLED FROM BACKEND: Frontend deployment is independent of backend jobs.
-  # Frontend can deploy whenever:
-  #   - apps/web code changes (auto)
-  #   - Workflow dispatch with run_frontend=true (manual)
-  #   - Workflow/CI files change (for env var updates)
-  #
-  # This allows frontend-only deployments without requiring backend image validation.
+  # Deploy Frontend to SWA (Reusable Workflow)
   # ---------------------------------------------------------------------------
   deploy-frontend:
     name: Deploy Frontend
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    uses: ./.github/workflows/deploy-frontend-swa.yml
     needs: [wait-for-ci]
     if: |
       !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_frontend != false) ||
        (github.event_name != 'workflow_dispatch'))
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
-
-      - name: Deploy frontend with CI artifact
-        id: deploy-frontend
-        uses: ./.github/actions/deploy-frontend-swa
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
-          api-url: ${{ vars.PRODUCTION_API_URL || env.PRODUCTION_URL }}
-          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          app-location: apps/web
-          runtime-config-path: apps/web/public/runtime-config.js
-          output_location: ""
-          production-branch: main
-          deployment-environment: default
-
-      - name: Verify frontend deployment
-        uses: ./.github/actions/health-check
-        with:
-          url: ${{ steps.deploy-frontend.outputs.static_web_app_url || vars.PRODUCTION_WEB_URL || 'https://web.yt-summarizer.apps.ashleyhollis.com' }}
-          max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
-          interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
-          timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
-          expected-status: '200'
-          service-name: 'Production Web'
+    with:
+      environment: prod
+      ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
+      api-url: ${{ vars.PRODUCTION_API_URL || vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
+      deployment-environment: default
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      SWA_DEPLOYMENT_TOKEN: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
   # Deployment Summary

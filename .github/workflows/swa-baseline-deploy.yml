@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: "20"
+          node-version: "22"
           working-directory: apps/web
 
       - name: Build frontend
