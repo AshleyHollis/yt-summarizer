@@ -51,13 +51,13 @@ spec:
     - git:
         repoURL: https://github.com/AshleyHollis/yt-summarizer.git
         revision: preview-overlays
-        
+
         # Discover preview overlays by directory pattern
         # Each PR gets a directory: k8s/overlays/preview-pr-{number}/
         directories:
           - path: k8s/overlays/preview-pr-*
             exclude: false
-        
+
         # Poll every 15s to quickly detect overlay commits
         # Fast polling ensures changes are picked up within 15s
         requeueAfterSeconds: 15
