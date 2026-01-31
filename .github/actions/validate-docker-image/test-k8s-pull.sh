@@ -67,12 +67,19 @@ POD_NAME="acr-pull-test-$(date +%s)"
 PULL_SUCCESS=false
 
 # Create a simple pod that just tries to pull the image (using kubectl run instead of YAML)
-kubectl run ${POD_NAME} \
+if ! kubectl run ${POD_NAME} \
   --image=${FULL_IMAGE} \
   --restart=Never \
   --namespace="$TEST_NAMESPACE" \
-  --command -- sh -c "echo 'Image pulled successfully' && exit 0" \
-  &>/dev/null
+  --command -- sh -c "echo 'Image pulled successfully' && exit 0" 2>&1; then
+  echo "  ::error::Failed to create test pod. kubectl run command failed."
+  echo "  ::error::This may indicate insufficient permissions or cluster connectivity issues."
+  # Cleanup namespace if we created it
+  if [ "$CLEANUP_NEEDED" = "true" ]; then
+    kubectl delete namespace "$TEST_NAMESPACE" --ignore-not-found=true &>/dev/null || true
+  fi
+  exit 1
+fi
 
 # Wait up to 60 seconds for pod to start or fail
 echo "  ⏳ Waiting for pod status (max 60s)..."
