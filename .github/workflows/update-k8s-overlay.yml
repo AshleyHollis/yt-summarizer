@@ -158,7 +158,7 @@ jobs:
         with:
           install-python: 'true'
 
-      # Only validate existing overlays (prod). Preview overlays are generated dynamically.
+      # Baseline validation only for prod (preview overlays don't exist yet in PR branch)
       - name: Validate current overlay (baseline)
         if: inputs.environment == 'prod'
         uses: ./.github/actions/validate
@@ -213,7 +213,10 @@ jobs:
           auto-commit: 'true'
           pr-branch: ${{ inputs.pr-branch }}
 
-      # Validate overlay after update (skip for preview - overlay is on different branch)
+      # Post-update validation
+      # NOTE: For preview, validation happens inside manage-kustomization action
+      # before committing to preview-overlays branch (while file is still on disk)
+      # For prod, we also validate here as a double-check after the update
       - name: Validate updated overlay
         if: inputs.environment == 'prod'
         uses: ./.github/actions/validate
