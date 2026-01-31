@@ -4,6 +4,8 @@
 # =============================================================================
 # PURPOSE:
 #   Update Kubernetes preview overlay with image tags and preview configuration
+#   Creates PR-specific overlay directories in preparation for commit to
+#   the preview-overlays branch.
 #
 # INPUTS (via environment variables):
 #   PR_NUMBER           Pull request number
@@ -18,14 +20,18 @@
 #   preview_url         Preview environment URL
 #   preview_host        Preview environment host
 #   tls_secret          TLS secret name
-#   Updated k8s/overlays/preview/kustomization.yaml file
+#   Updated k8s/overlays/preview-pr-{number}/kustomization.yaml file
 #
 # LOGIC:
 #   1. Validate that image tag is not empty
-#   2. Check that preview overlay file exists
-#   3. Call Python script to generate kustomization with environment variables
-#   4. Output URL, host, and secret via GITHUB_OUTPUT
-#   5. Display generated overlay for verification
+#   2. Create PR-specific overlay directory if it doesn't exist
+#   3. Copy base preview overlay as starting point
+#   4. Call shell script to generate kustomization with environment variables
+#   5. Output URL, host, and secret via GITHUB_OUTPUT
+#   6. Display generated overlay for verification
+#
+# NOTE: This overlay is committed to the 'preview-overlays' branch, NOT the PR branch.
+#       This prevents preview commits from invalidating CI status on PR branches.
 #
 # =============================================================================
 set -euo pipefail
@@ -36,11 +42,21 @@ if [ -z "${IMAGE_TAG}" ]; then
   exit 1
 fi
 
-OVERLAY_FILE="k8s/overlays/preview/kustomization.yaml"
-if [ ! -f "${OVERLAY_FILE}" ]; then
-  echo "::error::Preview overlay not found at ${OVERLAY_FILE}"
-  echo "::error::Ensure k8s/overlays/preview/ exists in your PR branch"
-  exit 1
+# PR-specific overlay path
+OVERLAY_DIR="k8s/overlays/preview-pr-${PR_NUMBER}"
+OVERLAY_FILE="${OVERLAY_DIR}/kustomization.yaml"
+BASE_OVERLAY_DIR="k8s/overlays/preview"
+
+# Create PR-specific overlay directory if it doesn't exist
+if [ ! -d "${OVERLAY_DIR}" ]; then
+  echo "📁 Creating PR-specific overlay directory: ${OVERLAY_DIR}"
+  mkdir -p "${OVERLAY_DIR}"
+
+  # Copy base preview overlay structure if it exists
+  if [ -d "${BASE_OVERLAY_DIR}" ]; then
+    echo "📋 Copying base preview overlay structure..."
+    cp -r "${BASE_OVERLAY_DIR}"/* "${OVERLAY_DIR}/" 2>/dev/null || true
+  fi
 fi
 
 # Generate preview overlay using shell script

@@ -1,8 +1,16 @@
 # =============================================================================
 # Argo CD ApplicationSet - Preview Environments
 # =============================================================================
-# Uses Pull Request Generator to automatically create preview apps for open PRs
-# Overlay files live in the PR branch itself (k8s/overlays/preview/)
+# Uses Pull Request Generator to automatically create preview apps for open PRs.
+#
+# ARCHITECTURE:
+# - PR-specific overlays live in the 'preview-overlays' branch at:
+#   k8s/overlays/preview-pr-{number}/kustomization.yaml
+# - This prevents preview commits from invalidating CI status on PR branches
+# - When a PR is opened/updated:
+#   1. CI builds image → preview.yml updates overlay → commits to preview-overlays branch
+#   2. ArgoCD detects PR via Pull Request Generator
+#   3. ArgoCD syncs from preview-overlays branch using PR-specific path
 #
 # AUTHENTICATION OPTIONS:
 #
@@ -36,48 +44,40 @@ metadata:
     app.kubernetes.io/component: preview
     app.kubernetes.io/part-of: yt-summarizer
 spec:
-  # Pull Request Generator discovers open PRs targeting main
+  # Git Files Generator discovers preview overlays by scanning preview-overlays branch
+  # for directories matching k8s/overlays/preview-pr-*/
+  # This approach ensures ArgoCD detects overlay updates immediately when committed
   generators:
-    - pullRequest:
-        github:
-          owner: AshleyHollis
-          repo: yt-summarizer
+    - git:
+        repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+        revision: preview-overlays
 
-          # AUTHENTICATION: Choose ONE of the following:
+        # Discover preview overlays by directory pattern
+        # Each PR gets a directory: k8s/overlays/preview-pr-{number}/
+        directories:
+          - path: k8s/overlays/preview-pr-*
+            exclude: false
 
-          # GitHub App (recommended - no expiration, 5000 req/hour)
-          # Using GitHub App for authentication
-          appSecretName: github-app
-
-          # GitHub PAT (fallback - requires rotation, 60 req/hour)
-          # Uncomment to use PAT instead of GitHub App:
-          # tokenRef:
-          #   secretName: github-token
-          #   key: token
-
-          # Optional: filter by labels
-          # labels:
-          #   - preview
-        # Poll every 15s to quickly detect PR branch updates (overlay commits)
-        # Fast polling ensures Argo CD picks up overlay changes within 15s
+        # Poll every 15s to quickly detect overlay commits
+        # Fast polling ensures changes are picked up within 15s
         requeueAfterSeconds: 15
 
 
-  # Template for each discovered PR
+  # Template for each discovered preview overlay directory
   template:
     metadata:
-      name: 'preview-pr-{{number}}'
+      # Directory path.basename is already 'preview-pr-127', use it directly
+      name: '{{path.basename}}'
       namespace: argocd
       labels:
         app.kubernetes.io/name: yt-summarizer
-        app.kubernetes.io/instance: 'pr-{{number}}'
+        app.kubernetes.io/instance: '{{path.basename}}'
         app.kubernetes.io/component: preview
         app.kubernetes.io/part-of: yt-summarizer
       annotations:
-        # Track which PR this preview is for
-        preview.yt-summarizer/pr-number: '{{number}}'
-        preview.yt-summarizer/pr-branch: '{{branch}}'
-        preview.yt-summarizer/pr-head-sha: '{{head_sha}}'
+        # Track which overlay directory this preview uses
+        preview.yt-summarizer/overlay-path: '{{path}}'
+        preview.yt-summarizer/overlay-revision: '{{revision}}'
         # Force hard refresh on every sync to bypass cache
         argocd.argoproj.io/refresh: hard
       finalizers:
@@ -87,17 +87,16 @@ spec:
 
       source:
         repoURL: https://github.com/AshleyHollis/yt-summarizer.git
-        # IMPORTANT: Use branch name (not head_sha) so Argo CD picks up overlay commits
-        # The preview workflow commits updated kustomization.yaml to the PR branch.
-        # Using {{head_sha}} would lock to the original commit and miss those updates.
-        # Using {{branch}} ensures Argo CD always reads the latest PR branch state.
-        targetRevision: '{{branch}}'
-        # Preview overlay lives in the PR branch
-        path: k8s/overlays/preview
+        # Use the preview-overlays branch
+        targetRevision: preview-overlays
+        # Use the discovered overlay directory path
+        path: '{{path}}'
 
       destination:
         server: https://kubernetes.default.svc
-        namespace: 'preview-pr-{{number}}'
+        # Extract PR number from path.basename (preview-pr-127 -> preview-pr-127)
+        # The namespace will be the full basename to match the Application name
+        namespace: '{{path.basename}}'
 
       syncPolicy:
         automated:

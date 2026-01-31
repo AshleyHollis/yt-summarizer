@@ -30,7 +30,7 @@
 #     uses: ./.github/workflows/update-k8s-overlay.yml
 #     with:
 #       environment: preview
-#       overlay-path: k8s/overlays/preview
+#       overlay-path: k8s/overlays/preview-pr-42
 #       image-tag: pr-42-abc1234
 #       commit-sha: ${{ github.sha }}
 #       pr-number: '42'
@@ -38,6 +38,9 @@
 #       preview-host: pr-42.yt-summarizer.apps.ashleyhollis.com
 #       preview-url: https://pr-42.yt-summarizer.apps.ashleyhollis.com
 #       tls-secret: preview-pr-42-tls
+#
+# NOTE: Preview overlays are committed to the 'preview-overlays' branch (not PR branches)
+#       to prevent invalidating CI status on PRs.
 # =============================================================================
 
 name: Update Kubernetes Overlay
@@ -155,7 +158,9 @@ jobs:
         with:
           install-python: 'true'
 
+      # Baseline validation only for prod (preview overlays don't exist yet in PR branch)
       - name: Validate current overlay (baseline)
+        if: inputs.environment == 'prod'
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
@@ -208,7 +213,12 @@ jobs:
           auto-commit: 'true'
           pr-branch: ${{ inputs.pr-branch }}
 
+      # Post-update validation
+      # NOTE: For preview, validation happens inside manage-kustomization action
+      # before committing to preview-overlays branch (while file is still on disk)
+      # For prod, we also validate here as a double-check after the update
       - name: Validate updated overlay
+        if: inputs.environment == 'prod'
         uses: ./.github/actions/validate
         with:
           validators: kustomize-build
