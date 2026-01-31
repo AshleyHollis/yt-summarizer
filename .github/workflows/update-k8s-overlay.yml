@@ -234,15 +234,15 @@ jobs:
           ARGOCD_NAMESPACE: argocd
         run: |
           echo "🔄 Triggering hard refresh for ArgoCD Application: ${APP_NAME}"
-          
+
           # Hard refresh forces ArgoCD to re-check the Git repo and update to latest commit
           kubectl patch app "${APP_NAME}" -n "${ARGOCD_NAMESPACE}" \
             --type merge \
             -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' || true
-          
+
           # Alternative: Use argocd CLI if available
           # argocd app refresh "${APP_NAME}" --hard || true
-          
+
           echo "✅ Triggered hard refresh for ${APP_NAME}"
 
       # Post-update validation
