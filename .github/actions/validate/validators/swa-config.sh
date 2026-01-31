@@ -63,22 +63,21 @@ for workflow_file in "${WORKFLOW_FILES[@]}"; do
     fi
 done
 
-# 2. Validate SWA token name in deploy-prod.yml
+# 2. Validate SWA token name in SWA workflow files
 log_info "Checking SWA token configuration..."
-deploy_workflow=".github/workflows/deploy-prod.yml"
+token_found=false
 
-if [[ ! -f "$deploy_workflow" ]]; then
-    log_error "Deploy workflow not found: $deploy_workflow"
-    ERRORS=$((ERRORS + 1))
-else
-    # Check for azure_static_web_apps_api_token and swa-token patterns
-    token_found=false
+for workflow_file in "${WORKFLOW_FILES[@]}"; do
+    [[ -z "$workflow_file" ]] && continue
+    [[ ! -f "$workflow_file" ]] && continue
+
+    log_verbose "Checking SWA token in: $workflow_file"
 
     # Pattern 1: azure_static_web_apps_api_token: ${{ secrets.XXX }}
-    if grep -qE '^\s*azure_static_web_apps_api_token:\s*\$\{\{\s*secrets\.' "$deploy_workflow"; then
-        token_name=$(grep -E '^\s*azure_static_web_apps_api_token:' "$deploy_workflow" | sed -E 's/.*secrets\.([A-Z_]+).*/\1/' | head -1)
+    if grep -qE '^\s*azure_static_web_apps_api_token:\s*\$\{\{\s*secrets\.' "$workflow_file"; then
+        token_name=$(grep -E '^\s*azure_static_web_apps_api_token:' "$workflow_file" | sed -E 's/.*secrets\.([A-Z_]+).*/\1/' | head -1)
         if [[ "$token_name" != "SWA_DEPLOYMENT_TOKEN" ]]; then
-            log_error "Invalid SWA token in $deploy_workflow. Expected SWA_DEPLOYMENT_TOKEN, found: $token_name"
+            log_error "Invalid SWA token in $workflow_file. Expected SWA_DEPLOYMENT_TOKEN, found: $token_name"
             ERRORS=$((ERRORS + 1))
         else
             token_found=true
@@ -86,20 +85,20 @@ else
     fi
 
     # Pattern 2: swa-token: ${{ secrets.XXX }}
-    if grep -qE '^\s*swa-token:\s*\$\{\{\s*secrets\.' "$deploy_workflow"; then
-        token_name=$(grep -E '^\s*swa-token:' "$deploy_workflow" | sed -E 's/.*secrets\.([A-Z_]+).*/\1/' | head -1)
+    if grep -qE '^\s*swa-token:\s*\$\{\{\s*secrets\.' "$workflow_file"; then
+        token_name=$(grep -E '^\s*swa-token:' "$workflow_file" | sed -E 's/.*secrets\.([A-Z_]+).*/\1/' | head -1)
         if [[ "$token_name" != "SWA_DEPLOYMENT_TOKEN" ]]; then
-            log_error "Invalid SWA token in $deploy_workflow. Expected SWA_DEPLOYMENT_TOKEN, found: $token_name"
+            log_error "Invalid SWA token in $workflow_file. Expected SWA_DEPLOYMENT_TOKEN, found: $token_name"
             ERRORS=$((ERRORS + 1))
         else
             token_found=true
         fi
     fi
+done
 
-    if [[ "$token_found" == "false" ]]; then
-        log_error "Missing SWA deployment token configuration in $deploy_workflow"
-        ERRORS=$((ERRORS + 1))
-    fi
+if [[ "$token_found" == "false" ]]; then
+    log_error "Missing SWA deployment token configuration in any of: ${WORKFLOW_FILES[*]}"
+    ERRORS=$((ERRORS + 1))
 fi
 
 # 3. Validate package.json build script
