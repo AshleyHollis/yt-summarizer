@@ -92,9 +92,23 @@ run_deploy_with_timeout() {
   fi
 }
 
-# Retry loop
+# Retry loop with per-attempt timeout strategy
+# Strategy: Fail fast on attempts 1-2 (5 min timeout), longer timeout on final attempt
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-  if run_deploy_with_timeout "$attempt" "$TIMEOUT_SECONDS"; then
+  # Determine timeout for this attempt
+  if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+    # Final attempt: Use configured timeout (default 600s = 10 minutes)
+    # This allows more time for genuinely slow deployments
+    attempt_timeout="$TIMEOUT_SECONDS"
+    echo "::notice::Final attempt - using extended timeout of ${attempt_timeout}s"
+  else
+    # Attempts 1-2: Short timeout (5 minutes) for fail-fast retry
+    # Azure SWA can be transiently slow; quick retry often succeeds
+    attempt_timeout="300"
+    echo "::notice::Retry attempt ${attempt} - using fail-fast timeout of ${attempt_timeout}s"
+  fi
+
+  if run_deploy_with_timeout "$attempt" "$attempt_timeout"; then
     echo "DEPLOY_SUCCESS=true" >> "${GITHUB_OUTPUT:-/dev/stdout}"
     echo "DEPLOY_ATTEMPT=$attempt" >> "${GITHUB_OUTPUT:-/dev/stdout}"
     echo "DEPLOY_ENVIRONMENT=${DEPLOYMENT_ENVIRONMENT}" >> "${GITHUB_OUTPUT:-/dev/stdout}"
