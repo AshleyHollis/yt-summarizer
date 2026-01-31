@@ -126,7 +126,7 @@ fi
 if git diff --quiet "$FILE_TO_COMMIT" 2>/dev/null && git ls-files --error-unmatch "$FILE_TO_COMMIT" > /dev/null 2>&1; then
   echo "ℹ️  No changes to commit"
   echo "committed=false" >> "$GITHUB_OUTPUT"
-  
+
   # For preview operations, switch back to the original branch before exiting
   # This ensures subsequent workflow steps can find the .github/actions/ directory
   if [ "$OPERATION" == "update-preview" ]; then
