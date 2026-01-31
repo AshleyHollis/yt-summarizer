@@ -352,7 +352,8 @@ jobs:
     needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform]
     with:
       environment: preview
-      overlay-path: k8s/overlays/preview
+      # PR-specific overlay path - each PR gets its own directory
+      overlay-path: k8s/overlays/preview-pr-${{ needs.detect-changes.outputs.pr_number }}
       image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
       commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
       pr-number: ${{ needs.detect-changes.outputs.pr_number }}

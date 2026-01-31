@@ -30,7 +30,7 @@
 #     uses: ./.github/workflows/update-k8s-overlay.yml
 #     with:
 #       environment: preview
-#       overlay-path: k8s/overlays/preview
+#       overlay-path: k8s/overlays/preview-pr-42
 #       image-tag: pr-42-abc1234
 #       commit-sha: ${{ github.sha }}
 #       pr-number: '42'
@@ -38,6 +38,9 @@
 #       preview-host: pr-42.yt-summarizer.apps.ashleyhollis.com
 #       preview-url: https://pr-42.yt-summarizer.apps.ashleyhollis.com
 #       tls-secret: preview-pr-42-tls
+#
+# NOTE: Preview overlays are committed to the 'preview-overlays' branch (not PR branches)
+#       to prevent invalidating CI status on PRs.
 # =============================================================================
 
 name: Update Kubernetes Overlay

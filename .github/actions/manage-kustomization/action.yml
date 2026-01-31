@@ -95,6 +95,7 @@ runs:
         TLS_SECRET: ${{ inputs.tls-secret }}
         PREVIEW_URL: ${{ inputs.preview-url }}
         COMMIT_SHA: ${{ inputs.commit-sha }}
+        OVERLAY_PATH: k8s/overlays/preview-pr-${{ inputs.pr-number }}
       run: |
         # Validate inputs
         if [ -z "$IMAGE_TAG" ]; then
@@ -140,6 +141,7 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
         IMAGE_TAG: ${{ inputs.image-tag }}
         COMMIT_SHA: ${{ inputs.commit-sha }}
-        OVERLAY_PATH: ${{ inputs.overlay-path }}
+        # For preview: use PR-specific path; for others: use provided overlay-path
+        OVERLAY_PATH: ${{ inputs.operation == 'update-preview' && format('k8s/overlays/preview-pr-{0}', inputs.pr-number) || inputs.overlay-path }}
         KUSTOMIZATION_PATH: ${{ inputs.kustomization-path }}
       run: bash ${{ github.action_path }}/commit-changes.sh

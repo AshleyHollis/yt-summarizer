@@ -99,7 +99,7 @@ runs:
         DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment-environment }}
         VERBOSE: ${{ inputs.verbose }}
         MAX_ATTEMPTS: "3"
-        TIMEOUT_SECONDS: "300"
+        TIMEOUT_SECONDS: "600"  # Increased from 300s to 600s (10 minutes)
       run: |
         chmod +x .github/actions/deploy-frontend-swa/deploy-with-retry.sh
         .github/actions/deploy-frontend-swa/deploy-with-retry.sh

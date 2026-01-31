@@ -1,8 +1,16 @@
 # =============================================================================
 # Argo CD ApplicationSet - Preview Environments
 # =============================================================================
-# Uses Pull Request Generator to automatically create preview apps for open PRs
-# Overlay files live in the PR branch itself (k8s/overlays/preview/)
+# Uses Pull Request Generator to automatically create preview apps for open PRs.
+#
+# ARCHITECTURE:
+# - PR-specific overlays live in the 'preview-overlays' branch at:
+#   k8s/overlays/preview-pr-{number}/kustomization.yaml
+# - This prevents preview commits from invalidating CI status on PR branches
+# - When a PR is opened/updated:
+#   1. CI builds image → preview.yml updates overlay → commits to preview-overlays branch
+#   2. ArgoCD detects PR via Pull Request Generator
+#   3. ArgoCD syncs from preview-overlays branch using PR-specific path
 #
 # AUTHENTICATION OPTIONS:
 #
@@ -87,13 +95,13 @@ spec:
 
       source:
         repoURL: https://github.com/AshleyHollis/yt-summarizer.git
-        # IMPORTANT: Use branch name (not head_sha) so Argo CD picks up overlay commits
-        # The preview workflow commits updated kustomization.yaml to the PR branch.
-        # Using {{head_sha}} would lock to the original commit and miss those updates.
-        # Using {{branch}} ensures Argo CD always reads the latest PR branch state.
-        targetRevision: '{{branch}}'
-        # Preview overlay lives in the PR branch
-        path: k8s/overlays/preview
+        # IMPORTANT: Use the dedicated preview-overlays branch for all preview deployments
+        # This prevents preview commits from invalidating CI status on PR branches.
+        # The preview workflow commits updated kustomization.yaml files to preview-overlays
+        # in PR-specific directories: k8s/overlays/preview-pr-{number}/
+        targetRevision: preview-overlays
+        # PR-specific overlay directory - each PR gets its own kustomization
+        path: k8s/overlays/preview-pr-{{number}}
 
       destination:
         server: https://kubernetes.default.svc
