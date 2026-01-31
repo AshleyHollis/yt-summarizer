@@ -87,8 +87,6 @@ on:
         required: true
       SWA_DEPLOYMENT_TOKEN:
         required: true
-      GITHUB_TOKEN:
-        required: true
 
 jobs:
   deploy:

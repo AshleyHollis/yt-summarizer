@@ -64,7 +64,8 @@ runs:
         if [ -n "$PR_NUMBER" ]; then
           EXPECTED_TAG="pr-${PR_NUMBER}-${COMMIT_SHA:0:7}"
         elif [ -n "$COMMIT_SHA" ]; then
-          EXPECTED_TAG="main-${COMMIT_SHA:0:7}"
+          # Production uses sha-{short_sha} format
+          EXPECTED_TAG="sha-${COMMIT_SHA:0:7}"
         else
           echo "::error::Either pr-number or commit-sha must be provided for tag-format validation"
           exit 1

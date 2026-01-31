@@ -408,10 +408,17 @@ jobs:
 
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
-        continue-on-error: true
         with:
-          fail_level: none
+          fail_level: error
           filter_mode: nofilter
+          reporter: github-pr-review
+
+      - name: Validate reusable workflows
+        uses: ./.github/actions/validate
+        with:
+          validators: reusable-workflows
+          fail-fast: 'true'
+          timeout-seconds: '30'
 
       - name: Install pre-commit
         run: pip install pre-commit
