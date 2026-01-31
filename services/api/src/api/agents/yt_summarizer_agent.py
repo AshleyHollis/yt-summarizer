@@ -22,15 +22,8 @@ try:
     from collections.abc import Callable
     from typing import TypeVar
 
-    from agent_framework import BaseChatClient, ChatAgent
+    from agent_framework import AIFunction, BaseChatClient, ChatAgent
     from agent_framework.openai import OpenAIChatClient
-
-    # Try to import AIFunction from multiple possible locations for version compatibility
-    try:
-        from agent_framework import AIFunction
-    except ImportError:
-        # In newer versions, AIFunction moved to a submodule
-        from agent_framework._tools import AIFunction  # type: ignore
 
     F = TypeVar("F", bound=Callable)
 

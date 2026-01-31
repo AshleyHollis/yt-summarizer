@@ -78,17 +78,8 @@ class TestAgentFrameworkAvailability:
         import agent_framework
 
         assert hasattr(agent_framework, "ChatAgent")
-        # Check for AIFunction - may be at module level (old) or in _tools submodule (new)
-        has_ai_function = hasattr(agent_framework, "AIFunction") or hasattr(
-            agent_framework, "ai_function"
-        )
-        try:
-            from agent_framework._tools import AIFunction  # noqa: F401
-
-            has_ai_function = True
-        except ImportError:
-            pass
-        assert has_ai_function, "AIFunction not found in agent_framework"
+        # With pinned version 1.0.0b260116, AIFunction should be available
+        assert hasattr(agent_framework, "AIFunction")
 
     def test_tool_names_are_correct(self, monkeypatch):
         """Verify tools have the expected names."""

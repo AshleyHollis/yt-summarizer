@@ -22,7 +22,8 @@ dependencies = [
     "youtube-transcript-api>=0.6.2",  # For fetching YouTube transcripts
     # Agent Framework - pinned to compatible versions to avoid import errors
     # agent-framework-ag-ui 1.0.0b260107 requires agent-framework with use_instrumentation
-    "agent-framework>=1.0.0b260107",  # Ensure we get latest with required features
+    # Pinned to b260116 to avoid breaking API changes in newer betas (b260128+ removed AIFunction export)
+    "agent-framework==1.0.0b260116",  # Specific version with stable AIFunction API
     "agent-framework-ag-ui>=1.0.0b260107",
     # OpenTelemetry for observability (T185)
     "opentelemetry-api>=1.27.0",
