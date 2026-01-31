@@ -135,19 +135,19 @@ runs:
         OVERLAY_PATH: ${{ inputs.operation == 'update-preview' && format('k8s/overlays/preview-pr-{0}', inputs.pr-number) || inputs.overlay-path }}
       run: |
         echo "🔍 Validating overlay at ${OVERLAY_PATH}..."
-        
+
         if [ ! -f "${OVERLAY_PATH}/kustomization.yaml" ]; then
           echo "::error::Overlay file not found at ${OVERLAY_PATH}/kustomization.yaml"
           exit 1
         fi
-        
+
         # Validate kustomize build
         if ! kustomize build "${OVERLAY_PATH}" > /dev/null 2>&1; then
           echo "::error::Kustomize build failed for ${OVERLAY_PATH}"
           kustomize build "${OVERLAY_PATH}"  # Show the error
           exit 1
         fi
-        
+
         echo "✅ Overlay validation passed"
 
     # Commit operation (all modes if auto-commit enabled)
