@@ -52,18 +52,10 @@ spec:
         repoURL: https://github.com/AshleyHollis/yt-summarizer.git
         revision: preview-overlays
 
-        # AUTHENTICATION: Choose ONE of the following:
-
-        # GitHub App (recommended - no expiration, 5000 req/hour)
-        # Using GitHub App for authentication
-        githubAppSecretRef:
-          name: github-app
-
-        # GitHub PAT (fallback - requires rotation, 60 req/hour)
-        # Uncomment to use PAT instead of GitHub App:
-        # tokenRef:
-        #   secretName: github-token
-        #   key: token
+        # AUTHENTICATION: GitHub App for Git Generator
+        # Git Generator uses github.appSecretName (not githubAppSecretRef)
+        github:
+          appSecretName: github-app
 
         # Discover preview overlays by directory pattern
         # Each PR gets a directory: k8s/overlays/preview-pr-{number}/
