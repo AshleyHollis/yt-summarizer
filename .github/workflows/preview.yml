@@ -502,14 +502,13 @@ jobs:
 
       - name: Verify cluster can pull image
         # Runs after AKS context + ACR login are configured
-        # K8s pull test disabled due to known ACR/AKS authentication issues
         uses: ./.github/actions/validate-docker-image
         with:
           validation-type: acr-exists
           image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          run-k8s-pull-test: 'false'
+          run-k8s-pull-test: 'true'
 
       - name: Validate CI image tag for PR
         if: needs.detect-changes.outputs.needs_image_build == 'true'
