@@ -1,0 +1,27 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-httproute
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/component: api
+  annotations:
+    # ExternalDNS watches this annotation to create DNS records
+    # Placeholder will be replaced by preview overlay patch
+    external-dns.alpha.kubernetes.io/hostname: __PREVIEW_HOST__
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: gateway-system
+    sectionName: https-yt-summarizer
+  hostnames:
+  - "__PREVIEW_HOST__"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: api
+      port: 80
+      weight: 100

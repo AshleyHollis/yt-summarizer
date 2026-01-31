@@ -1,0 +1,56 @@
+# =============================================================================
+# Database Migration Job
+# =============================================================================
+# Argo CD PreSync hook - runs before new deployments
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration
+  namespace: yt-summarizer
+  labels:
+    app.kubernetes.io/name: db-migration
+    app.kubernetes.io/component: migration
+    app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    # Run as Sync hook with sync-wave to run after ExternalSecrets create secrets
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "1"
+    # Delete old job before creating new one, and delete successful job after completion
+    # This ensures Argo CD waits for job completion and doesn't get stuck
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db-migration
+        app.kubernetes.io/component: migration
+        app.kubernetes.io/part-of: yt-summarizer
+    spec:
+      serviceAccountName: yt-summarizer-sa
+      restartPolicy: Never
+      containers:
+        - name: migration
+          image: yt-summarizer-api
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting database migrations..."
+              cd /app
+              alembic upgrade head
+              echo "Migrations completed successfully!"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: connection-string
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

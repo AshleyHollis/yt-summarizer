@@ -1,0 +1,112 @@
+# =============================================================================
+# API Deployment
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: yt-summarizer
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: yt-summarizer
+    spec:
+      serviceAccountName: yt-summarizer-sa
+      containers:
+        - name: api
+          image: yt-summarizer-api
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            # Explicitly set API_PORT to prevent collision with Kubernetes service env vars
+            # K8s auto-creates API_PORT=tcp://... which breaks pydantic int parsing
+            - name: API_PORT
+              value: "8000"
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: yt-summarizer-config
+                  key: ENVIRONMENT
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: connection-string
+            - name: AZURE_STORAGE_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: storage-credentials
+                  key: connection-string
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: api-key
+            - name: AUTH0_DOMAIN
+              valueFrom:
+                secretKeyRef:
+                  name: auth0-credentials
+                  key: domain
+            - name: AUTH0_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: auth0-credentials
+                  key: client-id
+            - name: AUTH0_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auth0-credentials
+                  key: client-secret
+            - name: AUTH0_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auth0-credentials
+                  key: session-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+      restartPolicy: Always

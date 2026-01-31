@@ -1,0 +1,29 @@
+# =============================================================================
+# Base Kustomization
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: yt-summarizer
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+
+  - api-httproute.yaml
+  - transcribe-worker-deployment.yaml
+  - summarize-worker-deployment.yaml
+  - embed-worker-deployment.yaml
+  - relationships-worker-deployment.yaml
+  - externalsecret-db.yaml
+  - externalsecret-openai.yaml
+  - externalsecret-storage.yaml
+  - externalsecret-auth0.yaml
+  - migration-job.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
