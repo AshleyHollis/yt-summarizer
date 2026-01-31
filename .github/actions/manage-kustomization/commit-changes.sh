@@ -56,6 +56,10 @@ git config user.email "github-actions[bot]@users.noreply.github.com"
 if [ "$OPERATION" == "update-preview" ]; then
   echo "🔄 Setting up preview-overlays branch..."
 
+  # Save the current branch/ref so we can return to it later
+  ORIGINAL_REF=$(git rev-parse HEAD)
+  ORIGINAL_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "detached")
+
   # Fetch the preview-overlays branch if it exists
   git fetch origin "$BRANCH" 2>/dev/null || true
 
@@ -138,6 +142,17 @@ fi
 
 echo "🚀 Pushing to $BRANCH..."
 git push origin "HEAD:$BRANCH"
+
+# For preview operations, switch back to the original branch
+# This ensures subsequent workflow steps can find the .github/actions/ directory
+if [ "$OPERATION" == "update-preview" ]; then
+  echo "🔙 Switching back to original branch..."
+  if [ "$ORIGINAL_BRANCH" != "detached" ]; then
+    git checkout "$ORIGINAL_BRANCH"
+  else
+    git checkout "$ORIGINAL_REF"
+  fi
+fi
 
 echo "✅ Changes committed and pushed"
 echo "committed=true" >> "$GITHUB_OUTPUT"
