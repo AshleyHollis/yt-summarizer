@@ -3,6 +3,11 @@
 # =============================================================================
 # TRIGGERS: PR opened/updated, push to main, manual dispatch
 # EXECUTION: Full validation - all tests, checks, and builds run on every trigger
+#
+# NOTE: We intentionally do NOT use paths-ignore for k8s/overlays/** because:
+# 1. PR merges often include kustomization changes alongside code changes
+# 2. paths-ignore would skip CI entirely if ANY file matches, even with other changes
+# 3. Instead, kustomization-only commits use [skip ci] in commit message
 # =============================================================================
 
 name: CI
@@ -17,7 +22,6 @@ on:
       - "*.md"
       - "docs/**"
       - "specs/**"
-      - "k8s/overlays/**"
   workflow_dispatch:
 
 concurrency:
