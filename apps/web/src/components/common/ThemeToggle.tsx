@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
  * Theme toggle button that switches between light and dark modes
  */
 export function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   // Prevent hydration mismatch

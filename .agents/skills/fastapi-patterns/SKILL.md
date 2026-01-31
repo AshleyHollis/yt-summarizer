@@ -55,7 +55,7 @@ async def list_videos(db: AsyncSession = Depends(get_db)):
 class VideoRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
-    
+
     async def get_by_id(self, video_id: str) -> Video | None:
         result = await self.db.execute(
             select(Video).where(Video.id == video_id)

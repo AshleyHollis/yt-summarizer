@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MarkdownRenderer, PROSE_CLASSES, PROSE_VARIANTS } from '@/components/common/MarkdownRenderer';
 import { CollapsibleContent } from '@/components/common/CollapsibleContent';

@@ -152,7 +152,6 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
 
   // Track tool call IDs we've seen in "assistant" messages that are actually tool invocations
   let lastToolCallId: string | null = null;
-  let lastToolCallAssistantIdx: number = -1;
 
   for (const msg of copilotMessages) {
     const m = msg as Record<string, unknown>;
@@ -191,7 +190,6 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
           // Attach to existing assistant message that doesn't already have tool calls
           result[lastAssistantIdx].toolCalls = [toolCall];
           lastToolCallId = id;
-          lastToolCallAssistantIdx = lastAssistantIdx;
         } else {
           // Create a new assistant message for this tool call
           result.push({
@@ -201,7 +199,6 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
             toolCalls: [toolCall],
           });
           lastToolCallId = id;
-          lastToolCallAssistantIdx = result.length - 1;
         }
       } else {
         // Regular assistant text message

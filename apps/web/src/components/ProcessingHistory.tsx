@@ -188,7 +188,9 @@ export function ProcessingHistory({ videoId, className = '' }: ProcessingHistory
   // Calculate display values
   // Note: estimated_seconds already INCLUDES enforced delays (they're baked into
   // historical averages since job duration includes sleep time)
-  const hasEnforcedDelay = (history.total_estimated_delay_seconds ?? 0) > 0;
+  // Track if enforced delays exist (used for potential future UI indicator)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _hasEnforcedDelay = (history.total_estimated_delay_seconds ?? 0) > 0;
   const hasQueueWait = (history.total_wait_seconds ?? 0) > 0 || (history.total_estimated_wait_seconds ?? 0) > 0;
   const queueWaitVariance = (history.total_wait_seconds ?? 0) - (history.total_estimated_wait_seconds ?? 0);
 
