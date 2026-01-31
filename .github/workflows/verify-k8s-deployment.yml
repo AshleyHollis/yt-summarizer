@@ -94,8 +94,6 @@ on:
         required: true
       AZURE_SUBSCRIPTION_ID:
         required: true
-      GITHUB_TOKEN:
-        required: true
 
 jobs:
   verify:
