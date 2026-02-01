@@ -20,6 +20,31 @@
 
 set -euo pipefail
 
+# Logging helpers
+print_header() {
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] 🚀 $1"
+  shift
+  for line in "$@"; do
+    echo "[INFO]    $line"
+  done
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+print_footer() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] $1"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+log_info() { echo "[INFO] $1"; }
+log_warn() { echo "[WARN] ⚠️  $1"; }
+log_error() { echo "[ERROR] ✗ $1"; }
+log_success() { echo "[INFO]    ✓ $1"; }
+log_step() { echo "[INFO] $1"; }
+
 URL="${URL:-}"
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-30}"
 INTERVAL="${INTERVAL:-10}"
@@ -27,15 +52,17 @@ TIMEOUT="${TIMEOUT:-5}"
 EXPECTED_STATUS="${EXPECTED_STATUS:-200}"
 SERVICE_NAME="${SERVICE_NAME:-Service}"
 
-echo "Waiting for $SERVICE_NAME to become healthy..."
-echo "URL: $URL"
-echo "Max attempts: $MAX_ATTEMPTS (interval: ${INTERVAL}s)"
+print_header "Health Check: $SERVICE_NAME" \
+  "URL: $URL" \
+  "Max Attempts: $MAX_ATTEMPTS" \
+  "Interval: ${INTERVAL}s" \
+  "Expected Status: $EXPECTED_STATUS"
 
 ATTEMPT=1
 HEALTHY=false
 
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-  echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+  log_info "⏳ Attempt $ATTEMPT/$MAX_ATTEMPTS..."
 
   HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     --max-time $TIMEOUT \
@@ -43,14 +70,18 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     "$URL" 2>/dev/null || echo "000")
 
   if [ "$HTTP_STATUS" = "$EXPECTED_STATUS" ]; then
-    echo "✅ $SERVICE_NAME is healthy (HTTP $HTTP_STATUS)"
+    log_success "$SERVICE_NAME is healthy (HTTP $HTTP_STATUS)"
     HEALTHY=true
     break
   else
-    echo "  Status: $HTTP_STATUS (expected: $EXPECTED_STATUS)"
+    if [ "$HTTP_STATUS" = "000" ]; then
+      log_info "   ⏱️ Connection timeout or error"
+    else
+      log_info "   ↻ HTTP $HTTP_STATUS (expected: $EXPECTED_STATUS)"
+    fi
 
     if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-      echo "  Waiting ${INTERVAL}s before next attempt..."
+      log_info "   Waiting ${INTERVAL}s before retry..."
       sleep $INTERVAL
     fi
   fi
@@ -59,10 +90,13 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
 done
 
 if [ "$HEALTHY" = "false" ]; then
-  echo "::error::$SERVICE_NAME did not become healthy after \
-    $MAX_ATTEMPTS attempts"
+  log_error "$SERVICE_NAME did not become healthy after $MAX_ATTEMPTS attempts"
+  echo "::error::$SERVICE_NAME did not become healthy after $MAX_ATTEMPTS attempts"
+  print_footer "❌ Health check failed after $((ATTEMPT - 1)) attempts"
   exit 1
 fi
 
 echo "healthy=true" >> $GITHUB_OUTPUT
 echo "attempts=$ATTEMPT" >> $GITHUB_OUTPUT
+
+print_footer "✅ $SERVICE_NAME is healthy! (took $ATTEMPT attempt(s))"

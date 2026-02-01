@@ -124,6 +124,11 @@ inputs:
     required: false
     default: ''
 
+  expected-image-tag:
+    description: 'Expected image tag to verify before declaring sync successful (prevents race conditions)'
+    required: false
+    default: ''
+
 outputs:
   sync-status:
     description: 'Final sync status (Synced, OutOfSync, Failed, Unknown)'
@@ -187,6 +192,7 @@ runs:
         FAIL_ON_INVALID_YAML: ${{ inputs.fail-on-invalid-yaml }}
         AUTO_RECOVERY: ${{ inputs.auto-recovery }}
         PR_NUMBER: ${{ inputs.pr-number }}
+        EXPECTED_IMAGE_TAG: ${{ inputs.expected-image-tag }}
       run: |
         set -euo pipefail
 
@@ -197,6 +203,9 @@ runs:
         echo "Max wait: ${MAX_WAIT_SECONDS}s"
         echo "Poll interval: ${POLL_INTERVAL_SECONDS}s"
         echo "Auto-recovery: $AUTO_RECOVERY"
+        if [[ -n "${EXPECTED_IMAGE_TAG}" ]]; then
+          echo "Expected image tag: $EXPECTED_IMAGE_TAG"
+        fi
         if [[ "$AUTO_RECOVERY" == "true" ]]; then
           echo "Max recovery attempts: $MAX_RECOVERY_ATTEMPTS"
           echo "Recovery cooldown: ${RECOVERY_COOLDOWN_SECONDS}s"

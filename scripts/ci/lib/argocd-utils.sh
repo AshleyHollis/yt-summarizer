@@ -167,26 +167,21 @@ is_operation_stuck() {
 clear_stuck_operation() {
     local app_name="$1"
 
-    log_warn "Clearing stuck operation for $app_name..."
-
-    # Remove operation
+    # Remove operation (silently)
     kubectl patch application "$app_name" -n "$ARGOCD_NAMESPACE" \
         --type json -p='[{"op": "remove", "path": "/operation"}]' 2>/dev/null || true
 
-    # Remove operation state
+    # Remove operation state (silently)
     kubectl patch application "$app_name" -n "$ARGOCD_NAMESPACE" \
         --type json -p='[{"op": "remove", "path": "/status/operationState"}]' 2>/dev/null || true
-
-    log_info "Operation cleared for $app_name"
 }
 
 # Trigger hard refresh
 trigger_hard_refresh() {
     local app_name="$1"
 
-    log_info "Triggering hard refresh for $app_name..."
     kubectl annotate application "$app_name" -n "$ARGOCD_NAMESPACE" \
-        argocd.argoproj.io/refresh=hard --overwrite
+        argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1
 }
 
 # Check for common failure patterns
@@ -280,40 +275,21 @@ auto_recover() {
     local app_name="$1"
     local pattern="$2"
 
-    log_warn "Attempting auto-recovery for pattern: $pattern"
-
     case "$pattern" in
         QUOTA_EXCEEDED)
-            log_error "Resource quota exceeded - cannot auto-recover"
-            log_error "Manual intervention required: increase quota or reduce resource requests"
+            log_error "   Cannot recover: Resource quota exceeded"
             return 1
             ;;
         INVALID_YAML)
-            log_error "Invalid YAML structure - cannot auto-recover"
-            log_error "Manual intervention required: fix kustomization template"
+            log_error "   Cannot recover: Invalid YAML structure"
             return 1
             ;;
         IMAGE_PULL_FAILED)
-            log_error "Image pull failed - cannot auto-recover"
-            log_error "Manual intervention required: verify image exists in registry"
+            log_error "   Cannot recover: Image pull failed"
             return 1
             ;;
-        MISSING_DEPENDENCY)
-            log_warn "Missing dependency detected - retrying sync..."
-            clear_stuck_operation "$app_name"
-            sleep 5
-            trigger_hard_refresh "$app_name"
-            return 0
-            ;;
-        HOOK_TIMEOUT)
-            log_warn "Hook timeout detected - clearing operation and retrying..."
-            clear_stuck_operation "$app_name"
-            sleep 5
-            trigger_hard_refresh "$app_name"
-            return 0
-            ;;
-        *)
-            log_warn "Unknown failure pattern - attempting generic recovery..."
+        MISSING_DEPENDENCY|HOOK_TIMEOUT|*)
+            log_info "   Clearing operation and refreshing..."
             clear_stuck_operation "$app_name"
             sleep 5
             trigger_hard_refresh "$app_name"
@@ -328,14 +304,28 @@ wait_for_sync() {
     local namespace="$2"
     local timeout="${3:-$MAX_SYNC_DURATION}"
     local check_interval="${4:-$OPERATION_CHECK_INTERVAL}"
+    local expected_image="${EXPECTED_IMAGE_TAG:-}"
 
-    log_info "Waiting for Argo CD sync: $app_name (timeout: ${timeout}s)"
+    # Print header with deployment context
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log_info "🚀 ArgoCD Sync: $app_name"
+    log_info "   Namespace: $namespace"
+    log_info "   Timeout: ${timeout}s"
+    if [ -n "$expected_image" ]; then
+        log_info "   Expected Image: $expected_image"
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
 
     local elapsed=0
     local missing_elapsed=0
     local last_recovery_attempt=0
     local recovery_attempts=0
     local max_recovery_attempts=3
+    local last_status=""
+    local same_status_count=0
+    local stuck_warning_shown=false
 
     while [ $elapsed -lt "$timeout" ]; do
         # Check if PR is still open (for preview deployments)
@@ -350,7 +340,7 @@ wait_for_sync() {
 
         local app_present=$(app_exists "$app_name")
         if [ "$app_present" = "false" ]; then
-            log_warn "[missing ${missing_elapsed}/${MISSING_APP_TIMEOUT}s] Application $app_name not found yet"
+            log_warn "⏳ [${missing_elapsed}s] Waiting for application to be created..."
 
             if [ $missing_elapsed -ge "$MISSING_APP_TIMEOUT" ]; then
                 # Before failing, check if PR was closed (common cause of app disappearance)
@@ -374,32 +364,77 @@ wait_for_sync() {
         fi
 
         if [ $missing_elapsed -gt 0 ]; then
-            log_info "Application $app_name detected after ${missing_elapsed}s"
+            log_info "✓ Application detected after ${missing_elapsed}s"
             missing_elapsed=0
         fi
 
         local sync_status=$(get_sync_status "$app_name")
         local health_status=$(get_health_status "$app_name")
         local operation_state=$(get_operation_state "$app_name")
+        local current_status="${sync_status}|${health_status}|${operation_state}"
 
-        log_info "[$elapsed/${timeout}s] Sync: $sync_status | Health: $health_status | Operation: $operation_state"
+        # Track repeated status for stuck detection
+        if [ "$current_status" = "$last_status" ]; then
+            same_status_count=$((same_status_count + 1))
+        else
+            same_status_count=0
+            stuck_warning_shown=false
+        fi
+        last_status="$current_status"
+
+        # Format status line with visual indicators
+        local sync_icon="⏳"
+        local health_icon="⏳"
+        [ "$sync_status" = "Synced" ] && sync_icon="✓"
+        [ "$sync_status" = "OutOfSync" ] && sync_icon="↻"
+        [ "$health_status" = "Healthy" ] && health_icon="✓"
+        [ "$health_status" = "Progressing" ] && health_icon="⏳"
+        [ "$health_status" = "Degraded" ] && health_icon="✗"
+
+        # Only log status changes or every 30s to reduce noise
+        if [ "$current_status" != "$last_status" ] || [ $((elapsed % 30)) -eq 0 ] || [ $elapsed -eq 0 ]; then
+            log_info "[${elapsed}s] Sync: ${sync_icon} ${sync_status} | Health: ${health_icon} ${health_status} | Op: ${operation_state}"
+        fi
 
         # Success condition
         if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ]; then
-            log_info "✅ Deployment successful!"
+            # If expected image tag is provided, verify it matches before declaring success
+            if [ -n "$expected_image" ]; then
+                local actual_tag=""
+                # Get the actual deployed image tag from the api deployment
+                actual_tag=$(kubectl get deployment api -n "$namespace" \
+                    -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | sed 's/.*://' || echo "")
+
+                if [ "$actual_tag" != "$expected_image" ]; then
+                    # ArgoCD shows synced but with wrong image tag - it hasn't synced the new overlay yet
+                    if [ $((elapsed % 30)) -eq 0 ] || [ $elapsed -eq 0 ]; then
+                        log_info "[${elapsed}s] Waiting for image tag update: current=$actual_tag, expected=$expected_image"
+                    fi
+                    sleep "$check_interval"
+                    elapsed=$((elapsed + check_interval))
+                    continue
+                fi
+                log_info "   ✓ Image tag verified: $actual_tag"
+            fi
+
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log_info "✅ Deployment successful! (${elapsed}s)"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             return 0
         fi
 
-        # Early detection: OutOfSync + Healthy + Running for 60s suggests stuck refresh
-        if [ "$sync_status" = "OutOfSync" ] && [ "$health_status" = "Healthy" ] && [ "$operation_state" = "Running" ] && [ $elapsed -ge 60 ]; then
-            log_warn "⚠️  Detected potentially stuck refresh: OutOfSync + Healthy + Running for ${elapsed}s"
+        # Stuck detection: same status for 90s+ with OutOfSync + Running (increased from 60s)
+        if [ "$sync_status" = "OutOfSync" ] && [ "$operation_state" = "Running" ] && [ $same_status_count -ge 9 ] && [ "$stuck_warning_shown" = "false" ]; then
+            log_warn "⚠️  Sync appears stuck (no progress for $((same_status_count * check_interval))s)"
+            stuck_warning_shown=true
 
             # Check if refresh annotation is already present
             local has_refresh=$(kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" \
                 -o jsonpath='{.metadata.annotations.argocd\.argoproj\.io/refresh}' 2>/dev/null || echo "")
 
             if [ -n "$has_refresh" ] && [ $((elapsed - last_recovery_attempt)) -gt 30 ] && [ $recovery_attempts -lt $max_recovery_attempts ]; then
-                log_warn "Hard refresh annotation present but not progressing - triggering recovery..."
+                log_warn "Triggering recovery (attempt $((recovery_attempts + 1))/$max_recovery_attempts)..."
 
                 # Clear stuck operation and re-trigger refresh
                 if auto_recover "$app_name" "UNKNOWN"; then
@@ -408,7 +443,7 @@ wait_for_sync() {
 
                     # Extend timeout for recovery
                     timeout=$((timeout + RECOVERY_TIMEOUT_EXTENSION))
-                    log_info "Timeout extended to ${timeout}s for recovery"
+                    log_info "⏱️  Timeout extended to ${timeout}s for recovery"
 
                     sleep 10
                     continue
@@ -416,39 +451,32 @@ wait_for_sync() {
             fi
         fi
 
-        # Check for stuck operation
+        # Check for stuck operation (using STUCK_OPERATION_THRESHOLD)
         if [ "$operation_state" = "Running" ]; then
             local is_stuck=$(is_operation_stuck "$app_name" "$STUCK_OPERATION_THRESHOLD")
             if [ "$is_stuck" = "true" ]; then
-                log_error "❌ Operation has been running for more than ${STUCK_OPERATION_THRESHOLD}s - likely stuck!"
-
-                # Collect diagnostics
-                collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-stuck.log"
+                log_warn "⚠️  Operation running for >${STUCK_OPERATION_THRESHOLD}s - triggering recovery"
 
                 # Attempt recovery if we haven't exceeded max attempts
                 if [ $recovery_attempts -lt $max_recovery_attempts ]; then
-                    log_warn "Attempting auto-recovery (attempt $((recovery_attempts + 1))/$max_recovery_attempts)..."
-
                     local message=$(get_operation_message "$app_name")
                     local pattern=$(detect_failure_pattern "$app_name" "$message")
 
                     if auto_recover "$app_name" "$pattern"; then
                         recovery_attempts=$((recovery_attempts + 1))
                         last_recovery_attempt=$elapsed
-
-                        # Extend timeout to give recovery time to complete
-                        log_info "Extending timeout by ${RECOVERY_TIMEOUT_EXTENSION}s to allow recovery to complete..."
                         timeout=$((timeout + RECOVERY_TIMEOUT_EXTENSION))
-                        log_info "New timeout: ${timeout}s"
-
+                        log_info "⏱️  Timeout extended to ${timeout}s (recovery $recovery_attempts/$max_recovery_attempts)"
                         sleep 10
                         continue
                     else
                         log_error "Auto-recovery failed - manual intervention required"
+                        collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-stuck.log"
                         return 1
                     fi
                 else
                     log_error "Max recovery attempts ($max_recovery_attempts) exceeded"
+                    collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-stuck.log"
                     return 1
                 fi
             fi
@@ -456,17 +484,11 @@ wait_for_sync() {
 
         # Check for explicit failure
         if [ "$operation_state" = "Failed" ] || [ "$operation_state" = "Error" ]; then
-            log_error "❌ Sync operation failed!"
-
             local message=$(get_operation_message "$app_name")
-            log_error "Error: $message"
-
-            # Collect diagnostics
-            collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-failed.log"
-
-            # Attempt recovery
             local pattern=$(detect_failure_pattern "$app_name" "$message")
-            log_error "Detected failure pattern: $pattern"
+
+            log_error "❌ Sync failed: $pattern"
+            [ -n "$message" ] && log_error "   $message"
 
             if [ $recovery_attempts -lt $max_recovery_attempts ] && [ $((elapsed - last_recovery_attempt)) -gt 30 ]; then
                 if auto_recover "$app_name" "$pattern"; then
@@ -474,34 +496,31 @@ wait_for_sync() {
                     last_recovery_attempt=$elapsed
                     sleep 10
                     continue
-                else
-                    return 1
                 fi
-            else
-                return 1
             fi
+
+            collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-failed.log"
+            return 1
         fi
 
-        # Check for Degraded health
+        # Check for Degraded health (only warn once per degraded period)
         if [ "$health_status" = "Degraded" ] || [ "$health_status" = "Missing" ]; then
-            log_warn "⚠️  Application health is $health_status"
+            if [ $same_status_count -eq 0 ]; then
+                log_warn "⚠️  Health: $health_status"
+            fi
 
-            # If degraded for too long, collect diagnostics
-            if [ $elapsed -gt 60 ]; then
+            # If degraded for >60s, attempt recovery
+            if [ $elapsed -gt 60 ] && [ $recovery_attempts -lt $max_recovery_attempts ] && [ $((elapsed - last_recovery_attempt)) -gt 30 ]; then
                 local message=$(get_operation_message "$app_name")
                 local pattern=$(detect_failure_pattern "$app_name" "$message")
 
                 if [ "$pattern" != "UNKNOWN" ]; then
-                    log_warn "Detected issue pattern: $pattern"
-
-                    # Only attempt recovery if we haven't tried recently
-                    if [ $recovery_attempts -lt $max_recovery_attempts ] && [ $((elapsed - last_recovery_attempt)) -gt 30 ]; then
-                        if auto_recover "$app_name" "$pattern"; then
-                            recovery_attempts=$((recovery_attempts + 1))
-                            last_recovery_attempt=$elapsed
-                            sleep 10
-                            continue
-                        fi
+                    log_warn "Detected issue: $pattern - attempting recovery"
+                    if auto_recover "$app_name" "$pattern"; then
+                        recovery_attempts=$((recovery_attempts + 1))
+                        last_recovery_attempt=$elapsed
+                        sleep 10
+                        continue
                     fi
                 fi
             fi
@@ -511,7 +530,10 @@ wait_for_sync() {
         elapsed=$((elapsed + check_interval))
     done
 
-    log_error "❌ Timeout waiting for sync after ${timeout}s"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log_error "❌ Timeout after ${timeout}s"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-timeout.log"
     return 1
 }

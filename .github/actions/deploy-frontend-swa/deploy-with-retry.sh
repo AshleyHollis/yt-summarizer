@@ -27,28 +27,62 @@ export GITHUB_ACTOR="${GITHUB_ACTOR:-}"
 # Format: owner/repo#branch
 if [ -n "${GITHUB_REPOSITORY}" ] && [ -n "${GITHUB_HEAD_REF}" ]; then
   export REPOSITORY_BASE="${GITHUB_REPOSITORY}#${GITHUB_HEAD_REF}"
-  echo "::debug::Set REPOSITORY_BASE=${REPOSITORY_BASE}"
 elif [ -n "${GITHUB_REPOSITORY}" ] && [ -n "${GITHUB_REF##*/}" ]; then
   export REPOSITORY_BASE="${GITHUB_REPOSITORY}#${GITHUB_REF##*/}"
-  echo "::debug::Set REPOSITORY_BASE=${REPOSITORY_BASE}"
 fi
 
 # Determine SWA CLI verbosity flags
 VERBOSE_FLAGS=""
 if [[ "${VERBOSE}" == "true" ]]; then
   VERBOSE_FLAGS="--verbose=silly"
-  echo "::debug::Verbose logging enabled (--verbose=silly)"
 fi
+
+# Logging helpers
+log_info() { echo "[INFO] $*"; }
+log_warn() { echo "[WARN] $*"; }
+log_error() { echo "[ERROR] $*"; }
+
+# Print deployment header
+print_header() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  log_info "🚀 Azure Static Web Apps Deployment"
+  log_info "   Environment: ${DEPLOYMENT_ENVIRONMENT}"
+  log_info "   App Location: ${APP_LOCATION}"
+  log_info "   Max Attempts: ${MAX_ATTEMPTS}"
+  log_info "   Timeout: ${TIMEOUT_SECONDS}s (final attempt)"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+# Print success footer
+print_success() {
+  local attempt=$1
+  local elapsed=$2
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  log_info "✅ Deployment successful! (attempt ${attempt}, ${elapsed}s)"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+# Print failure footer
+print_failure() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  log_error "❌ Deployment failed after ${MAX_ATTEMPTS} attempts"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
 
 # Function to run deployment with timeout
 run_deploy_with_timeout() {
   local attempt=$1
   local timeout=$2
 
-  echo "::group::Deployment attempt $attempt of $MAX_ATTEMPTS to '${DEPLOYMENT_ENVIRONMENT}' environment (${timeout}s timeout)"
-  echo "::debug::App location: ${APP_LOCATION}"
-  echo "::debug::Output location: ${OUTPUT_LOCATION}"
-  echo "::debug::Environment: ${DEPLOYMENT_ENVIRONMENT}"
+  # Determine attempt strategy label
+  local strategy_label="fail-fast"
+  [ "$attempt" -eq "$MAX_ATTEMPTS" ] && strategy_label="extended"
+
+  log_info "📦 Attempt ${attempt}/${MAX_ATTEMPTS} (${strategy_label}, ${timeout}s timeout)"
 
   local start_time=$(date +%s)
 
@@ -67,13 +101,13 @@ run_deploy_with_timeout() {
     swa_cmd+=(${VERBOSE_FLAGS})
   fi
 
-  echo "::debug::Running command: ${swa_cmd[*]}"
-
   # Run SWA CLI with timeout and capture output
   # Note: timeout command is available in GitHub Actions runners (both Linux and macOS)
   # We need to capture output because SWA CLI returns exit code 0 even on deployment failure!
   local output_file
   output_file=$(mktemp)
+
+  echo "::group::SWA CLI Output (attempt ${attempt})"
 
   local cli_exit_code=0
   if timeout "${timeout}s" "${swa_cmd[@]}" 2>&1 | tee "$output_file"; then
@@ -82,35 +116,45 @@ run_deploy_with_timeout() {
     cli_exit_code=$?
   fi
 
+  echo "::endgroup::"
+
   local elapsed=$(($(date +%s) - start_time))
 
   # Check for deployment failure in output - SWA CLI returns 0 even when deployment fails!
   # Look for explicit failure messages from the CLI
   if grep -q "Deployment Failed" "$output_file" || grep -q "Status: Failed" "$output_file"; then
     local failure_reason
-    failure_reason=$(grep -o "Deployment Failure Reason: .*" "$output_file" | head -1 || echo "Unknown reason")
-    echo "::warning::Deployment attempt $attempt failed: ${failure_reason} (${elapsed}s elapsed)"
+    failure_reason=$(grep -o "Deployment Failure Reason: .*" "$output_file" | head -1 | sed 's/Deployment Failure Reason: //' || echo "Unknown")
+    log_error "   ✗ Failed: ${failure_reason} (${elapsed}s)"
     rm -f "$output_file"
-    echo "::endgroup::"
     return 1
+  fi
+
+  # Check for success indicators in output
+  if grep -q "Status: Succeeded" "$output_file" || grep -q "Deployment complete" "$output_file"; then
+    log_info "   ✓ Deployed successfully (${elapsed}s)"
+    rm -f "$output_file"
+    return 0
   fi
 
   rm -f "$output_file"
 
   if [ $cli_exit_code -eq 0 ]; then
-    echo "::notice::Deployment to '${DEPLOYMENT_ENVIRONMENT}' succeeded on attempt $attempt (${elapsed}s elapsed)"
-    echo "::endgroup::"
+    log_info "   ✓ Completed (${elapsed}s)"
     return 0
   elif [ $cli_exit_code -eq 124 ]; then
-    echo "::warning::Deployment attempt $attempt timed out after ${timeout}s"
-    echo "::endgroup::"
+    log_warn "   ⏱️  Timed out after ${timeout}s"
     return $cli_exit_code
   else
-    echo "::warning::Deployment attempt $attempt failed with exit code $cli_exit_code (${elapsed}s elapsed)"
-    echo "::endgroup::"
+    log_error "   ✗ Exit code ${cli_exit_code} (${elapsed}s)"
     return $cli_exit_code
   fi
 }
+
+# Main execution
+print_header
+
+total_start_time=$(date +%s)
 
 # Retry loop with per-attempt timeout strategy
 # Strategy: Fail fast on attempts 1-2 (5 min timeout), longer timeout on final attempt
@@ -120,15 +164,15 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     # Final attempt: Use configured timeout (default 600s = 10 minutes)
     # This allows more time for genuinely slow deployments
     attempt_timeout="$TIMEOUT_SECONDS"
-    echo "::notice::Final attempt - using extended timeout of ${attempt_timeout}s"
   else
     # Attempts 1-2: Short timeout (5 minutes) for fail-fast retry
     # Azure SWA can be transiently slow; quick retry often succeeds
     attempt_timeout="300"
-    echo "::notice::Retry attempt ${attempt} - using fail-fast timeout of ${attempt_timeout}s"
   fi
 
   if run_deploy_with_timeout "$attempt" "$attempt_timeout"; then
+    total_elapsed=$(($(date +%s) - total_start_time))
+    print_success "$attempt" "$total_elapsed"
     echo "DEPLOY_SUCCESS=true" >> "${GITHUB_OUTPUT:-/dev/stdout}"
     echo "DEPLOY_ATTEMPT=$attempt" >> "${GITHUB_OUTPUT:-/dev/stdout}"
     echo "DEPLOY_ENVIRONMENT=${DEPLOYMENT_ENVIRONMENT}" >> "${GITHUB_OUTPUT:-/dev/stdout}"
@@ -137,11 +181,12 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
 
   # If this was the last attempt, fail
   if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-    echo "::error::All $MAX_ATTEMPTS deployment attempts to '${DEPLOYMENT_ENVIRONMENT}' failed"
+    print_failure
     echo "DEPLOY_SUCCESS=false" >> "${GITHUB_OUTPUT:-/dev/stdout}"
     exit 1
   fi
 
-  # Otherwise, log and continue to next attempt
-  echo "Retrying immediately (attempt $((attempt + 1))/$MAX_ATTEMPTS)..."
+  # Otherwise, log retry
+  log_info "   ↻ Retrying..."
+  echo ""
 done

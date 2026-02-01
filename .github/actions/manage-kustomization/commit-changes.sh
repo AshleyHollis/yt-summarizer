@@ -4,6 +4,31 @@
 
 set -euo pipefail
 
+# Logging helpers
+print_header() {
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] 🚀 $1"
+  shift
+  for line in "$@"; do
+    echo "[INFO]    $line"
+  done
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+print_footer() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] $1"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+log_info() { echo "[INFO] $1"; }
+log_warn() { echo "[WARN] ⚠️  $1"; }
+log_error() { echo "[ERROR] ✗ $1"; }
+log_success() { echo "[INFO]    ✓ $1"; }
+log_step() { echo "[INFO] $1"; }
+
 # Determine what to commit based on operation
 case "$OPERATION" in
   update-preview)
@@ -39,22 +64,26 @@ case "$OPERATION" in
     ;;
 
   *)
+    log_error "Invalid operation: $OPERATION"
     echo "::error::Invalid operation: $OPERATION"
     exit 1
     ;;
 esac
 
-echo "📝 Committing changes..."
-echo "  File: $FILE_TO_COMMIT"
-echo "  Branch: $BRANCH"
+print_header "Commit Kustomization Changes" \
+  "Operation: $OPERATION" \
+  "File: $FILE_TO_COMMIT" \
+  "Branch: $BRANCH"
 
 # Configure git
+log_step "Configuring git..."
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
+log_success "Git configured"
 
 # For preview overlays, we need to work with the dedicated preview-overlays branch
 if [ "$OPERATION" == "update-preview" ]; then
-  echo "🔄 Setting up preview-overlays branch..."
+  log_step "Setting up preview-overlays branch..."
 
   # Save the current branch/ref so we can return to it later
   ORIGINAL_REF=$(git rev-parse HEAD)
@@ -67,20 +96,22 @@ if [ "$OPERATION" == "update-preview" ]; then
   TEMP_BASE_DIR="/tmp/preview-base-${PR_NUMBER}"
 
   if [ -d "$OVERLAY_DIR" ]; then
-    echo "📦 Saving generated overlay directory to temp location..."
+    log_step "⏳ Saving generated overlay to temp location..."
     cp -r "$OVERLAY_DIR" "$TEMP_OVERLAY_DIR"
     # Also copy the base-preview directory - required for kustomization to work
     # The overlay references ../../base-preview which must exist on preview-overlays branch
     if [ -d "k8s/base-preview" ]; then
-      echo "📦 Saving base-preview directory to temp location..."
       cp -r "k8s/base-preview" "$TEMP_BASE_DIR"
+      log_success "Saved overlay and base-preview directories"
     else
+      log_error "base-preview directory not found at k8s/base-preview"
       echo "::error::base-preview directory not found at k8s/base-preview"
       exit 1
     fi
     # Remove the directory to avoid checkout conflicts
     rm -rf "$OVERLAY_DIR"
   else
+    log_error "Preview overlay directory not found at $OVERLAY_DIR"
     echo "::error::Preview overlay directory not found at $OVERLAY_DIR. Was update-preview.sh run first?"
     exit 1
   fi
@@ -92,12 +123,14 @@ if [ "$OPERATION" == "update-preview" ]; then
   if git rev-parse "origin/$BRANCH" > /dev/null 2>&1; then
     # Branch exists, check it out
     git checkout -B "$BRANCH" "origin/$BRANCH"
+    log_success "Checked out existing preview-overlays branch"
   else
     # Branch doesn't exist, create it as orphan from main
-    echo "ℹ️  Creating new preview-overlays branch..."
+    log_step "Creating new preview-overlays branch..."
     git checkout --orphan "$BRANCH"
     # Remove all files from staging (orphan branch)
     git rm -rf . 2>/dev/null || true
+    log_success "Created new orphan branch"
   fi
 
   # Ensure the k8s/overlays directory structure exists
@@ -108,45 +141,48 @@ if [ "$OPERATION" == "update-preview" ]; then
   rm -rf "$OVERLAY_DIR"
 
   # Restore the entire overlay directory from temp location
-  echo "📥 Restoring overlay directory to preview-overlays branch..."
+  log_step "⏳ Restoring overlay directory to preview-overlays branch..."
   cp -r "$TEMP_OVERLAY_DIR" "$OVERLAY_DIR"
   rm -rf "$TEMP_OVERLAY_DIR"
 
   # Restore the base-preview directory
   # This is needed because kustomization.yaml references ../../base-preview
   # Remove first to ensure clean copy
-  echo "📥 Restoring base-preview directory to preview-overlays branch..."
   mkdir -p "k8s"
   rm -rf "k8s/base-preview"
   cp -r "$TEMP_BASE_DIR" "k8s/base-preview"
   rm -rf "$TEMP_BASE_DIR"
+  log_success "Restored directories to branch"
 fi
 
 # Check if file exists (should exist by now)
 if [ ! -f "$FILE_TO_COMMIT" ]; then
+  log_error "File not found: $FILE_TO_COMMIT"
   echo "::error::File not found: $FILE_TO_COMMIT"
   exit 1
 fi
 
 # Check if there are changes (for tracked files) or if file is new
 if git diff --quiet "$FILE_TO_COMMIT" 2>/dev/null && git ls-files --error-unmatch "$FILE_TO_COMMIT" > /dev/null 2>&1; then
-  echo "ℹ️  No changes to commit"
+  log_info "No changes to commit"
   echo "committed=false" >> "$GITHUB_OUTPUT"
 
   # For preview operations, switch back to the original branch before exiting
   # This ensures subsequent workflow steps can find the .github/actions/ directory
   if [ "$OPERATION" == "update-preview" ]; then
-    echo "🔙 Switching back to original branch..."
+    log_step "↻ Switching back to original branch..."
     if [ "$ORIGINAL_BRANCH" != "detached" ]; then
       git checkout "$ORIGINAL_BRANCH" 2>/dev/null || git checkout "$ORIGINAL_REF"
     else
       git checkout "$ORIGINAL_REF"
     fi
   fi
+  print_footer "ℹ️  No changes to commit"
   exit 0
 fi
 
 # Add and commit
+log_step "Staging changes..."
 git add "$FILE_TO_COMMIT"
 # For preview overlays, also add the entire overlay directory and base-preview directory
 if [ "$OPERATION" == "update-preview" ]; then
@@ -154,25 +190,29 @@ if [ "$OPERATION" == "update-preview" ]; then
   git add "$OVERLAY_DIR"
   git add "k8s/base-preview"
 fi
+log_success "Files staged"
+
+log_step "Creating commit..."
 git commit -m "$MESSAGE"
+log_success "Commit created"
 
 # For non-preview operations, handle the original branch logic
 if [ "$OPERATION" != "update-preview" ]; then
   # Handle detached HEAD - checkout branch if needed
   if ! git symbolic-ref HEAD > /dev/null 2>&1; then
-    echo "ℹ️  Detached HEAD detected, checking out branch..."
+    log_step "Detached HEAD detected, checking out branch..."
     git checkout -B "$BRANCH"
   fi
 
   # Fetch latest changes and rebase our commit on top
-  echo "📥 Fetching latest changes..."
+  log_step "⏳ Fetching latest changes..."
   git fetch origin "$BRANCH"
 
   # Check if remote branch exists and has diverged
   if git rev-parse "origin/$BRANCH" > /dev/null 2>&1; then
-    echo "🔄 Rebasing on latest changes..."
+    log_step "↻ Rebasing on latest changes..."
     if ! git rebase "origin/$BRANCH"; then
-      echo "⚠️  Rebase conflict detected - auto-resolving with our version..."
+      log_warn "Rebase conflict detected - auto-resolving with our version..."
       # Use our version for the kustomization file (it's auto-generated, ours is correct)
       git checkout --ours "$FILE_TO_COMMIT"
       git add "$FILE_TO_COMMIT"
@@ -180,30 +220,34 @@ if [ "$OPERATION" != "update-preview" ]; then
 
       # If rebase still fails, abort and try force push with lease
       if [ $? -ne 0 ]; then
-        echo "⚠️  Rebase failed, using force-with-lease push instead..."
+        log_warn "Rebase failed, using force-with-lease push instead..."
         git rebase --abort
         git push --force-with-lease origin "HEAD:$BRANCH"
-        echo "✅ Changes force-pushed with lease"
+        log_success "Changes force-pushed with lease"
         echo "committed=true" >> "$GITHUB_OUTPUT"
+        print_footer "✅ Changes committed and pushed (force-with-lease)"
         exit 0
       fi
     fi
+    log_success "Rebased successfully"
   fi
 fi
 
-echo "🚀 Pushing to $BRANCH..."
+log_step "⏳ Pushing to $BRANCH..."
 git push origin "HEAD:$BRANCH"
+log_success "Pushed to remote"
 
 # For preview operations, switch back to the original branch
 # This ensures subsequent workflow steps can find the .github/actions/ directory
 if [ "$OPERATION" == "update-preview" ]; then
-  echo "🔙 Switching back to original branch..."
+  log_step "↻ Switching back to original branch..."
   if [ "$ORIGINAL_BRANCH" != "detached" ]; then
     git checkout "$ORIGINAL_BRANCH"
   else
     git checkout "$ORIGINAL_REF"
   fi
+  log_success "Returned to original branch"
 fi
 
-echo "✅ Changes committed and pushed"
 echo "committed=true" >> "$GITHUB_OUTPUT"
+print_footer "✅ Changes committed and pushed successfully!"

@@ -50,12 +50,28 @@ GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}"
 GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME:-}"
 
-echo "Comparing: $BASE_SHA...$HEAD_SHA"
+################################################################################
+# Header
+################################################################################
+echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+echo "║  Detect PR Code Changes                                                      ║"
+echo "╠══════════════════════════════════════════════════════════════════════════════╣"
+echo "║  Base SHA: ${BASE_SHA:0:40}"
+echo "║  Head SHA: ${HEAD_SHA:0:40}"
+echo "║  Event:    ${GITHUB_EVENT_NAME}"
+if [ -n "$PR_NUMBER" ]; then
+echo "║  PR:       #${PR_NUMBER}"
+fi
+echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo ""
 
-# Check for force preview labels if PR number provided
+################################################################################
+# Check for force preview labels
+################################################################################
 FORCE_DEPLOY=false
+
 if [ -n "$PR_NUMBER" ] && [ -n "$FORCE_LABELS" ]; then
-  echo "Checking for force preview labels on PR #$PR_NUMBER..."
+  echo "[INFO] ⏳ Checking for force preview labels on PR #$PR_NUMBER..."
 
   # Get PR labels using GitHub API
   if [ -n "$GITHUB_TOKEN" ]; then
@@ -63,78 +79,92 @@ if [ -n "$PR_NUMBER" ] && [ -n "$FORCE_LABELS" ]; then
     LABELS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$API_URL" | jq -r '.labels[].name' 2>/dev/null || echo "")
 
     if [ -n "$LABELS" ]; then
-      echo "PR labels: $LABELS"
+      echo "[INFO]   Labels found: $(echo "$LABELS" | tr '\n' ', ' | sed 's/,$//')"
 
       # Check if any force label is present
       IFS=',' read -ra LABEL_ARRAY <<< "$FORCE_LABELS"
       for label in "${LABEL_ARRAY[@]}"; do
         label=$(echo "$label" | xargs)  # trim whitespace
         if echo "$LABELS" | grep -q "^$label$"; then
-          echo "✅ Force preview label '$label' found - forcing deployment"
+          echo "[INFO] ✓ Force preview label '$label' found"
           FORCE_DEPLOY=true
           break
         fi
       done
     else
-      echo "Could not fetch PR labels"
+      echo "[WARN] ⚠️ Could not fetch PR labels"
     fi
   else
-    echo "No GITHUB_TOKEN available for API calls"
+    echo "[WARN] ⚠️ No GITHUB_TOKEN available for API calls"
   fi
 fi
 
 # For manual workflow_dispatch triggers, always force deploy (no PR context needed)
 if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ "$FORCE_DEPLOY" = "true" ]; then
-  echo "🚀 Force deployment requested - proceeding with deployment"
+  echo "[INFO] ✓ Force deployment requested"
   FORCE_DEPLOY=true
 fi
 
 if [ "$FORCE_DEPLOY" = "true" ]; then
+  echo ""
+  echo "[INFO] 🚀 Force deploying - using existing images"
   echo "needs_image_build=false" >> $GITHUB_OUTPUT
   echo "needs_deployment=true" >> $GITHUB_OUTPUT
-  echo "🚀 Force deploying - using existing images"
+  echo ""
+  echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+  echo "║  Result: Force deploy enabled                                                ║"
+  echo "║  needs_image_build=false | needs_deployment=true                             ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════╝"
   exit 0
 fi
 
-# Get all changed files using git diff
-# Use merge-base for reliable comparison
-echo "🔍 Attempting to detect changed files..."
-echo "   BASE_SHA: $BASE_SHA"
-echo "   HEAD_SHA: $HEAD_SHA"
+################################################################################
+# Detect changed files
+################################################################################
+echo "[INFO] ⏳ Detecting changed files..."
 
 # For PRs, use merge-base to ensure reliable diff
 if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
   MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "$BASE_SHA")
-  echo "   Using merge-base: $MERGE_BASE"
+  echo "[INFO]   Using merge-base: ${MERGE_BASE:0:7}"
   FILES=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" 2>/dev/null || echo "")
 else
   FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
 fi
 
-echo "   git diff result: $(echo "$FILES" | wc -l) files found"
+FILE_COUNT=$(echo "$FILES" | grep -c . || echo "0")
+echo "[INFO]   Found $FILE_COUNT changed file(s)"
 
 # If still empty, try git show for all commits in the range
 if [ -z "$FILES" ]; then
-  echo "   git diff failed, trying git log --name-only..."
+  echo "[INFO] ↻ git diff failed, trying git log --name-only..."
   if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
     FILES=$(git log --name-only --pretty=format: "$MERGE_BASE..$HEAD_SHA" 2>/dev/null | sed '/^$/d' | sort | uniq || echo "")
   else
     FILES=$(git log --name-only --pretty=format: "$BASE_SHA..$HEAD_SHA" 2>/dev/null | sed '/^$/d' | sort | uniq || echo "")
   fi
-  echo "   git log result: $(echo "$FILES" | wc -l) files found"
+  FILE_COUNT=$(echo "$FILES" | grep -c . || echo "0")
+  echo "[INFO]   Found $FILE_COUNT file(s) via git log"
 fi
 
 if [ -z "$FILES" ]; then
-  echo "⚠️ Could not fetch changed files - assuming no deployment needed for safety"
+  echo "[WARN] ⚠️ Could not fetch changed files - assuming no deployment needed"
   echo "needs_image_build=false" >> $GITHUB_OUTPUT
   echo "needs_deployment=false" >> $GITHUB_OUTPUT
+  echo ""
+  echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+  echo "║  Result: No changes detected (conservative)                                  ║"
+  echo "║  needs_image_build=false | needs_deployment=false                            ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════╝"
   exit 0
 fi
 
-echo "Files changed in this comparison:"
-echo "$FILES"
+################################################################################
+# Analyze files for build/deployment triggers
+################################################################################
+echo ""
+echo "[INFO] ⏳ Analyzing files for build/deployment triggers..."
 
-# Check if any file would trigger image building in CI
 # Check for changes that require image building vs changes that require deployment
 #
 # IMAGE BUILD TRIGGERS (CI actually builds new images):
@@ -151,15 +181,18 @@ echo "$FILES"
 # - k8s/** (Kubernetes manifests - change deployment config)
 #
 # This allows K8s-only changes to trigger preview deployments using existing images
+
 HAS_IMAGE_BUILD=false
 HAS_DEPLOYMENT=false
-echo "🔍 Analyzing files for build/deployment triggers..."
+SKIP_COUNT=0
+BUILD_COUNT=0
+DEPLOY_COUNT=0
+
 while IFS= read -r file; do
   if [[ -n "$file" ]]; then
-    echo "  📄 Processing: $file"
     # Skip docs, specs, and markdown files
     if [[ "$file" =~ ^docs/ ]] || [[ "$file" =~ ^specs/ ]] || [[ "$file" =~ \.md$ ]]; then
-      echo "     [skip] docs/specs/markdown"
+      SKIP_COUNT=$((SKIP_COUNT + 1))
     # Check if file triggers image building
     elif [[ "$file" =~ ^services/api/ ]] || \
       [[ "$file" =~ ^services/workers/ ]] || \
@@ -168,23 +201,34 @@ while IFS= read -r file; do
       [[ "$file" =~ /Dockerfile ]] || \
       [[ "$file" =~ ^docker-compose.*\.yml$ ]] || \
       [[ "$file" == .dockerignore ]]; then
-      echo "     [BUILD] triggers image build"
+      BUILD_COUNT=$((BUILD_COUNT + 1))
       HAS_IMAGE_BUILD=true
       HAS_DEPLOYMENT=true
     # Check if file triggers deployment (but not image build)
     elif [[ "$file" =~ ^k8s/ ]]; then
-      echo "     [DEPLOY] triggers deployment (K8s config)"
+      DEPLOY_COUNT=$((DEPLOY_COUNT + 1))
       HAS_DEPLOYMENT=true
     else
-      echo "     [skip] does not trigger build or deployment"
+      SKIP_COUNT=$((SKIP_COUNT + 1))
     fi
   fi
 done <<< "$FILES"
 
-echo "📊 Analysis Results:"
-echo "   needs_image_build=$HAS_IMAGE_BUILD"
-echo "   needs_deployment=$HAS_DEPLOYMENT"
+echo "[INFO]   Build triggers:  $BUILD_COUNT file(s)"
+echo "[INFO]   Deploy triggers: $DEPLOY_COUNT file(s)"
+echo "[INFO]   Skipped:         $SKIP_COUNT file(s)"
 
+################################################################################
 # Set outputs
+################################################################################
 echo "needs_image_build=$HAS_IMAGE_BUILD" >> $GITHUB_OUTPUT
 echo "needs_deployment=$HAS_DEPLOYMENT" >> $GITHUB_OUTPUT
+
+################################################################################
+# Summary
+################################################################################
+echo ""
+echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+echo "║  Result: Analysis complete                                                   ║"
+echo "║  needs_image_build=${HAS_IMAGE_BUILD} | needs_deployment=${HAS_DEPLOYMENT}"
+echo "╚══════════════════════════════════════════════════════════════════════════════╝"
