@@ -133,6 +133,7 @@ jobs:
           poll-interval-seconds: ${{ inputs.environment == 'prod' && '5' || '10' }}
           pr-number: ${{ inputs.pr-number }}
           max-recovery-attempts: '3'
+          expected-image-tag: ${{ inputs.expected-image-tag }}
 
       - name: Verify deployments are using correct image tag
         uses: ./.github/actions/verify-k8s-deployment

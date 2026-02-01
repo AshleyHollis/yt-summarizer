@@ -398,6 +398,25 @@ wait_for_sync() {
 
         # Success condition
         if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ]; then
+            # If expected image tag is provided, verify it matches before declaring success
+            if [ -n "$expected_image" ]; then
+                local actual_tag=""
+                # Get the actual deployed image tag from the api deployment
+                actual_tag=$(kubectl get deployment api -n "$namespace" \
+                    -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | sed 's/.*://' || echo "")
+                
+                if [ "$actual_tag" != "$expected_image" ]; then
+                    # ArgoCD shows synced but with wrong image tag - it hasn't synced the new overlay yet
+                    if [ $((elapsed % 30)) -eq 0 ] || [ $elapsed -eq 0 ]; then
+                        log_info "[${elapsed}s] Waiting for image tag update: current=$actual_tag, expected=$expected_image"
+                    fi
+                    sleep "$check_interval"
+                    elapsed=$((elapsed + check_interval))
+                    continue
+                fi
+                log_info "   ✓ Image tag verified: $actual_tag"
+            fi
+            
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             log_info "✅ Deployment successful! (${elapsed}s)"
