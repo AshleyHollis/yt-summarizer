@@ -467,7 +467,7 @@ wait_for_sync() {
         if [ "$operation_state" = "Failed" ] || [ "$operation_state" = "Error" ]; then
             local message=$(get_operation_message "$app_name")
             local pattern=$(detect_failure_pattern "$app_name" "$message")
-            
+
             log_error "❌ Sync failed: $pattern"
             [ -n "$message" ] && log_error "   $message"
 
@@ -479,7 +479,7 @@ wait_for_sync() {
                     continue
                 fi
             fi
-            
+
             collect_diagnostics "$app_name" "$namespace" "/tmp/argocd-diagnostics-failed.log"
             return 1
         fi
