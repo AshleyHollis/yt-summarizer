@@ -36,8 +36,34 @@
 # =============================================================================
 set -euo pipefail
 
+# Logging helpers
+print_header() {
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] 🚀 $1"
+  shift
+  for line in "$@"; do
+    echo "[INFO]    $line"
+  done
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+print_footer() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] $1"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+log_info() { echo "[INFO] $1"; }
+log_warn() { echo "[WARN] ⚠️  $1"; }
+log_error() { echo "[ERROR] ✗ $1"; }
+log_success() { echo "[INFO]    ✓ $1"; }
+log_step() { echo "[INFO] $1"; }
+
 # Validate inputs
 if [ -z "${IMAGE_TAG}" ]; then
+  log_error "IMAGE_TAG is empty. Aborting to avoid committing empty tags."
   echo "::error::IMAGE_TAG is empty. Aborting to avoid committing empty tags."
   exit 1
 fi
@@ -47,20 +73,29 @@ OVERLAY_DIR="k8s/overlays/preview-pr-${PR_NUMBER}"
 OVERLAY_FILE="${OVERLAY_DIR}/kustomization.yaml"
 BASE_OVERLAY_DIR="k8s/overlays/preview"
 
+print_header "Update Preview Overlay" \
+  "PR Number: #${PR_NUMBER}" \
+  "Image Tag: ${IMAGE_TAG}" \
+  "Preview URL: ${PREVIEW_URL}"
+
 # Create PR-specific overlay directory if it doesn't exist
 if [ ! -d "${OVERLAY_DIR}" ]; then
-  echo "📁 Creating PR-specific overlay directory: ${OVERLAY_DIR}"
+  log_step "Creating PR-specific overlay directory..."
   mkdir -p "${OVERLAY_DIR}"
 
   # Copy base preview overlay structure if it exists
   if [ -d "${BASE_OVERLAY_DIR}" ]; then
-    echo "📋 Copying base preview overlay structure..."
+    log_step "⏳ Copying base preview overlay structure..."
     cp -r "${BASE_OVERLAY_DIR}"/* "${OVERLAY_DIR}/" 2>/dev/null || true
+    log_success "Base overlay copied"
   fi
+  log_success "Created ${OVERLAY_DIR}"
+else
+  log_info "Overlay directory already exists: ${OVERLAY_DIR}"
 fi
 
 # Generate preview overlay using shell script
-echo "Using IMAGE_TAG=${IMAGE_TAG}"
+log_step "⏳ Generating preview kustomization..."
 
 bash scripts/ci/generate_preview_kustomization.sh \
   --template scripts/ci/templates/preview-kustomization-template.yaml \
@@ -72,7 +107,7 @@ bash scripts/ci/generate_preview_kustomization.sh \
   --tls-secret "${TLS_SECRET}" \
   --commit-sha "${COMMIT_SHA}"
 
-echo "✅ Updated preview overlay at ${OVERLAY_FILE}"
+log_success "Generated overlay at ${OVERLAY_FILE}"
 
 # Output values for downstream jobs
 {
@@ -82,5 +117,7 @@ echo "✅ Updated preview overlay at ${OVERLAY_FILE}"
 } >> "$GITHUB_OUTPUT"
 
 # Display generated overlay for verification
-echo "Generated overlay content:"
+log_step "Generated overlay content:"
 cat "${OVERLAY_FILE}"
+
+print_footer "✅ Preview overlay updated successfully!"

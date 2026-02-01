@@ -29,9 +29,35 @@
 
 set -euo pipefail
 
+# Logging helpers
+print_header() {
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] 🚀 $1"
+  shift
+  for line in "$@"; do
+    echo "[INFO]    $line"
+  done
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+print_footer() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] $1"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+log_info() { echo "[INFO] $1"; }
+log_warn() { echo "[WARN] ⚠️  $1"; }
+log_error() { echo "[ERROR] ✗ $1"; }
+log_success() { echo "[INFO]    ✓ $1"; }
+log_step() { echo "[INFO] $1"; }
+
 # Validate required tools
 for tool in curl jq unzip; do
   if ! command -v "$tool" &>/dev/null; then
+    log_error "Required tool '$tool' not found in PATH"
     echo "::error::Required tool '$tool' not found in PATH"
     exit 1
   fi
@@ -47,11 +73,13 @@ WORKFLOW_EVENT="${WORKFLOW_EVENT:-}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}"
 
 if [[ -z "$GITHUB_TOKEN" ]] || [[ -z "$COMMIT_SHA" ]]; then
+  log_error "GITHUB_TOKEN and COMMIT_SHA are required"
   echo "::error::GITHUB_TOKEN and COMMIT_SHA are required"
   exit 1
 fi
 
 if [[ -z "$GITHUB_REPOSITORY" ]]; then
+  log_error "GITHUB_REPOSITORY is required"
   echo "::error::GITHUB_REPOSITORY is required"
   exit 1
 fi
@@ -78,7 +106,7 @@ check_pr_state() {
 
   # Handle HTTP errors
   if [[ "$http_code" != "200" ]]; then
-    echo "   ⚠️ Failed to check PR state (HTTP $http_code), assuming open"
+    log_warn "Failed to check PR state (HTTP $http_code), assuming open"
     return 0
   fi
 
@@ -92,10 +120,11 @@ check_pr_state() {
   return 0
 }
 
-echo "⏳ Waiting for CI workflow to complete..."
-echo "   Commit: $COMMIT_SHA"
-echo "   Timeout: $TIMEOUT_SECONDS seconds"
-echo "   Check interval: $INTERVAL_SECONDS seconds"
+print_header "Wait for CI Workflow" \
+  "Commit: ${COMMIT_SHA:0:7}" \
+  "Timeout: ${TIMEOUT_SECONDS}s" \
+  "Interval: ${INTERVAL_SECONDS}s" \
+  "Workflow: $WORKFLOW_FILE"
 
 start_time=$(date +%s)
 end_time=$((start_time + TIMEOUT_SECONDS))
@@ -104,15 +133,17 @@ attempt=1
 while [ $(date +%s) -lt $end_time ]; do
   # Check if PR is still open
   if ! check_pr_state "$PR_NUMBER"; then
+    log_info "PR #$PR_NUMBER is closed; skipping wait for CI"
     echo "::notice::PR $PR_NUMBER is closed; skipping wait for CI."
     echo "image_tag=" >> ${GITHUB_OUTPUT:-/dev/null}
     echo "ci_run_id=" >> ${GITHUB_OUTPUT:-/dev/null}
+    print_footer "ℹ️  Skipped - PR is closed"
     exit 0
   fi
 
   current_time=$(date +%s)
   elapsed=$((current_time - start_time))
-  echo "🔍 [$(date '+%H:%M:%S')] Attempt $attempt (elapsed: ${elapsed}s) - Checking CI status..."
+  log_info "⏳ Attempt $attempt (elapsed: ${elapsed}s)..."
 
   # Get CI workflow runs for this commit
   query="head_sha=$COMMIT_SHA"
@@ -130,32 +161,31 @@ while [ $(date +%s) -lt $end_time ]; do
 
   # Handle API errors
   if [[ "$http_code" != "200" ]]; then
-    echo "   ⚠️ GitHub API returned HTTP $http_code, retrying..."
+    log_warn "GitHub API returned HTTP $http_code, retrying..."
     attempt=$((attempt + 1))
     sleep $INTERVAL_SECONDS
     continue
   fi
 
-  # Debug: Show total workflow runs found
-  total_runs=$(echo "$body" | jq -r '.total_count // 0')
-  echo "   📊 Found $total_runs total workflow runs for commit $COMMIT_SHA"
-
   # Extract latest CI workflow run
+  total_runs=$(echo "$body" | jq -r '.total_count // 0')
   ci_run=$(echo "$body" | jq -r '.workflow_runs[0].id // empty')
+
   if [ -z "$ci_run" ]; then
-    echo "   ❌ No CI workflow run found yet for commit $COMMIT_SHA"
+    log_info "   ↻ No CI workflow run found yet ($total_runs total runs)"
   else
     ci_status=$(echo "$body" | jq -r ".workflow_runs[0].status // empty")
     ci_conclusion=$(echo "$body" | jq -r ".workflow_runs[0].conclusion // empty")
-    echo "   🔗 CI Run ID: $ci_run | Status: $ci_status | Conclusion: $ci_conclusion"
+    log_info "   Run #$ci_run: $ci_status${ci_conclusion:+ ($ci_conclusion)}"
 
     if [ "$ci_status" = "completed" ]; then
       if [ "$ci_conclusion" = "success" ]; then
-        echo "✅ CI workflow completed successfully (took ${elapsed}s)"
+        log_success "CI workflow completed (took ${elapsed}s)"
 
         echo "ci_run_id=$ci_run" >> ${GITHUB_OUTPUT:-/dev/null}
 
         # Attempt to download the image-tag artifact from the CI run (if it exists)
+        log_step "⏳ Fetching artifacts..."
         artifacts_response=$(curl -s -w "\n%{http_code}" \
           -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
@@ -167,7 +197,7 @@ while [ $(date +%s) -lt $end_time ]; do
         if [[ "$artifacts_http_code" == "200" ]]; then
           artifact_id=$(echo "$artifacts_body" | jq -r '.artifacts[] | select(.name == "image-tag") | .id' | head -1)
           if [ -n "$artifact_id" ]; then
-            echo "   🔽 Found image-tag artifact (id: $artifact_id), downloading..."
+            log_info "   ⏳ Downloading image-tag artifact..."
             archive_url=$(echo "$artifacts_body" | jq -r ".artifacts[] | select(.id == ($artifact_id | tonumber)) | .archive_download_url")
 
             if curl -s -L -H "Authorization: token $GITHUB_TOKEN" -o /tmp/artifacts.zip "$archive_url"; then
@@ -175,34 +205,41 @@ while [ $(date +%s) -lt $end_time ]; do
 
               if [ -f /tmp/artifacts/image-tag.txt ]; then
                 TAG=$(cat /tmp/artifacts/image-tag.txt | tr -d '\r\n')
-                echo "   ✅ Retrieved image tag from artifact: $TAG"
+                log_success "Image tag: $TAG"
                 echo "image_tag=$TAG" >> ${GITHUB_OUTPUT:-/dev/null}
               else
-                echo "   ⚠️ image-tag artifact found but file not present"
+                log_warn "image-tag artifact found but file not present"
                 echo "image_tag=" >> ${GITHUB_OUTPUT:-/dev/null}
               fi
             else
-              echo "   ⚠️ Failed to download artifact, continuing without image tag"
+              log_warn "Failed to download artifact"
               echo "image_tag=" >> ${GITHUB_OUTPUT:-/dev/null}
             fi
           else
-            echo "   ⚠️ No image-tag artifact found on CI run"
+            log_info "   ℹ️  No image-tag artifact found on CI run"
             echo "image_tag=" >> ${GITHUB_OUTPUT:-/dev/null}
           fi
         else
-          echo "   ⚠️ Failed to fetch artifacts (HTTP $artifacts_http_code)"
+          log_warn "Failed to fetch artifacts (HTTP $artifacts_http_code)"
           echo "image_tag=" >> ${GITHUB_OUTPUT:-/dev/null}
         fi
 
+        print_footer "✅ CI completed successfully!"
         exit 0
       elif [ "$ci_conclusion" = "failure" ]; then
+        log_error "CI workflow failed"
         echo "::error::CI workflow failed. Stopping preview deployment."
+        print_footer "❌ CI workflow failed"
         exit 1
       elif [ "$ci_conclusion" = "cancelled" ]; then
+        log_error "CI workflow was cancelled"
         echo "::error::CI workflow was cancelled. Stopping preview deployment."
+        print_footer "❌ CI workflow cancelled"
         exit 1
       else
+        log_error "CI workflow completed with unexpected conclusion: $ci_conclusion"
         echo "::error::CI workflow completed with unexpected conclusion: $ci_conclusion"
+        print_footer "❌ CI failed ($ci_conclusion)"
         exit 1
       fi
     fi
@@ -213,5 +250,7 @@ while [ $(date +%s) -lt $end_time ]; do
   sleep $INTERVAL_SECONDS
 done
 
+log_error "Timeout waiting for CI workflow after $TIMEOUT_SECONDS seconds"
 echo "::error::Timeout waiting for CI workflow to complete after $TIMEOUT_SECONDS seconds"
+print_footer "⏱️ Timeout after ${TIMEOUT_SECONDS}s"
 exit 1
