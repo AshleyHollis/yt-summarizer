@@ -1,53 +1,71 @@
 #!/bin/bash
-# Pre-deployment validation for Kubernetes manifests
-# Catches common issues before Argo CD deploys them
+################################################################################
+# Library: validate-deployment.sh
+#
+# Purpose: Pre-deployment validation for Kubernetes manifests.
+#          Catches common issues before Argo CD deploys them.
+#
+# Usage:
+#   Source this file or run directly:
+#   ./validate-deployment.sh <kustomize_dir> <namespace> [acr_server]
+#
+# Example:
+#   ./validate-deployment.sh k8s/overlays/preview preview-pr-110 acrytsummprd.azurecr.io
+################################################################################
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
+################################################################################
+# Logging functions
+################################################################################
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $*"
+    echo "[INFO] $*"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*"
+    echo "[WARN] ⚠️ $*"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*"
+    echo "[ERROR] ✗ $*"
 }
 
+log_success() {
+    echo "[INFO] ✓ $*"
+}
+
+################################################################################
 # Validation results
+################################################################################
 VALIDATION_ERRORS=0
 VALIDATION_WARNINGS=0
 
+################################################################################
 # Validate kustomization builds successfully
+################################################################################
 validate_kustomize_build() {
     local kustomize_dir="$1"
 
-    log_info "Validating kustomize build: $kustomize_dir"
+    log_info "⏳ Validating kustomize build: $kustomize_dir"
 
     if ! kubectl kustomize "$kustomize_dir" > /tmp/manifests.yaml 2>&1; then
-        log_error "❌ Kustomize build failed!"
+        log_error "Kustomize build failed!"
         cat /tmp/manifests.yaml
         VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
         return 1
     fi
 
-    log_info "✅ Kustomize build successful"
+    log_success "Kustomize build successful"
     return 0
 }
 
+################################################################################
 # Validate YAML syntax and structure
+################################################################################
 validate_yaml_structure() {
     local manifests_file="$1"
 
-    log_info "Validating YAML structure..."
+    log_info "⏳ Validating YAML structure..."
 
     # Skip kubectl validation in CI (no K8s API server available)
     if [[ "${SKIP_SECRET_VALIDATION:-false}" == "true" ]]; then
@@ -59,21 +77,23 @@ validate_yaml_structure() {
     local errors=$(kubectl apply --dry-run=client -f "$manifests_file" 2>&1 | grep -i "error\|invalid" || true)
 
     if [ -n "$errors" ]; then
-        log_error "❌ YAML validation failed:"
+        log_error "YAML validation failed:"
         echo "$errors"
         VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
         return 1
     fi
 
-    log_info "✅ YAML structure valid"
+    log_success "YAML structure valid"
     return 0
 }
 
+################################################################################
 # Extract resource requests/limits from manifests
+################################################################################
 calculate_resource_requirements() {
     local manifests_file="$1"
 
-    log_info "Calculating resource requirements..."
+    log_info "⏳ Calculating resource requirements..."
 
     local total_cpu_requests=0
     local total_cpu_limits=0
@@ -126,19 +146,21 @@ calculate_resource_requirements() {
     echo "$total_cpu_requests $total_cpu_limits $total_memory_requests $total_memory_limits"
 }
 
+################################################################################
 # Validate against namespace quota
+################################################################################
 validate_quota() {
     local namespace="$1"
     local total_cpu_limits="$2"
     local total_memory_limits="$3"
 
-    log_info "Validating against namespace quota: $namespace"
+    log_info "⏳ Validating against namespace quota: $namespace"
 
     # Get quota (if exists)
     local quota=$(kubectl get resourcequota -n "$namespace" -o json 2>/dev/null || echo '{"items":[]}')
 
     if [ "$(echo "$quota" | jq '.items | length')" -eq 0 ]; then
-        log_warn "⚠️  No resource quota found in namespace $namespace"
+        log_warn "No resource quota found in namespace $namespace"
         VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
         return 0
     fi
@@ -151,15 +173,15 @@ validate_quota() {
 
     # Check if deployment would exceed quota
     if [ "$total_cpu_limits" -gt "$quota_cpu" ]; then
-        log_error "❌ CPU limit ($total_cpu_limits m) exceeds quota ($quota_cpu m)"
-        log_error "   Deficit: $((total_cpu_limits - quota_cpu))m"
+        log_error "CPU limit ($total_cpu_limits m) exceeds quota ($quota_cpu m)"
+        log_error "  Deficit: $((total_cpu_limits - quota_cpu))m"
         VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
         return 1
     fi
 
     if [ "$total_memory_limits" -gt "$quota_memory" ]; then
-        log_error "❌ Memory limit ($total_memory_limits Mi) exceeds quota ($quota_memory Mi)"
-        log_error "   Deficit: $((total_memory_limits - quota_memory))Mi"
+        log_error "Memory limit ($total_memory_limits Mi) exceeds quota ($quota_memory Mi)"
+        log_error "  Deficit: $((total_memory_limits - quota_memory))Mi"
         VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
         return 1
     fi
@@ -169,35 +191,37 @@ validate_quota() {
     local mem_usage_pct=$((total_memory_limits * 100 / quota_memory))
 
     if [ "$cpu_usage_pct" -gt 80 ]; then
-        log_warn "⚠️  CPU usage at ${cpu_usage_pct}% of quota"
+        log_warn "CPU usage at ${cpu_usage_pct}% of quota"
         VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
     fi
 
     if [ "$mem_usage_pct" -gt 80 ]; then
-        log_warn "⚠️  Memory usage at ${mem_usage_pct}% of quota"
+        log_warn "Memory usage at ${mem_usage_pct}% of quota"
         VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
     fi
 
-    log_info "✅ Resource requirements within quota limits"
-    log_info "   CPU: ${cpu_usage_pct}% (${total_cpu_limits}m / ${quota_cpu}m)"
-    log_info "   Memory: ${mem_usage_pct}% (${total_memory_limits}Mi / ${quota_memory}Mi)"
+    log_success "Resource requirements within quota limits"
+    log_info "  CPU: ${cpu_usage_pct}% (${total_cpu_limits}m / ${quota_cpu}m)"
+    log_info "  Memory: ${mem_usage_pct}% (${total_memory_limits}Mi / ${quota_memory}Mi)"
 
     return 0
 }
 
+################################################################################
 # Validate images exist in registry
+################################################################################
 validate_images() {
     local manifests_file="$1"
     local acr_server="${2:-acrytsummprd.azurecr.io}"
 
-    log_info "Validating container images exist in registry..."
+    log_info "⏳ Validating container images exist in registry..."
 
     # Extract all images from manifests
     local images=$(kubectl get -f "$manifests_file" -o json 2>/dev/null | \
         jq -r '.items[].spec.template.spec.containers[]?.image // empty' | sort -u || true)
 
     if [ -z "$images" ]; then
-        log_warn "⚠️  No container images found in manifests"
+        log_warn "No container images found in manifests"
         VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
         return 0
     fi
@@ -216,10 +240,10 @@ validate_images() {
             # Check if image exists
             if ! az acr repository show-tags --name "${acr_server%%.*}" \
                 --repository "$repo" --output tsv 2>/dev/null | grep -q "^$tag$"; then
-                log_error "❌ Image not found: $image"
+                log_error "Image not found: $image"
                 missing_images=$((missing_images + 1))
             else
-                log_info "  ✅ $repo:$tag exists"
+                log_success "  $repo:$tag exists"
             fi
         else
             log_info "  Skipping non-ACR image: $image"
@@ -227,21 +251,23 @@ validate_images() {
     done
 
     if [ $missing_images -gt 0 ]; then
-        log_error "❌ $missing_images image(s) not found in registry"
+        log_error "$missing_images image(s) not found in registry"
         VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
         return 1
     fi
 
-    log_info "✅ All images exist in registry"
+    log_success "All images exist in registry"
     return 0
 }
 
+################################################################################
 # Validate required secrets exist
+################################################################################
 validate_secrets() {
     local manifests_file="$1"
     local namespace="$2"
 
-    log_info "Validating required secrets exist..."
+    log_info "⏳ Validating required secrets exist..."
 
     # Extract secret references from ExternalSecrets
     local external_secrets=$(kubectl get -f "$manifests_file" --ignore-not-found -o json 2>/dev/null | \
@@ -258,22 +284,24 @@ validate_secrets() {
         log_info "  Checking secret: $secret"
 
         if ! kubectl get secret "$secret" -n "$namespace" &>/dev/null; then
-            log_warn "⚠️  Secret not yet created (will be created by ExternalSecret operator): $secret"
+            log_warn "Secret not yet created (will be created by ExternalSecret operator): $secret"
             VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
         else
-            log_info "  ✅ $secret exists"
+            log_success "  $secret exists"
         fi
     done
 
     return 0
 }
 
+################################################################################
 # Validate resource dependencies (ServiceAccounts, ConfigMaps, etc.)
+################################################################################
 validate_dependencies() {
     local manifests_file="$1"
     local namespace="$2"
 
-    log_info "Validating resource dependencies..."
+    log_info "⏳ Validating resource dependencies..."
 
     # Check for ServiceAccount references in Pods/Jobs
     local service_accounts=$(kubectl get -f "$manifests_file" -o json 2>/dev/null | \
@@ -293,29 +321,35 @@ validate_dependencies() {
         if [ -z "$sa_exists" ]; then
             # Check if SA exists in cluster
             if ! kubectl get serviceaccount "$sa" -n "$namespace" &>/dev/null; then
-                log_error "❌ ServiceAccount not found in manifests or cluster: $sa"
+                log_error "ServiceAccount not found in manifests or cluster: $sa"
                 VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
             else
-                log_info "  ✅ $sa exists in cluster"
+                log_success "  $sa exists in cluster"
             fi
         else
-            log_info "  ✅ $sa defined in manifests"
+            log_success "  $sa defined in manifests"
         fi
     done
 
     return 0
 }
 
+################################################################################
 # Main validation function
+################################################################################
 validate_deployment() {
     local kustomize_dir="$1"
     local namespace="$2"
     local acr_server="${3:-acrytsummprd.azurecr.io}"
 
-    log_info "==== Pre-Deployment Validation ===="
-    log_info "Kustomize directory: $kustomize_dir"
-    log_info "Target namespace: $namespace"
-    log_info "====================================="
+    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+    echo "║  Pre-Deployment Validation                                                   ║"
+    echo "╠══════════════════════════════════════════════════════════════════════════════╣"
+    echo "║  Kustomize Dir: ${kustomize_dir}"
+    echo "║  Namespace:     ${namespace}"
+    echo "║  ACR Server:    ${acr_server}"
+    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+    echo ""
 
     # Step 1: Validate kustomize builds
     if ! validate_kustomize_build "$kustomize_dir"; then
@@ -326,9 +360,11 @@ validate_deployment() {
     local manifests_file="/tmp/manifests.yaml"
 
     # Step 2: Validate YAML structure
+    echo ""
     validate_yaml_structure "$manifests_file" || true
 
     # Step 3: Calculate resource requirements
+    echo ""
     local resource_totals=$(calculate_resource_requirements "$manifests_file")
     local cpu_requests=$(echo "$resource_totals" | awk '{print $1}')
     local cpu_limits=$(echo "$resource_totals" | awk '{print $2}')
@@ -336,39 +372,49 @@ validate_deployment() {
     local mem_limits=$(echo "$resource_totals" | awk '{print $4}')
 
     # Step 4: Validate against quota
+    echo ""
     validate_quota "$namespace" "$cpu_limits" "$mem_limits" || true
 
     # Step 5: Validate images exist
+    echo ""
     validate_images "$manifests_file" "$acr_server" || true
 
     # Step 6: Validate secrets
+    echo ""
     validate_secrets "$manifests_file" "$namespace" || true
 
     # Step 7: Validate dependencies
+    echo ""
     validate_dependencies "$manifests_file" "$namespace" || true
 
     # Summary
-    log_info "====================================="
-    log_info "Validation Summary:"
-    log_info "  Errors: $VALIDATION_ERRORS"
-    log_info "  Warnings: $VALIDATION_WARNINGS"
-    log_info "====================================="
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+    echo "║  Validation Summary                                                          ║"
+    echo "╠══════════════════════════════════════════════════════════════════════════════╣"
+    echo "║  Errors:   ${VALIDATION_ERRORS}"
+    echo "║  Warnings: ${VALIDATION_WARNINGS}"
+    echo "╠══════════════════════════════════════════════════════════════════════════════╣"
 
     if [ $VALIDATION_ERRORS -gt 0 ]; then
-        log_error "❌ Validation failed with $VALIDATION_ERRORS error(s)"
+        echo "║  Result: ✗ FAILED - ${VALIDATION_ERRORS} error(s) found                              ║"
+        echo "╚══════════════════════════════════════════════════════════════════════════════╝"
         return 1
     fi
 
     if [ $VALIDATION_WARNINGS -gt 0 ]; then
-        log_warn "⚠️  Validation passed with $VALIDATION_WARNINGS warning(s)"
+        echo "║  Result: ⚠️ PASSED with ${VALIDATION_WARNINGS} warning(s)                              ║"
     else
-        log_info "✅ All validations passed!"
+        echo "║  Result: ✓ SUCCESS - All validations passed                                  ║"
     fi
+    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 
     return 0
 }
 
+################################################################################
 # If script is executed directly (not sourced)
+################################################################################
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     if [ $# -lt 2 ]; then
         echo "Usage: $0 <kustomize_dir> <namespace> [acr_server]"

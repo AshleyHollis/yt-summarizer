@@ -40,10 +40,22 @@ REPOSITORY="${REPOSITORY:?REPOSITORY not set}"
 TAG="${TAG:?TAG not set}"
 FAIL_IF_MISSING="${FAIL_IF_MISSING:?FAIL_IF_MISSING not set}"
 
-echo "🔍 Validating image exists in ACR..."
-echo "  Registry: ${REGISTRY}.azurecr.io"
-echo "  Repository: ${REPOSITORY}"
-echo "  Tag: ${TAG}"
+################################################################################
+# Header
+################################################################################
+echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+echo "║  ACR Image Validation                                                        ║"
+echo "╠══════════════════════════════════════════════════════════════════════════════╣"
+echo "║  Registry:   ${REGISTRY}.azurecr.io"
+echo "║  Repository: ${REPOSITORY}"
+echo "║  Tag:        ${TAG}"
+echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo ""
+
+################################################################################
+# Validate image exists
+################################################################################
+echo "[INFO] ⏳ Checking if image exists in ACR..."
 
 # Try to get manifest for the specific tag
 # This requires authentication, which should be set up by Azure Login action
@@ -53,13 +65,12 @@ if [ -z "$MANIFEST" ] || [[ "$MANIFEST" == *"not found"* ]] || [[ "$MANIFEST" ==
   echo "exists=false" >> $GITHUB_OUTPUT
   echo "digest=" >> $GITHUB_OUTPUT
 
-  echo "::warning::❌ Image NOT found: ${REGISTRY}.azurecr.io/${REPOSITORY}:${TAG}"
+  echo "[WARN] ✗ Image NOT found: ${REGISTRY}.azurecr.io/${REPOSITORY}:${TAG}"
 
   if [ "$FAIL_IF_MISSING" = "true" ]; then
     echo ""
-    echo "::error::Required image does not exist in ACR!"
-    echo "::error::  Registry: ${REGISTRY}.azurecr.io"
-    echo "::error::  Image: ${REPOSITORY}:${TAG}"
+    echo "[ERROR] Required image does not exist in ACR!"
+    echo "::error::Image not found: ${REGISTRY}.azurecr.io/${REPOSITORY}:${TAG}"
     echo ""
     echo "::group::🔧 How to Fix This"
     echo "This usually means the CI workflow didn't complete successfully or didn't push images."
@@ -92,6 +103,10 @@ if [ -z "$MANIFEST" ] || [[ "$MANIFEST" == *"not found"* ]] || [[ "$MANIFEST" ==
       echo "Could not list tags (permission issue or repository doesn't exist)"
     echo "::endgroup::"
 
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+    echo "║  Result: ✗ FAILED - Image not found                                          ║"
+    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
     exit 1
   fi
 else
@@ -109,8 +124,13 @@ else
   echo "exists=true" >> $GITHUB_OUTPUT
   echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
-  echo "✅ Image exists in ACR"
+  echo "[INFO] ✓ Image exists in ACR"
   if [ -n "$DIGEST" ]; then
-    echo "   Digest: ${DIGEST}"
+    echo "[INFO]   Digest: ${DIGEST}"
   fi
+
+  echo ""
+  echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+  echo "║  Result: ✓ SUCCESS - Image verified                                          ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 fi
