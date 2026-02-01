@@ -150,6 +150,15 @@ jobs:
           ref: ${{ inputs.pr-head-sha != '' && inputs.pr-head-sha || github.sha }}
           token: ${{ inputs.environment == 'prod' && steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
 
+      # Fail-fast if PR has been closed to avoid false failures and wasted resources
+      - name: Check if PR is still open
+        if: inputs.environment == 'preview' && inputs.pr-number != ''
+        uses: ./.github/actions/check-pr-open
+        with:
+          pr-number: ${{ inputs.pr-number }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
+
       - name: Load shared environment
         uses: ./.github/actions/load-shared-env
 
