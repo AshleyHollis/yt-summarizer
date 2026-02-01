@@ -1,5 +1,12 @@
 name: Manage Kustomization
-description: Unified action for updating and committing Kubernetes kustomization overlays (preview/prod)
+description: |
+  Unified action for updating and committing Kubernetes kustomization overlays (preview/prod)
+  
+  IMPORTANT: This action uses different input parameters for different operations:
+  - Preview operations: Uses pr-number to auto-generate overlay path (k8s/overlays/preview-pr-{number})
+  - Production operations: Uses kustomization-path to specify overlay directory
+  
+  Both operations set OVERLAY_PATH environment variable for validation and commit scripts.
 
 inputs:
   operation:
@@ -10,10 +17,6 @@ inputs:
   image-tag:
     description: 'Docker image tag to deploy'
     required: false
-  overlay-path:
-    description: 'Path to kustomization overlay directory'
-    required: false
-    default: ''
 
   # Preview-specific inputs
   pr-number:
@@ -37,7 +40,7 @@ inputs:
 
   # Production-specific inputs
   kustomization-path:
-    description: 'Path to kustomization overlay (for prod)'
+    description: 'Path to kustomization overlay directory (for prod and commit-only)'
     required: false
     default: 'k8s/overlays/prod'
   template-path:
@@ -132,7 +135,7 @@ runs:
     - name: Validate generated overlay
       shell: bash
       env:
-        OVERLAY_PATH: ${{ inputs.operation == 'update-preview' && format('k8s/overlays/preview-pr-{0}', inputs.pr-number) || inputs.overlay-path }}
+        OVERLAY_PATH: ${{ inputs.operation == 'update-preview' && format('k8s/overlays/preview-pr-{0}', inputs.pr-number) || inputs.kustomization-path }}
       run: |
         echo "🔍 Validating overlay at ${OVERLAY_PATH}..."
 
@@ -164,7 +167,7 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
         IMAGE_TAG: ${{ inputs.image-tag }}
         COMMIT_SHA: ${{ inputs.commit-sha }}
-        # For preview: use PR-specific path; for others: use provided overlay-path
-        OVERLAY_PATH: ${{ inputs.operation == 'update-preview' && format('k8s/overlays/preview-pr-{0}', inputs.pr-number) || inputs.overlay-path }}
+        # For preview: use PR-specific path; for prod: use kustomization-path
+        OVERLAY_PATH: ${{ inputs.operation == 'update-preview' && format('k8s/overlays/preview-pr-{0}', inputs.pr-number) || inputs.kustomization-path }}
         KUSTOMIZATION_PATH: ${{ inputs.kustomization-path }}
       run: bash ${{ github.action_path }}/commit-changes.sh
