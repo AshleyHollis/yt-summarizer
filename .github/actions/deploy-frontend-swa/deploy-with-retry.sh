@@ -108,7 +108,7 @@ run_deploy_with_timeout() {
   output_file=$(mktemp)
 
   echo "::group::SWA CLI Output (attempt ${attempt})"
-  
+
   local cli_exit_code=0
   if timeout "${timeout}s" "${swa_cmd[@]}" 2>&1 | tee "$output_file"; then
     cli_exit_code=0
