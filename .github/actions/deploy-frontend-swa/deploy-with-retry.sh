@@ -69,26 +69,46 @@ run_deploy_with_timeout() {
 
   echo "::debug::Running command: ${swa_cmd[*]}"
 
-  # Run SWA CLI with timeout
+  # Run SWA CLI with timeout and capture output
   # Note: timeout command is available in GitHub Actions runners (both Linux and macOS)
-  if timeout "${timeout}s" "${swa_cmd[@]}"; then
+  # We need to capture output because SWA CLI returns exit code 0 even on deployment failure!
+  local output_file
+  output_file=$(mktemp)
+  
+  local cli_exit_code=0
+  if timeout "${timeout}s" "${swa_cmd[@]}" 2>&1 | tee "$output_file"; then
+    cli_exit_code=0
+  else
+    cli_exit_code=$?
+  fi
+  
+  local elapsed=$(($(date +%s) - start_time))
 
-    local elapsed=$(($(date +%s) - start_time))
+  # Check for deployment failure in output - SWA CLI returns 0 even when deployment fails!
+  # Look for explicit failure messages from the CLI
+  if grep -q "Deployment Failed" "$output_file" || grep -q "Status: Failed" "$output_file"; then
+    local failure_reason
+    failure_reason=$(grep -o "Deployment Failure Reason: .*" "$output_file" | head -1 || echo "Unknown reason")
+    echo "::warning::Deployment attempt $attempt failed: ${failure_reason} (${elapsed}s elapsed)"
+    rm -f "$output_file"
+    echo "::endgroup::"
+    return 1
+  fi
+
+  rm -f "$output_file"
+
+  if [ $cli_exit_code -eq 0 ]; then
     echo "::notice::Deployment to '${DEPLOYMENT_ENVIRONMENT}' succeeded on attempt $attempt (${elapsed}s elapsed)"
     echo "::endgroup::"
     return 0
-  else
-    local exit_code=$?
-    local elapsed=$(($(date +%s) - start_time))
-
-    if [ $exit_code -eq 124 ]; then
-      echo "::warning::Deployment attempt $attempt timed out after ${timeout}s"
-    else
-      echo "::warning::Deployment attempt $attempt failed with exit code $exit_code (${elapsed}s elapsed)"
-    fi
-
+  elif [ $cli_exit_code -eq 124 ]; then
+    echo "::warning::Deployment attempt $attempt timed out after ${timeout}s"
     echo "::endgroup::"
-    return $exit_code
+    return $cli_exit_code
+  else
+    echo "::warning::Deployment attempt $attempt failed with exit code $cli_exit_code (${elapsed}s elapsed)"
+    echo "::endgroup::"
+    return $cli_exit_code
   fi
 }
 
