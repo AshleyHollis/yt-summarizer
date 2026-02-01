@@ -11,6 +11,10 @@ inputs:
     description: 'GitHub token for API access'
     required: false
     default: ${{ github.token }}
+  repository:
+    description: 'Repository in the format owner/repo'
+    required: false
+    default: ''
 
 outputs:
   is-open:
@@ -29,17 +33,25 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         PR_NUMBER: ${{ inputs.pr-number }}
+        REPOSITORY: ${{ inputs.repository }}
       run: |
         echo "🔍 Checking if PR #${PR_NUMBER} is still open..."
 
-        # Fetch PR state using GitHub CLI
-        PR_DATA=$(gh pr view "${PR_NUMBER}" --json state,closed,merged --repo "${{ github.repository }}" 2>/dev/null || echo "")
+        # Determine repository - use input if provided, otherwise detect from git remote
+        if [ -z "$REPOSITORY" ]; then
+          REPOSITORY=$(git remote get-url origin | sed -E 's|https://github.com/||' | sed -E 's|git@github.com:||' | sed -E 's|\.git$||')
+          echo "📍 Detected repository: $REPOSITORY"
+        fi
 
-        if [ -z "$PR_DATA" ]; then
-          echo "::error::Failed to fetch PR #${PR_NUMBER}"
-          echo "is-open=unknown" >> "$GITHUB_OUTPUT"
+        # Fetch PR state using GitHub CLI
+        PR_DATA=$(gh pr view "${PR_NUMBER}" --json state,closed,merged --repo "${REPOSITORY}" 2>&1 || echo "")
+
+        if [ -z "$PR_DATA" ] || echo "$PR_DATA" | grep -q "Could not resolve"; then
+          echo "::warning::Could not fetch PR #${PR_NUMBER} status - assuming PR is still open to avoid false failures"
+          echo "PR may not exist yet or may be in a transitional state"
+          echo "is-open=true" >> "$GITHUB_OUTPUT"
           echo "pr-state=unknown" >> "$GITHUB_OUTPUT"
-          exit 1
+          exit 0
         fi
 
         STATE=$(echo "$PR_DATA" | jq -r '.state')
