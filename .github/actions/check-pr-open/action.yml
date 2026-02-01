@@ -31,23 +31,23 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
       run: |
         echo "🔍 Checking if PR #${PR_NUMBER} is still open..."
-        
+
         # Fetch PR state using GitHub CLI
         PR_DATA=$(gh pr view "${PR_NUMBER}" --json state,closed,merged --repo "${{ github.repository }}" 2>/dev/null || echo "")
-        
+
         if [ -z "$PR_DATA" ]; then
           echo "::error::Failed to fetch PR #${PR_NUMBER}"
           echo "is-open=unknown" >> "$GITHUB_OUTPUT"
           echo "pr-state=unknown" >> "$GITHUB_OUTPUT"
           exit 1
         fi
-        
+
         STATE=$(echo "$PR_DATA" | jq -r '.state')
         CLOSED=$(echo "$PR_DATA" | jq -r '.closed')
         MERGED=$(echo "$PR_DATA" | jq -r '.merged')
-        
+
         echo "📊 PR State: $STATE (closed=$CLOSED, merged=$MERGED)"
-        
+
         # Determine if PR is open
         if [ "$STATE" = "OPEN" ]; then
           echo "✅ PR #${PR_NUMBER} is still open - continuing deployment"
@@ -63,7 +63,7 @@ runs:
             echo "is-open=false" >> "$GITHUB_OUTPUT"
             echo "pr-state=closed" >> "$GITHUB_OUTPUT"
           fi
-          
+
           # Exit with error to stop the job
           echo "::error::Stopping job because PR is no longer open"
           exit 1
