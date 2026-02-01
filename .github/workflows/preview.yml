@@ -337,6 +337,44 @@ jobs:
           base-domain: ${{ env.APPS_BASE_DOMAIN }}
 
   # ===========================================================================
+  # PHASE 4B: SYNC ARGOCD MANIFESTS
+  # ===========================================================================
+  # Apply preview-appset.yaml to ensure ArgoCD Git Generator detects overlay updates
+  # This is critical: changing the YAML in repo doesn't update the cluster automatically
+  sync-argocd-manifests:
+    name: Sync ArgoCD Manifests
+    runs-on: ubuntu-latest
+    needs: [check-concurrency, terraform]
+    if: |
+      always() && !cancelled() &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.check-concurrency.result == 'success' &&
+      needs.check-concurrency.outputs.can_deploy == 'true' &&
+      (needs.terraform.result != 'failure')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
+      - name: Setup Azure and AKS
+        uses: ./.github/actions/setup-azure-aks
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
+      - name: Sync ArgoCD manifests
+        uses: ./.github/actions/sync-argocd-manifests
+        with:
+          mode: all
+          namespace: ${{ env.NAMESPACE_ARGOCD }}
+          verbose: 'true'
+
+  # ===========================================================================
   # PHASE 5: UPDATE KUBERNETES OVERLAY (Reusable Workflow)
   # ===========================================================================
   update-overlay:
@@ -348,11 +386,13 @@ jobs:
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success' &&
-      (needs.terraform.result != 'failure')
-    needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform]
+      (needs.terraform.result != 'failure') &&
+      needs.sync-argocd-manifests.result == 'success'
+    needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform, sync-argocd-manifests]
     with:
       environment: preview
-      overlay-path: k8s/overlays/preview
+      # PR-specific overlay path - each PR gets its own directory
+      overlay-path: k8s/overlays/preview-pr-${{ needs.detect-changes.outputs.pr_number }}
       image-tag: ${{ needs.check-concurrency.outputs.final_image_tag }}
       commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
       pr-number: ${{ needs.detect-changes.outputs.pr_number }}

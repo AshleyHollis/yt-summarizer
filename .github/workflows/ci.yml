@@ -3,6 +3,11 @@
 # =============================================================================
 # TRIGGERS: PR opened/updated, push to main, manual dispatch
 # EXECUTION: Full validation - all tests, checks, and builds run on every trigger
+#
+# NOTE: We intentionally do NOT use paths-ignore for k8s/overlays/** because:
+# 1. PR merges often include kustomization changes alongside code changes
+# 2. paths-ignore would skip CI entirely if ANY file matches, even with other changes
+# 3. Instead, kustomization-only commits use [skip ci] in commit message
 # =============================================================================
 
 name: CI
@@ -17,7 +22,6 @@ on:
       - "*.md"
       - "docs/**"
       - "specs/**"
-      - "k8s/overlays/**"
   workflow_dispatch:
 
 concurrency:
@@ -266,7 +270,13 @@ jobs:
   build-images-meta:
     name: Prepare Image Tag
     runs-on: ubuntu-latest
-    if: vars.ACR_NAME != ''
+    # Only build images for:
+    # - Pull requests (have ACR credentials via federated identity)
+    # - Main branch pushes (have ACR credentials via federated identity)
+    # Skip for workflow_dispatch on feature branches (no federated identity configured)
+    if: |
+      vars.ACR_NAME != '' &&
+      (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
     outputs:
       image_tag: ${{ steps.tag.outputs.image-tag }}
     steps:
