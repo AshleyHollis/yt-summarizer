@@ -74,14 +74,14 @@ run_deploy_with_timeout() {
   # We need to capture output because SWA CLI returns exit code 0 even on deployment failure!
   local output_file
   output_file=$(mktemp)
-  
+
   local cli_exit_code=0
   if timeout "${timeout}s" "${swa_cmd[@]}" 2>&1 | tee "$output_file"; then
     cli_exit_code=0
   else
     cli_exit_code=$?
   fi
-  
+
   local elapsed=$(($(date +%s) - start_time))
 
   # Check for deployment failure in output - SWA CLI returns 0 even when deployment fails!
