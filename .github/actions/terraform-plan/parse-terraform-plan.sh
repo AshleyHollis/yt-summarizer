@@ -10,6 +10,8 @@
 #   3. Create JSON summary with counts and has_changes flag
 #   4. Output full JSON plan for downstream parsing
 
+set -eo pipefail
+
 # Get structured JSON output from terraform
 terraform show -json tfplan > plan.json
 
@@ -24,10 +26,10 @@ DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | \
 # Create JSON summary
 SUMMARY=$(cat <<EOF
 {
-  "add": $ADD,
-  "change": $CHANGE,
-  "destroy": $DESTROY,
-  "has_changes": $([ $ADD -gt 0 ] || [ $CHANGE -gt 0 ] || [ $DESTROY -gt 0 ] \
+  "add": ${ADD},
+  "change": ${CHANGE},
+  "destroy": ${DESTROY},
+  "has_changes": $([ "${ADD}" -gt 0 ] || [ "${CHANGE}" -gt 0 ] || [ "${DESTROY}" -gt 0 ] \
     && echo "true" || echo "false")
 }
 EOF
