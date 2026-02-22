@@ -42,7 +42,7 @@ class ProxyRequestLog(Base):
     )
     job_id: Mapped[UUID | None] = mapped_column(
         UNIQUEIDENTIFIER,
-        ForeignKey("Jobs.id", ondelete="SET NULL"),
+        ForeignKey("Jobs.job_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
