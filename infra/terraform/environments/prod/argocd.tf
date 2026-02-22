@@ -9,11 +9,16 @@
 #
 # To upgrade ArgoCD, bump chart_version below and apply.
 
-# Import the pre-existing argocd namespace (created by bootstrap-argocd.ps1).
-# This is a one-time import; once the resource is in state this block is a no-op.
+# Import pre-existing resources created by bootstrap-argocd.ps1 (Helm install).
+# These blocks are one-time imports; once resources are in state they are no-ops.
 import {
   to = module.argocd.kubernetes_namespace.argocd
   id = "argocd"
+}
+
+import {
+  to = module.argocd.helm_release.argocd
+  id = "argocd/argocd"
 }
 
 module "argocd" {
