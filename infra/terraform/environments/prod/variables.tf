@@ -94,16 +94,14 @@ variable "webshare_proxy_username" {
   description = "Webshare rotating residential proxy username (sourced from Webshare dashboard)"
   type        = string
   sensitive   = false
-  default     = null
-  nullable    = true
+  default     = ""
 }
 
 variable "webshare_proxy_password" {
   description = "Webshare rotating residential proxy password (sourced from Webshare dashboard)"
   type        = string
   sensitive   = true
-  default     = null
-  nullable    = true
+  default     = ""
 }
 
 # -----------------------------------------------------------------------------
