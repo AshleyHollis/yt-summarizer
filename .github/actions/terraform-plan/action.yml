@@ -32,6 +32,11 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Terraform Init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: terraform init -input=false -no-color
+
     - name: Run terraform plan
       id: plan
       shell: bash
@@ -43,7 +48,6 @@ runs:
         CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
         AUTH0_DOMAIN: ${{ env.AUTH0_DOMAIN }}
       run: ${{ github.action_path }}/run-terraform-plan.sh
-      continue-on-error: true
 
     - name: Get JSON plan
       id: format
