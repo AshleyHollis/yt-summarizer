@@ -423,10 +423,12 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 # Rate limit avoidance - wait before subtitle download
                 "sleep_interval_subtitles": subtitle_sleep,
                 "sleep_interval_requests": 1.0,  # Wait between API requests
-                # Use alternative YouTube clients that may be less rate-limited
+                # Use alternative YouTube clients that work reliably with proxies.
+                # tv_embedded bypasses n-challenge and supports subtitle extraction.
+                # web is the standard fallback.
                 "extractor_args": {
                     "youtube": {
-                        "player_client": ["android_sdkless", "web_safari"],
+                        "player_client": ["tv_embedded", "web"],
                     }
                 },
                 "http_headers": {
