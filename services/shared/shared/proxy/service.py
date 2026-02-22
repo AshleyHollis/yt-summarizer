@@ -31,7 +31,7 @@ class ProxyService:
     into their yt-dlp opts dict without any conditional branching.
 
     The proxy URL format used by Webshare rotating residential:
-        http://{username}-backbone:{password}@p.webshare.io:80
+        http://{username}:{password}@p.webshare.io:80
 
     Usage::
 
@@ -93,7 +93,7 @@ class ProxyService:
         if not self._settings.enabled:
             return None
         return (
-            f"http://{self._settings.username}-backbone:{self._settings.password}"
+            f"http://{self._settings.username}:{self._settings.password}"
             f"@{WEBSHARE_GATEWAY_HOST}:{WEBSHARE_GATEWAY_PORT}"
         )
 
@@ -102,8 +102,7 @@ class ProxyService:
         if not self._settings.enabled:
             return None
         return (
-            f"http://{self._settings.username}-backbone:***"
-            f"@{WEBSHARE_GATEWAY_HOST}:{WEBSHARE_GATEWAY_PORT}"
+            f"http://{self._settings.username}:***@{WEBSHARE_GATEWAY_HOST}:{WEBSHARE_GATEWAY_PORT}"
         )
 
     def get_ydl_opts(self) -> dict:
