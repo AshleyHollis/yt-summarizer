@@ -13,7 +13,7 @@ resource "kubernetes_namespace" "argocd" {
   }
 
   lifecycle {
-    ignore_changes = [metadata[0].annotations]
+    ignore_changes = [metadata[0].annotations, metadata[0].labels]
   }
 }
 
