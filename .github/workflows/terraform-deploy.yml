@@ -131,7 +131,7 @@ jobs:
         uses: ./.github/actions/post-terraform-plan
         with:
           plan-summary: ${{ steps.plan.outputs.plan_summary }}
-          formatted-plan: ${{ steps.plan.outputs.formatted_plan }}
+          plan-json-path: ${{ steps.plan.outputs.plan_json_path }}
           plan-outcome: ${{ steps.plan.outcome }}
 
       - name: Plan Status Check
@@ -209,6 +209,9 @@ jobs:
           terraform-directory: ${{ inputs.working-directory }}
           fail-fast: 'true'
           timeout-seconds: '60'
+
+      - name: Terraform Init
+        run: terraform init -input=false -no-color
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan

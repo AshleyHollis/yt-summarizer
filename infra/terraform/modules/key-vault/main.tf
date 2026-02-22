@@ -94,7 +94,7 @@ resource "azurerm_key_vault" "vault" {
   sku_name                   = var.sku_name
   soft_delete_retention_days = var.soft_delete_retention_days
   purge_protection_enabled   = var.purge_protection_enabled
-  rbac_authorization_enabled = var.enable_rbac_authorization  # Renamed from enable_rbac_authorization in azurerm 4.x
+  rbac_authorization_enabled = var.enable_rbac_authorization # Renamed from enable_rbac_authorization in azurerm 4.x
 
   tags = var.tags
 }
@@ -103,9 +103,9 @@ resource "azurerm_key_vault" "vault" {
 # If not specified, secrets can still be created via GitHub OIDC Contributor role
 resource "azurerm_role_assignment" "secrets_officer" {
   count                = var.secrets_officer_principal_id != null ? 1 : 0
-  scope               = azurerm_key_vault.vault.id
+  scope                = azurerm_key_vault.vault.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id        = var.secrets_officer_principal_id
+  principal_id         = var.secrets_officer_principal_id
 }
 
 # Create secrets

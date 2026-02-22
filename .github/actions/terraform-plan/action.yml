@@ -20,9 +20,9 @@ outputs:
   plan_output:
     description: 'Raw terraform plan output'
     value: ${{ steps.plan.outputs.plan_output }}
-  formatted_plan:
-    description: 'Formatted plan for PR comments'
-    value: ${{ steps.format.outputs.formatted_plan }}
+  plan_json_path:
+    description: 'Absolute path to plan.json on disk (avoids GITHUB_OUTPUT size limits)'
+    value: ${{ steps.format.outputs.plan_json_path }}
   plan_summary:
     description: 'JSON summary of plan changes'
     value: ${{ steps.format.outputs.plan_summary }}

@@ -7,9 +7,9 @@
 #          Avoids passing large JSON through environment variables.
 #
 # Inputs (Environment Variables):
-#   PLAN_SUMMARY    - JSON summary of plan changes
-#   FORMATTED_PLAN  - Formatted terraform plan output (JSON)
-#   PLAN_OUTCOME    - Plan outcome (success/failure)
+#   PLAN_SUMMARY      - JSON summary of plan changes
+#   PLAN_JSON_PATH    - Absolute path to plan.json written by parse-terraform-plan.sh
+#   PLAN_OUTCOME      - Plan outcome (success/failure)
 #
 # Outputs:
 #   Creates: plan-summary.json, formatted-plan.json, plan-outcome.txt
@@ -25,15 +25,14 @@
 set -euo pipefail
 
 # Write data to files (safer than passing large JSON through env vars)
-cat > plan-summary.json <<'PLAN_SUMMARY_EOF'
+cat > plan-summary.json <<PLAN_SUMMARY_EOF
 $PLAN_SUMMARY
 PLAN_SUMMARY_EOF
 
-cat > formatted-plan.json <<'FORMATTED_PLAN_EOF'
-$FORMATTED_PLAN
-FORMATTED_PLAN_EOF
+# Copy plan JSON from the path on disk (avoids GITHUB_OUTPUT size limits)
+cp "$PLAN_JSON_PATH" formatted-plan.json
 
-cat > plan-outcome.txt <<'PLAN_OUTCOME_EOF'
+cat > plan-outcome.txt <<PLAN_OUTCOME_EOF
 $PLAN_OUTCOME
 PLAN_OUTCOME_EOF
 
