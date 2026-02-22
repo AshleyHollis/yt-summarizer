@@ -187,6 +187,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
   // ============================================================================
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
 
     const savedSize = localStorage.getItem(SIDEBAR_SIZE_KEY) as SizeMode | null;
@@ -216,6 +217,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
         isDeletingThreadRef.current = false;
         return;
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setThreadNotFoundMessage("The requested chat thread was not found.");
       setTimeout(() => setThreadNotFoundMessage(null), 5000);
       const params = new URLSearchParams(searchParams.toString());

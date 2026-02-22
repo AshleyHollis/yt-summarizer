@@ -372,6 +372,7 @@ export function useThreadPersistence({
       setMessages([]);
       setIsRestoringSettings(false);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeThreadId, state.isLoading, setMessages, setScope, setAISettings]);
 
   /**
@@ -490,7 +491,7 @@ export function useThreadPersistence({
    */
   const saveIfNeeded = useCallback(() => {
     const messages = getMessages();
-    const { activeThreadId: currentActiveThreadId, threads: currentThreads } = state;
+    const { activeThreadId: currentActiveThreadId } = state;
 
     // Add any pending tool results to the messages
     const toolResultMessages = getToolResultMessages();
@@ -586,7 +587,7 @@ export function useThreadPersistence({
         }
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [getMessages, state, onThreadIdChange, getScope, getAISettings]);
+  }, [getMessages, state, onThreadIdChange, getScope, getAISettings, getToolResultMessages]);
 
   /**
    * Save current scope and AI settings to the active thread.
