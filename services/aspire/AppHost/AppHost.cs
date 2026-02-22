@@ -15,6 +15,10 @@ var auth0ClientId = builder.AddParameter("auth0-client-id", secret: false);
 var auth0ClientSecret = builder.AddParameter("auth0-client-secret", secret: true);
 var auth0SessionSecret = builder.AddParameter("auth0-session-secret", secret: true);
 
+// Webshare rotating residential proxy (for yt-dlp calls)
+var webshareProxyUsername = builder.AddParameter("webshare-proxy-username", secret: false);
+var webshareProxyPassword = builder.AddParameter("webshare-proxy-password", secret: true);
+
 // Azure Storage (Azurite for local dev)
 var storage = builder.AddAzureStorage("storage")
     .RunAsEmulator(azurite =>
@@ -52,7 +56,11 @@ var api = builder.AddPythonModule("api", "../../api", "uvicorn")
     .WithEnvironment("AUTH0_CLIENT_ID", auth0ClientId)
     .WithEnvironment("AUTH0_CLIENT_SECRET", auth0ClientSecret)
     .WithEnvironment("AUTH0_SESSION_SECRET", auth0SessionSecret)
-    .WithEnvironment("AUTH0_DEFAULT_RETURN_TO", "http://localhost:3000");
+    .WithEnvironment("AUTH0_DEFAULT_RETURN_TO", "http://localhost:3000")
+    .WithEnvironment("PROXY_ENABLED", "false")
+    .WithEnvironment("PROXY_USERNAME", webshareProxyUsername)
+    .WithEnvironment("PROXY_PASSWORD", webshareProxyPassword)
+    .WithEnvironment("PROXY_MAX_CONCURRENCY", "5");
 
 // Next.js Frontend
 var web = builder.AddNpmApp("web", "../../../apps/web", "dev")
@@ -74,6 +82,10 @@ var transcribeWorker = builder.AddExecutable("transcribe-worker",
     .WithEnvironment("HEALTH_PORT", "8091")
     .WithEnvironment("QUEUE_POLL_INTERVAL", "10.0")
     .WithEnvironment("QUEUE_BATCH_SIZE", "32")
+    .WithEnvironment("PROXY_ENABLED", "false")
+    .WithEnvironment("PROXY_USERNAME", webshareProxyUsername)
+    .WithEnvironment("PROXY_PASSWORD", webshareProxyPassword)
+    .WithEnvironment("PROXY_MAX_CONCURRENCY", "5")
     .WithHttpEndpoint(port: 8091, targetPort: 8091, name: "health", isProxied: false)
     .WithOtlpExporter();
 

@@ -10,8 +10,10 @@ from sqlalchemy.orm import selectinload
 
 # Import shared modules
 try:
+    from shared.config import get_settings
     from shared.db.models import Channel, Job, Video
     from shared.logging.config import get_logger
+    from shared.proxy import ProxyService
     from shared.queue.client import TRANSCRIBE_QUEUE, get_queue_client
     from shared.telemetry.config import inject_trace_context
 except ImportError:
@@ -21,6 +23,10 @@ except ImportError:
     Channel = Any
     Job = Any
     Video = Any
+    ProxyService = None  # type: ignore[assignment,misc]
+
+    def get_settings():
+        return None
 
     def get_logger(name):
         import logging
@@ -71,13 +77,25 @@ class NoTranscriptError(Exception):
 class VideoService:
     """Service for video operations."""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, proxy_service: "ProxyService | None" = None):
         """Initialize the video service.
 
         Args:
             session: Database session.
+            proxy_service: Optional ProxyService for proxy-backed yt-dlp calls.
+                           If None, a ProxyService is constructed from settings.
         """
         self.session = session
+        if proxy_service is not None:
+            self._proxy_service = proxy_service
+        elif get_settings is not None:
+            try:
+                settings = get_settings()
+                self._proxy_service = ProxyService(settings.proxy) if ProxyService else None
+            except Exception:
+                self._proxy_service = None
+        else:
+            self._proxy_service = None
 
     async def submit_video(
         self,
@@ -443,19 +461,29 @@ class VideoService:
             "quiet": True,
             "no_warnings": True,
             "extract_flat": False,
+            # Proxy routing — empty dict when proxy is disabled
+            **(self._proxy_service.get_ydl_opts() if self._proxy_service else {}),
         }
 
         try:
             # Run yt-dlp in a thread pool since it's synchronous
             loop = asyncio.get_event_loop()
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await loop.run_in_executor(
-                    None,
-                    lambda: ydl.extract_info(
-                        f"https://www.youtube.com/watch?v={youtube_video_id}",
-                        download=False,
-                    ),
-                )
+            from contextlib import nullcontext
+
+            ctx = (
+                self._proxy_service.log_request(service="api", operation="fetch_video_metadata")
+                if self._proxy_service
+                else nullcontext()
+            )
+            async with ctx:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = await loop.run_in_executor(
+                        None,
+                        lambda: ydl.extract_info(
+                            f"https://www.youtube.com/watch?v={youtube_video_id}",
+                            download=False,
+                        ),
+                    )
 
             # Parse upload date
             upload_date_str = info.get("upload_date")  # Format: YYYYMMDD
@@ -606,21 +634,34 @@ class VideoService:
                 "subtitleslangs": ["en"],
                 "quiet": True,
                 "no_warnings": True,
+                # Proxy routing — empty dict when proxy is disabled
+                **(self._proxy_service.get_ydl_opts() if self._proxy_service else {}),
             }
 
             loop = asyncio.get_event_loop()
+            from contextlib import nullcontext
 
-            def check_subtitles():
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(
-                        f"https://www.youtube.com/watch?v={youtube_video_id}",
-                        download=False,
-                    )
-                    subtitles = info.get("subtitles", {})
-                    auto_captions = info.get("automatic_captions", {})
-                    return bool(subtitles.get("en") or auto_captions.get("en"))
+            ctx = (
+                self._proxy_service.log_request(
+                    service="api", operation="check_transcript_availability"
+                )
+                if self._proxy_service
+                else nullcontext()
+            )
 
-            has_subtitles = await loop.run_in_executor(None, check_subtitles)
+            async with ctx:
+
+                def check_subtitles():
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(
+                            f"https://www.youtube.com/watch?v={youtube_video_id}",
+                            download=False,
+                        )
+                        subtitles = info.get("subtitles", {})
+                        auto_captions = info.get("automatic_captions", {})
+                        return bool(subtitles.get("en") or auto_captions.get("en"))
+
+                has_subtitles = await loop.run_in_executor(None, check_subtitles)
             if has_subtitles:
                 return True
 

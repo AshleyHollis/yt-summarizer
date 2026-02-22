@@ -1,5 +1,6 @@
 """Transcribe worker for extracting YouTube video transcripts."""
 
+import asyncio
 import random
 import time
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from shared.blob.client import (
     get_segments_blob_path,
     get_transcript_blob_path,
 )
+from shared.config import get_settings
 from shared.db.connection import get_db
 from shared.db.job_service import (
     mark_job_completed,
@@ -21,15 +23,12 @@ from shared.db.job_service import (
 )
 from shared.db.models import Artifact, Job
 from shared.logging.config import get_logger
+from shared.proxy import ProxyService
 from shared.queue.client import SUMMARIZE_QUEUE, TRANSCRIBE_QUEUE, get_queue_client
 from shared.telemetry.config import inject_trace_context
 from shared.worker.base_worker import BaseWorker, WorkerResult, run_worker
 
 logger = get_logger(__name__)
-
-# Track request timing for rate limit debugging
-_last_youtube_request_time: float | None = None
-_youtube_request_count: int = 0
 
 # Maximum length for content to be considered an error page when combined with other signals
 MAX_ERROR_PAGE_LENGTH = 1000
@@ -57,23 +56,51 @@ class TranscribeMessage:
 class TranscribeWorker(BaseWorker[TranscribeMessage]):
     """Worker for extracting YouTube video transcripts.
 
-    Configured with rate limiting to avoid YouTube API rate limits:
-    - 5 second minimum delay between requests
-    - Up to 5 seconds additional random jitter
-    - This results in ~6-12 requests per minute max
+    When proxy is disabled (PROXY_ENABLED=false, the default):
+    - Requests go directly to YouTube with 5s+jitter delays to limit the IP rate.
+
+    When proxy is enabled (PROXY_ENABLED=true):
+    - All yt-dlp calls are routed through the Webshare rotating residential gateway.
+    - The per-IP sequential delay (min_request_delay) is reduced to 0 because
+      the rotating gateway supplies a fresh IP for each request automatically.
     """
 
     def __init__(self):
-        """Initialize with YouTube-friendly rate limiting."""
+        """Initialize with proxy-aware rate limiting."""
+        settings = get_settings()
+        self._proxy_service = ProxyService(settings.proxy)
+
+        # When proxy is active the gateway provides IP rotation — no need for
+        # a per-worker sequential cooldown. Keep the delay for direct requests.
+        min_delay = 0.0 if settings.proxy.enabled else 5.0
+        jitter = 0.0 if settings.proxy.enabled else 5.0
+
         super().__init__(
-            min_request_delay=5.0,  # 5 seconds minimum between requests
-            request_delay_jitter=5.0,  # 0-5 seconds random additional delay
+            min_request_delay=min_delay,
+            request_delay_jitter=jitter,
         )
+
+        # Instance-level request tracking (replaces module-level globals — T023)
+        self._last_youtube_request_time: float | None = None
+        self._youtube_request_count: int = 0
+        self._youtube_timing_lock = asyncio.Lock()
 
     @property
     def queue_name(self) -> str:
         """Return the queue name."""
         return TRANSCRIBE_QUEUE
+
+    def get_additional_connectivity_checks(self) -> dict:
+        """Add proxy connectivity to health server checks."""
+        if self._proxy_service is not None:
+            return {"proxy": self._proxy_service.check_connectivity}
+        return {}
+
+    def get_proxy_summary_fn(self):
+        """Return proxy usage summary callable for /debug/proxy."""
+        if self._proxy_service is not None:
+            return self._proxy_service.get_usage_summary
+        return None
 
     def parse_message(self, raw_message: dict[str, Any]) -> TranscribeMessage:
         """Parse raw message to TranscribeMessage."""
@@ -102,8 +129,6 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         6. Update job status to completed
         7. Queue next job (summarize)
         """
-        global _last_youtube_request_time, _youtube_request_count
-
         logger.info(
             "Processing transcribe job",
             job_id=message.job_id,
@@ -155,6 +180,8 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 "YouTube rate limit detected, will retry in 5 minutes",
                 job_id=message.job_id,
                 error=str(e),
+                proxy_enabled=self._proxy_service.enabled,
+                proxy=self._proxy_service.get_proxy_url_masked(),
             )
             # Update job AND video status to show rate limiting in UI
             await mark_job_rate_limited(message.job_id, message.video_id, retry_delay)
@@ -332,18 +359,16 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
 
     def _log_youtube_request(self, video_id: str, method: str) -> None:
         """Log a YouTube API request with timing info for rate limit debugging."""
-        global _last_youtube_request_time, _youtube_request_count
-
         now = time.time()
-        _youtube_request_count += 1
+        self._youtube_request_count += 1
 
-        if _last_youtube_request_time is not None:
-            elapsed = now - _last_youtube_request_time
+        if self._last_youtube_request_time is not None:
+            elapsed = now - self._last_youtube_request_time
             logger.info(
                 "YouTube API request",
                 method=method,
                 video_id=video_id,
-                request_number=_youtube_request_count,
+                request_number=self._youtube_request_count,
                 seconds_since_last_request=round(elapsed, 2),
             )
         else:
@@ -351,10 +376,10 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 "YouTube API request (first)",
                 method=method,
                 video_id=video_id,
-                request_number=_youtube_request_count,
+                request_number=self._youtube_request_count,
             )
 
-        _last_youtube_request_time = now
+        self._last_youtube_request_time = now
 
     async def _fetch_transcript_with_timestamps_and_text(
         self, youtube_video_id: str
@@ -406,25 +431,35 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 "http_headers": {
                     "Accept-Language": "en-US,en;q=0.9",
                 },
+                # Proxy routing — empty dict when proxy is disabled (T013)
+                **self._proxy_service.get_ydl_opts(),
             }
 
             logger.info(
                 "Starting subtitle download with rate limit delay",
                 video_id=youtube_video_id,
                 sleep_seconds=subtitle_sleep,
+                proxy_enabled=self._proxy_service.enabled,
             )
 
             try:
-                # Run yt-dlp in a thread pool to not block async loop
-                def download_subs():
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        return ydl.extract_info(
-                            f"https://www.youtube.com/watch?v={youtube_video_id}",
-                            download=True,  # Actually download subtitles
-                        )
+                # Run yt-dlp in a thread pool to not block async loop.
+                # Wrapped with log_request() to record outcome and duration (T014).
+                async with self._proxy_service.log_request(
+                    job_id=youtube_video_id,
+                    service="transcribe-worker",
+                    operation="fetch_transcript",
+                ):
 
-                loop = asyncio.get_event_loop()
-                info = await loop.run_in_executor(None, download_subs)
+                    def download_subs():
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            return ydl.extract_info(
+                                f"https://www.youtube.com/watch?v={youtube_video_id}",
+                                download=True,  # Actually download subtitles
+                            )
+
+                    loop = asyncio.get_event_loop()
+                    info = await loop.run_in_executor(None, download_subs)
 
                 # Find the downloaded subtitle file
                 sub_files = glob.glob(os.path.join(tmpdir, f"{youtube_video_id}*.json3"))
