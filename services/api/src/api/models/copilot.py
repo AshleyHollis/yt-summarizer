@@ -7,7 +7,7 @@ All copilot operations are read-only. The copilot cannot:
 """
 
 from datetime import date, datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from .base import BaseResponse
 
 
-class ContentType(str, Enum):
+class ContentType(StrEnum):
     """Types of content to search."""
 
     SUMMARY = "summary"
@@ -23,7 +23,7 @@ class ContentType(str, Enum):
     RELATIONSHIP = "relationship"
 
 
-class RelationshipType(str, Enum):
+class RelationshipType(StrEnum):
     """Types of relationships between videos."""
 
     SERIES = "series"

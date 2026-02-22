@@ -1,7 +1,7 @@
 """Library Pydantic models for browsing and filtering videos."""
 
 from datetime import date, datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from .base import BaseResponse, TimestampMixin
 
 
-class ProcessingStatusFilter(str, Enum):
+class ProcessingStatusFilter(StrEnum):
     """Video processing status for filtering."""
 
     PENDING = "pending"
@@ -18,7 +18,7 @@ class ProcessingStatusFilter(str, Enum):
     FAILED = "failed"
 
 
-class SortField(str, Enum):
+class SortField(StrEnum):
     """Available sort fields for video list."""
 
     PUBLISH_DATE = "publishDate"
@@ -26,7 +26,7 @@ class SortField(str, Enum):
     CREATED_AT = "createdAt"
 
 
-class SortOrder(str, Enum):
+class SortOrder(StrEnum):
     """Sort order direction."""
 
     ASC = "asc"

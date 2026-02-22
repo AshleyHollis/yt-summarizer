@@ -133,6 +133,7 @@ const TimeUntil = ({ date }: { date: string }) => {
       return `${seconds}s`;
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTimeLeft(calculateTimeLeft());
     const interval = setInterval(() => {
       setTimeLeft(calculateTimeLeft());
@@ -193,6 +194,7 @@ const ETADisplay = ({ eta, currentStageName }: { eta: ETAInfo; currentStageName:
   useEffect(() => {
     if (eta.processing_started_at) {
       const newTarget = calculateTargetEndTime();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTargetEndTime(newTarget);
     }
   }, [eta.processing_started_at, calculateTargetEndTime]);
@@ -341,6 +343,7 @@ export function JobProgress({
    */
   useEffect(() => {
     // Initial fetch
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchProgress();
 
     // Set up polling interval
