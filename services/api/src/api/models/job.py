@@ -1,7 +1,7 @@
 """Job Pydantic models for API requests and responses."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from .base import BaseResponse, PaginatedResponse, TimestampMixin
 
 
-class JobType(str, Enum):
+class JobType(StrEnum):
     """Types of processing jobs."""
 
     TRANSCRIBE = "transcribe"
@@ -18,7 +18,7 @@ class JobType(str, Enum):
     BUILD_RELATIONSHIPS = "build_relationships"
 
 
-class JobStage(str, Enum):
+class JobStage(StrEnum):
     """Job execution stages."""
 
     QUEUED = "queued"
@@ -29,7 +29,7 @@ class JobStage(str, Enum):
     RATE_LIMITED = "rate_limited"
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     """Job status values."""
 
     PENDING = "pending"

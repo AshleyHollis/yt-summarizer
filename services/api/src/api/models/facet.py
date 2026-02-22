@@ -1,6 +1,6 @@
 """Facet Pydantic models for API responses."""
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import Field
@@ -8,7 +8,7 @@ from pydantic import Field
 from .base import BaseResponse
 
 
-class FacetType(str, Enum):
+class FacetType(StrEnum):
     """Types of facets/tags."""
 
     TOPIC = "topic"

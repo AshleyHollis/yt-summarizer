@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Generic, TypeVar
 
 from shared.config import get_settings
@@ -32,7 +32,7 @@ from shared.worker.health_server import WorkerHealthServer
 T = TypeVar("T")
 
 
-class WorkerStatus(str, Enum):
+class WorkerStatus(StrEnum):
     """Worker processing status."""
 
     SUCCESS = "success"

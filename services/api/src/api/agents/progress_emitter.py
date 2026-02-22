@@ -21,11 +21,11 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Protocol
 
 
-class WorkflowStatus(str, Enum):
+class WorkflowStatus(StrEnum):
     """Status of a workflow execution."""
 
     PENDING = "pending"
