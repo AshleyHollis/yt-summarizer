@@ -11,6 +11,7 @@ The table contains only telemetry data (no business data) so recreation is safe.
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "013"
