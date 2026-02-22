@@ -9,6 +9,13 @@
 #
 # To upgrade ArgoCD, bump chart_version below and apply.
 
+# Import the pre-existing argocd namespace (created by bootstrap-argocd.ps1).
+# This is a one-time import; once the resource is in state this block is a no-op.
+import {
+  to = module.argocd.kubernetes_namespace.argocd
+  id = "argocd"
+}
+
 module "argocd" {
   source = "../../modules/argocd"
 
