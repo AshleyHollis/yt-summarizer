@@ -79,6 +79,18 @@ spec:
                 secretKeyRef:
                   name: auth0-credentials
                   key: session-secret
+            - name: PROXY_ENABLED
+              value: "true"
+            - name: PROXY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-credentials
+                  key: username
+            - name: PROXY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-credentials
+                  key: password
           resources:
             requests:
               cpu: 100m
