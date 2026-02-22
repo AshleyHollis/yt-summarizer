@@ -16,21 +16,19 @@ set -eo pipefail
 terraform show -json tfplan > plan.json
 
 # Parse plan summary from JSON
-ADD=$(jq -r '.resource_changes | map(select(.change.actions | \
-  contains(["create"]))) | length' plan.json)
-CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | \
-  contains(["update"]))) | length' plan.json)
-DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | \
-  contains(["delete"]))) | length' plan.json)
+ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"]))) | length' plan.json)
+CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | contains(["update"]))) | length' plan.json)
+DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | contains(["delete"]))) | length' plan.json)
 
 # Create JSON summary
+HAS_CHANGES="false"
+if [ "${ADD}" -gt 0 ] || [ "${CHANGE}" -gt 0 ] || [ "${DESTROY}" -gt 0 ]; then HAS_CHANGES="true"; fi
 SUMMARY=$(cat <<EOF
 {
   "add": ${ADD},
   "change": ${CHANGE},
   "destroy": ${DESTROY},
-  "has_changes": $([ "${ADD}" -gt 0 ] || [ "${CHANGE}" -gt 0 ] || [ "${DESTROY}" -gt 0 ] \
-    && echo "true" || echo "false")
+  "has_changes": ${HAS_CHANGES}
 }
 EOF
 )
