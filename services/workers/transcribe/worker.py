@@ -408,8 +408,9 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_template = os.path.join(tmpdir, "%(id)s")
 
-            # 60 seconds minimum + 0-10 seconds jitter (confirmed fix from GitHub issue #13831)
-            subtitle_sleep = 60 + random.randint(0, 10)
+            # Without proxy: 60s minimum + 0-10s jitter avoids YouTube bot detection.
+            # With proxy: IP rotation handles rate limiting — no sleep needed.
+            subtitle_sleep = 0 if self._proxy_service.enabled else 60 + random.randint(0, 10)
 
             ydl_opts = {
                 "skip_download": True,  # Don't download video/audio
