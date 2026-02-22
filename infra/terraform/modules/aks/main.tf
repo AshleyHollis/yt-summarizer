@@ -58,7 +58,7 @@ variable "node_count" {
 variable "node_vm_size" {
   description = "VM size for nodes"
   type        = string
-  default     = "Standard_B4als_v2"  # 4 vCPUs, 8GB RAM, ~$97/month
+  default     = "Standard_B4als_v2" # 4 vCPUs, 8GB RAM, ~$97/month
 }
 
 variable "os_disk_size_gb" {
@@ -119,7 +119,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
     vm_size              = var.node_vm_size
     os_disk_size_gb      = var.os_disk_size_gb
     max_pods             = var.max_pods
-    auto_scaling_enabled = false  # Renamed from enable_auto_scaling in azurerm 4.x
+    auto_scaling_enabled = false # Renamed from enable_auto_scaling in azurerm 4.x
   }
 
   # Managed identity for AAD integration

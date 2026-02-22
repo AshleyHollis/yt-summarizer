@@ -98,14 +98,14 @@ resource "azurerm_storage_account" "storage" {
 resource "azurerm_storage_container" "containers" {
   for_each              = { for c in var.containers : c.name => c }
   name                  = each.value.name
-  storage_account_id   = azurerm_storage_account.storage.id
+  storage_account_id    = azurerm_storage_account.storage.id
   container_access_type = each.value.container_access_type
 }
 
 # Create queues
 resource "azurerm_storage_queue" "queues" {
-  for_each             = toset(var.queues)
-  name                 = each.value
+  for_each           = toset(var.queues)
+  name               = each.value
   storage_account_id = azurerm_storage_account.storage.id
 }
 
