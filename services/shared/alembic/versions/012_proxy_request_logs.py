@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column(
             "job_id",
             sa.String(36),
-            sa.ForeignKey("jobs.id", ondelete="SET NULL"),
+            sa.ForeignKey("Jobs.id", ondelete="SET NULL"),
             nullable=True,
             comment="FK to the Job that triggered this call (nullable for API-originated calls).",
         ),
