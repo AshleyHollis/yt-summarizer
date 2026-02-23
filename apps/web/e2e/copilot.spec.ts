@@ -340,6 +340,8 @@ test.describe('Copilot Feature', () => {
      * Tool results are re-executed when the thread is reloaded.
      */
 
+    const API_BASE = process.env.API_URL || 'http://localhost:8000';
+
     test('creates thread with proper message structure when sending query', async ({ page, request }) => {
       // Navigate to add page with chat open
       await page.goto('/add?chat=open');
@@ -369,7 +371,7 @@ test.describe('Copilot Feature', () => {
       const threadId = threadMatch![1];
 
       // Verify thread was saved with proper structure via API
-      const response = await request.get(`http://localhost:8000/api/v1/threads/${threadId}`);
+      const response = await request.get(`${API_BASE}/api/v1/threads/${threadId}`);
       expect(response.status()).toBe(200);
 
       const threadData = await response.json();
@@ -470,7 +472,7 @@ test.describe('Copilot Feature', () => {
       ];
 
       // Create thread via API (uses /messages endpoint which auto-generates thread_id)
-      const createResponse = await request.post('http://localhost:8000/api/v1/threads/messages', {
+      const createResponse = await request.post(`${API_BASE}/api/v1/threads/messages`, {
         data: {
           title: 'Structure Test Thread',
           messages: testMessages
@@ -482,7 +484,7 @@ test.describe('Copilot Feature', () => {
       const threadId = created.thread_id;
 
       // Read it back
-      const getResponse = await request.get(`http://localhost:8000/api/v1/threads/${threadId}`);
+      const getResponse = await request.get(`${API_BASE}/api/v1/threads/${threadId}`);
       expect(getResponse.status()).toBe(200);
 
       const threadData = await getResponse.json();
@@ -499,7 +501,7 @@ test.describe('Copilot Feature', () => {
       expect(toolMsg.toolCallId).toBe('call_test_structure');
 
       // Cleanup
-      await request.delete(`http://localhost:8000/api/v1/threads/${threadId}`);
+      await request.delete(`${API_BASE}/api/v1/threads/${threadId}`);
     });
 
     test('thread with multiple tool calls persists all correctly', async ({ request }) => {
@@ -529,7 +531,7 @@ test.describe('Copilot Feature', () => {
         { id: 'tool-2', role: 'tool', content: '{"answer":"second result"}', toolCallId: 'call_second' },
       ];
 
-      const createResponse = await request.post('http://localhost:8000/api/v1/threads/messages', {
+      const createResponse = await request.post(`${API_BASE}/api/v1/threads/messages`, {
         data: {
           title: 'Multi-Tool Thread Test',
           messages: testMessages
@@ -541,7 +543,7 @@ test.describe('Copilot Feature', () => {
       const threadId = created.thread_id;
 
       // Read back
-      const getResponse = await request.get(`http://localhost:8000/api/v1/threads/${threadId}`);
+      const getResponse = await request.get(`${API_BASE}/api/v1/threads/${threadId}`);
       const threadData = await getResponse.json();
 
       // Verify all messages preserved
@@ -559,7 +561,7 @@ test.describe('Copilot Feature', () => {
       expect(toolMsgs.map((m: { toolCallId: string }) => m.toolCallId).sort()).toEqual(['call_first', 'call_second'].sort());
 
       // Cleanup
-      await request.delete(`http://localhost:8000/api/v1/threads/${threadId}`);
+      await request.delete(`${API_BASE}/api/v1/threads/${threadId}`);
     });
   });
 });

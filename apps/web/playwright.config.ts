@@ -12,8 +12,8 @@ export default defineConfig({
   globalSetup: process.env.USE_EXTERNAL_SERVER ? './e2e/global-setup.ts' : undefined,
 
   // Maximum timeout for each test
-  // Increased to handle LLM rate limit retries (up to 5 retries with exponential backoff)
-  timeout: 120_000,
+  // 45s on CI (preview E2E against live backend), 120s locally for LLM retries
+  timeout: process.env.CI ? 45_000 : 120_000,
 
   // Run tests in files in parallel
   fullyParallel: true,
@@ -22,8 +22,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
 
   // Retry failed tests - LLM responses can be flaky
-  // CI: 2 retries for stability, Local: 1 retry for quick feedback
-  retries: process.env.CI ? 2 : 1,
+  // CI: 1 retry for fast failure signal, Local: 1 retry for quick feedback
+  retries: 1,
 
   // Run tests in parallel - LLM rate limiting is handled at the app level
   // with smart retry that uses Retry-After headers

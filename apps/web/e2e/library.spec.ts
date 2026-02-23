@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+const API_URL = process.env.API_URL || 'http://localhost:8000';
+
 /**
  * E2E Tests for User Story 3: Browse the Library
  *
@@ -64,7 +66,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
     test('library stats endpoint returns valid data', async ({ request }) => {
       // Direct API test to ensure backend is working
-      const response = await request.get('http://localhost:8000/api/v1/library/stats', {
+      const response = await request.get(`${API_URL}/api/v1/library/stats`, {
         headers: { 'X-Correlation-ID': 'e2e-test' }
       });
 
@@ -126,7 +128,7 @@ test.describe('User Story 3: Browse the Library', () => {
     test('invalid status filter returns error from API', async ({ request }) => {
       // Test that the API correctly rejects invalid status values
       // This protects against bugs like using 'ready' instead of 'completed'
-      const response = await request.get('http://localhost:8000/api/v1/library/videos?status=ready', {
+      const response = await request.get(`${API_URL}/api/v1/library/videos?status=ready`, {
         headers: { 'X-Correlation-ID': 'e2e-test' }
       });
 
@@ -139,7 +141,7 @@ test.describe('User Story 3: Browse the Library', () => {
       const validStatuses = ['pending', 'processing', 'completed', 'failed'];
 
       for (const status of validStatuses) {
-        const response = await request.get(`http://localhost:8000/api/v1/library/videos?status=${status}`, {
+        const response = await request.get(`${API_URL}/api/v1/library/videos?status=${status}`, {
           headers: { 'X-Correlation-ID': 'e2e-test' }
         });
 
@@ -223,7 +225,7 @@ test.describe('User Story 3: Browse the Library', () => {
   test.describe('Pagination', () => {
     test('pagination shows when there are multiple pages', async ({ page, request }) => {
       // First check if there's enough data for pagination
-      const response = await request.get('http://localhost:8000/api/v1/library/videos?page_size=10', {
+      const response = await request.get(`${API_URL}/api/v1/library/videos?page_size=10`, {
         headers: { 'X-Correlation-ID': 'e2e-test' }
       });
       const data = await response.json();
@@ -278,7 +280,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
     test.beforeAll(async ({ request }) => {
       // Get a video ID from the library
-      const response = await request.get('http://localhost:8000/api/v1/library/videos?page_size=1', {
+      const response = await request.get(`${API_URL}/api/v1/library/videos?page_size=1`, {
         headers: { 'X-Correlation-ID': 'e2e-test' }
       });
       const data = await response.json();
@@ -341,7 +343,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Get a completed video from the library
       const listResponse = await request.get(
-        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
         { headers: { 'X-Correlation-ID': 'e2e-transcript-tab-test' } }
       );
 
@@ -500,7 +502,7 @@ test.describe('User Story 3: Browse the Library', () => {
     test('completed video API returns summary content', async ({ request }) => {
       // Get a completed video from the library
       const listResponse = await request.get(
-        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
         { headers: { 'X-Correlation-ID': 'e2e-summary-test' } }
       );
 
@@ -517,7 +519,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Fetch video detail - this is where the blob path bug manifested
       const detailResponse = await request.get(
-        `http://localhost:8000/api/v1/library/videos/${videoId}`,
+        `${API_URL}/api/v1/library/videos/${videoId}`,
         { headers: { 'X-Correlation-ID': 'e2e-summary-test' } }
       );
 
@@ -547,7 +549,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Get a completed video from the library
       const listResponse = await request.get(
-        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
         { headers: { 'X-Correlation-ID': 'e2e-transcript-api-test' } }
       );
 
@@ -564,7 +566,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Call the transcript endpoint directly - this is what the TranscriptViewer component uses
       const transcriptResponse = await request.get(
-        `http://localhost:8000/api/v1/videos/${videoId}/transcript`,
+        `${API_URL}/api/v1/videos/${videoId}/transcript`,
         { headers: { 'X-Correlation-ID': 'e2e-transcript-api-test' } }
       );
 
@@ -582,7 +584,7 @@ test.describe('User Story 3: Browse the Library', () => {
     test('video detail page displays summary for completed videos', async ({ page, request }) => {
       // Get a completed video
       const listResponse = await request.get(
-        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
         { headers: { 'X-Correlation-ID': 'e2e-summary-ui-test' } }
       );
 
@@ -613,7 +615,7 @@ test.describe('User Story 3: Browse the Library', () => {
     test('API response time for video detail is acceptable', async ({ request }) => {
       // Get a completed video
       const listResponse = await request.get(
-        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=1',
+        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
         { headers: { 'X-Correlation-ID': 'e2e-perf-test' } }
       );
 
@@ -630,7 +632,7 @@ test.describe('User Story 3: Browse the Library', () => {
       const startTime = Date.now();
 
       const detailResponse = await request.get(
-        `http://localhost:8000/api/v1/library/videos/${videoId}`,
+        `${API_URL}/api/v1/library/videos/${videoId}`,
         { headers: { 'X-Correlation-ID': 'e2e-perf-test' } }
       );
 
@@ -646,7 +648,7 @@ test.describe('User Story 3: Browse the Library', () => {
     test('summary artifact blob_uri format is valid', async ({ request }) => {
       // This test validates the blob URI format at the database level
       const listResponse = await request.get(
-        'http://localhost:8000/api/v1/library/videos?status=completed&page_size=5',
+        `${API_URL}/api/v1/library/videos?status=completed&page_size=5`,
         { headers: { 'X-Correlation-ID': 'e2e-blob-uri-test' } }
       );
 
@@ -659,7 +661,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       for (const video of listData.videos) {
         const detailResponse = await request.get(
-          `http://localhost:8000/api/v1/library/videos/${video.video_id}`,
+          `${API_URL}/api/v1/library/videos/${video.video_id}`,
           { headers: { 'X-Correlation-ID': 'e2e-blob-uri-test' } }
         );
 
