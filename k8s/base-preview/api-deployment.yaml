@@ -94,22 +94,22 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: openai-credentials
-                  key: azure-openai-endpoint
+                  key: azure-endpoint
             - name: AZURE_OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: openai-credentials
-                  key: azure-openai-api-key
+                  key: azure-api-key
             - name: AZURE_OPENAI_DEPLOYMENT
               valueFrom:
                 secretKeyRef:
                   name: openai-credentials
-                  key: azure-openai-deployment
+                  key: azure-deployment
             - name: AZURE_OPENAI_EMBEDDING_DEPLOYMENT
               valueFrom:
                 secretKeyRef:
                   name: openai-credentials
-                  key: azure-openai-embedding-deployment
+                  key: azure-embedding-deployment
           resources:
             requests:
               cpu: 100m
