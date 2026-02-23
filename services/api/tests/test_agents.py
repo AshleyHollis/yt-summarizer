@@ -77,9 +77,9 @@ class TestAgentFrameworkAvailability:
         """Verify agent_framework package can be imported."""
         import agent_framework
 
-        assert hasattr(agent_framework, "ChatAgent")
-        # With pinned version 1.0.0b260116, AIFunction should be available
-        assert hasattr(agent_framework, "AIFunction")
+        # b260212+ uses Agent and FunctionTool (ChatAgent and AIFunction were removed)
+        assert hasattr(agent_framework, "Agent")
+        assert hasattr(agent_framework, "FunctionTool")
 
     def test_tool_names_are_correct(self, monkeypatch):
         """Verify tools have the expected names."""

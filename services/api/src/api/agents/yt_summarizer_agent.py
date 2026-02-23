@@ -18,36 +18,13 @@ import httpx
 
 # Import Agent Framework components
 try:
-    import inspect
-    from collections.abc import Callable
-    from typing import TypeVar
-
-    from agent_framework import AIFunction, BaseChatClient, ChatAgent
+    from agent_framework import Agent, BaseChatClient, tool as agent_tool
     from agent_framework.openai import OpenAIChatClient
-
-    F = TypeVar("F", bound=Callable)
-
-    # Support both old and new API for backward compatibility
-    # New API uses AIFunction class, old API had ai_function decorator
-    # Create a decorator wrapper for backward compatibility
-    def ai_function(func: F) -> F:
-        """Backward-compatible decorator for AIFunction.
-
-        Wraps a function with AIFunction, inferring name and description from docstring.
-        """
-        name = func.__name__
-        doc = inspect.getdoc(func) or ""
-        # Use first line of docstring as description
-        description = doc.split("\n")[0] if doc else f"Tool: {name}"
-
-        ai_func = AIFunction(name=name, description=description, func=func)
-        # Return the AIFunction instance but preserve attributes for type checking
-        return ai_func  # type: ignore
 
     AGENT_FRAMEWORK_AVAILABLE = True
 except ImportError:
-    ChatAgent = None  # type: ignore
-    ai_function = None  # type: ignore
+    Agent = None  # type: ignore
+    agent_tool = None  # type: ignore
     BaseChatClient = None  # type: ignore
     OpenAIChatClient = None  # type: ignore
     AGENT_FRAMEWORK_AVAILABLE = False
@@ -217,11 +194,11 @@ async def safe_api_call(
 # Agent Tools
 # =============================================================================
 
-if ai_function is not None:
+if agent_tool is not None:
     # Import the context accessor for AI settings
     from .agui_endpoint import get_current_ai_settings
 
-    @ai_function
+    @agent_tool
     async def query_library(
         query: Annotated[str, "The question to ask about the video library"],
         video_id: Annotated[str | None, "Optional video ID to focus the search on"] = None,
@@ -290,7 +267,7 @@ if ai_function is not None:
             )
         return result
 
-    @ai_function
+    @agent_tool
     async def search_videos(
         query: Annotated[str, "The search query to find videos"],
         channel_filter: Annotated[str | None, "Optional channel name to filter by"] = None,
@@ -315,7 +292,7 @@ if ai_function is not None:
             )
         return result
 
-    @ai_function
+    @agent_tool
     async def search_segments(
         query: Annotated[str, "The search query to find transcript segments"],
         video_ids: Annotated[
@@ -342,7 +319,7 @@ if ai_function is not None:
             )
         return result
 
-    @ai_function
+    @agent_tool
     async def get_video_summary(
         video_id: Annotated[str, "The UUID of the video to get the summary for"],
     ) -> dict[str, Any]:
@@ -356,7 +333,7 @@ if ai_function is not None:
             logger.info(f"get_video_summary retrieved summary for video {video_id}")
         return result
 
-    @ai_function
+    @agent_tool
     async def get_library_coverage(
         channel_id: Annotated[str | None, "Optional channel ID to get coverage for"] = None,
     ) -> dict[str, Any]:
@@ -373,7 +350,7 @@ if ai_function is not None:
             logger.info(f"get_library_coverage: {result.get('videoCount', 0)} videos")
         return result
 
-    @ai_function
+    @agent_tool
     async def get_topics_for_channel(
         channel_id: Annotated[str | None, "Optional UUID of the channel to get topics for"] = None,
     ) -> dict[str, Any]:
@@ -390,7 +367,7 @@ if ai_function is not None:
             logger.info(f"get_topics_for_channel: {len(result.get('topics', []))} topics")
         return result
 
-    @ai_function
+    @agent_tool
     async def synthesize_learning_path(
         query: Annotated[
             str,
@@ -432,7 +409,7 @@ if ai_function is not None:
                 logger.info(f"synthesize_learning_path: {item_count} items for '{query}'")
         return result
 
-    @ai_function
+    @agent_tool
     async def synthesize_watch_list(
         query: Annotated[
             str, "Description of what videos to recommend (e.g., 'fitness for beginners')"
@@ -479,7 +456,7 @@ if ai_function is not None:
 # =============================================================================
 
 
-def create_openai_chat_client() -> BaseChatClient | None:
+def create_openai_chat_client() -> "BaseChatClient | None":
     """Create an OpenAI-compatible chat client.
 
     Supports Azure AI Foundry, Azure OpenAI, and standard OpenAI based on environment variables.
@@ -600,16 +577,16 @@ def get_agent_tools() -> list:
     ]
 
 
-def create_yt_summarizer_agent() -> ChatAgent | None:
+def create_yt_summarizer_agent() -> "Agent | None":
     """Create the YT Summarizer agent with tools.
 
-    Creates a ChatAgent configured with:
+    Creates an Agent configured with:
     - System instructions for the YT Summarizer use case
     - Tools for searching videos, segments, and getting summaries
     - Appropriate temperature settings
 
     Returns:
-        Configured ChatAgent or None if dependencies not available.
+        Configured Agent or None if dependencies not available.
     """
     if not AGENT_FRAMEWORK_AVAILABLE:
         logger.warning("agent_framework not installed - agent cannot be created")
@@ -621,12 +598,11 @@ def create_yt_summarizer_agent() -> ChatAgent | None:
 
     tools = get_agent_tools()
 
-    # Create the agent
+    # Create the agent using the new Agent API (b260212+)
     # Note: Reasoning models (o1, o3, gpt-5-mini, etc.) only support:
     # - temperature=1 (the only allowed value)
-    # - max_completion_tokens instead of max_tokens
     # We explicitly set temperature=1 for compatibility with all models.
-    agent = ChatAgent(
+    agent = Agent(
         chat_client=chat_client,
         name=AGENT_NAME,
         description=AGENT_DESCRIPTION,
@@ -635,7 +611,7 @@ def create_yt_summarizer_agent() -> ChatAgent | None:
         temperature=1,  # Only value supported by reasoning models
     )
 
-    # Get tool names - AIFunction objects use .name, not __name__
+    # Get tool names - FunctionTool objects use .name
     tool_names = [getattr(t, "name", getattr(t, "__name__", str(t))) for t in tools]
     logger.info(f"Created YT Summarizer agent with {len(tools)} tools: {', '.join(tool_names)}")
     return agent
