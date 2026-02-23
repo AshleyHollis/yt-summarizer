@@ -27,7 +27,8 @@ export default defineConfig({
 
   // Run tests in parallel - LLM rate limiting is handled at the app level
   // with smart retry that uses Retry-After headers
-  workers: process.env.CI ? 1 : undefined,
+  // 4 workers on CI to keep E2E under 30 min (172 tests × ~10s avg / 4 workers ≈ 7 min)
+  workers: process.env.CI ? 4 : undefined,
 
   // Reporter to use
   reporter: [
