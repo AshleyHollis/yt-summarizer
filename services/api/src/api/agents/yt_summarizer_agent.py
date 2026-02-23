@@ -18,7 +18,8 @@ import httpx
 
 # Import Agent Framework components
 try:
-    from agent_framework import Agent, BaseChatClient, tool as agent_tool
+    from agent_framework import Agent, BaseChatClient
+    from agent_framework import tool as agent_tool
     from agent_framework.openai import OpenAIChatClient
 
     AGENT_FRAMEWORK_AVAILABLE = True
@@ -456,7 +457,7 @@ if agent_tool is not None:
 # =============================================================================
 
 
-def create_openai_chat_client() -> "BaseChatClient | None":
+def create_openai_chat_client() -> BaseChatClient | None:
     """Create an OpenAI-compatible chat client.
 
     Supports Azure AI Foundry, Azure OpenAI, and standard OpenAI based on environment variables.
@@ -577,7 +578,7 @@ def get_agent_tools() -> list:
     ]
 
 
-def create_yt_summarizer_agent() -> "Agent | None":
+def create_yt_summarizer_agent() -> Agent | None:
     """Create the YT Summarizer agent with tools.
 
     Creates an Agent configured with:
