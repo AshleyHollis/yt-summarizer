@@ -534,6 +534,28 @@ class AGUIEndpoint:
                         }
                         logger.info(f"Captured tool result for: {tool_call_id}")
 
+                # Fix MESSAGES_SNAPSHOT: remap snake_case "tool_calls" to camelCase
+                # "toolCalls" so CopilotKit's useLazyToolRenderer can find tool calls
+                # after the snapshot overwrites the in-memory messages state.
+                elif event_type == "MESSAGES_SNAPSHOT":
+                    raw_messages = getattr(event, "messages", None)
+                    if raw_messages:
+                        fixed_messages = []
+                        for msg in raw_messages:
+                            if isinstance(msg, dict) and "tool_calls" in msg:
+                                msg = {
+                                    **{k: v for k, v in msg.items() if k != "tool_calls"},
+                                    "toolCalls": msg["tool_calls"],
+                                }
+                            fixed_messages.append(msg)
+                        # Serialize manually since Pydantic model may be immutable
+                        event_data = json.loads(
+                            self._event_encoder.encode(event).removeprefix("data: ").rstrip("\n")
+                        )
+                        event_data["messages"] = fixed_messages
+                        yield f"data: {json.dumps(event_data)}\n\n"
+                        continue
+
                 encoded = self._event_encoder.encode(event)
                 yield encoded
 
