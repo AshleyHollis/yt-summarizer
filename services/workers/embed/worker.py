@@ -320,8 +320,10 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                     client = AsyncOpenAI(
                         api_key=settings.openai.effective_api_key,
                         base_url=base_url,
-                        default_headers={"api-key": settings.openai.effective_api_key},
-                        default_query={"api-version": settings.openai.azure_api_version},
+                        default_headers={
+                            "api-key": settings.openai.effective_api_key,
+                            "api-version": settings.openai.azure_api_version,
+                        },
                     )
                     logger.info(
                         "Using Azure AI Foundry for embeddings",
