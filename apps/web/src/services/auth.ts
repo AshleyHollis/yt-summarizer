@@ -7,8 +7,6 @@
 
 import { getClientApiUrl } from './runtimeConfig';
 
-const API_BASE_URL = getClientApiUrl();
-
 export interface User {
   id: string;
   email: string;
@@ -31,7 +29,7 @@ export function login(returnTo?: string): void {
     params.set('return_to', returnTo);
   }
 
-  const loginUrl = `${API_BASE_URL}/api/auth/login${params.toString() ? `?${params}` : ''}`;
+  const loginUrl = `${getClientApiUrl()}/api/auth/login${params.toString() ? `?${params}` : ''}`;
   window.location.href = loginUrl;
 }
 
@@ -40,7 +38,7 @@ export function login(returnTo?: string): void {
  * Backend will clear session cookie and redirect to Auth0 logout
  */
 export function logout(): void {
-  const logoutUrl = `${API_BASE_URL}/api/auth/logout`;
+  const logoutUrl = `${getClientApiUrl()}/api/auth/logout`;
   window.location.href = logoutUrl;
 }
 
@@ -59,7 +57,7 @@ export async function getSession(): Promise<Session> {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/session`, {
+    const response = await fetch(`${getClientApiUrl()}/api/auth/session`, {
       method: 'GET',
       credentials: 'include', // Send cookies cross-origin
       headers: {
