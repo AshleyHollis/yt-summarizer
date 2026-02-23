@@ -24,6 +24,9 @@ dependencies = [
     # (fixing AttributeError: SpanAttributes has no attribute LLM_SYSTEM on CI)
     "agent-framework==1.0.0b260212",
     "agent-framework-ag-ui==1.0.0b260212",
+    # Pin semconv-ai to <0.4.14 because 0.4.14 removed SpanAttributes.LLM_SYSTEM
+    # which agent-framework==b260212/observability.py:1533 still accesses at module import time.
+    "opentelemetry-semantic-conventions-ai>=0.4.13,<0.4.14",
     # OpenTelemetry for observability (T185)
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
