@@ -90,6 +90,26 @@ spec:
                 secretKeyRef:
                   name: proxy-credentials
                   key: password
+            - name: AZURE_OPENAI_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: azure-openai-endpoint
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: azure-openai-api-key
+            - name: AZURE_OPENAI_DEPLOYMENT
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: azure-openai-deployment
+            - name: AZURE_OPENAI_EMBEDDING_DEPLOYMENT
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: azure-openai-embedding-deployment
           resources:
             requests:
               cpu: 100m
