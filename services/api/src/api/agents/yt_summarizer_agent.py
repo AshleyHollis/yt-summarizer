@@ -18,7 +18,7 @@ import httpx
 
 # Import Agent Framework components
 try:
-    from agent_framework import Agent, BaseChatClient
+    from agent_framework import Agent, BaseChatClient, ChatOptions
     from agent_framework import tool as agent_tool
     from agent_framework.openai import OpenAIChatClient
 
@@ -27,6 +27,7 @@ except ImportError:
     Agent = None  # type: ignore
     agent_tool = None  # type: ignore
     BaseChatClient = None  # type: ignore
+    ChatOptions = None  # type: ignore
     OpenAIChatClient = None  # type: ignore
     AGENT_FRAMEWORK_AVAILABLE = False
 
@@ -602,14 +603,14 @@ def create_yt_summarizer_agent() -> Agent | None:
     # Create the agent using the new Agent API (b260212+)
     # Note: Reasoning models (o1, o3, gpt-5-mini, etc.) only support:
     # - temperature=1 (the only allowed value)
-    # We explicitly set temperature=1 for compatibility with all models.
+    # We explicitly set temperature=1 via default_options for compatibility with all models.
     agent = Agent(
-        chat_client=chat_client,
+        chat_client,
         name=AGENT_NAME,
         description=AGENT_DESCRIPTION,
         instructions=SYSTEM_INSTRUCTIONS,
         tools=tools,
-        temperature=1,  # Only value supported by reasoning models
+        default_options=ChatOptions(temperature=1),  # Only value supported by reasoning models
     )
 
     # Get tool names - FunctionTool objects use .name
