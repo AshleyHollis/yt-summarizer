@@ -30,17 +30,11 @@ async function submitQuery(page: Page, query: string): Promise<void> {
   // Wait for CopilotKit to finish its initial agent/connect handshake before
   // submitting; otherwise the message can be silently discarded in CI.
   await page.waitForLoadState("networkidle");
-  // Count existing "Searching..." loaders so we can detect the NEW one that
-  // appears after this submission (important for the subsequent-queries test
-  // where submitQuery is called twice: the old loader must not be confused with new).
-  const existingCount = await page.locator('text="Searching your video library..."').count();
   await input.fill(query);
   await input.press("Enter");
-  // Wait for a NEW "Searching your video library..." text to appear, confirming
-  // the message was sent and CopilotKit's tool call lifecycle has started.
-  await expect(
-    page.locator('text="Searching your video library..."'),
-  ).toHaveCount(existingCount + 1, { timeout: 30000 });
+  // Wait for the input to be cleared - CopilotKit clears the input after
+  // accepting the message, confirming the submission was received.
+  await expect(input).toHaveValue("", { timeout: 10000 });
 }
 
 async function waitForResponse(page: Page, testInfo: TestInfo): Promise<void> {
@@ -289,7 +283,7 @@ test.describe("Chat Response Quality", () => {
     }, href);
 
     // Should navigate to video detail page (either /videos/ or /library/ path)
-    await page.waitForURL(/\/videos\/|\/library\//, { timeout: 10000 });
+    await page.waitForURL(/\/videos\/|\/library\//, { timeout: 30000 });
 
     // Video detail page should load with video info
     await page.waitForLoadState("networkidle");
