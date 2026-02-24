@@ -30,11 +30,26 @@ async function submitQuery(page: Page, query: string): Promise<void> {
   // Wait for CopilotKit to finish its initial agent/connect handshake before
   // submitting; otherwise the message can be silently discarded in CI.
   await page.waitForLoadState("networkidle");
+  // Set up listener for the POST to /api/copilotkit that includes user messages
+  // BEFORE pressing Enter to avoid missing a fast response.
+  const submittedPromise = page.waitForRequest(
+    (req) =>
+      req.method() === "POST" &&
+      req.url().includes("/api/copilotkit") &&
+      (() => {
+        try {
+          const body = req.postDataJSON();
+          return Array.isArray(body?.messages) && body.messages.length > 0;
+        } catch {
+          return false;
+        }
+      })(),
+    { timeout: 30000 },
+  );
   await input.fill(query);
   await input.press("Enter");
-  // Wait for the input to be cleared - CopilotKit clears the input after
-  // accepting the message, confirming the submission was received.
-  await expect(input).toHaveValue("", { timeout: 10000 });
+  // Wait for CopilotKit to send the request with the user message
+  await submittedPromise;
 }
 
 async function waitForResponse(page: Page, testInfo: TestInfo): Promise<void> {
