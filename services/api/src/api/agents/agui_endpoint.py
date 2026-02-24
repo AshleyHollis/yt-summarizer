@@ -79,7 +79,7 @@ def _sanitize_tool_call_id(tc_id: str) -> str:
     """
     if len(tc_id) <= _TOOL_CALL_ID_MAX_LEN:
         return tc_id
-    return hashlib.sha1(tc_id.encode()).hexdigest()[:_TOOL_CALL_ID_MAX_LEN]
+    return hashlib.sha1(tc_id.encode(), usedforsecurity=False).hexdigest()[:_TOOL_CALL_ID_MAX_LEN]  # nosec B324
 
 
 def _sanitize_messages_tool_call_ids(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
