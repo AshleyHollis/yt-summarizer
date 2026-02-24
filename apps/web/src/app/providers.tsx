@@ -3,7 +3,7 @@
 import { CopilotKit } from "@copilotkit/react-core";
 import "@copilotkit/react-ui/styles.css";
 import { ThemeProvider } from "next-themes";
-import React, { createContext, useContext, useState, useCallback, useEffect, Suspense } from "react";
+import React, { createContext, useContext, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ToolResultProvider } from "@/contexts/ToolResultContext";
 import { HealthStatusProvider, useHealthStatus } from "@/contexts/HealthStatusContext";
@@ -302,17 +302,14 @@ function ProvidersInner({ children }: ProvidersProps) {
   const searchParams = useSearchParams();
   const urlThreadId = searchParams.get("thread");
 
-  // Track mounted state for hydration
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
-
-  // Always render CopilotKit, but wait for client-side mount
-  // to avoid hydration mismatch with threadId
-  // ThreadedCopilotSidebar handles creating threads and updating the URL
+  // Always render CopilotKit with the URL thread ID from the very first render.
+  // We no longer guard with `mounted` because useSearchParams() returns null on
+  // SSR (no URL), so there is no hydration mismatch risk.  Passing the correct
+  // threadId from the first render prevents CopilotKit from generating its own
+  // ephemeral thread UUID before we can inject the persisted one, which previously
+  // caused agent responses to be saved to a different thread than the one the
+  // browser was listening on.
+  //
   // NOTE: We intentionally DO NOT use key={threadId} here!
   // Using key causes full component remount which destroys UI state and
   // causes the "page refresh" effect. CopilotKit handles threadId changes internally.
@@ -324,7 +321,7 @@ function ProvidersInner({ children }: ProvidersProps) {
         agent="yt-summarizer"
         showDevConsole={false}
         enableInspector={false}
-        threadId={mounted ? (urlThreadId ?? undefined) : undefined}
+        threadId={urlThreadId ?? undefined}
       >
         <ToolResultProvider>
           <VideoContextProvider>
