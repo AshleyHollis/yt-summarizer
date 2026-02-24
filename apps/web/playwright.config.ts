@@ -26,11 +26,11 @@ export default defineConfig({
   // CI: 1 retry for fast failure signal, Local: 1 retry for quick feedback
   retries: 1,
 
-  // Run tests in parallel - limited to 2 workers on CI to avoid saturating
-  // DeepSeek-V3.2 (20 RPM limit) with concurrent LLM calls across all spec files.
-  // With 4 workers, tests 3-6 start while 1-2 are still running, creating 4 concurrent
-  // LLM calls that exhaust the rate limit and cause timeouts.
-  workers: process.env.CI ? 2 : undefined,
+  // Run tests in parallel - 4 workers on CI keeps total run time under
+  // the 60-minute GitHub Actions limit. The submitQuery() fix (waiting for
+  // networkidle before typing + input.toHaveValue("") confirmation) prevents
+  // the race condition that caused earlier failures, so concurrency is safe.
+  workers: process.env.CI ? 4 : undefined,
 
   // Reporter to use
   reporter: [
