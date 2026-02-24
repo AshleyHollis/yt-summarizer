@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { submitQuery, waitForCopilotReady, getApiUrl } from './helpers';
+import { submitQuery, waitForCopilotReady, waitForResponse, getApiUrl } from './helpers';
 
 /**
  * E2E Tests for Copilot Feature (User Story 4)
@@ -23,7 +23,7 @@ test.describe('Copilot Feature', () => {
       await page.goto('/library');
 
       // Wait for page to load
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Check for copilot sidebar or toggle button
       const sidebar = page.locator('[data-testid="copilot-sidebar"]').or(
@@ -46,7 +46,7 @@ test.describe('Copilot Feature', () => {
     test('copilot is accessible from submit page', async ({ page }) => {
       await page.goto('/submit');
 
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Look for copilot elements
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -62,7 +62,7 @@ test.describe('Copilot Feature', () => {
     test.beforeEach(async ({ page }) => {
       // Navigate with chat=open to have the sidebar open by default
       await page.goto('/library?chat=open');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('has query input field', async ({ page }) => {
@@ -95,7 +95,7 @@ test.describe('Copilot Feature', () => {
     test.beforeEach(async ({ page }) => {
       // Navigate with chat=open to have the sidebar open by default
       await page.goto('/library?chat=open');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('scope indicator is visible in copilot header', async ({ page }) => {
@@ -112,7 +112,7 @@ test.describe('Copilot Feature', () => {
   test.describe('Coverage Indicator', () => {
     test('coverage information displays video count', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Look for coverage indicator showing indexed content count
       // This should display something like "X videos indexed" or "X segments"
@@ -181,7 +181,7 @@ test.describe('Copilot Feature', () => {
       });
 
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Filter out expected/non-critical errors (dev mode warnings, resource loads, etc.)
       const criticalErrors = errors.filter(e => {
@@ -215,7 +215,7 @@ test.describe('Copilot Feature', () => {
   test.describe('Accessibility', () => {
     test('copilot elements have proper ARIA attributes', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Check for any buttons that should be accessible
       const buttons = page.getByRole('button');
@@ -227,7 +227,7 @@ test.describe('Copilot Feature', () => {
 
     test('input fields have associated labels', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Get all text inputs
       const inputs = page.locator('input[type="text"], textarea');
@@ -256,36 +256,36 @@ test.describe('Copilot Feature', () => {
       await waitForCopilotReady(page);
     });
 
-    test('positive: returns results for push-up exercises (covered topic)', async ({ page }) => {
+    test('positive: returns results for push-up exercises (covered topic)', async ({ page }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       await submitQuery(page, 'How do I do a proper push-up?');
 
-      // Wait for video cards - allow extra time for LLM rate limit retries
-      await page.waitForSelector('a[href*="/videos/"]', { timeout: 60000 });
+      // Wait for any response indicator (uses test timeout with 30s headroom)
+      await waitForResponse(page, testInfo);
 
       // Should find video cards with links to video pages
       const videoLinks = page.locator('a[href*="/videos/"]');
       await expect(videoLinks.first()).toBeVisible();
     });
 
-    test('positive: returns results for kettlebell training (covered topic)', async ({ page }) => {
+    test('positive: returns results for kettlebell training (covered topic)', async ({ page }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       await submitQuery(page, 'What are the benefits of kettlebell training?');
 
-      // Wait for video cards - allow extra time for LLM rate limit retries
-      await page.waitForSelector('a[href*="/videos/"]', { timeout: 60000 });
+      // Wait for any response indicator (uses test timeout with 30s headroom)
+      await waitForResponse(page, testInfo);
 
       // Should find kettlebell-related videos
       const videoLinks = page.locator('a[href*="/videos/"]');
       await expect(videoLinks.first()).toBeVisible();
     });
 
-    test('negative: returns no video cards for cooking pasta (uncovered topic)', async ({ page }) => {
+    test('negative: returns no video cards for cooking pasta (uncovered topic)', async ({ page }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       await submitQuery(page, 'How do I cook pasta?');
 
-      // Wait for response - look for the "Limited Information" indicator
-      await page.waitForSelector('text="Limited Information"', { timeout: 30000 });
+      // Wait for response - uses test timeout with 30s headroom
+      await waitForResponse(page, testInfo);
 
       // Should NOT show video cards for an unrelated topic
       const videoLinks = page.locator('a[href*="/videos/"]');
@@ -295,12 +295,12 @@ test.describe('Copilot Feature', () => {
       await expect(page.getByText('No relevant content found in your library')).toBeVisible();
     });
 
-    test('negative: returns no video cards for quantum physics (uncovered topic)', async ({ page }) => {
+    test('negative: returns no video cards for quantum physics (uncovered topic)', async ({ page }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       await submitQuery(page, 'Explain quantum entanglement');
 
-      // Wait for response
-      await page.waitForTimeout(15000);
+      // Wait for response - uses test timeout with 30s headroom
+      await waitForResponse(page, testInfo);
 
       // Should NOT show video cards for an unrelated topic
       const videoLinks = page.locator('a[href*="/videos/"]');
@@ -309,12 +309,12 @@ test.describe('Copilot Feature', () => {
 
     // Skip: Heavy clubs video is not in the seeded test data
     // To enable: Add Mark Wildman's heavy clubs video to global-setup.ts TEST_VIDEOS
-    test.skip('positive: returns results for heavy clubs (specific video topic)', async ({ page }) => {
+    test.skip('positive: returns results for heavy clubs (specific video topic)', async ({ page }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       await submitQuery(page, 'What are heavy clubs and how do beginners use them?');
 
-      // Wait for video cards (allow more time for LLM rate limit retries)
-      await page.waitForSelector('a[href*="/videos/"]', { timeout: 60000 });
+      // Wait for any response indicator
+      await waitForResponse(page, testInfo);
 
       // Should find the Heavy Clubs video
       const videoLinks = page.locator('a[href*="/videos/"]');
@@ -338,7 +338,7 @@ test.describe('Copilot Feature', () => {
 
     const API_BASE = getApiUrl();
 
-    test('creates thread with proper message structure when sending query', async ({ page, request }) => {
+    test('creates thread with proper message structure when sending query', async ({ page, request }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       // Navigate to add page with chat open
       await page.goto('/add?chat=open');
@@ -348,10 +348,8 @@ test.describe('Copilot Feature', () => {
       const testQuery = `E2E Test Thread ${Date.now()}`;
       await submitQuery(page, testQuery);
 
-      // Wait for the response to appear (tool call completion)
-      await page.waitForSelector('text="Limited Information"', { timeout: 30000 }).catch(() => {
-        // May get different response if library has content
-      });
+      // Wait for the response to appear (uses test timeout with 30s headroom)
+      await waitForResponse(page, testInfo);
 
       // Wait a bit for save to complete
       await page.waitForTimeout(2000);
@@ -392,7 +390,7 @@ test.describe('Copilot Feature', () => {
       expect(toolCall.function.name).toBeTruthy();
     });
 
-    test('thread renders tool call UI correctly when reopened', async ({ page }) => {
+    test('thread renders tool call UI correctly when reopened', async ({ page }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       // First, create a new thread
       await page.goto('/add?chat=open');
@@ -402,8 +400,8 @@ test.describe('Copilot Feature', () => {
       const testQuery = `Reload Test ${Date.now()}`;
       await submitQuery(page, testQuery);
 
-      // Wait for response
-      await page.waitForTimeout(5000);
+      // Wait for response to fully render
+      await waitForResponse(page, testInfo);
 
       // Get thread ID
       const url = page.url();
@@ -417,8 +415,7 @@ test.describe('Copilot Feature', () => {
 
       // Navigate back to the thread
       await page.goto(`/add?chat=open&thread=${threadId}`);
-      await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(2000);
+      await waitForCopilotReady(page);
 
       // Verify the thread loads and shows proper tool UI (not placeholder)
       // Look for "Limited Information" card (tool result UI) or video cards

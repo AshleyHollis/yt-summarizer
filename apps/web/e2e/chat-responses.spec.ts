@@ -255,7 +255,7 @@ test.describe("Chat Edge Cases", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // Navigate with chat=open to have the sidebar open by default
     await page.goto("/library?chat=open");
-    await page.waitForLoadState("networkidle");
+    await waitForCopilotReady(page);
   });
 
   test("handles empty and whitespace-only queries gracefully", async ({ page }) => {

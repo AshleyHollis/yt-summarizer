@@ -444,7 +444,7 @@ async function waitForVideoProcessing(page: Page, timeout: number): Promise<bool
 
     // Refresh the page to get latest status
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   }
 
   console.error('Video processing timed out');

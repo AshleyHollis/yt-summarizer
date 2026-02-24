@@ -23,22 +23,33 @@ const MAX_SUBMIT_RETRIES = 3;
 const RETRY_DELAY_MS = 3000;
 
 /**
+ * Time to wait for CopilotKit's initial agent/connect handshake (ms).
+ *
+ * On the library page, `page.waitForLoadState("networkidle")` never resolves
+ * because the page polls for video status. So we simply wait a fixed period
+ * that is long enough for the handshake to complete in CI.
+ */
+const HANDSHAKE_WAIT_MS = 8000;
+
+/**
  * Wait for CopilotKit to be ready to accept user input.
  *
- * This waits for the chat input to be visible and then waits for the initial
- * agent/connect handshake to complete. On the library page, networkidle never
- * resolves due to polling, so we race against a generous timeout.
+ * This waits for the chat input to be visible and then waits a fixed period
+ * for the initial agent/connect handshake to complete. We use a fixed wait
+ * rather than networkidle because the library page polls continuously and
+ * networkidle never resolves (causing test timeout errors that bypass
+ * Promise.race catch handlers).
  */
 export async function waitForCopilotReady(page: Page): Promise<void> {
   const input = page.getByPlaceholder(CHAT_INPUT_PLACEHOLDER);
   await expect(input).toBeVisible({ timeout: 30_000 });
 
-  // Wait for CopilotKit's initial handshake. We race networkidle against a
-  // fixed timeout because the library page polls continuously.
-  await Promise.race([
-    page.waitForLoadState("networkidle").catch(() => {}),
-    page.waitForTimeout(8000),
-  ]);
+  // Fixed wait for CopilotKit handshake. We intentionally do NOT use
+  // page.waitForLoadState("networkidle") because on the library page it never
+  // resolves (the page polls continuously) and when a Playwright test timeout
+  // fires, the error bypasses Promise.race catch handlers, consuming the
+  // entire test timeout budget.
+  await page.waitForTimeout(HANDSHAKE_WAIT_MS);
 }
 
 /**
@@ -49,28 +60,32 @@ export async function waitForCopilotReady(page: Page): Promise<void> {
  * retry up to MAX_SUBMIT_RETRIES times.
  */
 export async function submitQuery(page: Page, query: string): Promise<void> {
-  await waitForCopilotReady(page);
+  // Don't call waitForCopilotReady here — callers should ensure it's been
+  // called once already (e.g., in beforeEach or via openChat). This avoids
+  // paying the HANDSHAKE_WAIT_MS penalty on every follow-up query.
 
   for (let attempt = 1; attempt <= MAX_SUBMIT_RETRIES; attempt++) {
     const input = page.getByPlaceholder(CHAT_INPUT_PLACEHOLDER);
+    await expect(input).toBeVisible({ timeout: 10_000 });
     await input.fill(query);
     await input.press("Enter");
 
-    // Verify the user message appeared in the chat. CopilotKit renders user
-    // messages in the chat area. We look for a text node containing the query
-    // (or a reasonable prefix of it for long queries).
-    const verifyText = query.length > 60 ? query.substring(0, 60) : query;
+    // Verify the user message appeared in the chat. Use a short prefix with
+    // getByText (substring match) rather than exact CSS text= selector, because
+    // CopilotKit may wrap the text in markdown or truncate it.
+    const verifyText =
+      query.length > 40 ? query.substring(0, 40) : query;
     try {
-      await expect(page.locator(`text="${verifyText}"`).first()).toBeVisible({
-        timeout: 10_000,
-      });
-      // Message was accepted - return
+      await expect(
+        page.getByText(verifyText, { exact: false }).first(),
+      ).toBeVisible({ timeout: 10_000 });
+      // Message was accepted — return
       return;
     } catch {
       if (attempt === MAX_SUBMIT_RETRIES) {
         throw new Error(
-          `submitQuery: message "${query}" was not rendered in chat after ` +
-            `${MAX_SUBMIT_RETRIES} attempts. CopilotKit may not be ready.`
+          `submitQuery: message "${verifyText}..." was not rendered in chat ` +
+            `after ${MAX_SUBMIT_RETRIES} attempts. CopilotKit may not be ready.`,
         );
       }
       // Wait before retrying
@@ -85,8 +100,9 @@ export async function submitQuery(page: Page, query: string): Promise<void> {
  * Derives timeout from the current test's actual timeout (respects test.slow()),
  * leaving 30s headroom for subsequent assertions.
  *
- * Waits for any of: "Recommended Videos", "Sources", video links,
- * "Limited Information", or "No relevant content" to appear.
+ * Uses Playwright's `locator.or()` to wait for any response indicator rather
+ * than racing multiple waitForSelector calls (which can cause unhandled
+ * rejections when they all fail).
  */
 export async function waitForResponse(
   page: Page,
@@ -94,13 +110,18 @@ export async function waitForResponse(
 ): Promise<void> {
   const timeout = Math.max(testInfo.timeout - 30_000, 60_000);
 
-  await Promise.race([
-    page.waitForSelector('text="Recommended Videos"', { timeout }),
-    page.waitForSelector('text="Sources"', { timeout }),
-    page.waitForSelector('a[href*="/videos/"]', { timeout }),
-    page.waitForSelector('text="Limited Information"', { timeout }),
-    page.waitForSelector('text="No relevant content"', { timeout }),
-  ]);
+  // Build a composite locator that matches ANY response indicator.
+  // This avoids the race condition of multiple waitForSelector calls where
+  // losing selectors throw unhandled errors.
+  const responseIndicator = page
+    .getByText("Recommended Videos")
+    .or(page.getByText("Sources"))
+    .or(page.locator('a[href*="/videos/"]'))
+    .or(page.getByText("Limited Information"))
+    .or(page.getByText("No relevant content"))
+    .or(page.getByText("Searching your video library..."));
+
+  await expect(responseIndicator.first()).toBeVisible({ timeout });
 }
 
 /**

@@ -235,7 +235,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Only check pagination if there are more than 10 videos
       if (data.total_count > 10) {
-        const pagination = page.locator('nav[aria-label*="Pagination"], .pagination');
+        const pagination = page.locator('nav[aria-label*="Pagination"], .pagination').first();
         await expect(pagination).toBeVisible();
       }
     });
