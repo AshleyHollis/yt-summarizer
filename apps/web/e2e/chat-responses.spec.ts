@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page, TestInfo } from "@playwright/test";
 
 /**
  * E2E tests for Chat Response Quality
@@ -31,7 +31,10 @@ async function submitQuery(page: Page, query: string): Promise<void> {
   await input.press("Enter");
 }
 
-async function waitForResponse(page: Page, timeout = 80000): Promise<void> {
+async function waitForResponse(page: Page, testInfo: TestInfo): Promise<void> {
+  // Derive timeout from the current test's actual timeout (respects test.slow()),
+  // leaving 30s headroom for subsequent assertions.
+  const timeout = Math.max(testInfo.timeout - 30000, 30000);
   // Wait for response indicators - the UI shows "Sources" section with citations
   // Also check for video links, or informational messages
   // Increased timeout to handle LLM rate limit retries under parallel CI load
@@ -73,9 +76,9 @@ test.describe("Chat Response Quality", () => {
     await page.waitForLoadState("networkidle");
   });
 
-  test("push-up query returns accurate content with proper citations", async ({ page }) => {
+  test("push-up query returns accurate content with proper citations", async ({ page }, testInfo) => {
     await submitQuery(page, "How do I do a proper push-up with good form?");
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // 1. Should show video cards (indicated by video links)
     const videoLinks = page.locator('a[href*="/videos/"]');
@@ -105,9 +108,9 @@ test.describe("Chat Response Quality", () => {
     expect(linkCount).toBeGreaterThan(0);
   });
 
-  test("kettlebell query returns content from Pavel Tsatsouline video", async ({ page }) => {
+  test("kettlebell query returns content from Pavel Tsatsouline video", async ({ page }, testInfo) => {
     await submitQuery(page, "Tell me about kettlebell training techniques");
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // 1. Should show video cards
     const videoLinks = page.locator('a[href*="/videos/"]');
@@ -131,9 +134,9 @@ test.describe("Chat Response Quality", () => {
 
   // Skip: Heavy clubs video is not in the seeded test data
   // To enable: Add Mark Wildman's heavy clubs video to global-setup.ts TEST_VIDEOS
-  test.skip("heavy clubs query returns Mark Wildman video content", async ({ page }) => {
+  test.skip("heavy clubs query returns Mark Wildman video content", async ({ page }, testInfo) => {
     await submitQuery(page, "What should beginners know about heavy clubs?");
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // 1. Should show video cards
     await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible();
@@ -153,10 +156,10 @@ test.describe("Chat Response Quality", () => {
     await expect(page.getByText("The Key Part of Heavy Clubs").first()).toBeVisible();
   });
 
-  test("multi-topic query returns multiple relevant videos", async ({ page }) => {
+  test("multi-topic query returns multiple relevant videos", async ({ page }, testInfo) => {
     test.slow(); // LLM-heavy: triple timeout to 360s
     await submitQuery(page, "What exercises can I do for a full body workout?");
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // Response should include citations - check for any of these indicators:
     // - Video links with /videos/ or /library/ paths
@@ -187,10 +190,10 @@ test.describe("Chat Response Quality", () => {
     expect(hasExerciseContent).toBe(true);
   });
 
-  test("response includes synthesized answer not just raw transcript", async ({ page }) => {
+  test("response includes synthesized answer not just raw transcript", async ({ page }, testInfo) => {
     test.slow(); // LLM-heavy: triple timeout to 360s
     await submitQuery(page, "What are the common mistakes when doing push-ups?");
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // 1. Should show video cards
     await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible();
@@ -211,11 +214,12 @@ test.describe("Chat Response Quality", () => {
     expect(pageContent.toLowerCase()).toContain("mistake");
   });
 
-  test("irrelevant query shows Limited Information indicator", async ({ page }) => {
+  test("irrelevant query shows Limited Information indicator", async ({ page }, testInfo) => {
     await submitQuery(page, "How do I bake a chocolate cake?");
 
-    // Wait for the "Limited Information" response
-    await page.waitForSelector('text="Limited Information"', { timeout: 70000 });
+    // Wait for the "Limited Information" response - derive timeout from test budget
+    const limitedInfoTimeout = Math.max(testInfo.timeout - 30000, 30000);
+    await page.waitForSelector('text="Limited Information"', { timeout: limitedInfoTimeout });
 
     // 1. Should NOT show video cards
     const videoLinks = page.locator('a[href*="/videos/"]');
@@ -233,9 +237,9 @@ test.describe("Chat Response Quality", () => {
     expect(pageContent.toLowerCase()).toMatch(/don't have|didn't find|no.*video|not.*library/i);
   });
 
-  test("video card links navigate to correct video detail page", async ({ page }) => {
+  test("video card links navigate to correct video detail page", async ({ page }, testInfo) => {
     await submitQuery(page, "Show me push-up tutorials");
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // Find a video link - could be in /videos/ or /library/ paths
     const videoLink = page.locator('a[href*="/videos/"], a[href*="/library/"]').first();
@@ -309,11 +313,11 @@ test.describe("Chat Edge Cases", () => {
     }
   });
 
-  test("handles special characters in query", async ({ page }) => {
+  test("handles special characters in query", async ({ page }, testInfo) => {
     await submitQuery(page, "What about push-ups? (with good form) & proper technique!");
 
     // Should still work and not crash
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // Should get a response (either video cards or "limited information")
     const hasResponse =
@@ -322,7 +326,7 @@ test.describe("Chat Edge Cases", () => {
     expect(hasResponse).toBe(true);
   });
 
-  test("handles very long query", async ({ page }) => {
+  test("handles very long query", async ({ page }, testInfo) => {
     const longQuery = "I want to learn about push-ups, specifically the proper form, " +
       "common mistakes, how to progress from beginner to advanced, " +
       "what muscles are worked, how many reps and sets I should do, " +
@@ -330,22 +334,22 @@ test.describe("Chat Edge Cases", () => {
       "Also interested in variations like diamond push-ups, wide push-ups, and decline push-ups.";
 
     await submitQuery(page, longQuery);
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // Should handle long query and return results
     const videoLinks = page.locator('a[href*="/videos/"]');
     await expect(videoLinks.first()).toBeVisible();
   });
 
-  test("subsequent queries work correctly", async ({ page }) => {
+  test("subsequent queries work correctly", async ({ page }, testInfo) => {
     // First query
     await submitQuery(page, "How do push-ups work?");
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
     await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible();
 
     // Second query - different topic
     await submitQuery(page, "What about kettlebells?");
-    await waitForResponse(page);
+    await waitForResponse(page, testInfo);
 
     // Should show new results
     const pageContent = await page.content();
