@@ -26,9 +26,15 @@ import { test, expect, Page, TestInfo, BrowserContext } from "@playwright/test";
 
 async function submitQuery(page: Page, query: string): Promise<void> {
   const input = page.getByPlaceholder("Ask about your videos...");
-  await expect(input).toBeVisible({ timeout: 10000 });
+  await expect(input).toBeVisible({ timeout: 30000 });
+  // Wait for CopilotKit to finish its initial agent/connect handshake before
+  // submitting; otherwise the message can be silently discarded in CI.
+  await page.waitForLoadState("networkidle");
   await input.fill(query);
   await input.press("Enter");
+  // Wait for the backend to start processing - confirms the message was sent
+  // and CopilotKit's tool call lifecycle has started
+  await page.waitForSelector('text="Searching your video library..."', { timeout: 30000 });
 }
 
 async function waitForResponse(page: Page, testInfo: TestInfo): Promise<void> {

@@ -26,10 +26,11 @@ export default defineConfig({
   // CI: 1 retry for fast failure signal, Local: 1 retry for quick feedback
   retries: 1,
 
-  // Run tests in parallel - LLM rate limiting is handled at the app level
-  // with smart retry that uses Retry-After headers
-  // 4 workers on CI to keep E2E under 30 min (172 tests × ~10s avg / 4 workers ≈ 7 min)
-  workers: process.env.CI ? 4 : undefined,
+  // Run tests in parallel - limited to 2 workers on CI to avoid saturating
+  // DeepSeek-V3.2 (20 RPM limit) with concurrent LLM calls across all spec files.
+  // With 4 workers, tests 3-6 start while 1-2 are still running, creating 4 concurrent
+  // LLM calls that exhaust the rate limit and cause timeouts.
+  workers: process.env.CI ? 2 : undefined,
 
   // Reporter to use
   reporter: [
