@@ -83,7 +83,7 @@ test.describe('User Story 3: Browse the Library', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/library');
       // Wait for initial load
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('search filter updates results', async ({ page }) => {
@@ -192,7 +192,7 @@ test.describe('User Story 3: Browse the Library', () => {
   test.describe('Video Cards Display', () => {
     test('video cards show required information', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Wait for content to load
       const videoCard = page.locator('[data-testid="video-card"], .video-card, article').first();
@@ -209,7 +209,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
     test('clicking video card navigates to detail page', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const videoCard = page.locator('[data-testid="video-card"], .video-card, article a').first();
 
@@ -231,7 +231,7 @@ test.describe('User Story 3: Browse the Library', () => {
       const data = await response.json();
 
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Only check pagination if there are more than 10 videos
       if (data.total_count > 10) {
@@ -242,7 +242,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
     test('pagination buttons navigate between pages', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const nextButton = page.getByRole('button', { name: /Next/i }).first();
 
@@ -250,7 +250,7 @@ test.describe('User Story 3: Browse the Library', () => {
         await nextButton.click();
 
         // Page should update
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
       }
     });
   });
@@ -258,7 +258,7 @@ test.describe('User Story 3: Browse the Library', () => {
   test.describe('Channel Filter', () => {
     test('channel dropdown loads channels from API', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Wait for channels to load (loading skeleton should disappear)
       await page.waitForFunction(() => {
@@ -299,14 +299,14 @@ test.describe('User Story 3: Browse the Library', () => {
       // Page should load - check for body content (main might not exist during loading)
       await expect(page.locator('body')).toBeVisible();
       // Wait for actual content to render
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('video detail shows segments', async ({ page }) => {
       test.skip(!videoId, 'No videos in library');
 
       await page.goto(`/library/${videoId}`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should show segments section or transcript
       const segmentsSection = page.getByText(/Segments|Transcript|Timeline/i);
@@ -363,7 +363,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Navigate to the video detail page
       await page.goto(`/library/${completedVideoId}`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Click on the Transcript tab
       const transcriptTab = page.getByRole('button', { name: /Transcript/i });
@@ -416,7 +416,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Should show error message or have some content (not a crash)
       // The page might show an error or just render with error state
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Verify page didn't crash - body should be visible
       await expect(page.locator('body')).toBeVisible();
@@ -599,7 +599,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Navigate to video detail page
       await page.goto(`/library/${videoId}`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // The summary section should be visible and contain content
       // This catches UI issues where summary is fetched but not displayed

@@ -263,6 +263,14 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
   test.describe('Polling and Auto-refresh', () => {
     test('page auto-refreshes during processing', async ({ page }) => {
+      // Set up API call tracking BEFORE any navigation so we capture all
+      // requests, including those fired immediately on page load.
+      let apiCallCount = 0;
+      await page.route('**/api/v1/videos/**', (route) => {
+        apiCallCount++;
+        return route.continue();
+      });
+
       await page.goto('/submit');
 
       const urlInput = page.getByLabel(/YouTube Video URL/i);
@@ -272,13 +280,6 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
-
-      // Track API calls to verify polling
-      let apiCallCount = 0;
-      await page.route('**/api/v1/videos/**', (route) => {
-        apiCallCount++;
-        return route.continue();
-      });
 
       // Wait a bit for polling to happen
       await page.waitForTimeout(10_000);

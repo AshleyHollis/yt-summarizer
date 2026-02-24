@@ -363,8 +363,11 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
   }
 
   console.log('[global-setup] └──────────────────────────────────────────────────────────────────┘');
-  console.log(`[global-setup] ⚠ Timeout waiting for video processing. Tests may fail.`);
-  return false;
+  throw new Error(
+    `[global-setup] Timeout waiting for video processing after ${MAX_WAIT_TIME_MS / 1000}s. ` +
+    `Tests require completed videos with ${MIN_SEGMENTS_REQUIRED}+ segments. ` +
+    `Aborting test run to avoid cascading failures.`
+  );
 }
 
 async function waitForVideoProcessing(): Promise<boolean> {
@@ -399,8 +402,11 @@ async function waitForVideoProcessing(): Promise<boolean> {
     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  console.log(`[global-setup] ⚠ Timeout waiting for video processing. Tests may fail.`);
-  return false;
+  throw new Error(
+    `[global-setup] Timeout waiting for video processing after ${MAX_WAIT_TIME_MS / 1000}s. ` +
+    `Tests require completed videos with ${MIN_SEGMENTS_REQUIRED}+ segments. ` +
+    `Aborting test run to avoid cascading failures.`
+  );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

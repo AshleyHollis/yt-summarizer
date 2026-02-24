@@ -1,0 +1,175 @@
+import { Page, TestInfo, expect } from "@playwright/test";
+
+/**
+ * Shared E2E test helpers for CopilotKit interaction.
+ *
+ * CopilotKit has an initial agent/connect handshake on page load. If a message
+ * is submitted before this handshake completes, the message is silently
+ * discarded. These helpers ensure the handshake is complete before interacting.
+ *
+ * The library page polls for video processing status in the background, so
+ * `page.waitForLoadState("networkidle")` hangs indefinitely. We use a
+ * verification-based approach instead: after pressing Enter we confirm the
+ * user message appeared in the chat UI. If it didn't, we retry.
+ */
+
+/** Default placeholder text for the CopilotKit chat input. */
+const CHAT_INPUT_PLACEHOLDER = "Ask about your videos...";
+
+/** Maximum number of times to retry submitting a query if it gets silently discarded. */
+const MAX_SUBMIT_RETRIES = 3;
+
+/** Time to wait between submission retries (ms). */
+const RETRY_DELAY_MS = 3000;
+
+/**
+ * Wait for CopilotKit to be ready to accept user input.
+ *
+ * This waits for the chat input to be visible and then waits for the initial
+ * agent/connect handshake to complete. On the library page, networkidle never
+ * resolves due to polling, so we race against a generous timeout.
+ */
+export async function waitForCopilotReady(page: Page): Promise<void> {
+  const input = page.getByPlaceholder(CHAT_INPUT_PLACEHOLDER);
+  await expect(input).toBeVisible({ timeout: 30_000 });
+
+  // Wait for CopilotKit's initial handshake. We race networkidle against a
+  // fixed timeout because the library page polls continuously.
+  await Promise.race([
+    page.waitForLoadState("networkidle").catch(() => {}),
+    page.waitForTimeout(8000),
+  ]);
+}
+
+/**
+ * Submit a query to the CopilotKit chat and verify it was accepted.
+ *
+ * After pressing Enter, we verify that the user message text appears in the
+ * chat UI. If CopilotKit silently discarded it (handshake not complete), we
+ * retry up to MAX_SUBMIT_RETRIES times.
+ */
+export async function submitQuery(page: Page, query: string): Promise<void> {
+  await waitForCopilotReady(page);
+
+  for (let attempt = 1; attempt <= MAX_SUBMIT_RETRIES; attempt++) {
+    const input = page.getByPlaceholder(CHAT_INPUT_PLACEHOLDER);
+    await input.fill(query);
+    await input.press("Enter");
+
+    // Verify the user message appeared in the chat. CopilotKit renders user
+    // messages in the chat area. We look for a text node containing the query
+    // (or a reasonable prefix of it for long queries).
+    const verifyText = query.length > 60 ? query.substring(0, 60) : query;
+    try {
+      await expect(page.locator(`text="${verifyText}"`).first()).toBeVisible({
+        timeout: 10_000,
+      });
+      // Message was accepted - return
+      return;
+    } catch {
+      if (attempt === MAX_SUBMIT_RETRIES) {
+        throw new Error(
+          `submitQuery: message "${query}" was not rendered in chat after ` +
+            `${MAX_SUBMIT_RETRIES} attempts. CopilotKit may not be ready.`
+        );
+      }
+      // Wait before retrying
+      await page.waitForTimeout(RETRY_DELAY_MS);
+    }
+  }
+}
+
+/**
+ * Wait for the copilot to finish responding to a query.
+ *
+ * Derives timeout from the current test's actual timeout (respects test.slow()),
+ * leaving 30s headroom for subsequent assertions.
+ *
+ * Waits for any of: "Recommended Videos", "Sources", video links,
+ * "Limited Information", or "No relevant content" to appear.
+ */
+export async function waitForResponse(
+  page: Page,
+  testInfo: TestInfo,
+): Promise<void> {
+  const timeout = Math.max(testInfo.timeout - 30_000, 60_000);
+
+  await Promise.race([
+    page.waitForSelector('text="Recommended Videos"', { timeout }),
+    page.waitForSelector('text="Sources"', { timeout }),
+    page.waitForSelector('a[href*="/videos/"]', { timeout }),
+    page.waitForSelector('text="Limited Information"', { timeout }),
+    page.waitForSelector('text="No relevant content"', { timeout }),
+  ]);
+}
+
+/**
+ * Open the CopilotKit chat sidebar.
+ *
+ * Navigates to the given path with `?chat=open` if not already on it.
+ * Waits for the chat input to become visible and CopilotKit to be ready.
+ */
+export async function openChat(
+  page: Page,
+  path: string = "/library",
+): Promise<void> {
+  const separator = path.includes("?") ? "&" : "?";
+  await page.goto(`${path}${separator}chat=open`);
+  await waitForCopilotReady(page);
+}
+
+/**
+ * Open the CopilotKit chat sidebar by clicking the "Open AI Assistant" button.
+ *
+ * Useful when the page is already loaded and we need to toggle the sidebar.
+ */
+export async function openChatViaButton(page: Page): Promise<void> {
+  const button = page.getByRole("button", { name: /open ai assistant/i });
+  await expect(button).toBeVisible({ timeout: 15_000 });
+  await button.click();
+  await waitForCopilotReady(page);
+}
+
+/**
+ * Wait for the copilot assistant response to appear (non-tool-specific).
+ *
+ * This waits for loading spinners/indicators to disappear and for a response
+ * message to be rendered in the chat area. Useful for tests that check message
+ * count or generic response behavior rather than specific tool output.
+ */
+export async function waitForAssistantResponse(
+  page: Page,
+  options: { timeout?: number } = {},
+): Promise<void> {
+  const timeout = options.timeout ?? 120_000;
+
+  // Wait for "Searching your video library..." loading indicator to appear
+  // and then disappear (tool call lifecycle)
+  try {
+    await page.waitForSelector('text="Searching your video library..."', {
+      timeout: 30_000,
+    });
+  } catch {
+    // Loading indicator may have already appeared and disappeared
+  }
+
+  // Wait for loading indicator to disappear
+  await expect(
+    page.getByText("Searching your video library..."),
+  ).not.toBeVisible({ timeout });
+
+  // Also wait for any spinner/loading animations to settle
+  const spinners = page.locator(
+    '[class*="animate-spin"], [class*="loading"], [role="progressbar"]',
+  );
+  if ((await spinners.count()) > 0) {
+    await expect(spinners.first()).not.toBeVisible({ timeout: 30_000 });
+  }
+}
+
+/**
+ * Get the API base URL from environment or default to localhost.
+ */
+export function getApiUrl(): string {
+  return process.env.API_URL || "http://localhost:8000";
+}

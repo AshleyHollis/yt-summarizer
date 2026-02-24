@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { submitQuery, waitForCopilotReady, getApiUrl } from './helpers';
 
 /**
  * E2E Tests for Copilot Feature (User Story 4)
@@ -248,25 +249,16 @@ test.describe('Copilot Feature', () => {
   });
 
   test.describe('Relevance Filtering', () => {
-    /**
-     * Helper to submit a query to the copilot.
-     */
-    async function submitCopilotQuery(page: import('@playwright/test').Page, query: string): Promise<void> {
-      const queryInput = page.getByPlaceholder("Ask about your videos...");
-      await expect(queryInput).toBeVisible({ timeout: 10000 });
-      await queryInput.fill(query);
-      await queryInput.press("Enter");
-    }
-
     test.beforeEach(async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 720 });
       // Navigate with chat=open to have the sidebar open by default
       await page.goto('/library?chat=open');
-      await page.waitForLoadState('networkidle');
+      await waitForCopilotReady(page);
     });
 
     test('positive: returns results for push-up exercises (covered topic)', async ({ page }) => {
-      await submitCopilotQuery(page, 'How do I do a proper push-up?');
+      test.slow(); // LLM call - needs extra time
+      await submitQuery(page, 'How do I do a proper push-up?');
 
       // Wait for video cards - allow extra time for LLM rate limit retries
       await page.waitForSelector('a[href*="/videos/"]', { timeout: 60000 });
@@ -277,7 +269,8 @@ test.describe('Copilot Feature', () => {
     });
 
     test('positive: returns results for kettlebell training (covered topic)', async ({ page }) => {
-      await submitCopilotQuery(page, 'What are the benefits of kettlebell training?');
+      test.slow(); // LLM call - needs extra time
+      await submitQuery(page, 'What are the benefits of kettlebell training?');
 
       // Wait for video cards - allow extra time for LLM rate limit retries
       await page.waitForSelector('a[href*="/videos/"]', { timeout: 60000 });
@@ -288,7 +281,8 @@ test.describe('Copilot Feature', () => {
     });
 
     test('negative: returns no video cards for cooking pasta (uncovered topic)', async ({ page }) => {
-      await submitCopilotQuery(page, 'How do I cook pasta?');
+      test.slow(); // LLM call - needs extra time
+      await submitQuery(page, 'How do I cook pasta?');
 
       // Wait for response - look for the "Limited Information" indicator
       await page.waitForSelector('text="Limited Information"', { timeout: 30000 });
@@ -302,7 +296,8 @@ test.describe('Copilot Feature', () => {
     });
 
     test('negative: returns no video cards for quantum physics (uncovered topic)', async ({ page }) => {
-      await submitCopilotQuery(page, 'Explain quantum entanglement');
+      test.slow(); // LLM call - needs extra time
+      await submitQuery(page, 'Explain quantum entanglement');
 
       // Wait for response
       await page.waitForTimeout(15000);
@@ -315,7 +310,8 @@ test.describe('Copilot Feature', () => {
     // Skip: Heavy clubs video is not in the seeded test data
     // To enable: Add Mark Wildman's heavy clubs video to global-setup.ts TEST_VIDEOS
     test.skip('positive: returns results for heavy clubs (specific video topic)', async ({ page }) => {
-      await submitCopilotQuery(page, 'What are heavy clubs and how do beginners use them?');
+      test.slow(); // LLM call - needs extra time
+      await submitQuery(page, 'What are heavy clubs and how do beginners use them?');
 
       // Wait for video cards (allow more time for LLM rate limit retries)
       await page.waitForSelector('a[href*="/videos/"]', { timeout: 60000 });
@@ -340,21 +336,17 @@ test.describe('Copilot Feature', () => {
      * Tool results are re-executed when the thread is reloaded.
      */
 
-    const API_BASE = process.env.API_URL || 'http://localhost:8000';
+    const API_BASE = getApiUrl();
 
     test('creates thread with proper message structure when sending query', async ({ page, request }) => {
+      test.slow(); // LLM call - needs extra time
       // Navigate to add page with chat open
       await page.goto('/add?chat=open');
-      await page.waitForLoadState('networkidle');
-
-      // Find the chat input
-      const chatInput = page.getByRole('textbox', { name: /ask about your videos/i });
-      await expect(chatInput).toBeVisible({ timeout: 10000 });
+      await waitForCopilotReady(page);
 
       // Send a message that triggers the queryLibrary tool
       const testQuery = `E2E Test Thread ${Date.now()}`;
-      await chatInput.fill(testQuery);
-      await chatInput.press('Enter');
+      await submitQuery(page, testQuery);
 
       // Wait for the response to appear (tool call completion)
       await page.waitForSelector('text="Limited Information"', { timeout: 30000 }).catch(() => {
@@ -401,17 +393,14 @@ test.describe('Copilot Feature', () => {
     });
 
     test('thread renders tool call UI correctly when reopened', async ({ page }) => {
+      test.slow(); // LLM call - needs extra time
       // First, create a new thread
       await page.goto('/add?chat=open');
-      await page.waitForLoadState('networkidle');
-
-      const chatInput = page.getByRole('textbox', { name: /ask about your videos/i });
-      await expect(chatInput).toBeVisible({ timeout: 10000 });
+      await waitForCopilotReady(page);
 
       // Send query
       const testQuery = `Reload Test ${Date.now()}`;
-      await chatInput.fill(testQuery);
-      await chatInput.press('Enter');
+      await submitQuery(page, testQuery);
 
       // Wait for response
       await page.waitForTimeout(5000);

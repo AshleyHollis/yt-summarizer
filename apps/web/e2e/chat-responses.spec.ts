@@ -1,4 +1,5 @@
-import { test, expect, Page, TestInfo, BrowserContext } from "@playwright/test";
+import { test, expect, BrowserContext } from "@playwright/test";
+import { submitQuery, waitForResponse, waitForCopilotReady } from "./helpers";
 
 /**
  * E2E tests for Chat Response Quality
@@ -8,68 +9,18 @@ import { test, expect, Page, TestInfo, BrowserContext } from "@playwright/test";
  * - The configured LLM (DeepSeek-V3.2)
  *
  * Test videos (all with YouTube auto-captions for cost efficiency):
- * - The Perfect Push Up (Calisthenicmovement) - IODxDxX7oi4 - 3:37 ✓ has captions
- * - You CAN do pushups! (Hybrid Calisthenics) - 0GsVJsS6474 - 3:09 ✓ has captions
- * - The Perfect Push-Up (short) - c-lBErfxszs - 0:31 ✓ has captions
- * - The BEST Kettlebell Swing Tutorial - aSYap2yhW8s - 0:58 ✓ has captions
- * - How To Do Kettlebell Swings | Proper Form - hp3qVqIHNOI - 4:37 ✓ has captions
+ * - The Perfect Push Up (Calisthenicmovement) - IODxDxX7oi4 - 3:37
+ * - You CAN do pushups! (Hybrid Calisthenics) - 0GsVJsS6474 - 3:09
+ * - The Perfect Push-Up (short) - c-lBErfxszs - 0:31
+ * - The BEST Kettlebell Swing Tutorial - aSYap2yhW8s - 0:58
+ * - How To Do Kettlebell Swings | Proper Form - hp3qVqIHNOI - 4:37
  *
  * Videos are clustered by topic for relationship testing:
  * - Push-up cluster: IODxDxX7oi4 + 0GsVJsS6474 + c-lBErfxszs (should relate)
  * - Kettlebell cluster: aSYap2yhW8s + hp3qVqIHNOI (should relate)
  *
- * IMPORTANT: Videos without YouTube auto-captions require Whisper transcription
- * which is expensive. Verify captions with: yt-dlp --list-subs "URL"
- *
  * These tests use multiple assertions per test for efficiency.
  */
-
-async function submitQuery(page: Page, query: string): Promise<void> {
-  const input = page.getByPlaceholder("Ask about your videos...");
-  await expect(input).toBeVisible({ timeout: 30000 });
-  // Wait for CopilotKit to finish its initial agent/connect handshake before
-  // submitting; otherwise the message can be silently discarded in CI.
-  // Race against a 5s timeout in case the page is polling (e.g. library status
-  // polls) and networkidle would otherwise hang indefinitely.
-  await Promise.race([
-    page.waitForLoadState("networkidle"),
-    new Promise((resolve) => setTimeout(resolve, 5000)),
-  ]);
-  await input.fill(query);
-  await input.press("Enter");
-}
-
-async function waitForResponse(page: Page, testInfo: TestInfo): Promise<void> {
-  // Derive timeout from the current test's actual timeout (respects test.slow()),
-  // leaving 30s headroom for subsequent assertions.
-  const timeout = Math.max(testInfo.timeout - 30000, 30000);
-  // Wait for response indicators - the UI shows "Sources" section with citations
-  // Also check for video links, or informational messages
-  // Increased timeout to handle LLM rate limit retries under parallel CI load
-  await Promise.race([
-    page.waitForSelector('text="Recommended Videos"', { timeout }),
-    page.waitForSelector('text="Sources"', { timeout }),
-    page.waitForSelector('a[href*="/videos/"]', { timeout }),
-    page.waitForSelector('text="Limited Information"', { timeout }),
-    page.waitForSelector('text="No relevant content"', { timeout }),
-    // Also wait for any response with citations (superscript [1], [2], etc.)
-    page.waitForSelector('superscript', { timeout }),
-  ]);
-}
-
-// Helper function to get response text - kept for potential future use
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function getResponseText(_page: Page): Promise<string> {
-  // Get all paragraph text from the copilot response area
-  const paragraphs = _page.locator('.copilot-sidebar p, [class*="copilot"] p, [class*="Copilot"] p');
-  const texts: string[] = [];
-  const count = await paragraphs.count();
-  for (let i = 0; i < count; i++) {
-    const text = await paragraphs.nth(i).textContent();
-    if (text) texts.push(text);
-  }
-  return texts.join(' ');
-}
 
 test.describe("Chat Response Quality", () => {
   // Each test gets a fresh browser context so CopilotKit in-memory thread state
@@ -77,13 +28,13 @@ test.describe("Chat Response Quality", () => {
   // (server should own thread ID generation) and prevents history bloat
   // that causes progressive LLM prompt growth and timeout failures.
   let context: BrowserContext;
-  let page: Page;
+  let page: import("@playwright/test").Page;
 
   test.beforeEach(async ({ browser }) => {
     context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     page = await context.newPage();
     await page.goto("/library?chat=open");
-    await page.waitForLoadState("networkidle");
+    await waitForCopilotReady(page);
   });
 
   test.afterEach(async () => {

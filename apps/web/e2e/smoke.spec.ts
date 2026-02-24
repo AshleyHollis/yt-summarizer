@@ -258,7 +258,8 @@ test.describe('Error Handling (Requires Backend)', () => {
     await page.goto('/videos/non-existent-video-id-12345');
 
     // Should show error or not found message
-    const errorMessage = page.getByText(/not found|error|failed|unable/i);
+    // Use .first() because multiple elements may match this broad regex (strict mode)
+    const errorMessage = page.getByText(/not found|error|failed|unable/i).first();
     await expect(errorMessage).toBeVisible({ timeout: 10000 });
   });
 });
