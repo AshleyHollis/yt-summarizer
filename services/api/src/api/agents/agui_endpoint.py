@@ -18,6 +18,7 @@ See: https://docs.copilotkit.ai/microsoft-agent-framework
 from __future__ import annotations
 
 import contextvars
+import hashlib
 import json
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -65,6 +66,86 @@ def get_current_ai_settings() -> dict[str, Any]:
             "useWebSearch": False,
         }
     return settings
+
+
+_TOOL_CALL_ID_MAX_LEN = 40
+
+
+def _sanitize_tool_call_id(tc_id: str) -> str:
+    """Truncate a tool_call ID to the Azure AI Foundry maximum length of 40 chars.
+
+    If the ID exceeds the limit, it is replaced with a stable 40-char hex digest
+    so that any corresponding tool-result messages can still be matched.
+    """
+    if len(tc_id) <= _TOOL_CALL_ID_MAX_LEN:
+        return tc_id
+    return hashlib.sha1(tc_id.encode()).hexdigest()[:_TOOL_CALL_ID_MAX_LEN]
+
+
+def _sanitize_messages_tool_call_ids(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Walk all messages and sanitize any tool_call IDs that exceed 40 chars.
+
+    Azure AI Foundry rejects IDs longer than 40 characters, which can happen when
+    the agent framework injects synthetic 'coagent-state-render-…' IDs.
+
+    The remap is applied consistently to:
+    - ``message.tool_calls[*].id`` (OpenAI-style assistant messages)
+    - ``message.toolCalls[*].id`` (CopilotKit camelCase variant)
+    - ``message.tool_call_id``    (tool-result messages, snake_case)
+    - ``message.toolCallId``      (tool-result messages, camelCase)
+    """
+    # Build a remap table so we can update matching toolCallId fields consistently
+    id_remap: dict[str, str] = {}
+
+    sanitized: list[dict[str, Any]] = []
+    for msg in messages:
+        msg = dict(msg)  # shallow copy
+
+        # --- assistant messages with tool_calls (OpenAI snake_case) ---
+        if "tool_calls" in msg and isinstance(msg["tool_calls"], list):
+            new_tcs = []
+            for tc in msg["tool_calls"]:
+                tc = dict(tc)
+                orig = tc.get("id", "")
+                fixed = _sanitize_tool_call_id(orig)
+                if orig != fixed:
+                    id_remap[orig] = fixed
+                    logger.info(f"Sanitized tool_call_id (tool_calls): {orig!r} -> {fixed!r}")
+                tc["id"] = fixed
+                new_tcs.append(tc)
+            msg["tool_calls"] = new_tcs
+
+        # --- assistant messages with toolCalls (camelCase) ---
+        if "toolCalls" in msg and isinstance(msg["toolCalls"], list):
+            new_tcs = []
+            for tc in msg["toolCalls"]:
+                tc = dict(tc)
+                orig = tc.get("id", "")
+                fixed = _sanitize_tool_call_id(orig)
+                if orig != fixed:
+                    id_remap[orig] = fixed
+                    logger.info(f"Sanitized tool_call_id (toolCalls): {orig!r} -> {fixed!r}")
+                tc["id"] = fixed
+                new_tcs.append(tc)
+            msg["toolCalls"] = new_tcs
+
+        # --- tool-result messages (snake_case) ---
+        if "tool_call_id" in msg:
+            orig = msg["tool_call_id"]
+            msg["tool_call_id"] = id_remap.get(orig, _sanitize_tool_call_id(orig))
+            if msg["tool_call_id"] != orig:
+                logger.info(f"Sanitized tool_call_id (tool_call_id): {orig!r}")
+
+        # --- tool-result messages (camelCase) ---
+        if "toolCallId" in msg:
+            orig = msg["toolCallId"]
+            msg["toolCallId"] = id_remap.get(orig, _sanitize_tool_call_id(orig))
+            if msg["toolCallId"] != orig:
+                logger.info(f"Sanitized tool_call_id (toolCallId): {orig!r}")
+
+        sanitized.append(msg)
+
+    return sanitized
 
 
 class AGUIEndpoint:
@@ -396,6 +477,13 @@ class AGUIEndpoint:
                     "X-Accel-Buffering": "no",
                 },
             )
+
+        # Sanitize tool_call IDs to meet Azure AI Foundry's 40-char limit.
+        # The agent framework can inject synthetic IDs like
+        # "coagent-state-render-yt-summarizer-pending:<UUID>" (79+ chars) which
+        # cause a 400 from the model endpoint.
+        if "messages" in agent_data:
+            agent_data["messages"] = _sanitize_messages_tool_call_ids(agent_data["messages"])
 
         # Stream the agent response with thread persistence
         return StreamingResponse(
