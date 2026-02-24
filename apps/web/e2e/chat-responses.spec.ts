@@ -63,6 +63,11 @@ async function getResponseText(_page: Page): Promise<string> {
 test.describe("Chat Response Quality", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
+    // Clear localStorage to force a fresh thread for each test.
+    // Without this, the chat accumulates message history across tests in the
+    // same browser context, making LLM prompts progressively larger and slower.
+    await page.goto("/library");
+    await page.evaluate(() => localStorage.clear());
     // Navigate with chat=open to have the sidebar open by default
     await page.goto("/library?chat=open");
     await page.waitForLoadState("networkidle");
