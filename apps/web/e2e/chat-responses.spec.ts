@@ -1,4 +1,4 @@
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect, Page, TestInfo, BrowserContext } from "@playwright/test";
 
 /**
  * E2E tests for Chat Response Quality
@@ -64,17 +64,26 @@ async function getResponseText(_page: Page): Promise<string> {
 }
 
 test.describe("Chat Response Quality", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    await page.setViewportSize({ width: 1280, height: 720 });
-    // Use a unique thread ID per test to prevent history accumulation across tests.
-    // Accumulated message history makes LLM prompts progressively larger and slower,
-    // causing later tests to exceed timeouts.
-    const uniqueThread = `e2e-${testInfo.title.replace(/\s+/g, "-").toLowerCase().slice(0, 30)}-${Date.now()}`;
-    await page.goto(`/library?chat=open&thread=${encodeURIComponent(uniqueThread)}`);
+  // Each test gets a fresh browser context so CopilotKit in-memory thread state
+  // never accumulates across tests. This avoids client-generated thread IDs
+  // (server should own thread ID generation) and prevents history bloat
+  // that causes progressive LLM prompt growth and timeout failures.
+  let context: BrowserContext;
+  let page: Page;
+
+  test.beforeEach(async ({ browser }) => {
+    context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    page = await context.newPage();
+    await page.goto("/library?chat=open");
     await page.waitForLoadState("networkidle");
   });
 
-  test("push-up query returns accurate content with proper citations", async ({ page }, testInfo) => {
+  test.afterEach(async () => {
+    await context.close();
+  });
+
+  test("push-up query returns accurate content with proper citations", async ({}, testInfo) => {
+    test.slow(); // LLM call required: triple timeout to 360s
     await submitQuery(page, "How do I do a proper push-up with good form?");
     await waitForResponse(page, testInfo);
 
@@ -106,7 +115,8 @@ test.describe("Chat Response Quality", () => {
     expect(linkCount).toBeGreaterThan(0);
   });
 
-  test("kettlebell query returns content from Pavel Tsatsouline video", async ({ page }, testInfo) => {
+  test("kettlebell query returns content from Pavel Tsatsouline video", async ({}, testInfo) => {
+    test.slow(); // LLM call required: triple timeout to 360s
     await submitQuery(page, "Tell me about kettlebell training techniques");
     await waitForResponse(page, testInfo);
 
@@ -132,7 +142,7 @@ test.describe("Chat Response Quality", () => {
 
   // Skip: Heavy clubs video is not in the seeded test data
   // To enable: Add Mark Wildman's heavy clubs video to global-setup.ts TEST_VIDEOS
-  test.skip("heavy clubs query returns Mark Wildman video content", async ({ page }, testInfo) => {
+  test.skip("heavy clubs query returns Mark Wildman video content", async ({}, testInfo) => {
     await submitQuery(page, "What should beginners know about heavy clubs?");
     await waitForResponse(page, testInfo);
 
@@ -154,7 +164,7 @@ test.describe("Chat Response Quality", () => {
     await expect(page.getByText("The Key Part of Heavy Clubs").first()).toBeVisible();
   });
 
-  test("multi-topic query returns multiple relevant videos", async ({ page }, testInfo) => {
+  test("multi-topic query returns multiple relevant videos", async ({}, testInfo) => {
     test.slow(); // LLM-heavy: triple timeout to 360s
     await submitQuery(page, "What exercises can I do for a full body workout?");
     await waitForResponse(page, testInfo);
@@ -188,7 +198,7 @@ test.describe("Chat Response Quality", () => {
     expect(hasExerciseContent).toBe(true);
   });
 
-  test("response includes synthesized answer not just raw transcript", async ({ page }, testInfo) => {
+  test("response includes synthesized answer not just raw transcript", async ({}, testInfo) => {
     test.slow(); // LLM-heavy: triple timeout to 360s
     await submitQuery(page, "What are the common mistakes when doing push-ups?");
     await waitForResponse(page, testInfo);
@@ -212,7 +222,8 @@ test.describe("Chat Response Quality", () => {
     expect(pageContent.toLowerCase()).toContain("mistake");
   });
 
-  test("irrelevant query shows Limited Information indicator", async ({ page }, testInfo) => {
+  test("irrelevant query shows Limited Information indicator", async ({}, testInfo) => {
+    test.slow(); // LLM call can be slow: triple timeout to 360s
     await submitQuery(page, "How do I bake a chocolate cake?");
 
     // Wait for the "Limited Information" response - derive timeout from test budget
@@ -235,7 +246,8 @@ test.describe("Chat Response Quality", () => {
     expect(pageContent.toLowerCase()).toMatch(/don't have|didn't find|no.*video|not.*library/i);
   });
 
-  test("video card links navigate to correct video detail page", async ({ page }, testInfo) => {
+  test("video card links navigate to correct video detail page", async ({}, testInfo) => {
+    test.slow(); // LLM call required before link testing: triple timeout to 360s
     await submitQuery(page, "Show me push-up tutorials");
     await waitForResponse(page, testInfo);
 
