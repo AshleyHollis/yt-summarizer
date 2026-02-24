@@ -154,8 +154,9 @@ test.describe("Chat Response Quality", () => {
   });
 
   test("multi-topic query returns multiple relevant videos", async ({ page }) => {
+    test.slow(); // LLM-heavy: triple timeout to 360s
     await submitQuery(page, "What exercises can I do for a full body workout?");
-    await waitForResponse(page, 60000);
+    await waitForResponse(page);
 
     // Response should include citations - check for any of these indicators:
     // - Video links with /videos/ or /library/ paths
@@ -187,6 +188,7 @@ test.describe("Chat Response Quality", () => {
   });
 
   test("response includes synthesized answer not just raw transcript", async ({ page }) => {
+    test.slow(); // LLM-heavy: triple timeout to 360s
     await submitQuery(page, "What are the common mistakes when doing push-ups?");
     await waitForResponse(page);
 
