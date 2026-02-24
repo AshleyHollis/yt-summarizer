@@ -26,14 +26,15 @@ import { test, expect, Page, TestInfo, BrowserContext } from "@playwright/test";
 
 async function submitQuery(page: Page, query: string): Promise<void> {
   const input = page.getByPlaceholder("Ask about your videos...");
-  // 30s visibility wait handles both slow CI page loads and the CopilotKit
-  // initialization period (when input is rendered but not yet interactive).
-  // Both describe blocks' beforeEach already wait for networkidle after
-  // navigation, so the initial agent/connect handshake is done by the time
-  // submitQuery is called the first time. For subsequent calls (e.g. the
-  // subsequent-queries test), the library page polls in the background so
-  // networkidle would hang indefinitely - just waiting for the input is enough.
   await expect(input).toBeVisible({ timeout: 30000 });
+  // Wait for CopilotKit to finish its initial agent/connect handshake before
+  // submitting; otherwise the message can be silently discarded in CI.
+  // Race against a 5s timeout in case the page is polling (e.g. library status
+  // polls) and networkidle would otherwise hang indefinitely.
+  await Promise.race([
+    page.waitForLoadState("networkidle"),
+    new Promise((resolve) => setTimeout(resolve, 5000)),
+  ]);
   await input.fill(query);
   await input.press("Enter");
 }
