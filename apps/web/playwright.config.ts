@@ -12,9 +12,9 @@ export default defineConfig({
   globalSetup: process.env.USE_EXTERNAL_SERVER ? './e2e/global-setup.ts' : undefined,
 
   // Maximum timeout for each test
-  // 90s on CI (preview E2E against live backend, allows for LLM rate-limit retries),
+  // 120s on CI (preview E2E against live backend, allows for LLM rate-limit retries),
   // 120s locally for LLM retries
-  timeout: process.env.CI ? 90_000 : 120_000,
+  timeout: 120_000,
 
   // Run tests in files in parallel
   fullyParallel: true,

@@ -31,10 +31,10 @@ async function submitQuery(page: Page, query: string): Promise<void> {
   await input.press("Enter");
 }
 
-async function waitForResponse(page: Page, timeout = 60000): Promise<void> {
+async function waitForResponse(page: Page, timeout = 80000): Promise<void> {
   // Wait for response indicators - the UI shows "Sources" section with citations
   // Also check for video links, or informational messages
-  // Increased timeout to handle LLM rate limit retries
+  // Increased timeout to handle LLM rate limit retries under parallel CI load
   await Promise.race([
     page.waitForSelector('text="Recommended Videos"', { timeout }),
     page.waitForSelector('text="Sources"', { timeout }),
@@ -208,7 +208,7 @@ test.describe("Chat Response Quality", () => {
     await submitQuery(page, "How do I bake a chocolate cake?");
 
     // Wait for the "Limited Information" response
-    await page.waitForSelector('text="Limited Information"', { timeout: 30000 });
+    await page.waitForSelector('text="Limited Information"', { timeout: 70000 });
 
     // 1. Should NOT show video cards
     const videoLinks = page.locator('a[href*="/videos/"]');
