@@ -324,6 +324,7 @@ test.describe("Chat Edge Cases", () => {
   });
 
   test("handles special characters in query", async ({ page }, testInfo) => {
+    test.slow(); // LLM call required: triple timeout to 540s
     await submitQuery(page, "What about push-ups? (with good form) & proper technique!");
 
     // Should still work and not crash
@@ -337,6 +338,7 @@ test.describe("Chat Edge Cases", () => {
   });
 
   test("handles very long query", async ({ page }, testInfo) => {
+    test.slow(); // LLM call required: triple timeout to 540s
     const longQuery = "I want to learn about push-ups, specifically the proper form, " +
       "common mistakes, how to progress from beginner to advanced, " +
       "what muscles are worked, how many reps and sets I should do, " +
@@ -352,6 +354,7 @@ test.describe("Chat Edge Cases", () => {
   });
 
   test("subsequent queries work correctly", async ({ page }, testInfo) => {
+    test.slow(); // Two sequential LLM calls required: triple timeout to 540s
     // First query
     await submitQuery(page, "How do push-ups work?");
     await waitForResponse(page, testInfo);

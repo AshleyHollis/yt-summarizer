@@ -12,9 +12,9 @@ export default defineConfig({
   globalSetup: process.env.USE_EXTERNAL_SERVER ? './e2e/global-setup.ts' : undefined,
 
   // Maximum timeout for each test
-  // 120s on CI (preview E2E against live backend, allows for LLM rate-limit retries),
-  // 120s locally for LLM retries
-  timeout: 120_000,
+  // 180s on CI (preview E2E against live backend with DeepSeek-V3.2 which can be slow),
+  // test.slow() triples this to 540s for complex multi-LLM-call tests
+  timeout: 180_000,
 
   // Run tests in files in parallel
   fullyParallel: true,
