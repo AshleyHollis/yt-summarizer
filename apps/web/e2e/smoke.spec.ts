@@ -22,8 +22,9 @@ test.describe('Core User Flows @smoke', () => {
     test('home page redirects to add page @smoke', async ({ page }) => {
       await page.goto('/');
 
-      // Should redirect to /add
-      await expect(page).toHaveURL(/\/add(?:\?|$)/);
+      // Should redirect to /add — server-side redirect via Next.js
+      // SWA preview environments may be slower to redirect
+      await expect(page).toHaveURL(/\/add(?:\?|$)/, { timeout: 15_000 });
     });
 
     test('add page has correct title @smoke', async ({ page }) => {

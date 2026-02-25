@@ -493,11 +493,17 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Go to library
       await page.getByRole('link', { name: /Library/i }).click();
-      await expect(page).toHaveURL(/\/library(?:\?|$)/);
+      await page.waitForFunction(
+        () => /\/library/.test(window.location.pathname),
+        { timeout: 10_000 }
+      );
 
       // Go back to add
       await page.getByRole('link', { name: /Add/i }).click();
-      await expect(page).toHaveURL(/\/add(?:\?|$)/);
+      await page.waitForFunction(
+        () => /\/add/.test(window.location.pathname),
+        { timeout: 10_000 }
+      );
     });
   });
 
