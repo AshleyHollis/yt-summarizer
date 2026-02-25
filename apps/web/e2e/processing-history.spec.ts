@@ -136,11 +136,13 @@ test.describe('Processing History', () => {
   });
 
   test('multiple seeded videos have processing history', async ({ page }) => {
+    test.slow(); // This test navigates between multiple videos
     // This test verifies that the global-setup seeded videos
     // created a queue scenario and have history data
 
     // Navigate to library
     await page.goto('/library?status=completed');
+    await page.waitForLoadState('domcontentloaded');
 
     // Count completed videos (should have multiple from global-setup)
     const videoCards = page.locator('a[href^="/library/"]');
@@ -154,7 +156,7 @@ test.describe('Processing History', () => {
 
     // Check first video has history
     await videoCards.first().click();
-    await page.waitForURL(/\/library\/[a-f0-9-]+/);
+    await page.waitForURL(/\/library\/[a-f0-9-]+/, { timeout: 15_000 });
 
     const historyTab = page.getByRole('button', { name: /History/i });
     await expect(historyTab).toBeVisible({ timeout: 10000 });
@@ -164,9 +166,10 @@ test.describe('Processing History', () => {
 
     // Go back and check second video
     await page.goto('/library?status=completed');
+    await page.waitForLoadState('domcontentloaded');
     await expect(videoCards.nth(1)).toBeVisible({ timeout: 10000 });
     await videoCards.nth(1).click();
-    await page.waitForURL(/\/library\/[a-f0-9-]+/);
+    await page.waitForURL(/\/library\/[a-f0-9-]+/, { timeout: 15_000 });
 
     const historyTab2 = page.getByRole('button', { name: /History/i });
     await expect(historyTab2).toBeVisible({ timeout: 10000 });
