@@ -245,11 +245,13 @@ test.describe('Video Submission (Requires Backend)', () => {
     }
 
     // Should show video detail page elements
-    // The page shows either processing progress or video content
-    // Wait for main to be visible (rendered in all page states: loading, error, success)
+    // The page shows either processing progress or video content.
+    // /videos/{id} does a server-side redirect to /library/{id}, so wait
+    // for the redirect to complete first, then check for <main>.
+    await page.waitForLoadState('domcontentloaded');
     const pageContent = page.locator('main');
     try {
-      await expect(pageContent).toBeVisible({ timeout: 15_000 });
+      await expect(pageContent).toBeVisible({ timeout: 30_000 });
     } catch {
       // If main is not visible, the page may still be navigating/hydrating
       // Check if we're actually on a video detail page
