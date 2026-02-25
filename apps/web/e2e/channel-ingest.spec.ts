@@ -44,7 +44,7 @@ test.describe('Channel Ingestion Flow', () => {
       await ingestLink.click();
 
       // Should be on ingest page
-      await expect(page).toHaveURL('/ingest', { timeout: 10000 });
+      await expect(page).toHaveURL(/\/ingest(?:\?|$)/, { timeout: 10000 });
     });
 
     test('ingest page renders correctly', async ({ page }) => {
@@ -261,7 +261,7 @@ test.describe('Channel Ingestion Flow', () => {
 
         // Click the link and verify navigation works
         await viewReadyLink.click();
-        await expect(page).toHaveURL('/library?status=completed');
+        await expect(page).toHaveURL(/\/library\?status=completed/);
 
         // Verify library page loads with the filter applied
         await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();

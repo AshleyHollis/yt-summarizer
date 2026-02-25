@@ -47,7 +47,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // =========================================================================
     console.log('Step 1: Navigating to add page...');
     await page.goto('/add');
-    await expect(page).toHaveURL('/add');
+    await expect(page).toHaveURL(/\/add(?:\?|$)/);
 
     const urlInput = page.getByLabel(/YouTube URL/i);
     await expect(urlInput).toBeVisible({ timeout: 10_000 });

@@ -27,7 +27,7 @@ test.describe('User Story 3: Browse the Library', () => {
   test.describe('Library Page Loading', () => {
     test('library page loads successfully', async ({ page }) => {
       await page.goto('/library');
-      await expect(page).toHaveURL('/library');
+      await expect(page).toHaveURL(/\/library(?:\?|$)/);
 
       // Check for main content area and video count indicator
       await expect(page.getByText(/\d+ videos/)).toBeVisible({ timeout: 10000 });
@@ -328,7 +328,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       if (await backLink.first().isVisible()) {
         await backLink.first().click();
-        await expect(page).toHaveURL('/library');
+        await expect(page).toHaveURL(/\/library(?:\?|$)/);
       }
     });
 
@@ -484,7 +484,8 @@ test.describe('User Story 3: Browse the Library', () => {
       const libraryLink = page.getByRole('link', { name: /Library/i });
       await libraryLink.click();
 
-      await expect(page).toHaveURL('/library');
+      // Use regex to tolerate CopilotKit ?thread= query param
+      await expect(page).toHaveURL(/\/library(?:\?|$)/);
     });
 
     test('can navigate from add to library and back', async ({ page }) => {
@@ -492,11 +493,11 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Go to library
       await page.getByRole('link', { name: /Library/i }).click();
-      await expect(page).toHaveURL('/library');
+      await expect(page).toHaveURL(/\/library(?:\?|$)/);
 
       // Go back to add
       await page.getByRole('link', { name: /Add/i }).click();
-      await expect(page).toHaveURL('/add');
+      await expect(page).toHaveURL(/\/add(?:\?|$)/);
     });
   });
 

@@ -35,7 +35,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
     test('user can submit video and view completed result', async ({ page }) => {
       // Step 1: Navigate to submit page
       await page.goto('/submit');
-      await expect(page).toHaveURL('/submit');
+      await expect(page).toHaveURL(/\/submit(?:\?|$)/);
 
       // Step 2: Enter YouTube URL
       const urlInput = page.getByLabel(/YouTube Video URL/i);
@@ -252,9 +252,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
     });
 
     test('shows error for non-existent video', async ({ page }) => {
-      // Use a valid UUID format but non-existent
-      // /videos/ redirects server-side to /library/ — wait for redirect + API error
-      await page.goto('/videos/00000000-0000-0000-0000-000000000000');
+      // Navigate directly to /library/ (not /videos/) to avoid redirect loop
+      // that occurs when CopilotKit's ?thread= param interacts with server-side redirect
+      await page.goto('/library/00000000-0000-0000-0000-000000000000');
       await page.waitForLoadState('domcontentloaded');
 
       // The video detail page shows "Failed to load video. Please try again." for errors

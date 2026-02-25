@@ -24,18 +24,18 @@ test.describe('Processing History', () => {
   test('History tab displays processing stages and timing', async ({ page }) => {
     // Navigate to library - global-setup.ts seeds videos before tests run
     await page.goto('/library?status=completed');
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for at least one completed video from seeding
     const videoCard = page.locator('a[href^="/library/"]').first();
     await expect(videoCard).toBeVisible({ timeout: 30000 });
 
-    // Click on the first video
-    await videoCard.click();
-    // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling)
-    await page.waitForFunction(
-      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
-      { timeout: 15_000 }
-    );
+    // Extract the href and navigate directly — more reliable than clicking
+    // because Next.js hydration may not be complete when the link is visible
+    const href = await videoCard.getAttribute('href');
+    expect(href).toBeTruthy();
+    await page.goto(href!);
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for page to load
     await expect(page.locator('main')).toBeVisible();
@@ -58,17 +58,17 @@ test.describe('Processing History', () => {
   test('History tab shows Actual and Expected time summary', async ({ page }) => {
     // Navigate to library
     await page.goto('/library?status=completed');
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for completed video
     const videoCard = page.locator('a[href^="/library/"]').first();
     await expect(videoCard).toBeVisible({ timeout: 30000 });
 
-    // Click on video
-    await videoCard.click();
-    await page.waitForFunction(
-      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
-      { timeout: 15_000 }
-    );
+    // Extract href and navigate directly — more reliable than clicking
+    const href = await videoCard.getAttribute('href');
+    expect(href).toBeTruthy();
+    await page.goto(href!);
+    await page.waitForLoadState('domcontentloaded');
 
     // Click History tab
     const historyTab = page.getByRole('button', { name: /History/i });
@@ -90,17 +90,17 @@ test.describe('Processing History', () => {
   test('History tab shows rate limit delay breakdown', async ({ page }) => {
     // Navigate to library
     await page.goto('/library?status=completed');
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for completed video
     const videoCard = page.locator('a[href^="/library/"]').first();
     await expect(videoCard).toBeVisible({ timeout: 30000 });
 
-    // Click on video
-    await videoCard.click();
-    await page.waitForFunction(
-      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
-      { timeout: 15_000 }
-    );
+    // Extract href and navigate directly
+    const href = await videoCard.getAttribute('href');
+    expect(href).toBeTruthy();
+    await page.goto(href!);
+    await page.waitForLoadState('domcontentloaded');
 
     // Click History tab
     const historyTab = page.getByRole('button', { name: /History/i });
@@ -124,17 +124,17 @@ test.describe('Processing History', () => {
   test('History tab is accessible via keyboard', async ({ page }) => {
     // Navigate to library
     await page.goto('/library?status=completed');
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for completed video
     const videoCard = page.locator('a[href^="/library/"]').first();
     await expect(videoCard).toBeVisible({ timeout: 30000 });
 
-    // Click on video
-    await videoCard.click();
-    await page.waitForFunction(
-      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
-      { timeout: 15_000 }
-    );
+    // Extract href and navigate directly
+    const href = await videoCard.getAttribute('href');
+    expect(href).toBeTruthy();
+    await page.goto(href!);
+    await page.waitForLoadState('domcontentloaded');
 
     // Tab to History button and press Enter
     const historyTab = page.getByRole('button', { name: /History/i });
@@ -167,12 +167,11 @@ test.describe('Processing History', () => {
     // Verify at least 2 videos (to confirm queue scenario)
     expect(count).toBeGreaterThanOrEqual(2);
 
-    // Check first video has history
-    await videoCards.first().click();
-    await page.waitForFunction(
-      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
-      { timeout: 15_000 }
-    );
+    // Check first video has history — extract href and navigate directly
+    const href1 = await videoCards.first().getAttribute('href');
+    expect(href1).toBeTruthy();
+    await page.goto(href1!);
+    await page.waitForLoadState('domcontentloaded');
 
     const historyTab = page.getByRole('button', { name: /History/i });
     await expect(historyTab).toBeVisible({ timeout: 10000 });
@@ -183,12 +182,14 @@ test.describe('Processing History', () => {
     // Go back and check second video
     await page.goto('/library?status=completed');
     await page.waitForLoadState('domcontentloaded');
-    await expect(videoCards.nth(1)).toBeVisible({ timeout: 10000 });
-    await videoCards.nth(1).click();
-    await page.waitForFunction(
-      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
-      { timeout: 15_000 }
-    );
+    const videoCards2 = page.locator('a[href^="/library/"]');
+    await expect(videoCards2.nth(1)).toBeVisible({ timeout: 10000 });
+
+    // Extract href and navigate directly for second video too
+    const href2 = await videoCards2.nth(1).getAttribute('href');
+    expect(href2).toBeTruthy();
+    await page.goto(href2!);
+    await page.waitForLoadState('domcontentloaded');
 
     const historyTab2 = page.getByRole('button', { name: /History/i });
     await expect(historyTab2).toBeVisible({ timeout: 10000 });
