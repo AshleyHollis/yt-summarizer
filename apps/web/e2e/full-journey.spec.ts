@@ -59,7 +59,11 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
 
     // Wait for redirect to video detail page
     console.log('Step 1: Waiting for redirect to video page...');
-    await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+    // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling)
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
     const videoUrl = page.url();
     const videoId = videoUrl.match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1];
     console.log(`Step 1: Video submitted with ID: ${videoId}`);
@@ -121,7 +125,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
-    await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     // Wait for processing
     await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
@@ -255,7 +262,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
-    await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     // Wait for processing to complete
     const processingComplete = await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
@@ -295,7 +305,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
-    await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
     // Video ID extracted for potential future use
     // const _videoUrl = page.url();
     // const _videoId = _videoUrl.split('/videos/')[1];
@@ -328,7 +341,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
-    await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
     await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
 
     // Query copilot

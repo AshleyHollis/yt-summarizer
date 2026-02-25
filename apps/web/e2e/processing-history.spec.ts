@@ -31,7 +31,11 @@ test.describe('Processing History', () => {
 
     // Click on the first video
     await videoCard.click();
-    await page.waitForURL(/\/library\/[a-f0-9-]+/);
+    // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling)
+    await page.waitForFunction(
+      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     // Wait for page to load
     await expect(page.locator('main')).toBeVisible();
@@ -61,7 +65,10 @@ test.describe('Processing History', () => {
 
     // Click on video
     await videoCard.click();
-    await page.waitForURL(/\/library\/[a-f0-9-]+/);
+    await page.waitForFunction(
+      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     // Click History tab
     const historyTab = page.getByRole('button', { name: /History/i });
@@ -90,7 +97,10 @@ test.describe('Processing History', () => {
 
     // Click on video
     await videoCard.click();
-    await page.waitForURL(/\/library\/[a-f0-9-]+/);
+    await page.waitForFunction(
+      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     // Click History tab
     const historyTab = page.getByRole('button', { name: /History/i });
@@ -121,7 +131,10 @@ test.describe('Processing History', () => {
 
     // Click on video
     await videoCard.click();
-    await page.waitForURL(/\/library\/[a-f0-9-]+/);
+    await page.waitForFunction(
+      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     // Tab to History button and press Enter
     const historyTab = page.getByRole('button', { name: /History/i });
@@ -156,7 +169,10 @@ test.describe('Processing History', () => {
 
     // Check first video has history
     await videoCards.first().click();
-    await page.waitForURL(/\/library\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     const historyTab = page.getByRole('button', { name: /History/i });
     await expect(historyTab).toBeVisible({ timeout: 10000 });
@@ -169,7 +185,10 @@ test.describe('Processing History', () => {
     await page.waitForLoadState('domcontentloaded');
     await expect(videoCards.nth(1)).toBeVisible({ timeout: 10000 });
     await videoCards.nth(1).click();
-    await page.waitForURL(/\/library\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => /\/library\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     const historyTab2 = page.getByRole('button', { name: /History/i });
     await expect(historyTab2).toBeVisible({ timeout: 10000 });

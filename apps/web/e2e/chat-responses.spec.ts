@@ -236,7 +236,11 @@ test.describe("Chat Response Quality", () => {
     }, href);
 
     // Should navigate to video detail page (either /videos/ or /library/ path)
-    await page.waitForURL(/\/videos\/|\/library\//, { timeout: 30000 });
+    // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling)
+    await page.waitForFunction(
+      () => /\/videos\/|\/library\//.test(window.location.pathname),
+      { timeout: 30000 }
+    );
 
     // Video detail page should load with video info
     await page.waitForLoadState("domcontentloaded");

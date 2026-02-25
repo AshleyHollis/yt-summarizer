@@ -48,7 +48,11 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Step 4: Wait for redirect to video detail page
-      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+      // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling)
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
       const videoUrl = page.url();
       const videoId = videoUrl.match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1];
       expect(videoId).toBeTruthy();
@@ -76,7 +80,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Wait for redirect
-      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
 
       // Verify job progress section exists
       // The page should show job status information
@@ -102,7 +109,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Wait for redirect to video page
-      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
 
       // Wait for processing to complete (or check if already completed)
       // This uses a polling approach to wait for completion
@@ -139,7 +149,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
-      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
       existingVideoId = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1] ?? null;
 
       // Wait for processing to complete
@@ -240,11 +253,13 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
     test('shows error for non-existent video', async ({ page }) => {
       // Use a valid UUID format but non-existent
+      // /videos/ redirects server-side to /library/ — wait for redirect + API error
       await page.goto('/videos/00000000-0000-0000-0000-000000000000');
+      await page.waitForLoadState('domcontentloaded');
 
-      // Should show not found or error
+      // The video detail page shows "Failed to load video. Please try again." for errors
       const errorMessage = page.getByText(/error|not found|failed/i);
-      await expect(errorMessage.first()).toBeVisible({ timeout: 10_000 });
+      await expect(errorMessage.first()).toBeVisible({ timeout: 15_000 });
     });
 
     test('handles API timeout gracefully', async ({ page }) => {
@@ -286,7 +301,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
-      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
 
       // Wait a bit for polling to happen
       await page.waitForTimeout(10_000);
@@ -314,7 +332,10 @@ test.describe('Reprocessing Flow', () => {
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
-    await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     // Wait for completion
     await waitForVideoCompletion(page, PROCESSING_TIMEOUT);

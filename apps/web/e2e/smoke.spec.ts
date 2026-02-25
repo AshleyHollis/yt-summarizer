@@ -199,7 +199,11 @@ test.describe('Video Submission (Requires Backend)', () => {
     await submitButton.click();
 
     // Should redirect to video detail page
-    await page.waitForURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/, { timeout: 15000 });
+    // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling)
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
+      { timeout: 15000 }
+    );
     await expect(page).toHaveURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/);
   });
 
@@ -217,7 +221,10 @@ test.describe('Video Submission (Requires Backend)', () => {
     // Wait for either: redirect to video detail page, OR an inline message
     // (e.g., "already exists", processing status, etc.)
     try {
-      await page.waitForURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/, { timeout: 15000 });
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
+        { timeout: 15000 }
+      );
     } catch {
       // Video may already exist - check for feedback on the add page
       const feedback = page.getByText(/already|exists|processing|submitted|queued/i).first();
@@ -234,7 +241,7 @@ test.describe('Video Submission (Requires Backend)', () => {
     // Should show video detail page elements
     // The page shows either processing progress or video content
     const pageContent = page.locator('main');
-    await expect(pageContent).toBeVisible();
+    await expect(pageContent).toBeVisible({ timeout: 15_000 });
 
     // Should have navigation back - look for the actual link text
     const homeLink = page.getByRole('link', { name: /YT Summarizer/i });
@@ -270,12 +277,14 @@ test.describe('Error Handling (Requires Backend)', () => {
 
   test('handles non-existent video ID gracefully', async ({ page }) => {
     // Navigate directly to a non-existent video
+    // /videos/ redirects to /library/ server-side — wait for redirect + API error
     await page.goto('/videos/non-existent-video-id-12345');
+    await page.waitForLoadState('domcontentloaded');
 
-    // Should show error or not found message
+    // The video detail page shows "Failed to load video. Please try again." for errors
     // Use .first() because multiple elements may match this broad regex (strict mode)
     const errorMessage = page.getByText(/not found|error|failed|unable/i).first();
-    await expect(errorMessage).toBeVisible({ timeout: 10000 });
+    await expect(errorMessage).toBeVisible({ timeout: 15_000 });
   });
 });
 

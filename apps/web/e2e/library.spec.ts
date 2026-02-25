@@ -118,8 +118,11 @@ test.describe('User Story 3: Browse the Library', () => {
       await page.goto('/library?status=completed');
       await page.waitForLoadState('domcontentloaded');
 
-      // Verify page loads successfully (not an error)
-      await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible({ timeout: 15_000 });
+      // Verify page loads successfully - the library page has no <h1> heading,
+      // so check for actual page content: video count or the filter sidebar
+      await expect(
+        page.getByText(/\d+ videos/i).or(page.getByLabel(/Search/i))
+      ).toBeVisible({ timeout: 15_000 });
 
       // Verify the status dropdown reflects the URL parameter
       const statusDropdown = page.getByLabel(/Status/i);
@@ -415,8 +418,10 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Page should not crash - verify body is present
       await expect(page.locator('body')).toBeVisible();
-      // And verify some library content rendered
-      await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible({ timeout: 15_000 });
+      // Library page has no <h1> heading — verify actual content rendered
+      await expect(
+        page.getByText(/\d+ videos/i).or(page.getByLabel(/Search/i))
+      ).toBeVisible({ timeout: 15_000 });
     });
 
     test('shows error for invalid video ID in library detail', async ({ page }) => {
