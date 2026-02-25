@@ -354,11 +354,16 @@ test.describe('Copilot Feature', () => {
       // Wait a bit for save to complete
       await page.waitForTimeout(2000);
 
-      // Get the thread ID from URL
-      const url = page.url();
-      const threadMatch = url.match(/thread=([a-f0-9-]+)/);
-      expect(threadMatch).toBeTruthy();
-      const threadId = threadMatch![1];
+      // Get the thread ID from URL — CopilotKit oscillates the ?thread= parameter,
+      // so we need to wait for it to appear rather than reading page.url() once.
+      const threadId = await page.waitForFunction(
+        () => {
+          const match = window.location.search.match(/thread=([a-f0-9-]+)/);
+          return match ? match[1] : null;
+        },
+        { timeout: 15_000 },
+      ).then(handle => handle.jsonValue());
+      expect(threadId).toBeTruthy();
 
       // Verify thread was saved with proper structure via API
       const response = await request.get(`${API_BASE}/api/v1/threads/${threadId}`);
@@ -403,11 +408,15 @@ test.describe('Copilot Feature', () => {
       // Wait for response to fully render
       await waitForResponse(page, testInfo);
 
-      // Get thread ID
-      const url = page.url();
-      const threadMatch = url.match(/thread=([a-f0-9-]+)/);
-      expect(threadMatch).toBeTruthy();
-      const threadId = threadMatch![1];
+      // Get thread ID — CopilotKit oscillates ?thread=, so wait for it
+      const threadId = await page.waitForFunction(
+        () => {
+          const match = window.location.search.match(/thread=([a-f0-9-]+)/);
+          return match ? match[1] : null;
+        },
+        { timeout: 15_000 },
+      ).then(handle => handle.jsonValue());
+      expect(threadId).toBeTruthy();
 
       // Navigate away (start new chat) - button has title="New chat" with Plus icon
       await page.click('button[title="New chat"]');
