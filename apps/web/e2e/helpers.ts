@@ -100,9 +100,15 @@ export async function submitQuery(page: Page, query: string): Promise<void> {
  * Derives timeout from the current test's actual timeout (respects test.slow()),
  * leaving 30s headroom for subsequent assertions.
  *
- * Uses Playwright's `locator.or()` to wait for any response indicator rather
- * than racing multiple waitForSelector calls (which can cause unhandled
- * rejections when they all fail).
+ * Two-phase approach:
+ * 1. Wait for the tool loading indicator ("Searching your video library...")
+ *    to appear and then disappear — this confirms the backend is processing.
+ * 2. Wait for actual response content (video cards, headings, or uncertainty
+ *    indicators) to become visible.
+ *
+ * IMPORTANT: The loading indicator must NOT be in the final response locator
+ * because it appears transiently during tool execution. Including it causes
+ * premature resolution before the real response renders.
  */
 export async function waitForResponse(
   page: Page,
@@ -110,16 +116,35 @@ export async function waitForResponse(
 ): Promise<void> {
   const timeout = Math.max(testInfo.timeout - 30_000, 60_000);
 
-  // Build a composite locator that matches ANY response indicator.
-  // This avoids the race condition of multiple waitForSelector calls where
-  // losing selectors throw unhandled errors.
+  // Phase 1: Wait for the tool loading indicator to appear (confirms backend
+  // received and is processing the query). We use a short timeout since it may
+  // have already appeared and disappeared by the time we check.
+  const loadingText = page.getByText("Searching your video library...");
+  try {
+    await expect(loadingText).toBeVisible({ timeout: 30_000 });
+  } catch {
+    // Loading indicator may have already appeared and disappeared, or the
+    // response may have rendered so quickly that the loading state was never
+    // visible. Either way, proceed to phase 2.
+  }
+
+  // Phase 1b: Wait for loading indicator to disappear (tool execution complete).
+  // Skip if it's already gone.
+  try {
+    await expect(loadingText).not.toBeVisible({ timeout: Math.min(timeout, 120_000) });
+  } catch {
+    // If loading text is still visible after 120s, proceed anyway and let
+    // phase 2 handle the timeout.
+  }
+
+  // Phase 2: Wait for actual response content. These are the FINAL rendered
+  // elements, not transient loading states.
   const responseIndicator = page
     .getByText("Recommended Videos")
     .or(page.getByText("Sources"))
     .or(page.locator('a[href*="/videos/"]'))
     .or(page.getByText("Limited Information"))
-    .or(page.getByText("No relevant content"))
-    .or(page.getByText("Searching your video library..."));
+    .or(page.getByText("No relevant content"));
 
   await expect(responseIndicator.first()).toBeVisible({ timeout });
 }
@@ -154,7 +179,7 @@ export async function openChatViaButton(page: Page): Promise<void> {
 /**
  * Wait for the copilot assistant response to appear (non-tool-specific).
  *
- * This waits for loading spinners/indicators to disappear and for a response
+ * This waits for the tool loading lifecycle to complete and for a response
  * message to be rendered in the chat area. Useful for tests that check message
  * count or generic response behavior rather than specific tool output.
  */
@@ -166,18 +191,15 @@ export async function waitForAssistantResponse(
 
   // Wait for "Searching your video library..." loading indicator to appear
   // and then disappear (tool call lifecycle)
+  const loadingText = page.getByText("Searching your video library...");
   try {
-    await page.waitForSelector('text="Searching your video library..."', {
-      timeout: 30_000,
-    });
+    await expect(loadingText).toBeVisible({ timeout: 30_000 });
   } catch {
     // Loading indicator may have already appeared and disappeared
   }
 
   // Wait for loading indicator to disappear
-  await expect(
-    page.getByText("Searching your video library..."),
-  ).not.toBeVisible({ timeout });
+  await expect(loadingText).not.toBeVisible({ timeout });
 
   // Also wait for any spinner/loading animations to settle
   const spinners = page.locator(

@@ -265,7 +265,7 @@ test.describe('Copilot Feature', () => {
 
       // Should find video cards with links to video pages
       const videoLinks = page.locator('a[href*="/videos/"]');
-      await expect(videoLinks.first()).toBeVisible();
+      await expect(videoLinks.first()).toBeVisible({ timeout: 30_000 });
     });
 
     test('positive: returns results for kettlebell training (covered topic)', async ({ page }, testInfo) => {
@@ -277,7 +277,7 @@ test.describe('Copilot Feature', () => {
 
       // Should find kettlebell-related videos
       const videoLinks = page.locator('a[href*="/videos/"]');
-      await expect(videoLinks.first()).toBeVisible();
+      await expect(videoLinks.first()).toBeVisible({ timeout: 30_000 });
     });
 
     test('negative: returns no video cards for cooking pasta (uncovered topic)', async ({ page }, testInfo) => {
@@ -292,7 +292,7 @@ test.describe('Copilot Feature', () => {
       await expect(videoLinks).toHaveCount(0);
 
       // Check that the page shows the "No relevant content" message
-      await expect(page.getByText('No relevant content found in your library')).toBeVisible();
+      await expect(page.getByText('No relevant content found in your library')).toBeVisible({ timeout: 30_000 });
     });
 
     test('negative: returns no video cards for quantum physics (uncovered topic)', async ({ page }, testInfo) => {

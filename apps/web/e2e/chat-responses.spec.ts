@@ -48,10 +48,10 @@ test.describe("Chat Response Quality", () => {
 
     // 1. Should show video cards (indicated by video links)
     const videoLinks = page.locator('a[href*="/videos/"]');
-    await expect(videoLinks.first()).toBeVisible();
+    await expect(videoLinks.first()).toBeVisible({ timeout: 30_000 });
 
     // 2. Should have "Recommended Videos" section
-    await expect(page.getByText("Recommended Videos")).toBeVisible();
+    await expect(page.getByText("Recommended Videos")).toBeVisible({ timeout: 15_000 });
 
     // 3. Response should mention key push-up concepts (form cues from the videos)
     const pageContent = await page.content();
@@ -81,7 +81,7 @@ test.describe("Chat Response Quality", () => {
 
     // 1. Should show video cards
     const videoLinks = page.locator('a[href*="/videos/"]');
-    await expect(videoLinks.first()).toBeVisible();
+    await expect(videoLinks.first()).toBeVisible({ timeout: 30_000 });
 
     // 2. Should reference the kettlebell video
     const pageContent = await page.content();
@@ -163,7 +163,7 @@ test.describe("Chat Response Quality", () => {
     await waitForResponse(page, testInfo);
 
     // 1. Should show video cards
-    await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible();
+    await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible({ timeout: 30_000 });
 
     // 2. Response should be a coherent answer, not just transcript dump
     const pageContent = await page.content();
@@ -313,7 +313,7 @@ test.describe("Chat Edge Cases", () => {
 
     // Should handle long query and return results
     const videoLinks = page.locator('a[href*="/videos/"]');
-    await expect(videoLinks.first()).toBeVisible();
+    await expect(videoLinks.first()).toBeVisible({ timeout: 30_000 });
   });
 
   test("subsequent queries work correctly", async ({ page }, testInfo) => {
@@ -321,7 +321,7 @@ test.describe("Chat Edge Cases", () => {
     // First query
     await submitQuery(page, "How do push-ups work?");
     await waitForResponse(page, testInfo);
-    await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible();
+    await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible({ timeout: 30_000 });
 
     // Second query - different topic
     await submitQuery(page, "What about kettlebells?");
