@@ -239,7 +239,7 @@ test.describe("Chat Response Quality", () => {
     await page.waitForURL(/\/videos\/|\/library\//, { timeout: 30000 });
 
     // Video detail page should load with video info
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Should show video content - look for headings or article content
     const hasHeading = await page.locator("h1, h2, h3").first().isVisible().catch(() => false);

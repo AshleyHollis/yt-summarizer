@@ -201,8 +201,8 @@ test.describe('Queue Progress UI Updates', () => {
     if (await historyTab.isVisible().catch(() => false)) {
       await historyTab.click();
 
-      // Verify processing stages are shown
-      await expect(page.getByText(/transcribe/i).first()).toBeVisible({ timeout: 10000 });
+      // Verify processing stages are shown (using actual stage labels from API)
+      await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 10000 });
       console.log('  ✓ History tab shows processing stages');
     }
   });

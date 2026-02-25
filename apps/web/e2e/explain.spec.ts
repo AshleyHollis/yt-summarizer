@@ -19,7 +19,7 @@ test.describe('US5: Explain Why Feature', () => {
     test('video cards with explanation data show Why this? button', async ({ page }) => {
       // Navigate to library page
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Open the AI assistant panel
       const openChatButton = page.getByRole('button', { name: /open|chat|assistant/i });
@@ -49,7 +49,7 @@ test.describe('US5: Explain Why Feature', () => {
 
     test('Why this? button toggles explanation panel', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Open AI assistant
       const openChatButton = page.getByRole('button', { name: /open|chat|assistant/i });
@@ -94,7 +94,7 @@ test.describe('US5: Explain Why Feature', () => {
   test.describe('Explanation Panel Content', () => {
     test('explanation panel shows summary text', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Open AI assistant and query
       const openChatButton = page.getByRole('button', { name: /open|chat|assistant/i });
@@ -127,7 +127,7 @@ test.describe('US5: Explain Why Feature', () => {
 
     test('key moments have clickable YouTube links', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const openChatButton = page.getByRole('button', { name: /open|chat|assistant/i });
       if (await openChatButton.isVisible().catch(() => false)) {
@@ -163,7 +163,7 @@ test.describe('US5: Explain Why Feature', () => {
 
     test('relationship badge shows series/related info when present', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const openChatButton = page.getByRole('button', { name: /open|chat|assistant/i });
       if (await openChatButton.isVisible().catch(() => false)) {
@@ -197,7 +197,7 @@ test.describe('US5: Explain Why Feature', () => {
   test.describe('Accessibility', () => {
     test('Why this? button has proper aria attributes', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const openChatButton = page.getByRole('button', { name: /open|chat|assistant/i });
       if (await openChatButton.isVisible().catch(() => false)) {

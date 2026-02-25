@@ -48,9 +48,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Step 4: Wait for redirect to video detail page
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
       const videoUrl = page.url();
-      const videoId = videoUrl.split('/videos/')[1];
+      const videoId = videoUrl.match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1];
+      expect(videoId).toBeTruthy();
       expect(videoId).toMatch(/^[a-f0-9-]{36}$/);
 
       // Step 5: Verify video detail page loads
@@ -75,7 +76,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Wait for redirect
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
 
       // Verify job progress section exists
       // The page should show job status information
@@ -101,7 +102,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Wait for redirect to video page
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
 
       // Wait for processing to complete (or check if already completed)
       // This uses a polling approach to wait for completion
@@ -138,8 +139,8 @@ test.describe('User Story 1: Video Submission Flow', () => {
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
-      existingVideoId = page.url().split('/videos/')[1];
+      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
+      existingVideoId = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1] ?? null;
 
       // Wait for processing to complete
       await waitForVideoCompletion(page, PROCESSING_TIMEOUT);
@@ -248,7 +249,8 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
     test('handles API timeout gracefully', async ({ page }) => {
       // Simulate slow API by adding delay
-      await page.route('**/api/v1/videos/**', async (route) => {
+      // Note: actual API uses /api/v1/library/videos/ path
+      await page.route('**/api/v1/library/videos/**', async (route) => {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         await route.abort('timedout');
       });
@@ -265,8 +267,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
     test('page auto-refreshes during processing', async ({ page }) => {
       // Set up API call tracking BEFORE any navigation so we capture all
       // requests, including those fired immediately on page load.
+      // Note: actual API uses /api/v1/library/videos/ path
       let apiCallCount = 0;
-      await page.route('**/api/v1/videos/**', (route) => {
+      await page.route('**/api/v1/library/videos/**', (route) => {
         apiCallCount++;
         return route.continue();
       });
@@ -279,7 +282,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
 
       // Wait a bit for polling to happen
       await page.waitForTimeout(10_000);
@@ -307,7 +310,7 @@ test.describe('Reprocessing Flow', () => {
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
-    await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForURL(/\/(?:videos|library)\/[a-f0-9-]+/, { timeout: 15_000 });
 
     // Wait for completion
     await waitForVideoCompletion(page, PROCESSING_TIMEOUT);

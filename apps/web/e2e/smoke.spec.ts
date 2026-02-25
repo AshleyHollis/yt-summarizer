@@ -199,8 +199,8 @@ test.describe('Video Submission (Requires Backend)', () => {
     await submitButton.click();
 
     // Should redirect to video detail page
-    await page.waitForURL(/\/videos\/[a-zA-Z0-9-]+/, { timeout: 15000 });
-    await expect(page).toHaveURL(/\/videos\/[a-zA-Z0-9-]+/);
+    await page.waitForURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/);
   });
 
   test('video detail page shows processing status', async ({ page }) => {
@@ -214,7 +214,8 @@ test.describe('Video Submission (Requires Backend)', () => {
     await submitButton.click();
 
     // Wait for redirect to video detail page
-    await page.waitForURL(/\/videos\/[a-zA-Z0-9-]+/, { timeout: 15000 });
+    // /videos/[id] redirects to /library/[id], so match either URL
+    await page.waitForURL(/\/(videos|library)\/[a-zA-Z0-9-]+/, { timeout: 15000 });
 
     // Should show video detail page elements
     // The page shows either processing progress or video content

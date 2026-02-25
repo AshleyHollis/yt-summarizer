@@ -41,10 +41,10 @@ test.describe('Processing History', () => {
     await expect(historyTab).toBeVisible({ timeout: 10000 });
     await historyTab.click();
 
-    // Verify processing stages are displayed
-    await expect(page.getByText(/transcribe/i).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/summarize/i).first()).toBeVisible();
-    await expect(page.getByText(/embed/i).first()).toBeVisible();
+    // Verify processing stages are displayed (using actual stage labels from API)
+    await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Generating Summary/i).first()).toBeVisible();
+    await expect(page.getByText(/Creating Embeddings/i).first()).toBeVisible();
 
     // Verify timing information is shown (format: Xs or Xm Ys)
     const timingPattern = page.getByText(/\d+(\.\d+)?s|\d+m/);
@@ -68,16 +68,16 @@ test.describe('Processing History', () => {
     await expect(historyTab).toBeVisible({ timeout: 10000 });
     await historyTab.click();
 
-    // Wait for history content
-    await expect(page.getByText(/transcribe/i).first()).toBeVisible({ timeout: 10000 });
+    // Wait for history content (stage labels from API)
+    await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 10000 });
 
-    // Verify Actual time is displayed
-    const actualCard = page.locator('text=/Actual/i');
-    await expect(actualCard.first()).toBeVisible();
+    // Verify Processing time is displayed (actual processing time column)
+    const processingHeader = page.locator('text=/Processing/i');
+    await expect(processingHeader.first()).toBeVisible();
 
-    // Verify Expected time is displayed (includes rate limit delay)
-    const expectedCard = page.locator('text=/Expected/i');
-    await expect(expectedCard.first()).toBeVisible();
+    // Verify Est. (estimated) time is displayed
+    const estimatedHeader = page.locator('text=/Est\\./i');
+    await expect(estimatedHeader.first()).toBeVisible();
   });
 
   test('History tab shows rate limit delay breakdown', async ({ page }) => {
@@ -97,8 +97,8 @@ test.describe('Processing History', () => {
     await expect(historyTab).toBeVisible({ timeout: 10000 });
     await historyTab.click();
 
-    // Wait for history content
-    await expect(page.getByText(/transcribe/i).first()).toBeVisible({ timeout: 10000 });
+    // Wait for history content (stage labels from API)
+    await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 10000 });
 
     // The Expected card should show rate limit delay breakdown
     // Format: "incl. Xm rate limit delay" or similar
@@ -106,8 +106,8 @@ test.describe('Processing History', () => {
     const _delayInfo = page.locator('text=/rate limit|delay/i');
 
     // This may or may not be visible depending on if delays are tracked
-    // Just verify the summary cards are present
-    const summarySection = page.locator('[class*="grid"]').filter({ hasText: /Actual|Expected/ });
+    // Just verify the summary stats cards are present (Total Elapsed, Processing, etc.)
+    const summarySection = page.locator('[class*="grid"]').filter({ hasText: /Total Elapsed|Processing/ });
     await expect(summarySection.first()).toBeVisible();
   });
 
@@ -131,8 +131,8 @@ test.describe('Processing History', () => {
     await historyTab.focus();
     await page.keyboard.press('Enter');
 
-    // Verify history content loads
-    await expect(page.getByText(/transcribe/i).first()).toBeVisible({ timeout: 10000 });
+    // Verify history content loads (stage labels from API)
+    await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('multiple seeded videos have processing history', async ({ page }) => {
@@ -160,7 +160,7 @@ test.describe('Processing History', () => {
     await expect(historyTab).toBeVisible({ timeout: 10000 });
     await historyTab.click();
 
-    await expect(page.getByText(/transcribe/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 10000 });
 
     // Go back and check second video
     await page.goto('/library?status=completed');
@@ -172,6 +172,6 @@ test.describe('Processing History', () => {
     await expect(historyTab2).toBeVisible({ timeout: 10000 });
     await historyTab2.click();
 
-    await expect(page.getByText(/transcribe/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 10000 });
   });
 });
