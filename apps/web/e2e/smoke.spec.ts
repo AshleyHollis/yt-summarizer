@@ -23,8 +23,13 @@ test.describe('Core User Flows @smoke', () => {
       await page.goto('/');
 
       // Should redirect to /add — server-side redirect via Next.js
-      // SWA preview environments may be slower to redirect
-      await expect(page).toHaveURL(/\/add(?:\?|$)/, { timeout: 15_000 });
+      // SWA preview environments may be slower to redirect due to cold starts.
+      // Use waitForFunction instead of toHaveURL to avoid CopilotKit URL
+      // oscillation (?thread= parameter) interfering with URL matching.
+      await page.waitForFunction(
+        () => window.location.pathname === '/add',
+        { timeout: 30_000 },
+      );
     });
 
     test('add page has correct title @smoke', async ({ page }) => {
