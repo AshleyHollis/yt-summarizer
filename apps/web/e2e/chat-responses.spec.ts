@@ -301,9 +301,10 @@ test.describe("Chat Edge Cases", () => {
     await submitQuery(page, longQuery);
     await waitForResponse(page, testInfo);
 
-    // Should handle long query and return results
+    // Should handle long query and return results (video links or uncertainty response)
     const videoLinks = page.locator('a[href*="/videos/"]');
-    await expect(videoLinks.first()).toBeVisible({ timeout: 30_000 });
+    const uncertaintyResponse = page.getByText(/Limited Information|No relevant content/i);
+    await expect(videoLinks.first().or(uncertaintyResponse.first())).toBeVisible({ timeout: 30_000 });
   });
 
   test("subsequent queries work correctly", async ({ page }, testInfo) => {

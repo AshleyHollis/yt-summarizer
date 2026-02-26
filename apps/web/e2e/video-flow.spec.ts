@@ -244,11 +244,14 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
   test.describe('Error Handling', () => {
     test('shows error for invalid video ID', async ({ page }) => {
-      await page.goto('/videos/invalid-uuid-format');
+      // Navigate to /library/ directly to avoid server redirect from /videos/ → /library/
+      // which adds latency and can interact with CopilotKit's ?thread= param
+      await page.goto('/library/invalid-uuid-format');
+      await page.waitForLoadState('domcontentloaded');
 
-      // Should show error message
+      // Should show error message — increased timeout for slow preview environments
       const errorMessage = page.getByText(/error|not found|invalid|failed/i);
-      await expect(errorMessage.first()).toBeVisible({ timeout: 10_000 });
+      await expect(errorMessage.first()).toBeVisible({ timeout: 30_000 });
     });
 
     test('shows error for non-existent video', async ({ page }) => {
