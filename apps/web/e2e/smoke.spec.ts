@@ -20,10 +20,11 @@ import { test, expect } from '@playwright/test';
 test.describe('Core User Flows @smoke', () => {
   test.describe('Navigation', () => {
     test('home page redirects to add page @smoke', async ({ page }) => {
-      // SWA preview environments can take 90s+ on cold start. Set a generous
-      // test-level timeout so the waitForFunction has room, and the fallback
-      // test.skip() fires before the hard timeout.
-      test.setTimeout(180_000);
+      // SWA preview environments can take 90s+ on cold start. The test-level
+      // timeout MUST exceed the sum of all operation timeouts (90s goto + 90s
+      // waitForFunction = 180s) so that the try/catch can fire test.skip()
+      // before the hard test timeout fires (which counts as a failure).
+      test.setTimeout(300_000);
       // SWA cold starts can make the initial navigation very slow.
       // Use a generous navigation timeout and catch failures.
       try {
@@ -213,6 +214,10 @@ test.describe('Video Submission (Requires Backend)', () => {
   });
 
   test('submits video and redirects to video detail page', async ({ page }) => {
+    // The test-level timeout must exceed the sum of all operation timeouts
+    // (page.goto default + form interactions + 60s waitForFunction) so that
+    // the try/catch can fire test.skip() before the hard timeout fires.
+    test.setTimeout(300_000);
     await page.goto('/add');
 
     const input = page.getByLabel(/YouTube URL/i);

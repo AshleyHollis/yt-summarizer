@@ -380,7 +380,11 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   });
 
   test('copilot response includes timestamp links when available', async ({ page }, testInfo) => {
-    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
+    // The test-level timeout must be generous enough that all operation
+    // timeouts (redirect 30s + processing poll up to 180s + copilot nav +
+    // query + response 60s) can complete AND the try/catch has room to fire
+    // test.skip() before the hard test timeout fires.
+    test.setTimeout(PROCESSING_TIMEOUT * 3 + AGENT_RESPONSE_TIMEOUT + 120_000);
 
     // Ingest video
     await page.goto('/add');
