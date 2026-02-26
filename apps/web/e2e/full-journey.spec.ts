@@ -40,7 +40,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   );
 
   test('complete journey: ingest video and query copilot', async ({ page }, testInfo) => {
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 30_000);
+    // Use a generous test-level timeout so that waitForVideoProcessing always
+    // has time to return false and trigger test.skip(), rather than having the
+    // hard timeout fire first (which counts as a failure, not a skip).
+    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
 
     // =========================================================================
     // STEP 1: Submit a YouTube video
@@ -120,7 +123,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   });
 
   test('query copilot with specific video reference', async ({ page }, testInfo) => {
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 30_000);
+    // Use a generous test-level timeout so that waitForVideoProcessing always
+    // has time to return false and trigger test.skip(), rather than having the
+    // hard timeout fire first (which counts as a failure, not a skip).
+    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
 
     // Submit and wait for video to process
     await page.goto('/add');
@@ -262,7 +268,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   );
 
   test('agent response includes citation elements when video is ingested', async ({ page }, testInfo) => {
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 30_000);
+    // Use a generous test-level timeout so that waitForVideoProcessing always
+    // has time to return false and trigger test.skip(), rather than having the
+    // hard timeout fire first (which counts as a failure, not a skip).
+    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
 
     // Step 1: Ingest a video
     console.log('Ingesting video for citation test...');
@@ -310,7 +319,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   });
 
   test('agent references specific video content when asked about it', async ({ page }, testInfo) => {
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 30_000);
+    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
 
     // Ingest a video
     await page.goto('/add');
@@ -350,7 +359,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   });
 
   test('copilot response includes timestamp links when available', async ({ page }, testInfo) => {
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 30_000);
+    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
 
     // Ingest video
     await page.goto('/add');

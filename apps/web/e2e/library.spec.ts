@@ -239,8 +239,12 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Only check pagination if there are more than 10 videos
       if (data.total_count > 10) {
-        const pagination = page.locator('nav[aria-label*="Pagination"], .pagination').first();
-        await expect(pagination).toBeVisible();
+        // Wait for video cards to render before checking pagination —
+        // the library page fetches data async and pagination only renders
+        // after the video list is populated.
+        await page.locator('a[href*="/library/"]').first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+        const pagination = page.locator('nav[aria-label="Pagination"]').first();
+        await expect(pagination).toBeVisible({ timeout: 15_000 });
       }
     });
 
