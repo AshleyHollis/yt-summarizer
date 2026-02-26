@@ -307,9 +307,8 @@ test.describe('Copilot Feature', () => {
       await expect(videoLinks).toHaveCount(0);
     });
 
-    // Skip: Heavy clubs video is not in the seeded test data
-    // To enable: Add Mark Wildman's heavy clubs video to global-setup.ts TEST_VIDEOS
-    test.skip('positive: returns results for heavy clubs (specific video topic)', async ({ page }, testInfo) => {
+    // Heavy clubs video has been added to global-setup.ts TEST_VIDEOS
+    test('positive: returns results for heavy clubs (specific video topic)', async ({ page }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       await submitQuery(page, 'What are heavy clubs and how do beginners use them?');
 

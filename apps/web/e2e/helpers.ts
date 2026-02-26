@@ -23,33 +23,34 @@ const MAX_SUBMIT_RETRIES = 3;
 const RETRY_DELAY_MS = 3000;
 
 /**
- * Time to wait for CopilotKit's initial agent/connect handshake (ms).
- *
- * On the library page, `page.waitForLoadState("networkidle")` never resolves
- * because the page polls for video status. So we simply wait a fixed period
- * that is long enough for the handshake to complete in CI.
- */
-const HANDSHAKE_WAIT_MS = 8000;
-
-/**
  * Wait for CopilotKit to be ready to accept user input.
  *
- * This waits for the chat input to be visible and then waits a fixed period
- * for the initial agent/connect handshake to complete. We use a fixed wait
- * rather than networkidle because the library page polls continuously and
- * networkidle never resolves (causing test timeout errors that bypass
- * Promise.race catch handlers).
+ * Instead of a fixed 8-second wait for the handshake, we intercept the actual
+ * CopilotKit POST request to /api/copilotkit and wait for it to complete.
+ * This is deterministic: the handshake is done when the response arrives.
+ *
+ * On the library page, `page.waitForLoadState("networkidle")` never resolves
+ * because the page polls for video status. Request interception avoids this.
  */
 export async function waitForCopilotReady(page: Page): Promise<void> {
   const input = page.getByPlaceholder(CHAT_INPUT_PLACEHOLDER);
   await expect(input).toBeVisible({ timeout: 30_000 });
 
-  // Fixed wait for CopilotKit handshake. We intentionally do NOT use
-  // page.waitForLoadState("networkidle") because on the library page it never
-  // resolves (the page polls continuously) and when a Playwright test timeout
-  // fires, the error bypasses Promise.race catch handlers, consuming the
-  // entire test timeout budget.
-  await page.waitForTimeout(HANDSHAKE_WAIT_MS);
+  // Wait for CopilotKit's initial handshake request to complete.
+  // CopilotKit sends a POST to /api/copilotkit with 0 messages on mount.
+  // We wait for this round-trip to finish, proving the agent is connected.
+  try {
+    await page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/api/copilotkit") && resp.status() === 200,
+      { timeout: 60_000 },
+    );
+  } catch {
+    // If the handshake already completed before we started listening, or if
+    // the endpoint returned a non-200 status, fall back to a short fixed wait.
+    // This is better than the old 8s wait because the common case is deterministic.
+    await page.waitForTimeout(5000);
+  }
 }
 
 /**
@@ -215,4 +216,86 @@ export async function waitForAssistantResponse(
  */
 export function getApiUrl(): string {
   return process.env.API_URL || "http://localhost:8000";
+}
+
+/**
+ * Fetch a completed, seeded video ID from the API.
+ *
+ * Global-setup seeds 15+ videos and waits for processing to complete. This
+ * helper queries the library API to find one that's ready, eliminating the
+ * need to re-ingest and wait for processing in individual tests.
+ *
+ * Returns the video ID string, or null if no videos are available.
+ */
+export async function getSeededVideoId(): Promise<string | null> {
+  const API_URL = getApiUrl();
+  try {
+    const response = await fetch(
+      `${API_URL}/api/v1/library/videos?page_size=1`,
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const videos = data.videos || data.items || [];
+    if (videos.length === 0) return null;
+    return videos[0].id || videos[0].video_id || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Wait for a video to finish processing by polling the API directly.
+ *
+ * Unlike the old page-reload approach, this polls the backend API endpoint
+ * (`GET /api/v1/jobs/video/{id}/progress`) without touching the browser.
+ * This eliminates CopilotKit URL oscillation interference, ERR_ABORTED
+ * errors from page.reload(), and DOM-based detection fragility.
+ *
+ * @returns true if processing completed, false if timed out or failed.
+ */
+export async function waitForVideoProcessingViaApi(
+  videoId: string,
+  timeout: number = 180_000,
+): Promise<boolean> {
+  const API_URL = getApiUrl();
+  const startTime = Date.now();
+  const pollInterval = 3000;
+
+  console.log(
+    `[waitForVideoProcessingViaApi] Polling for video ${videoId} (timeout: ${timeout / 1000}s)`,
+  );
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/jobs/video/${videoId}/progress`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const status = data.status || data.state;
+        if (status === "completed" || status === "complete") {
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          console.log(
+            `[waitForVideoProcessingViaApi] Video ${videoId} completed in ${elapsed}s`,
+          );
+          return true;
+        }
+        if (status === "failed" || status === "error") {
+          console.error(
+            `[waitForVideoProcessingViaApi] Video ${videoId} failed: ${JSON.stringify(data)}`,
+          );
+          return false;
+        }
+      }
+    } catch {
+      // Network error — retry
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+  }
+
+  console.error(
+    `[waitForVideoProcessingViaApi] Video ${videoId} timed out after ${timeout / 1000}s`,
+  );
+  return false;
 }

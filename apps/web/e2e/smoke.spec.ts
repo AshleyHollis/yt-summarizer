@@ -20,36 +20,19 @@ import { test, expect } from '@playwright/test';
 test.describe('Core User Flows @smoke', () => {
   test.describe('Navigation', () => {
     test('home page redirects to add page @smoke', async ({ page }) => {
-      // SWA preview environments can take 90s+ on cold start. The test-level
-      // timeout MUST exceed the sum of all operation timeouts (90s goto + 90s
-      // waitForFunction = 180s) so that the try/catch can fire test.skip()
-      // before the hard test timeout fires (which counts as a failure).
-      test.setTimeout(360_000);
-      // SWA cold starts can make the initial navigation very slow.
-      // Use a generous navigation timeout and catch failures.
-      try {
-        await page.goto('/', { timeout: 90_000 });
-      } catch {
-        // Navigation timed out on cold SWA start — skip gracefully.
-        test.skip(true, 'SWA preview cold start exceeded 90s for initial navigation');
-        return;
-      }
+      // Global-setup's warmUpSwa() absorbs the SWA cold-start penalty,
+      // so this should be fast. Use a generous timeout as safety margin.
+      test.setTimeout(120_000);
 
-      // Should redirect to /add — server-side redirect via Next.js
-      // SWA preview environments may be very slow to redirect due to cold starts.
+      await page.goto('/', { timeout: 60_000 });
+
+      // Should redirect to /add — server-side redirect via Next.js.
       // Use waitForFunction instead of toHaveURL to avoid CopilotKit URL
       // oscillation (?thread= parameter) interfering with URL matching.
-      try {
-        await page.waitForFunction(
-          () => window.location.pathname === '/add',
-          { timeout: 90_000 },
-        );
-      } catch {
-        // SWA cold start exceeded 90s — skip this test rather than fail.
-        // The redirect works in production; this is a preview environment issue.
-        test.skip(true, 'SWA preview cold start exceeded 90s for root redirect');
-        return;
-      }
+      await page.waitForFunction(
+        () => window.location.pathname === '/add',
+        { timeout: 60_000 },
+      );
     });
 
     test('add page has correct title @smoke', async ({ page }) => {
@@ -215,10 +198,8 @@ test.describe('Video Submission (Requires Backend)', () => {
   });
 
   test('submits video and redirects to video detail page', async ({ page }) => {
-    // The test-level timeout must exceed the sum of all operation timeouts
-    // (page.goto default + form interactions + 60s waitForFunction) so that
-    // the try/catch can fire test.skip() before the hard timeout fires.
-    test.setTimeout(300_000);
+    // Global-setup warms up both SWA and API, so cold start is absorbed.
+    test.setTimeout(120_000);
     await page.goto('/add');
 
     const input = page.getByLabel(/YouTube URL/i);
@@ -230,20 +211,15 @@ test.describe('Video Submission (Requires Backend)', () => {
 
     // Should redirect to video detail page after API call + 1500ms delay.
     // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling).
-    // CI preview API can be slow — use 60s timeout and skip gracefully on failure.
-    try {
-      await page.waitForFunction(
-        () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
-        { timeout: 60_000 }
-      );
-    } catch {
-      test.skip(true, 'Video submission redirect exceeded 60s — CI preview API may be slow');
-      return;
-    }
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
+      { timeout: 60_000 }
+    );
     await expect(page).toHaveURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/);
   });
 
   test('video detail page shows processing status', async ({ page }) => {
+    test.setTimeout(120_000);
     await page.goto('/add');
     await page.waitForLoadState('domcontentloaded');
 
@@ -254,55 +230,26 @@ test.describe('Video Submission (Requires Backend)', () => {
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
 
-    // Wait for either: redirect to video detail page, OR an inline message
-    // (e.g., "already exists", processing status, etc.)
-    try {
-      await page.waitForFunction(
-        () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
-        { timeout: 15000 }
-      );
-    } catch {
-      // Video may already exist - check for feedback on the add page
-      const feedback = page.getByText(/already|exists|processing|submitted|queued/i).first();
-      const isFeedbackVisible = await feedback.isVisible().catch(() => false);
-      if (isFeedbackVisible) {
-        // Video already submitted - that's acceptable, skip the detail page assertions
-        return;
-      }
-      // If we're still on /add with no feedback, skip with a descriptive message
-      test.skip(true, 'Video submission did not redirect - may be a duplicate or API issue');
-      return;
+    // Wait for redirect to video detail page. The video may already exist
+    // (409), in which case the redirect still happens but faster.
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
+      { timeout: 30_000 }
+    );
+
+    // Navigate directly to /library/ path to avoid server-side redirect from /videos/
+    const currentUrl = page.url();
+    const libraryUrl = currentUrl.replace('/videos/', '/library/');
+    if (libraryUrl !== currentUrl) {
+      await page.goto(libraryUrl);
     }
-
-    // Should show video detail page elements
-    // The page shows either processing progress or video content.
-    // /videos/{id} does a server-side redirect to /library/{id}, so wait
-    // for the redirect to complete first, then check for <main>.
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait for the final page to settle after potential server-side redirect
-    // (/videos/ → /library/). The redirect causes a new page load cycle.
-    await page.waitForTimeout(3000);
-    await page.waitForLoadState('domcontentloaded');
-
+    // Should show video detail page with <main> element
     const pageContent = page.locator('main');
-    try {
-      await expect(pageContent).toBeVisible({ timeout: 30_000 });
-    } catch {
-      // If main is not visible, the page may still be navigating/hydrating
-      // after the server-side redirect. This is acceptable for a smoke test.
-      const isOnVideoPage = /\/(?:videos|library)\//.test(page.url());
-      if (!isOnVideoPage) {
-        test.skip(true, 'Navigation to video detail page did not complete');
-        return;
-      }
-      // On video page but main not visible — likely redirect/hydration timing
-      // issue. Skip gracefully rather than hard-fail.
-      test.skip(true, `On video page but <main> not rendered after 30s — redirect/hydration may be slow in CI`);
-      return;
-    }
+    await expect(pageContent).toBeVisible({ timeout: 30_000 });
 
-    // Should have navigation back - look for the actual link text
+    // Should have navigation back
     const homeLink = page.getByRole('link', { name: /YT Summarizer/i });
     await expect(homeLink).toBeVisible();
   });
