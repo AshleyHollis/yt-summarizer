@@ -277,7 +277,7 @@ test.describe('Copilot Feature', () => {
 
       // Should find kettlebell-related videos
       const videoLinks = page.locator('a[href*="/videos/"]');
-      await expect(videoLinks.first()).toBeVisible({ timeout: 30_000 });
+      await expect(videoLinks.first()).toBeVisible({ timeout: 60_000 });
     });
 
     test('negative: returns no video cards for cooking pasta (uncovered topic)', async ({ page }, testInfo) => {

@@ -28,7 +28,7 @@ test.describe('Core User Flows @smoke', () => {
       // oscillation (?thread= parameter) interfering with URL matching.
       await page.waitForFunction(
         () => window.location.pathname === '/add',
-        { timeout: 30_000 },
+        { timeout: 60_000 },
       );
     });
 

@@ -482,6 +482,49 @@ async function globalSetup(_config: FullConfig) {
     // Fallback to simple wait if we couldn't get video IDs
     await waitForVideoProcessing();
   }
+
+  // Warm up the CopilotKit agent endpoint.
+  // The first LLM call in a CI run can be very slow (Azure OpenAI cold start).
+  // Sending a warm-up request here ensures the backend is primed before tests start,
+  // preventing flaky timeouts in chat-responses, copilot, and full-journey tests.
+  await warmUpCopilotAgent();
+}
+
+async function warmUpCopilotAgent(): Promise<void> {
+  console.log('[global-setup] Warming up CopilotKit agent endpoint...');
+  const startTime = Date.now();
+
+  try {
+    // Send a minimal CopilotKit request to trigger Azure OpenAI connection initialization.
+    // This mirrors the handshake that CopilotKit sends on page load (0 messages).
+    const response = await fetch(`${API_URL}/api/copilotkit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        method: 'run',
+        threadId: 'warmup-global-setup',
+        runId: 'warmup-run',
+        messages: [],
+        actions: [],
+        agent: 'video_assistant',
+      }),
+    });
+
+    if (response.ok || response.status === 200) {
+      // Consume the SSE stream to ensure the full round-trip completes
+      const text = await response.text();
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[global-setup] ✓ Agent warm-up complete (${elapsed}s, ${text.length} bytes)`);
+    } else {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[global-setup] ⚠ Agent warm-up returned ${response.status} (${elapsed}s) - tests may be slower on first LLM call`);
+    }
+  } catch (error) {
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    console.log(`[global-setup] ⚠ Agent warm-up failed (${elapsed}s): ${error} - tests may be slower on first LLM call`);
+  }
 }
 
 export default globalSetup;
