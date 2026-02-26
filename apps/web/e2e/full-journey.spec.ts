@@ -482,9 +482,18 @@ async function waitForVideoProcessing(page: Page, timeout: number): Promise<bool
     // Wait before next poll
     await page.waitForTimeout(pollInterval);
 
-    // Refresh the page to get latest status
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
+    // Refresh the page to get latest status.
+    // CopilotKit's URL oscillation (?thread= toggling) can cause reload to fail
+    // with ERR_ABORTED if a navigation is already in progress.
+    try {
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded');
+    } catch {
+      // Reload failed — navigate directly instead
+      const currentUrl = page.url().split('?')[0]; // Strip query params
+      await page.goto(currentUrl);
+      await page.waitForLoadState('domcontentloaded');
+    }
   }
 
   console.error('Video processing timed out');
