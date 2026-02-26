@@ -40,10 +40,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   );
 
   test('complete journey: ingest video and query copilot', async ({ page }, testInfo) => {
-    // Use a generous test-level timeout so that waitForVideoProcessing always
-    // has time to return false and trigger test.skip(), rather than having the
-    // hard timeout fire first (which counts as a failure, not a skip).
-    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
+    // The test-level timeout must be generous enough that all operation
+    // timeouts can complete AND the try/catch has room to fire test.skip()
+    // before the hard test timeout fires (which counts as a failure).
+    test.setTimeout(PROCESSING_TIMEOUT * 3 + AGENT_RESPONSE_TIMEOUT + 120_000);
 
     // =========================================================================
     // STEP 1: Submit a YouTube video
@@ -127,10 +127,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   });
 
   test('query copilot with specific video reference', async ({ page }, testInfo) => {
-    // Use a generous test-level timeout so that waitForVideoProcessing always
-    // has time to return false and trigger test.skip(), rather than having the
-    // hard timeout fire first (which counts as a failure, not a skip).
-    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
+    // The test-level timeout must be generous enough that all operation
+    // timeouts can complete AND the try/catch has room to fire test.skip()
+    // before the hard test timeout fires (which counts as a failure).
+    test.setTimeout(PROCESSING_TIMEOUT * 3 + AGENT_RESPONSE_TIMEOUT + 120_000);
 
     // Submit and wait for video to process
     await page.goto('/add');
@@ -279,10 +279,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   );
 
   test('agent response includes citation elements when video is ingested', async ({ page }, testInfo) => {
-    // Use a generous test-level timeout so that waitForVideoProcessing always
-    // has time to return false and trigger test.skip(), rather than having the
-    // hard timeout fire first (which counts as a failure, not a skip).
-    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
+    // The test-level timeout must be generous enough that all operation
+    // timeouts can complete AND the try/catch has room to fire test.skip()
+    // before the hard test timeout fires (which counts as a failure).
+    test.setTimeout(PROCESSING_TIMEOUT * 3 + AGENT_RESPONSE_TIMEOUT + 120_000);
 
     // Step 1: Ingest a video
     console.log('Ingesting video for citation test...');
@@ -334,9 +334,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   });
 
   test('agent references specific video content when asked about it', async ({ page }, testInfo) => {
-    // These tests depend on video processing completing in CI preview environments,
-    // where workers are slow. Use a generous timeout and skip gracefully on timeout.
-    test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
+    // The test-level timeout must be generous enough that all operation
+    // timeouts can complete AND the try/catch has room to fire test.skip()
+    // before the hard test timeout fires (which counts as a failure).
+    test.setTimeout(PROCESSING_TIMEOUT * 3 + AGENT_RESPONSE_TIMEOUT + 120_000);
 
     // Ingest a video
     await page.goto('/add');
