@@ -24,7 +24,7 @@ test.describe('Core User Flows @smoke', () => {
       // timeout MUST exceed the sum of all operation timeouts (90s goto + 90s
       // waitForFunction = 180s) so that the try/catch can fire test.skip()
       // before the hard test timeout fires (which counts as a failure).
-      test.setTimeout(300_000);
+      test.setTimeout(360_000);
       // SWA cold starts can make the initial navigation very slow.
       // Use a generous navigation timeout and catch failures.
       try {
@@ -48,6 +48,7 @@ test.describe('Core User Flows @smoke', () => {
         // SWA cold start exceeded 90s — skip this test rather than fail.
         // The redirect works in production; this is a preview environment issue.
         test.skip(true, 'SWA preview cold start exceeded 90s for root redirect');
+        return;
       }
     });
 
