@@ -1,5 +1,10 @@
 import { test, expect, Page } from "@playwright/test";
-import { openChatViaButton, submitQuery, waitForAssistantResponse } from "./helpers";
+import {
+  openChatViaButton,
+  waitForCopilotReady,
+  submitQuery,
+  waitForAssistantResponse,
+} from "./helpers";
 
 /**
  * E2E tests for Single Response Verification
@@ -94,8 +99,8 @@ test.describe("Single Response Per Message", () => {
   test("tool result renders exactly once with all components", async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library");
-    await openChatViaButton(page);
+    await page.goto("/library?chat=open");
+    await waitForCopilotReady(page);
 
     // Send query
     await submitQuery(page, "Tell me about the videos in my library");

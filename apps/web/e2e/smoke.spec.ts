@@ -320,6 +320,11 @@ test.describe('Error Handling (Requires Backend)', () => {
 test.describe('Accessibility', () => {
   test('submit form is keyboard accessible', async ({ page }) => {
     await page.goto('/add');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for the URL input to be visible before testing keyboard navigation
+    const urlInput = page.getByLabel(/YouTube URL/i);
+    await expect(urlInput).toBeVisible({ timeout: 10_000 });
 
     // Tab to the input
     await page.keyboard.press('Tab');
