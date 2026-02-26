@@ -71,6 +71,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
       );
     } catch {
       test.skip(true, 'Video submission did not redirect within timeout — API may be slow');
+      return;
     }
     const videoUrl = page.url();
     const videoId = videoUrl.match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1];
@@ -84,7 +85,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // Poll for completion by checking for summary/transcript content
     // or a "completed" status indicator
     const processingComplete = await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
-    test.skip(!processingComplete, 'Video processing did not complete within timeout — CI preview workers may be slow');
+    if (!processingComplete) {
+      test.skip(true, 'Video processing did not complete within timeout — CI preview workers may be slow');
+      return;
+    }
     console.log('Step 2: Video processing completed!');
 
     // =========================================================================
@@ -143,11 +147,15 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
       );
     } catch {
       test.skip(true, 'Video submission did not redirect within timeout — API may be slow');
+      return;
     }
 
     // Wait for processing
     const processingComplete = await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
-    test.skip(!processingComplete, 'Video processing did not complete within timeout — CI preview workers may be slow');
+    if (!processingComplete) {
+      test.skip(true, 'Video processing did not complete within timeout — CI preview workers may be slow');
+      return;
+    }
 
     // Go to library and query copilot
     await page.goto('/library?chat=open');
@@ -158,7 +166,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
 
     // Wait for response — agent may be slow in CI preview
     const responseReceived = await waitForResponse(page, testInfo).then(() => true).catch(() => false);
-    test.skip(!responseReceived, 'Agent response did not arrive within timeout — CI preview backend may be slow');
+    if (!responseReceived) {
+      test.skip(true, 'Agent response did not arrive within timeout — CI preview backend may be slow');
+      return;
+    }
 
     const responseContent = await getCopilotResponseContent(page);
     expect(responseContent.length).toBeGreaterThan(0);
@@ -289,11 +300,15 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
       );
     } catch {
       test.skip(true, 'Video submission did not redirect within timeout — API may be slow');
+      return;
     }
 
     // Wait for processing to complete
     const processingComplete = await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
-    test.skip(!processingComplete, 'Video processing did not complete within timeout — CI preview workers may be slow');
+    if (!processingComplete) {
+      test.skip(true, 'Video processing did not complete within timeout — CI preview workers may be slow');
+      return;
+    }
     console.log('Video processed, querying copilot...');
 
     // Step 2: Query the copilot about the video
@@ -319,6 +334,8 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   });
 
   test('agent references specific video content when asked about it', async ({ page }, testInfo) => {
+    // These tests depend on video processing completing in CI preview environments,
+    // where workers are slow. Use a generous timeout and skip gracefully on timeout.
     test.setTimeout(PROCESSING_TIMEOUT * 2 + AGENT_RESPONSE_TIMEOUT + 60_000);
 
     // Ingest a video
@@ -338,10 +355,14 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
       );
     } catch {
       test.skip(true, 'Video submission did not redirect within timeout — API may be slow');
+      return;
     }
 
     const processingComplete2 = await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
-    test.skip(!processingComplete2, 'Video processing did not complete within timeout — CI preview workers may be slow');
+    if (!processingComplete2) {
+      test.skip(true, 'Video processing did not complete within timeout — CI preview workers may be slow');
+      return;
+    }
 
     // Query about specific video content
     await page.goto('/library?chat=open');
@@ -376,9 +397,13 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
       );
     } catch {
       test.skip(true, 'Video submission did not redirect within timeout — API may be slow');
+      return;
     }
     const processingComplete3 = await waitForVideoProcessing(page, PROCESSING_TIMEOUT);
-    test.skip(!processingComplete3, 'Video processing did not complete within timeout — CI preview workers may be slow');
+    if (!processingComplete3) {
+      test.skip(true, 'Video processing did not complete within timeout — CI preview workers may be slow');
+      return;
+    }
 
     // Query copilot
     await page.goto('/library?chat=open');
@@ -387,7 +412,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     await submitQuery(page, 'What are the key points discussed in the videos?');
 
     const responseReceived = await waitForResponse(page, testInfo).then(() => true).catch(() => false);
-    test.skip(!responseReceived, 'Agent response did not arrive within timeout — CI preview backend may be slow');
+    if (!responseReceived) {
+      test.skip(true, 'Agent response did not arrive within timeout — CI preview backend may be slow');
+      return;
+    }
 
     // Check for citation/evidence UI elements in the response
     const chatArea = page.locator('[class*="chat" i], [class*="copilot" i], [class*="message" i]');
@@ -464,6 +492,9 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
 async function waitForVideoProcessing(page: Page, timeout: number): Promise<boolean> {
   const startTime = Date.now();
   const pollInterval = 3000; // Poll every 3 seconds
+  // Cap individual operations to prevent the loop from getting stuck on a
+  // single slow reload/goto that runs past our total timeout budget.
+  const opTimeout = 15_000;
 
   while (Date.now() - startTime < timeout) {
     // Check for completion indicators
@@ -488,20 +519,33 @@ async function waitForVideoProcessing(page: Page, timeout: number): Promise<bool
       return false;
     }
 
+    // Bail early if we've exceeded our budget
+    if (Date.now() - startTime >= timeout) break;
+
     // Wait before next poll
     await page.waitForTimeout(pollInterval);
+
+    // Bail early if we've exceeded our budget after waiting
+    if (Date.now() - startTime >= timeout) break;
 
     // Refresh the page to get latest status.
     // CopilotKit's URL oscillation (?thread= toggling) can cause reload to fail
     // with ERR_ABORTED if a navigation is already in progress.
+    // Cap the reload to opTimeout to prevent the loop from getting stuck.
     try {
-      await page.reload();
-      await page.waitForLoadState('domcontentloaded');
+      await Promise.race([
+        page.reload().then(() => page.waitForLoadState('domcontentloaded')),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('reload timeout')), opTimeout)),
+      ]);
     } catch {
-      // Reload failed — navigate directly instead
-      const currentUrl = page.url().split('?')[0]; // Strip query params
-      await page.goto(currentUrl);
-      await page.waitForLoadState('domcontentloaded');
+      // Reload failed or timed out — try direct navigation instead
+      try {
+        const currentUrl = page.url().split('?')[0]; // Strip query params
+        await page.goto(currentUrl, { timeout: opTimeout });
+        await page.waitForLoadState('domcontentloaded');
+      } catch {
+        // Navigation also failed — continue polling on next iteration
+      }
     }
   }
 

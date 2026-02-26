@@ -332,7 +332,12 @@ test.describe('User Story 3: Browse the Library', () => {
 
       if (await backLink.first().isVisible()) {
         await backLink.first().click();
-        await expect(page).toHaveURL(/\/library(?:\?|$)/);
+        // Use waitForFunction on pathname to avoid CopilotKit URL oscillation
+        // (?thread= parameter) causing toHaveURL to fail.
+        await page.waitForFunction(
+          () => window.location.pathname === '/library',
+          { timeout: 15_000 },
+        );
       }
     });
 
