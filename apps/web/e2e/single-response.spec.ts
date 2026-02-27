@@ -1,4 +1,9 @@
 import { test, expect, Page } from "@playwright/test";
+import {
+  waitForCopilotReady,
+  submitQuery,
+  waitForAssistantResponse,
+} from "./helpers";
 
 /**
  * E2E tests for Single Response Verification
@@ -10,66 +15,29 @@ import { test, expect, Page } from "@playwright/test";
  * rendered multiple times, causing duplicate "Limited Information" cards.
  */
 
-async function openChat(page: Page): Promise<void> {
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto("/library");
-  await page.waitForLoadState("networkidle");
-
-  // Open the AI assistant sidebar
-  const openButton = page.getByRole("button", { name: "Open AI Assistant" });
-  await expect(openButton).toBeVisible({ timeout: 10000 });
-  await openButton.click();
-
-  // Wait for chat to be ready
-  await expect(page.getByRole("textbox", { name: "Ask about your videos..." })).toBeVisible();
-}
-
-async function sendMessage(page: Page, message: string): Promise<void> {
-  const input = page.getByRole("textbox", { name: "Ask about your videos..." });
-  await input.fill(message);
-  await input.press("Enter");
-}
-
-async function waitForAssistantResponse(page: Page, timeout = 60000): Promise<void> {
-  // Wait for any response to complete (not in progress state)
-  await page.waitForFunction(
-    () => {
-      // Look for spinner/loading indicators to disappear
-      const spinners = document.querySelectorAll('[class*="animate-spin"]');
-      const loadingText = document.body.textContent?.includes("Searching your video library...");
-      return spinners.length === 0 && !loadingText;
-    },
-    { timeout }
-  );
-
-  // Additional wait for any tool results to finish rendering
-  await page.waitForTimeout(1000);
-}
-
 function countAssistantMessageBlocks(page: Page) {
   // Count the number of "Limited Information" cards (indicator of queryLibrary tool response)
   return page.locator('text="Limited Information"').count();
 }
 
-// Helper function for counting tool progress indicators - reserved for future use
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function _countToolInProgressIndicators(_page: Page) {
-  return _page.locator('text="Searching your video library..."').count();
-}
-
 test.describe("Single Response Per Message", () => {
+  // All tests navigate with ?chat=open for reliable chat panel activation.
+  // openChatViaButton (button click) is flaky — the click sometimes doesn't
+  // register or the panel fails to open within the timeout.
+
   test("simple greeting produces exactly one response", async ({ page }) => {
-    await openChat(page);
+    test.slow(); // LLM call - needs extra time
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
+    await waitForCopilotReady(page);
 
     // Send a simple greeting that doesn't trigger tools
-    await sendMessage(page, "Hello, how are you?");
+    await submitQuery(page, "Hello, how are you?");
 
     // Wait for response
     await page.waitForTimeout(3000);
 
-    // Count user messages (should be 1)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _userMessages = page.locator('[class*="UserMessage"], [class*="userMessage"]');
     // The message text should appear exactly once as a user message
     const greetingTexts = page.locator('text="Hello, how are you?"');
     const greetingCount = await greetingTexts.count();
@@ -83,10 +51,14 @@ test.describe("Single Response Per Message", () => {
   });
 
   test("library query produces exactly one tool response card", async ({ page }) => {
-    await openChat(page);
+    test.slow(); // LLM call - needs extra time
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
+    await waitForCopilotReady(page);
 
     // Send a query that triggers the queryLibrary tool
-    await sendMessage(page, "What videos do I have about exercise?");
+    await submitQuery(page, "What videos do I have about exercise?");
 
     // Wait for response to complete
     await waitForAssistantResponse(page);
@@ -104,14 +76,18 @@ test.describe("Single Response Per Message", () => {
   });
 
   test("second query produces only one additional response", async ({ page }) => {
-    await openChat(page);
+    test.slow(); // LLM call - needs extra time
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
+    await waitForCopilotReady(page);
 
     // First message
-    await sendMessage(page, "Hello!");
+    await submitQuery(page, "Hello!");
     await page.waitForTimeout(2000);
 
     // Second message - triggers tool
-    await sendMessage(page, "What videos do I have?");
+    await submitQuery(page, "What videos do I have?");
     await waitForAssistantResponse(page);
 
     // Count tool response indicators
@@ -127,10 +103,14 @@ test.describe("Single Response Per Message", () => {
   });
 
   test("tool result renders exactly once with all components", async ({ page }) => {
-    await openChat(page);
+    test.slow(); // LLM call - needs extra time
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
+    await waitForCopilotReady(page);
 
     // Send query
-    await sendMessage(page, "Tell me about the videos in my library");
+    await submitQuery(page, "Tell me about the videos in my library");
     await waitForAssistantResponse(page);
 
     // Verify the structure appears once:

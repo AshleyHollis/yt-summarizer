@@ -87,6 +87,24 @@ variable "cloudflare_api_token" {
 }
 
 # -----------------------------------------------------------------------------
+# Webshare Rotating Residential Proxy
+# -----------------------------------------------------------------------------
+
+variable "webshare_proxy_username" {
+  description = "Webshare rotating residential proxy username (sourced from Webshare dashboard)"
+  type        = string
+  sensitive   = false
+  default     = ""
+}
+
+variable "webshare_proxy_password" {
+  description = "Webshare rotating residential proxy password (sourced from Webshare dashboard)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# -----------------------------------------------------------------------------
 # Auth0
 # -----------------------------------------------------------------------------
 

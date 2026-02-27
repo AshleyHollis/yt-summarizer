@@ -12,10 +12,12 @@ module "key_vault" {
   secrets_officer_principal_id = var.key_vault_secrets_officer_principal_id
 
   secrets = {
-    "sql-connection-string" = module.sql.connection_string
-    "storage-connection"    = module.storage.primary_connection_string
-    "openai-api-key"        = var.openai_api_key
-    "cloudflare-api-token"  = var.cloudflare_api_token
+    "sql-connection-string"   = module.sql.connection_string
+    "storage-connection"      = module.storage.primary_connection_string
+    "openai-api-key"          = var.openai_api_key
+    "cloudflare-api-token"    = var.cloudflare_api_token
+    "webshare-proxy-username" = var.webshare_proxy_username
+    "webshare-proxy-password" = var.webshare_proxy_password
   }
 
   tags = local.common_tags

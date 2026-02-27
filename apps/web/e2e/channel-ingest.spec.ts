@@ -36,11 +36,15 @@ test.describe('Channel Ingestion Flow', () => {
     test('can navigate to ingest page from submit page', async ({ page }) => {
       await page.goto('/submit');
 
+      // Wait for the link to be visible and page to be fully hydrated
+      const ingestLink = page.getByRole('link', { name: /ingest multiple videos from a channel/i });
+      await expect(ingestLink).toBeVisible();
+
       // Click the channel ingestion link
-      await page.getByRole('link', { name: /ingest multiple videos from a channel/i }).click();
+      await ingestLink.click();
 
       // Should be on ingest page
-      await expect(page).toHaveURL('/ingest');
+      await expect(page).toHaveURL(/\/ingest(?:\?|$)/, { timeout: 10000 });
     });
 
     test('ingest page renders correctly', async ({ page }) => {
@@ -257,7 +261,7 @@ test.describe('Channel Ingestion Flow', () => {
 
         // Click the link and verify navigation works
         await viewReadyLink.click();
-        await expect(page).toHaveURL('/library?status=completed');
+        await expect(page).toHaveURL(/\/library\?status=completed/);
 
         // Verify library page loads with the filter applied
         await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();

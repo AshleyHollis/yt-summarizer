@@ -193,7 +193,7 @@ class OpenAISettings(BaseSettings):
     @property
     def azure_api_version(self) -> str:
         """Get Azure OpenAI API version."""
-        return os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
+        return os.environ.get("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
 
     @property
     def azure_deployment(self) -> str | None:
@@ -406,6 +406,46 @@ class APISettings(BaseSettings):
     )
 
 
+class ProxySettings(BaseSettings):
+    """Webshare rotating residential proxy settings.
+
+    All fields are populated from environment variables with the PROXY_ prefix.
+    Secrets (username, password) must be provisioned via Azure Key Vault and
+    surfaced as environment variables by the Aspire host or K8s secret injection —
+    never stored in source code or .env files committed to the repo.
+
+    Example env vars:
+        PROXY_ENABLED=true
+        PROXY_USERNAME=myuser          # from Key Vault: webshare-proxy-username
+        PROXY_PASSWORD=secret          # from Key Vault: webshare-proxy-password
+        PROXY_MAX_CONCURRENCY=5
+        PROXY_HEALTH_CHECK_TIMEOUT_SECONDS=10.0
+    """
+
+    model_config = SettingsConfigDict(env_prefix="PROXY_")
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable Webshare rotating residential proxy for yt-dlp calls.",
+    )
+    username: str = Field(
+        default="",
+        description="Webshare proxy username (from Key Vault: webshare-proxy-username).",
+    )
+    password: str = Field(
+        default="",
+        description="Webshare proxy password (from Key Vault: webshare-proxy-password).",
+    )
+    max_concurrency: int = Field(
+        default=5,
+        description="Maximum number of concurrent yt-dlp requests when proxy is enabled.",
+    )
+    health_check_timeout_seconds: float = Field(
+        default=10.0,
+        description="Timeout in seconds for proxy gateway connectivity health checks.",
+    )
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -435,6 +475,7 @@ class Settings(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     api: APISettings = Field(default_factory=APISettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    proxy: ProxySettings = Field(default_factory=ProxySettings)
 
     @property
     def is_development(self) -> bool:

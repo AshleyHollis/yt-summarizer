@@ -35,7 +35,7 @@ export type {
 } from "@/types/copilot-types";
 
 // Re-export utils
-export { formatTime, API_URL } from "./copilot-utils";
+export { formatTime } from "./copilot-utils";
 
 /**
  * Main hook to register all Copilot actions.

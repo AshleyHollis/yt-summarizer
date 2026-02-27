@@ -13,7 +13,8 @@
 
 import { useCopilotAction } from "@copilotkit/react-core";
 import { useScope } from "@/app/providers";
-import { apiPost, API_URL } from "./copilot-utils";
+import { apiPost } from "./copilot-utils";
+import { getClientApiUrl } from "@/services/runtimeConfig";
 import type { SegmentSearchResponse, CoverageResponse } from "@/types/copilot-types";
 
 /**
@@ -128,7 +129,7 @@ function useRelatedVideosTool() {
     ],
     handler: async ({ videoId, limit = 10 }) => {
       const response = await fetch(
-        `${API_URL}/api/v1/copilot/neighbors/${videoId}?limit=${limit}`
+        `${getClientApiUrl()}/api/v1/copilot/neighbors/${videoId}?limit=${limit}`
       );
       if (!response.ok) {
         throw new Error(`Neighbors failed: ${response.statusText}`);

@@ -41,8 +41,8 @@ jobs:
           else
             PR_NUMBER="${{ github.event.pull_request.number }}"
           fi
-          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "PR Number: $PR_NUMBER"
+          echo "number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "PR Number: ${PR_NUMBER}"
 
       - name: Build frontend
         run: |

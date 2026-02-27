@@ -9,11 +9,6 @@ import { getClientApiUrl } from '@/services/runtimeConfig';
 export const formatTime = formatDuration;
 
 /**
- * API base URL from environment
- */
-export const API_URL = getClientApiUrl();
-
-/**
  * Default minimum relevance threshold for filtering results
  */
 export const MIN_RELEVANCE_THRESHOLD = 0.50;
@@ -25,7 +20,8 @@ export async function apiCall<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const apiUrl = getClientApiUrl();
+  const response = await fetch(`${apiUrl}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...options,
   });

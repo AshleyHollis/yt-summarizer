@@ -5,6 +5,7 @@ from .base import Base, TimestampMixin, generate_uuid
 from .batch import Batch, BatchItem, Job, JobHistory
 from .channel import Channel, Video
 from .chat_thread import ChatThread
+from .proxy_request_log import ProxyRequestLog
 from .relationship import Facet, Relationship, VideoFacet
 from .segment import Segment
 
@@ -18,6 +19,7 @@ __all__ = [
     "Facet",
     "Job",
     "JobHistory",
+    "ProxyRequestLog",
     "Relationship",
     "Segment",
     "TimestampMixin",

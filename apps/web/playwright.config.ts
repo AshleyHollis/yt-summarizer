@@ -12,8 +12,9 @@ export default defineConfig({
   globalSetup: process.env.USE_EXTERNAL_SERVER ? './e2e/global-setup.ts' : undefined,
 
   // Maximum timeout for each test
-  // Increased to handle LLM rate limit retries (up to 5 retries with exponential backoff)
-  timeout: 120_000,
+  // 180s on CI (preview E2E against live backend with DeepSeek-V3.2 which can be slow),
+  // test.slow() triples this to 540s for complex multi-LLM-call tests
+  timeout: 180_000,
 
   // Run tests in files in parallel
   fullyParallel: true,
@@ -22,12 +23,14 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
 
   // Retry failed tests - LLM responses can be flaky
-  // CI: 2 retries for stability, Local: 1 retry for quick feedback
-  retries: process.env.CI ? 2 : 1,
+  // CI: 1 retry for fast failure signal, Local: 1 retry for quick feedback
+  retries: 1,
 
-  // Run tests in parallel - LLM rate limiting is handled at the app level
-  // with smart retry that uses Retry-After headers
-  workers: process.env.CI ? 1 : undefined,
+  // Run tests in parallel - 4 workers on CI keeps total run time under
+  // the 60-minute GitHub Actions limit. The submitQuery() fix (waiting for
+  // networkidle before typing + input.toHaveValue("") confirmation) prevents
+  // the race condition that caused earlier failures, so concurrency is safe.
+  workers: process.env.CI ? 4 : undefined,
 
   // Reporter to use
   reporter: [
@@ -38,7 +41,7 @@ export default defineConfig({
   // Shared settings for all the projects below
   use: {
     // Base URL to use in actions like `await page.goto('/')`
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
 
     // Collect trace when retrying the failed test
     trace: 'on-first-retry',

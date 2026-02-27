@@ -40,6 +40,7 @@ class HealthServerConfig:
     stats: WorkerStats = field(default_factory=WorkerStats)
     connectivity_checks: dict[str, Callable[[], bool]] = field(default_factory=dict)
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    proxy_summary_fn: Callable[[], dict] | None = None
 
 
 class HealthRequestHandler(BaseHTTPRequestHandler):
@@ -78,6 +79,8 @@ class HealthRequestHandler(BaseHTTPRequestHandler):
             self._handle_queue()
         elif self.path == "/debug/trace-test":
             self._handle_trace_test()
+        elif self.path == "/debug/proxy":
+            self._handle_proxy()
         else:
             self._send_json({"error": "Not found"}, 404)
 
@@ -205,6 +208,7 @@ class HealthRequestHandler(BaseHTTPRequestHandler):
                     "telemetry": "/debug/telemetry",
                     "queue": "/debug/queue",
                     "trace_test": "/debug/trace-test",
+                    "proxy": "/debug/proxy",
                 },
             }
         )
@@ -504,6 +508,17 @@ class HealthRequestHandler(BaseHTTPRequestHandler):
 
         self._send_json(result)
 
+    def _handle_proxy(self) -> None:
+        """Return proxy usage summary."""
+        if self.config.proxy_summary_fn is None:
+            self._send_json({"enabled": False, "message": "Proxy not configured"})
+            return
+        try:
+            summary = self.config.proxy_summary_fn()
+            self._send_json({"enabled": True, **summary})
+        except Exception as e:
+            self._send_json({"enabled": True, "error": str(e)}, 500)
+
 
 class WorkerHealthServer:
     """HTTP server for worker health and debug endpoints.
@@ -533,6 +548,10 @@ class WorkerHealthServer:
     def add_connectivity_check(self, name: str, check_fn: Callable[[], bool]) -> None:
         """Add a connectivity check function."""
         self.config.connectivity_checks[name] = check_fn
+
+    def set_proxy_summary_fn(self, fn: Callable[[], dict]) -> None:
+        """Set a callable that returns proxy usage summary for /debug/proxy."""
+        self.config.proxy_summary_fn = fn
 
     def start(self) -> None:
         """Start the health server in a background thread."""

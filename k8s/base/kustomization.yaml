@@ -21,6 +21,7 @@ resources:
   - externalsecret-openai.yaml
   - externalsecret-storage.yaml
   - externalsecret-auth0.yaml
+  - externalsecret-proxy.yaml
   - migration-job.yaml
 
 labels:

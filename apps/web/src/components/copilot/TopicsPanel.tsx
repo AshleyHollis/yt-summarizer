@@ -16,8 +16,6 @@ interface TopicsPanelProps {
   onTopicClick?: (facetId: string) => void;
 }
 
-const API_URL = getClientApiUrl();
-
 export function TopicsPanel({ onTopicClick }: TopicsPanelProps) {
   const [topics, setTopics] = useState<TopicCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +24,7 @@ export function TopicsPanel({ onTopicClick }: TopicsPanelProps) {
 
   useEffect(() => {
     const fetchTopics = async () => {
+      const API_URL = getClientApiUrl();
       try {
         setLoading(true);
         setError(null);

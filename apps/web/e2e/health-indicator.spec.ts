@@ -18,7 +18,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
       await page.goto('/library');
 
       // Wait for the page to fully load
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Give the health check time to complete (it polls periodically)
       // The health check polls every 5 seconds and updates state
@@ -54,7 +54,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
       await page.goto('/library');
 
       // Wait for page to load
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Verify core content is visible (page should work even with banner)
       // The library page should show video count or navigation
@@ -67,7 +67,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
   test.describe('Banner structure and accessibility', () => {
     test('banner has correct ARIA attributes when visible', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
       const warmingIndicator = page.getByTestId('warming-up-indicator');
@@ -90,7 +90,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
 
     test('banner has correct styling for degraded or unhealthy state', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
       const warmingIndicator = page.getByTestId('warming-up-indicator');
@@ -118,7 +118,7 @@ test.describe('WarmingUpIndicator Health Status Banner', () => {
   test.describe('Banner message content', () => {
     test('banner message is appropriate for the status', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
       const warmingIndicator = page.getByTestId('warming-up-indicator');

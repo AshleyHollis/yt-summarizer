@@ -1,11 +1,14 @@
 """YouTube service for fetching channel and video data using yt-dlp."""
 
 import asyncio
+from contextlib import asynccontextmanager, nullcontext
 from datetime import datetime
 from typing import Any
 
 try:
+    from shared.config import get_settings
     from shared.logging.config import get_logger
+    from shared.proxy import ProxyService
 except ImportError:
 
     def get_logger(name):
@@ -13,12 +16,39 @@ except ImportError:
 
         return logging.getLogger(name)
 
+    def get_settings():
+        return None
+
+    ProxyService = None  # type: ignore[assignment,misc]
+
 
 logger = get_logger(__name__)
 
 
 class YouTubeService:
-    """Service for fetching YouTube data using yt-dlp."""
+    """Service for fetching YouTube data using yt-dlp.
+
+    Proxy-aware: when a ProxyService is provided (and enabled), all yt-dlp
+    calls are routed through the Webshare rotating residential gateway.
+    """
+
+    def __init__(self, proxy_service: "ProxyService | None" = None) -> None:
+        """Initialize the YouTube service.
+
+        Args:
+            proxy_service: Optional ProxyService for proxy-backed yt-dlp calls.
+                           If None, a ProxyService is constructed from settings.
+        """
+        if proxy_service is not None:
+            self._proxy_service = proxy_service
+        elif get_settings is not None:
+            try:
+                settings = get_settings()
+                self._proxy_service = ProxyService(settings.proxy)
+            except Exception:
+                self._proxy_service = None
+        else:
+            self._proxy_service = None
 
     @staticmethod
     def parse_channel_url(url: str) -> dict[str, str | None]:
@@ -141,14 +171,22 @@ class YouTubeService:
             "playliststart": start_index,
             "playlistend": end_index,
             "ignoreerrors": True,
+            # Proxy routing — empty dict when proxy is disabled
+            **(self._proxy_service.get_ydl_opts() if self._proxy_service else {}),
         }
 
         try:
             loop = asyncio.get_event_loop()
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await loop.run_in_executor(
-                    None, lambda: ydl.extract_info(normalized_url, download=False)
-                )
+            ctx = (
+                self._proxy_service.log_request(service="api", operation="fetch_channel_videos")
+                if self._proxy_service
+                else nullcontext()
+            )
+            async with ctx:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = await loop.run_in_executor(
+                        None, lambda: ydl.extract_info(normalized_url, download=False)
+                    )
 
             if not info:
                 raise ValueError("Failed to extract channel information")
@@ -265,14 +303,24 @@ class YouTubeService:
             "extract_flat": True,
             "ignoreerrors": True,
             # No limit - get all videos
+            # Proxy routing — empty dict when proxy is disabled
+            **(self._proxy_service.get_ydl_opts() if self._proxy_service else {}),
         }
 
         try:
             loop = asyncio.get_event_loop()
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await loop.run_in_executor(
-                    None, lambda: ydl.extract_info(normalized_url, download=False)
+            ctx = (
+                self._proxy_service.log_request(
+                    service="api", operation="fetch_all_channel_video_ids"
                 )
+                if self._proxy_service
+                else nullcontext()
+            )
+            async with ctx:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = await loop.run_in_executor(
+                        None, lambda: ydl.extract_info(normalized_url, download=False)
+                    )
 
             if not info:
                 raise ValueError("Failed to extract channel information")
@@ -304,9 +352,9 @@ def get_youtube_service() -> YouTubeService:
     """Get the YouTube service singleton.
 
     Returns:
-        YouTubeService instance.
+        YouTubeService instance with proxy configured from application settings.
     """
     global _youtube_service
     if _youtube_service is None:
-        _youtube_service = YouTubeService()
+        _youtube_service = YouTubeService()  # ProxyService constructed from settings internally
     return _youtube_service

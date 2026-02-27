@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 try:
+    from shared.config import get_settings
     from shared.db.models import Batch, BatchItem, Channel, Job, Video
     from shared.logging.config import get_logger
+    from shared.proxy import ProxyService
     from shared.queue.client import TRANSCRIBE_QUEUE, get_queue_client
     from shared.telemetry.config import inject_trace_context
 except ImportError:
@@ -33,6 +35,11 @@ except ImportError:
 
     def inject_trace_context(message):
         return message
+
+    def get_settings():
+        raise NotImplementedError("Settings not available")
+
+    ProxyService = None  # type: ignore[assignment,misc]
 
 
 from ..models.batch import (
@@ -66,6 +73,8 @@ class BatchService:
         self.session = session
         self.channel_service = ChannelService(session)
         self.youtube_service = get_youtube_service()
+        settings = get_settings()
+        self._proxy_service = ProxyService(settings.proxy) if ProxyService is not None else None
 
     async def create_batch(
         self,
@@ -283,6 +292,7 @@ class BatchService:
             Dictionary with video metadata.
         """
         import asyncio
+        from contextlib import nullcontext
 
         import yt_dlp
 
@@ -291,23 +301,36 @@ class BatchService:
             youtube_video_id=youtube_video_id,
         )
 
-        ydl_opts = {
+        ydl_opts: dict = {
             "skip_download": True,
             "quiet": True,
             "no_warnings": True,
             "extract_flat": False,
         }
 
+        if self._proxy_service is not None:
+            ydl_opts.update(self._proxy_service.get_ydl_opts())
+
+        ctx = (
+            self._proxy_service.log_request(
+                url=f"https://www.youtube.com/watch?v={youtube_video_id}",
+                operation="batch_fetch_video_metadata",
+            )
+            if self._proxy_service is not None
+            else nullcontext()
+        )
+
         try:
             loop = asyncio.get_event_loop()
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await loop.run_in_executor(
-                    None,
-                    lambda: ydl.extract_info(
-                        f"https://www.youtube.com/watch?v={youtube_video_id}",
-                        download=False,
-                    ),
-                )
+            async with ctx:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = await loop.run_in_executor(
+                        None,
+                        lambda: ydl.extract_info(
+                            f"https://www.youtube.com/watch?v={youtube_video_id}",
+                            download=False,
+                        ),
+                    )
 
             # Parse upload date
             upload_date_str = info.get("upload_date")

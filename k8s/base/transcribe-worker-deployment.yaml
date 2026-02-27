@@ -55,6 +55,18 @@ spec:
                 secretKeyRef:
                   name: openai-credentials
                   key: api-key
+            - name: PROXY_ENABLED
+              value: "true"
+            - name: PROXY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-credentials
+                  key: username
+            - name: PROXY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-credentials
+                  key: password
           resources:
             requests:
               cpu: 100m

@@ -1,4 +1,4 @@
-# Agent Instructions (YT Summarizer)
+﻿# Agent Instructions (YT Summarizer)
 
 <purpose>
 Essential rules for AI coding assistants. Discover implementation details by reading files as needed.

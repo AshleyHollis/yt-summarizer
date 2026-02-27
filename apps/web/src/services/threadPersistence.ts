@@ -13,9 +13,6 @@
 
 import { getApiBaseUrl } from './runtimeConfig';
 
-// API base URL
-const API_BASE = getApiBaseUrl();
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -265,7 +262,7 @@ function serverDetailToClient(server: ServerThreadDetail): ChatThread {
  * Idempotent - safe to call multiple times
  */
 export async function fetchThreads(): Promise<ChatThread[]> {
-  const response = await fetch(`${API_BASE}/api/v1/threads`);
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads`);
   if (!response.ok) {
     throw new Error(`Failed to fetch threads: ${response.status}`);
   }
@@ -280,7 +277,7 @@ export async function fetchThreads(): Promise<ChatThread[]> {
  * Idempotent - safe to call multiple times
  */
 export async function fetchThread(threadId: string): Promise<{ thread: ChatThread; messages: ThreadMessage[] } | null> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/${threadId}`);
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Failed to fetch thread: ${response.status}`);
@@ -303,7 +300,7 @@ export async function createThread(
   scope?: QueryScope | null,
   aiSettings?: AISettings | null,
 ): Promise<ChatThread | null> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/messages`, {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages, title, scope, aiSettings }),
@@ -336,7 +333,7 @@ export async function saveMessages(
   scope?: QueryScope | null,
   aiSettings?: AISettings | null,
 ): Promise<boolean> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/${threadId}/messages`, {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}/messages`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages, title, scope, aiSettings }),
@@ -353,7 +350,7 @@ export async function updateThreadSettings(
   scope?: QueryScope | null,
   aiSettings?: AISettings | null,
 ): Promise<boolean> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/${threadId}/settings`, {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}/settings`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scope, aiSettings }),
@@ -366,7 +363,7 @@ export async function updateThreadSettings(
  * Idempotent - deleting non-existent thread returns success
  */
 export async function deleteThread(threadId: string): Promise<boolean> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/${threadId}`, {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}`, {
     method: "DELETE",
   });
   return response.ok || response.status === 404;
