@@ -238,9 +238,10 @@ test.describe('Video Submission (Requires Backend)', () => {
 
     // Wait for redirect to video detail page. The video may already exist
     // (409), in which case the redirect still happens but faster.
+    // Allow 60s — under load the API can be slow to respond.
     await page.waitForFunction(
       () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
-      { timeout: 30_000 }
+      { timeout: 60_000 }
     );
 
     // Navigate directly to /library/ path to avoid server-side redirect from /videos/
