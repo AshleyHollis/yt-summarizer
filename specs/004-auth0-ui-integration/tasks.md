@@ -177,8 +177,8 @@ This project uses web application structure:
 
 ### Implementation for FR-017 - Auth State Sync (UI ↔ API)
 
-- [ ] T074 [P] [US4] Create API client utility in apps/web/src/lib/api-client.ts that reads the Auth0 session access token and attaches it as a Bearer token to outgoing API requests. Must handle 401 responses from the API by triggering a session refresh or redirect to login. (Covers FR-017: sync user authentication state between UI and API layers)
-- [ ] T075 [P] [US4] Create unit test for API client token forwarding in apps/web/src/__tests__/lib/api-client.test.ts — mock the Auth0 session, verify token is attached to request headers, verify 401 triggers re-auth flow.
+- [X] T074 [P] [US4] Create API client utility in apps/web/src/lib/api-client.ts that reads the Auth0 session access token and attaches it as a Bearer token to outgoing API requests. Must handle 401 responses from the API by triggering a session refresh or redirect to login. (Covers FR-017: sync user authentication state between UI and API layers)
+- [X] T075 [P] [US4] Create unit test for API client token forwarding in apps/web/src/__tests__/lib/api-client.test.ts — mock the Auth0 session, verify token is attached to request headers, verify 401 triggers re-auth flow.
 
 ---
 

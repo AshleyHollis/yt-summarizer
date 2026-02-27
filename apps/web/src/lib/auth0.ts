@@ -44,6 +44,8 @@ export function isAuth0Configured(): boolean {
  * - AUTH0_CLIENT_SECRET
  * - AUTH0_BASE_URL (optional, inferred from request if not set)
  *
+ * Custom routes are configured to use /api/auth/* paths (matching existing UI components).
+ *
  * If configuration is invalid, returns null and logs a warning.
  */
 let _auth0Client: Auth0Client | null = null;
@@ -90,8 +92,14 @@ export async function getAuth0Client(): Promise<Auth0Client | null> {
     // This is the key fix - dynamic import prevents loading at module init time
     const { Auth0Client: Auth0ClientClass } = await import('@auth0/nextjs-auth0/server');
 
-    // Attempt to create client
-    _auth0Client = new Auth0ClientClass();
+    // Attempt to create client with custom routes matching existing /api/auth/* paths
+    _auth0Client = new Auth0ClientClass({
+      routes: {
+        login: '/api/auth/login',
+        logout: '/api/auth/logout',
+        callback: '/api/auth/callback',
+      },
+    });
     console.log('[Auth0] Authentication is ENABLED');
     return _auth0Client;
   } catch (error) {

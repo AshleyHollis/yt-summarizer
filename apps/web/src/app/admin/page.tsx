@@ -18,11 +18,24 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function AdminDashboard() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isAuthenticated, hasRole } = useAuth();
+  const router = useRouter();
+
+  // Client-side auth guard — defense in depth alongside the proxy layer.
+  // Redirects if the proxy did not (e.g. Auth0 not configured in dev, or direct fetch).
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated) {
+      router.replace('/login');
+    } else if (!hasRole('admin')) {
+      router.replace('/access-denied');
+    }
+  }, [isLoading, isAuthenticated, hasRole, router]);
 
   if (isLoading) {
     return (
@@ -31,6 +44,11 @@ export default function AdminDashboard() {
         <span className="ml-3 text-lg">Loading admin dashboard...</span>
       </div>
     );
+  }
+
+  // Render nothing while redirect is in flight (prevents content flash)
+  if (!isAuthenticated || !hasRole('admin')) {
+    return null;
   }
 
   return (
