@@ -254,6 +254,10 @@ export async function getSeededVideoId(): Promise<string | null> {
  * This eliminates CopilotKit URL oscillation interference, ERR_ABORTED
  * errors from page.reload(), and DOM-based detection fragility.
  *
+ * OPTIMIZATION: First checks if the video already has segments (meaning it
+ * was processed in a previous run). This avoids polling the job endpoint
+ * for 3 minutes when the video is already done.
+ *
  * @returns true if processing completed, false if timed out or failed.
  */
 export async function waitForVideoProcessingViaApi(
@@ -267,6 +271,30 @@ export async function waitForVideoProcessingViaApi(
   console.log(
     `[waitForVideoProcessingViaApi] Polling for video ${videoId} (timeout: ${timeout / 1000}s)`,
   );
+
+  // Quick check: see if the video already has segments (already processed).
+  // This covers the common case where the video was ingested in a prior run.
+  try {
+    const libraryResp = await fetch(
+      `${API_URL}/api/v1/library/videos/${videoId}`,
+    );
+    if (libraryResp.ok) {
+      const videoData = await libraryResp.json();
+      const segmentCount =
+        videoData.segment_count ??
+        videoData.segments?.length ??
+        videoData.total_segments ??
+        0;
+      if (segmentCount > 0) {
+        console.log(
+          `[waitForVideoProcessingViaApi] Video ${videoId} already has ${segmentCount} segments — skipping poll`,
+        );
+        return true;
+      }
+    }
+  } catch {
+    // Library endpoint unavailable — fall through to job polling
+  }
 
   while (Date.now() - startTime < timeout) {
     try {
@@ -288,6 +316,30 @@ export async function waitForVideoProcessingViaApi(
             `[waitForVideoProcessingViaApi] Video ${videoId} failed: ${JSON.stringify(data)}`,
           );
           return false;
+        }
+      } else if (response.status === 404) {
+        // No active job found. The video may have already been processed
+        // (job record expired/cleaned up). Check library again.
+        try {
+          const checkResp = await fetch(
+            `${API_URL}/api/v1/library/videos/${videoId}`,
+          );
+          if (checkResp.ok) {
+            const checkData = await checkResp.json();
+            const count =
+              checkData.segment_count ??
+              checkData.segments?.length ??
+              checkData.total_segments ??
+              0;
+            if (count > 0) {
+              console.log(
+                `[waitForVideoProcessingViaApi] Job 404 but video has ${count} segments — treating as done`,
+              );
+              return true;
+            }
+          }
+        } catch {
+          // Ignore — will retry on next poll
         }
       }
     } catch {

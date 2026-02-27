@@ -31,9 +31,9 @@ import {
 // Use a short, known video for faster processing in ingest tests
 const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
 // Maximum time to wait for video processing to complete
-const PROCESSING_TIMEOUT = 180_000; // 3 minutes
+const PROCESSING_TIMEOUT = 90_000; // 90s — video likely already processed from prior runs
 // Time to wait for copilot agent response
-const AGENT_RESPONSE_TIMEOUT = 120_000; // 2 minutes (generous for LLM cold start)
+const AGENT_RESPONSE_TIMEOUT = 60_000; // 60s — sufficient for warmed-up agent
 
 // =========================================================================
 // Ingest Journey Tests — These test the submit → process → query flow
@@ -46,9 +46,9 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   );
 
   test('complete journey: ingest video and query copilot', async ({ page }, testInfo) => {
-    // Budget: submit (30s) + processing poll API (180s) + copilot ready (60s) +
-    // agent response (120s) + assertions. Generous headroom for CI variability.
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 120_000);
+    // Budget: submit (30s) + processing poll API (90s) + copilot ready (15s) +
+    // agent response (60s) + assertions. Total ~210s with headroom.
+    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 60_000);
 
     // STEP 1: Submit a YouTube video
     console.log('Step 1: Navigating to add page...');
@@ -104,7 +104,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   });
 
   test('query copilot with specific video reference', async ({ page }, testInfo) => {
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 120_000);
+    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 60_000);
 
     // Submit video
     await page.goto('/add');
