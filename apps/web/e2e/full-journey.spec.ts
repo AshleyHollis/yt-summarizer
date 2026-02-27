@@ -365,4 +365,3 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
 /**
  * Extract the text content of the copilot's response.
  */
-
