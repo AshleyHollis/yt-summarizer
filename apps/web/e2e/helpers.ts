@@ -39,17 +39,20 @@ export async function waitForCopilotReady(page: Page): Promise<void> {
   // Wait for CopilotKit's initial handshake request to complete.
   // CopilotKit sends a POST to /api/copilotkit with 0 messages on mount.
   // We wait for this round-trip to finish, proving the agent is connected.
+  // Use a short timeout (10s) because the handshake fires within 1-3s of page
+  // load. If we miss it (already completed), we fall back to 3s which is enough
+  // since the input is already visible and the handshake is done.
   try {
     await page.waitForResponse(
       (resp) =>
         resp.url().includes("/api/copilotkit") && resp.status() === 200,
-      { timeout: 60_000 },
+      { timeout: 10_000 },
     );
   } catch {
-    // If the handshake already completed before we started listening, or if
-    // the endpoint returned a non-200 status, fall back to a short fixed wait.
-    // This is better than the old 8s wait because the common case is deterministic.
-    await page.waitForTimeout(5000);
+    // Handshake already completed before we started listening, or the endpoint
+    // returned a non-200 status. Since the input is already visible (checked
+    // above), CopilotKit is likely ready. A short wait covers edge cases.
+    await page.waitForTimeout(3000);
   }
 }
 
