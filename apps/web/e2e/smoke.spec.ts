@@ -20,9 +20,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Core User Flows @smoke', () => {
   test.describe('Navigation', () => {
     test('home page redirects to add page @smoke', async ({ page }) => {
-      // Global-setup's warmUpSwa() absorbs the SWA cold-start penalty,
-      // so this should be fast. Use a generous timeout as safety margin.
-      test.setTimeout(120_000);
+      // Triple timeout to 540s: SWA cold starts can consume 60-120s on first
+      // page.goto, leaving insufficient time for the redirect check.
+      test.slow();
 
       await page.goto('/', { timeout: 60_000 });
 

@@ -464,8 +464,11 @@ test.describe('Copilot Feature', () => {
       await page.click('button[title="New chat"]');
       await page.waitForTimeout(1000);
 
-      // Navigate back to the thread
-      await page.goto(`/add?chat=open&thread=${threadId}`);
+      // Navigate back to the thread.
+      // Use waitUntil:'commit' because CopilotKit URL oscillation (?thread=)
+      // can cause ERR_ABORTED if we wait for 'load' or 'domcontentloaded'.
+      await page.goto(`/add?chat=open&thread=${threadId}`, { waitUntil: 'commit' });
+      await page.waitForLoadState('domcontentloaded');
       await waitForCopilotReady(page);
 
       // Verify the thread loads and shows proper tool UI (not placeholder)
