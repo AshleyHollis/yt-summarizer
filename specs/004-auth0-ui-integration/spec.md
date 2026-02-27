@@ -129,14 +129,12 @@ Existing automated test suites (unit, integration, E2E) must continue to functio
 - **FR-004**: System MUST present both social login options AND username/password login on the login page
 - **FR-005**: System MUST distinguish between two user roles: "admin" and "normal user"
 - **FR-006**: System MUST store user role information in authentication provider user metadata
-- **FR-006a**: All authentication provider configuration MUST be managed via Infrastructure as Code (no manual configuration)
 - **FR-007**: System MUST protect admin-only routes and components from unauthorized access
 - **FR-008**: System MUST display appropriate UI elements based on user role (show/hide admin features)
 - **FR-009**: System MUST maintain user session state across page refreshes and navigation
 - **FR-010**: System MUST provide a sign-out mechanism that clears session and authentication tokens
 - **FR-011**: System MUST redirect unauthenticated users to login page when accessing protected routes
 - **FR-012**: System MUST create username/password test accounts in authentication provider for QA and automated testing
-- **FR-012a**: Test accounts MUST be provisioned automatically via Infrastructure as Code
 - **FR-013**: System MUST store test account credentials in secure credential storage with appropriate access policies
 - **FR-014**: Test credentials MUST include both admin and normal user accounts
 - **FR-015**: System MUST handle authentication errors gracefully with user-friendly messages for both social and username/password flows
@@ -145,8 +143,7 @@ Existing automated test suites (unit, integration, E2E) must continue to functio
 - **FR-016**: System MUST validate authentication tokens on protected API requests regardless of authentication method used
 - **FR-017**: System MUST sync user authentication state between UI and API layers
 - **FR-018**: System MUST allow automated tests to authenticate using username/password without social provider dependencies
-- **FR-019**: All authentication infrastructure configuration MUST be deployable via Infrastructure as Code with zero manual steps
-- **FR-020**: Role assignments for users MUST be configurable via Infrastructure as Code
+- **FR-019**: All authentication infrastructure configuration MUST be deployable via Infrastructure as Code with zero manual steps. This covers: (a) all auth provider application and connection configuration (formerly FR-006a), (b) all test account provisioning (formerly FR-012a), and (c) all role assignments for users (formerly FR-020).
 
 #### Testing & Quality Assurance
 - **FR-021**: All existing automated tests MUST continue to pass after authentication is implemented

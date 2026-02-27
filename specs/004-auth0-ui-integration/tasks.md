@@ -76,8 +76,8 @@ This project uses web application structure:
 - [X] T021 [P] [US1] Create LogoutButton component in apps/web/src/components/auth/LogoutButton.tsx
 - [X] T022 [US1] Create login page at apps/web/src/app/login/page.tsx
 - [X] T023 [US1] Add AuthProvider to root layout in apps/web/src/app/layout.tsx
-- [X] T024 [P] [US1] Configure Auth0 Google connection via Terraform in infra/terraform/modules/auth0/main.tf (Completed in T009)
-- [X] T025 [P] [US1] Configure Auth0 GitHub connection via Terraform in infra/terraform/modules/auth0/main.tf (Completed in T009)
+- [X] T024 [P] [US1] Configure Auth0 Google connection via Terraform in infra/terraform/modules/auth0/main.tf (Scope: `auth0_connection` resource of type `google-oauth2` with client credentials from Key Vault; completed as part of T009's connection support)
+- [X] T025 [P] [US1] Configure Auth0 GitHub connection via Terraform in infra/terraform/modules/auth0/main.tf (Scope: `auth0_connection` resource of type `github` with client credentials from Key Vault; completed as part of T009's connection support)
 
 ### E2E Tests for User Story 1
 
@@ -106,8 +106,8 @@ This project uses web application structure:
 - [X] T032 [P] [US2] Create admin dashboard page at apps/web/src/app/admin/page.tsx
 - [X] T033 [P] [US2] Create access denied page at apps/web/src/app/access-denied/page.tsx
 - [X] T034 [P] [US2] Add role-based navigation menu rendering in apps/web/src/components/Navbar.tsx
-- [X] T035 [US2] Create Auth0 Action for adding role claims to tokens in infra/terraform/modules/auth0/main.tf (Completed in T011)
-- [X] T036 [US2] Bind Action to post-login trigger in infra/terraform/modules/auth0/main.tf (Completed in T011)
+- [X] T035 [US2] Create Auth0 Action for adding role claims to tokens in infra/terraform/modules/auth0/main.tf (Scope: `auth0_action` resource with post-login trigger JS code that reads `app_metadata.role` and sets namespaced custom claims on ID and access tokens; completed as part of T011's actions support)
+- [X] T036 [US2] Bind Action to post-login trigger in infra/terraform/modules/auth0/main.tf (Scope: `auth0_trigger_actions` resource binding the role-claims Action to the `post-login` trigger flow; completed as part of T011's actions support)
 
 ### E2E Tests for User Story 2
 
@@ -133,7 +133,7 @@ This project uses web application structure:
 
 - [X] T041 [P] [US3] Create UsernamePasswordForm component in apps/web/src/components/auth/UsernamePasswordForm.tsx
 - [X] T042 [US3] Add username/password form to login page in apps/web/src/app/login/page.tsx
-- [X] T043 [US3] Create Auth0 database connection via Terraform in infra/terraform/modules/auth0/main.tf (Completed in T009)
+- [X] T043 [US3] Create Auth0 database connection via Terraform in infra/terraform/modules/auth0/main.tf (Scope: `auth0_connection` resource of type `auth0` (Username-Password-Authentication) enabling username/password login; completed as part of T009's connection support)
 - [X] T044 [P] [US3] Create admin test user with username/password in infra/terraform/environments/prod/auth0.tf
 - [X] T045 [P] [US3] Create normal test user with username/password in infra/terraform/environments/prod/auth0.tf
 - [X] T046 [P] [US3] Store admin test credentials in Azure Key Vault via Terraform in infra/terraform/environments/prod/auth0.tf

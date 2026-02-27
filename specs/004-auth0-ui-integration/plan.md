@@ -65,6 +65,8 @@ Integrate Auth0 authentication into the Next.js UI with role-based access contro
 
 **Result**: ✅ PASS - Auth0 is single source of truth for identity; provenance via logging.
 
+> **Identity boundary note**: This feature uses **Auth0** for end-user identity (login, roles, sessions). The existing project architecture table lists `Azure Entra ID` under Identity, which refers to **Managed Identity** for service-to-service authentication (API → Azure SQL, API → Key Vault). These coexist without conflict: Auth0 handles the browser-facing user auth plane; Entra ID handles the infrastructure/service auth plane. No code or configuration conflicts between the two.
+
 ---
 
 ### IV. Reliability & Operations ✅
@@ -217,11 +219,19 @@ apps/web/ (Next.js frontend)
 │       ├── lib/auth-utils.test.ts
 │       ├── components/auth/       # Auth component tests
 │       └── middleware.test.ts
-├── e2e/
-│   ├── auth-social-login.spec.ts
-│   ├── auth-session-persistence.spec.ts
-│   ├── auth-rbac.spec.ts
-│   └── playwright/.auth/          # Auth storage state files
+│   ├── e2e/
+│   │   ├── auth-social-login.spec.ts
+│   │   ├── auth-session-persistence.spec.ts
+│   │   ├── auth-signout.spec.ts
+│   │   ├── auth-username-password.spec.ts
+│   │   ├── auth-dual-login-methods.spec.ts
+│   │   ├── auth-unauthenticated-redirect.spec.ts
+│   │   ├── auth-protected-page.spec.ts
+│   │   ├── rbac-admin-access.spec.ts
+│   │   ├── rbac-normal-user-denied.spec.ts
+│   │   ├── rbac-navigation.spec.ts
+│   │   ├── auth.setup.ts              # Programmatic auth setup for tests
+│   │   └── playwright/.auth/          # Auth storage state files (empty placeholders; populated at runtime)
 └── playwright.config.ts
 
 services/api/ (Python backend - existing, no auth changes)
@@ -233,7 +243,8 @@ infra/terraform/
 ├── modules/auth0/
 │   └── main.tf                    # Extended with connections, users, actions
 └── environments/prod/
-    └── variables.tf               # Auth0 variables (social OAuth credentials)
+    ├── variables.tf               # Auth0 variables (social OAuth credentials)
+    └── auth0.tf                   # Auth0 user provisioning (test accounts) and Key Vault secret storage
 ```
 
 **Structure Decision**: Web application structure (frontend + backend). Auth is frontend-focused with Terraform infrastructure extensions. Backend API already has Auth0 JWT validation (no changes needed for this feature).
@@ -241,9 +252,9 @@ infra/terraform/
 ## Notes
 
 - **Phase 0 (Research)**: COMPLETE - See [research.md](./research.md) for technology decisions
-- **Phase 1 (Design)**: Next step - Generate data-model.md, contracts/, quickstart.md
-- **Phase 2 (Tasks)**: Already generated - See [tasks.md](./tasks.md) for 73 implementation tasks
-- **Agent Context**: After Phase 1, run `.specify/scripts/powershell/update-agent-context.ps1 -AgentType opencode` to add `@auth0/nextjs-auth0` to AI context
+- **Phase 1 (Design)**: COMPLETE - See [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md)
+- **Phase 2 (Tasks)**: COMPLETE - See [tasks.md](./tasks.md) for 75 implementation tasks (73 original + T074/T075 for FR-017)
+- **Agent Context**: Run `.specify/scripts/powershell/update-agent-context.ps1 -AgentType opencode` to sync AI context if needed
 
 ## Complexity Tracking
 

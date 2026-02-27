@@ -43,7 +43,7 @@ paths:
           description: Specific Auth0 connection to use (bypasses Universal Login)
           example: "google-oauth2"
       responses:
-        '302':
+        "302":
           description: Redirect to Auth0 login page
           headers:
             Location:
@@ -51,6 +51,20 @@ paths:
                 type: string
               description: Auth0 authorization URL
               example: "https://yt-summarizer.us.auth0.com/authorize?client_id=..."
+        "302 (error)":
+          description: Redirect back with OAuth error (e.g. access_denied)
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Redirect URL with error params
+              example: "/?error=access_denied&error_description=User+denied+access"
+        "500":
+          description: Internal server error initiating login
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/auth/logout:
     get:
@@ -70,7 +84,7 @@ paths:
           description: URL to redirect to after logout (must be in allowed logout URLs)
           example: "/"
       responses:
-        '302':
+        "302":
           description: Redirect to Auth0 logout endpoint
           headers:
             Location:
@@ -83,6 +97,12 @@ paths:
                 type: string
               description: Clears session cookie
               example: "appSession=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+        "500":
+          description: Internal server error initiating logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/auth/callback:
     get:
@@ -109,7 +129,7 @@ paths:
           description: CSRF protection state parameter
           example: "xyz789"
       responses:
-        '302':
+        "302":
           description: Redirect to application after session established
           headers:
             Location:
@@ -122,12 +142,12 @@ paths:
                 type: string
               description: Encrypted session cookie
               example: "appSession=eyJhbGc...; Path=/; HttpOnly; Secure; SameSite=Lax"
-        '400':
+        "400":
           description: Invalid authorization code or state
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: "invalid_request"
                 error_description: "Invalid authorization code"
@@ -144,18 +164,18 @@ paths:
       security:
         - sessionCookie: []
       responses:
-        '200':
+        "200":
           description: User session information
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserSession'
-        '401':
+                $ref: "#/components/schemas/UserSession"
+        "401":
           description: Not authenticated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               example:
                 error: "unauthorized"
                 error_description: "No active session"
