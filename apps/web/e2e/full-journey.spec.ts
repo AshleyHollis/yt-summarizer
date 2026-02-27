@@ -80,10 +80,11 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
 
     // STEP 2: Wait for processing via API. Since ZDa-Z5JzLYM is a seeded video,
     // it may already be processed under its seeded ID. If the API created a new
-    // entry (new UUID), workers need to process it — allow up to 180s.
+    // entry (new UUID), workers need to process it — allow up to 120s.
+    // Keep this short to leave enough time budget for the copilot query below.
     console.log('Step 2: Waiting for video processing via API...');
     if (videoId) {
-      const processingComplete = await waitForVideoProcessingViaApi(videoId, 180_000);
+      const processingComplete = await waitForVideoProcessingViaApi(videoId, 120_000);
       if (!processingComplete) {
         console.log('Step 2: Processing incomplete — continuing with seeded data');
       }

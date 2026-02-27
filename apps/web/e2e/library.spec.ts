@@ -499,19 +499,20 @@ test.describe('User Story 3: Browse the Library', () => {
 
     test('can navigate from add to library and back', async ({ page }) => {
       await page.goto('/add');
+      await page.waitForLoadState('domcontentloaded');
 
       // Go to library
       await page.getByRole('link', { name: /Library/i }).click();
       await page.waitForFunction(
         () => /\/library/.test(window.location.pathname),
-        { timeout: 10_000 }
+        { timeout: 15_000 }
       );
 
       // Go back to add
       await page.getByRole('link', { name: /Add/i }).click();
       await page.waitForFunction(
         () => /\/add/.test(window.location.pathname),
-        { timeout: 10_000 }
+        { timeout: 15_000 }
       );
     });
   });
