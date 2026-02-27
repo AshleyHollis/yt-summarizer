@@ -215,9 +215,11 @@ test.describe('Video Submission (Requires Backend)', () => {
 
     // Should redirect to video detail page after API call + 1500ms delay.
     // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling).
+    // Allow 90s — under load the API can be slow to respond, and the 1500ms
+    // setTimeout in SmartUrlInput fires after the API resolves.
     await page.waitForFunction(
       () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
-      { timeout: 60_000 }
+      { timeout: 90_000 }
     );
     await expect(page).toHaveURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/);
   });

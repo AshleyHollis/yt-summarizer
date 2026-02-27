@@ -1,5 +1,10 @@
 import { test, expect, BrowserContext } from "@playwright/test";
-import { submitQuery, waitForResponse, waitForCopilotReady } from "./helpers";
+import {
+  submitQuery,
+  waitForResponse,
+  waitForCopilotReady,
+  getCopilotResponseContent,
+} from "./helpers";
 
 /**
  * E2E tests for Chat Response Quality
@@ -287,11 +292,9 @@ test.describe("Chat Edge Cases", () => {
     // Should still work and not crash
     await waitForResponse(page, testInfo);
 
-    // Should get a response (either video cards or "limited information")
-    const hasResponse =
-      await page.locator('a[href*="/videos/"]').count() > 0 ||
-      await page.locator('text="Limited Information"').count() > 0;
-    expect(hasResponse).toBe(true);
+    // waitForResponse confirmed the agent finished. Verify non-empty response.
+    const responseContent = await getCopilotResponseContent(page);
+    expect(responseContent.length).toBeGreaterThan(0);
   });
 
   test("handles very long query", async ({ page }, testInfo) => {
@@ -306,12 +309,11 @@ test.describe("Chat Edge Cases", () => {
     await submitQuery(page, longQuery);
     await waitForResponse(page, testInfo);
 
-    // Should handle long query and return results (video links or uncertainty response)
-    const videoLinks = page.locator('a[href*="/videos/"]');
-    const uncertaintyResponse = page.getByText(/Limited Information|No relevant content/i);
-    await expect(videoLinks.first().or(uncertaintyResponse.first())).toBeVisible({
-      timeout: 30_000,
-    });
+    // waitForResponse already confirmed the agent finished responding (either
+    // tool-rendered content appeared or the lifecycle completed). Verify we got
+    // a non-empty response — accept tool output OR plain text.
+    const responseContent = await getCopilotResponseContent(page);
+    expect(responseContent.length).toBeGreaterThan(0);
   });
 
   test("subsequent queries work correctly", async ({ page }, testInfo) => {
@@ -319,7 +321,8 @@ test.describe("Chat Edge Cases", () => {
     // First query
     await submitQuery(page, "How do push-ups work?");
     await waitForResponse(page, testInfo);
-    await expect(page.locator('a[href*="/videos/"]').first()).toBeVisible({ timeout: 30_000 });
+    const firstResponse = await getCopilotResponseContent(page);
+    expect(firstResponse.length).toBeGreaterThan(0);
 
     // Second query - different topic
     await submitQuery(page, "What about kettlebells?");

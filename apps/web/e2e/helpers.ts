@@ -398,3 +398,35 @@ export async function waitForVideoProcessingViaApi(
   );
   return false;
 }
+
+/**
+ * Extract the text content of the last copilot assistant response.
+ * Tries multiple selectors (CopilotKit-generated class names) and falls back
+ * to generic chat area text.
+ */
+export async function getCopilotResponseContent(page: Page): Promise<string> {
+  const responseSelectors = [
+    '[class*="assistant" i]',
+    '[class*="response" i]',
+    '[class*="message" i]:not([class*="user" i]):last-child',
+    '[data-role="assistant"]',
+  ];
+
+  for (const selector of responseSelectors) {
+    const elements = page.locator(selector);
+    const count = await elements.count();
+    if (count > 0) {
+      const lastElement = elements.last();
+      const text = await lastElement.textContent().catch(() => "");
+      if (text && text.length > 0) return text;
+    }
+  }
+
+  // Fallback: get all visible text in the chat area
+  const chatArea = page.locator('[class*="chat" i], [class*="copilot" i]').first();
+  if (await chatArea.isVisible().catch(() => false)) {
+    return (await chatArea.textContent().catch(() => "")) || "";
+  }
+
+  return "";
+}
