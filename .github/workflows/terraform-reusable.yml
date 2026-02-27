@@ -136,7 +136,7 @@ jobs:
         uses: ./.github/actions/post-terraform-plan
         with:
           plan-summary: ${{ steps.plan.outputs.plan_summary }}
-          formatted-plan: 'unused'
+          plan-json-path: ${{ steps.plan.outputs.plan_json_path }}
           plan-outcome: ${{ steps.plan.outcome }}
           plan-output: ${{ steps.plan.outputs.plan_output }}
 
