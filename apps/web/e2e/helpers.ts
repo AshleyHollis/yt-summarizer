@@ -40,7 +40,7 @@ export async function waitForCopilotReady(page: Page): Promise<void> {
   // CopilotKit sends a POST to /api/copilotkit with 0 messages on mount.
   // We wait for this round-trip to finish, proving the agent is connected.
   // Use a short timeout (10s) because the handshake fires within 1-3s of page
-  // load. If we miss it (already completed), we fall back to 3s which is enough
+  // load. If we miss it (already completed), we fall back to 5s which is enough
   // since the input is already visible and the handshake is done.
   try {
     await page.waitForResponse(
@@ -52,8 +52,15 @@ export async function waitForCopilotReady(page: Page): Promise<void> {
     // Handshake already completed before we started listening, or the endpoint
     // returned a non-200 status. Since the input is already visible (checked
     // above), CopilotKit is likely ready. A short wait covers edge cases.
-    await page.waitForTimeout(3000);
   }
+
+  // IMPORTANT: Even after the handshake response arrives, CopilotKit needs
+  // time to process it and fully initialize its internal state (thread setup,
+  // tool registration, etc.). Without this buffer, messages sent immediately
+  // after handshake may be silently discarded or processed incorrectly.
+  // 5s is sufficient based on production observation (old fixed 8s wait minus
+  // typical 1-3s handshake time).
+  await page.waitForTimeout(5000);
 }
 
 /**
