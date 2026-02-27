@@ -73,7 +73,7 @@ const nextConfig: NextConfig = {
     // Testing hypothesis: Next.js might be validating rewrite destinations during startup
     // and hanging when backend URLs are unreachable in preview environments
 
-    // let backendUrl = process.env.API_URL || 'http://localhost:8000';
+    let backendUrl = process.env.API_URL || 'http://localhost:8000';
 
     // Attempt to load dynamically injected backend URL (for CI/CD previews)
     try {
