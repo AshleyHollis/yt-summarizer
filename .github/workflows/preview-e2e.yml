@@ -46,7 +46,11 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -106,8 +110,6 @@ jobs:
 
       - name: Run E2E tests
         uses: ./.github/actions/run-playwright-tests
-        with:
-          playwright-args: '--reporter=html,list'
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ inputs.environment_url }}

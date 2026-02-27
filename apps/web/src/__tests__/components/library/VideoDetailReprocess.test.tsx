@@ -144,7 +144,7 @@ describe('Video Detail Page - Reprocess Button', () => {
       // Wait for the page to load
       await waitFor(
         () => {
-          expect(screen.getByText('Test Video')).toBeInTheDocument();
+          expect(screen.getByText('Test Video Title')).toBeInTheDocument();
         },
         { timeout: 5000 }
       );
@@ -167,7 +167,7 @@ describe('Video Detail Page - Reprocess Button', () => {
 
       await waitFor(
         () => {
-          expect(screen.getByText('Test Video')).toBeInTheDocument();
+          expect(screen.getByText('Test Video Title')).toBeInTheDocument();
         },
         { timeout: 5000 }
       );
@@ -185,9 +185,6 @@ describe('Video Detail Page - Reprocess Button', () => {
           processing_status: 'failed',
           summary: null,
         })
-      );
-      vi.mocked(videoApi.reprocess).mockResolvedValue(
-        createMockSubmitVideoResponse({ video_id: 'test-video-id' })
       );
       vi.mocked(videoApi.reprocess).mockResolvedValue({
         video_id: 'test-video-id',
