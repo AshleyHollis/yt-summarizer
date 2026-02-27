@@ -176,11 +176,15 @@ test.describe('Video Submission (Requires Backend)', () => {
   // Skip unless USE_EXTERNAL_SERVER is set
   test.skip(() => !process.env.USE_EXTERNAL_SERVER, 'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire');
 
+  // Use a seeded video with verified auto-captions. dQw4w9WgXcQ (Rick Astley) has NO
+  // captions → transcription fails → processing never completes → redirect never happens.
+  const SUBMIT_VIDEO_URL = 'https://www.youtube.com/watch?v=ZDa-Z5JzLYM';
+
   test('submits video and shows loading state', async ({ page }) => {
     await page.goto('/add');
 
     const input = page.getByLabel(/YouTube URL/i);
-    await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    await input.fill(SUBMIT_VIDEO_URL);
 
     // Wait for button to change to "Process Video"
     const submitButton = page.getByRole('button', { name: /Process Video/i });
@@ -203,7 +207,7 @@ test.describe('Video Submission (Requires Backend)', () => {
     await page.goto('/add');
 
     const input = page.getByLabel(/YouTube URL/i);
-    await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    await input.fill(SUBMIT_VIDEO_URL);
 
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await expect(submitButton).toBeEnabled();
@@ -224,7 +228,7 @@ test.describe('Video Submission (Requires Backend)', () => {
     await page.waitForLoadState('domcontentloaded');
 
     const input = page.getByLabel(/YouTube URL/i);
-    await input.fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    await input.fill(SUBMIT_VIDEO_URL);
 
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await expect(submitButton).toBeEnabled();

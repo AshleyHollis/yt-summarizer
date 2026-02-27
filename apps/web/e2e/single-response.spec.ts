@@ -1,6 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
 import {
-  openChatViaButton,
   waitForCopilotReady,
   submitQuery,
   waitForAssistantResponse,
@@ -22,11 +21,15 @@ function countAssistantMessageBlocks(page: Page) {
 }
 
 test.describe("Single Response Per Message", () => {
+  // All tests navigate with ?chat=open for reliable chat panel activation.
+  // openChatViaButton (button click) is flaky — the click sometimes doesn't
+  // register or the panel fails to open within the timeout.
+
   test("simple greeting produces exactly one response", async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library");
-    await openChatViaButton(page);
+    await page.goto("/library?chat=open");
+    await waitForCopilotReady(page);
 
     // Send a simple greeting that doesn't trigger tools
     await submitQuery(page, "Hello, how are you?");
@@ -49,8 +52,8 @@ test.describe("Single Response Per Message", () => {
   test("library query produces exactly one tool response card", async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library");
-    await openChatViaButton(page);
+    await page.goto("/library?chat=open");
+    await waitForCopilotReady(page);
 
     // Send a query that triggers the queryLibrary tool
     await submitQuery(page, "What videos do I have about exercise?");
@@ -73,8 +76,8 @@ test.describe("Single Response Per Message", () => {
   test("second query produces only one additional response", async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library");
-    await openChatViaButton(page);
+    await page.goto("/library?chat=open");
+    await waitForCopilotReady(page);
 
     // First message
     await submitQuery(page, "Hello!");

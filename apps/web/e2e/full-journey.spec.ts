@@ -28,12 +28,12 @@ import {
  * - Global-setup has seeded videos and warmed up SWA + CopilotKit agent
  */
 
-// Use a short, known video for faster processing in ingest tests
-const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+// Use a seeded video that has auto-captions and is already processed by global-setup.
+// dQw4w9WgXcQ (Rick Astley) has NO captions → transcription fails → all ingest tests fail.
+// ZDa-Z5JzLYM (Corey Schafer - Python OOP) is in the seed list with verified captions.
+const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=ZDa-Z5JzLYM';
 // Maximum time to wait for video processing to complete
-const PROCESSING_TIMEOUT = 90_000; // 90s — video likely already processed from prior runs
-// Time to wait for copilot agent response
-const AGENT_RESPONSE_TIMEOUT = 60_000; // 60s — sufficient for warmed-up agent
+const PROCESSING_TIMEOUT = 90_000; // 90s — video likely already processed from global-setup
 
 // =========================================================================
 // Ingest Journey Tests — These test the submit → process → query flow
@@ -48,7 +48,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   test('complete journey: ingest video and query copilot', async ({ page }, testInfo) => {
     // Budget: submit (30s) + processing poll API (90s) + copilot ready (15s) +
     // agent response (60s) + assertions. Total ~210s with headroom.
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 60_000);
+    test.slow(); // Triple timeout to 540s — covers submit + poll + LLM
 
     // STEP 1: Submit a YouTube video
     console.log('Step 1: Navigating to add page...');
@@ -104,7 +104,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   });
 
   test('query copilot with specific video reference', async ({ page }, testInfo) => {
-    test.setTimeout(PROCESSING_TIMEOUT + AGENT_RESPONSE_TIMEOUT + 60_000);
+    test.slow(); // Triple timeout to 540s — covers submit + poll + LLM
 
     // Submit video
     await page.goto('/add');
@@ -147,7 +147,7 @@ test.describe('Copilot Behavior: Response Quality', () => {
   );
 
   test('copilot handles empty library gracefully', async ({ page }, testInfo) => {
-    test.setTimeout(AGENT_RESPONSE_TIMEOUT + 60_000);
+    test.slow(); // LLM call: triple timeout to 540s
 
     await page.goto('/library?chat=open');
     await waitForCopilotReady(page);
@@ -176,7 +176,7 @@ test.describe('Copilot Behavior: Response Quality', () => {
   });
 
   test('copilot searches proactively instead of asking for clarification', async ({ page }, testInfo) => {
-    test.setTimeout(AGENT_RESPONSE_TIMEOUT + 60_000);
+    test.slow(); // LLM call: triple timeout to 540s
 
     await page.goto('/library?chat=open');
     await waitForCopilotReady(page);
@@ -248,7 +248,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
 
   test('agent response includes citation elements when video is ingested', async ({ page }, testInfo) => {
     test.skip(!seededVideoId, 'No processed videos available from global-setup');
-    test.setTimeout(AGENT_RESPONSE_TIMEOUT + 60_000);
+    test.slow(); // LLM call with vector search: triple timeout to 540s
 
     await page.goto('/library?chat=open');
     await waitForCopilotReady(page);
@@ -270,7 +270,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
 
   test('agent references specific video content when asked about it', async ({ page }, testInfo) => {
     test.skip(!seededVideoId, 'No processed videos available from global-setup');
-    test.setTimeout(AGENT_RESPONSE_TIMEOUT + 60_000);
+    test.slow(); // LLM call with vector search: triple timeout to 540s
 
     await page.goto('/library?chat=open');
     await waitForCopilotReady(page);
@@ -284,7 +284,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
 
   test('copilot response includes timestamp links when available', async ({ page }, testInfo) => {
     test.skip(!seededVideoId, 'No processed videos available from global-setup');
-    test.setTimeout(AGENT_RESPONSE_TIMEOUT + 60_000);
+    test.slow(); // LLM call with vector search: triple timeout to 540s
 
     await page.goto('/library?chat=open');
     await waitForCopilotReady(page);
@@ -312,7 +312,7 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   });
 
   test('agent uses search tools before answering factual questions', async ({ request }) => {
-    test.setTimeout(AGENT_RESPONSE_TIMEOUT + 60_000);
+    test.slow(); // API calls may be slow
 
     const API_URL = getApiUrl();
     const healthCheck = await request.get(`${API_URL}/health`).catch(() => null);
