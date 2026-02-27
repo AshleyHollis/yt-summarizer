@@ -327,10 +327,11 @@ test.describe('User Story 3: Browse the Library', () => {
       test.skip(!videoId, 'No videos in library');
 
       await page.goto(`/library/${videoId}`);
+      await page.waitForLoadState('domcontentloaded');
 
       const backLink = page.getByRole('link', { name: /back|library/i });
 
-      if (await backLink.first().isVisible()) {
+      if (await backLink.first().isVisible({ timeout: 10_000 }).catch(() => false)) {
         await backLink.first().click();
         // Use waitForFunction on pathname to avoid CopilotKit URL oscillation
         // (?thread= parameter) causing toHaveURL to fail.

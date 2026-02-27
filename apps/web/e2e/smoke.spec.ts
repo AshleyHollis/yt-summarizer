@@ -202,8 +202,9 @@ test.describe('Video Submission (Requires Backend)', () => {
   });
 
   test('submits video and redirects to video detail page', async ({ page }) => {
-    // Global-setup warms up both SWA and API, so cold start is absorbed.
-    test.setTimeout(120_000);
+    // Generous timeout: SWA cold start on page.goto can consume 30-60s,
+    // plus API call + 1500ms redirect delay.
+    test.setTimeout(180_000);
     await page.goto('/add');
 
     const input = page.getByLabel(/YouTube URL/i);
