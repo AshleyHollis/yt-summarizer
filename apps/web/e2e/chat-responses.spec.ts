@@ -38,7 +38,8 @@ test.describe("Chat Response Quality", () => {
   test.beforeEach(async ({ browser }) => {
     context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     page = await context.newPage();
-    await page.goto("/library?chat=open");
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
     await waitForCopilotReady(page);
   });
 
@@ -257,7 +258,9 @@ test.describe("Chat Edge Cases", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // Navigate with chat=open to have the sidebar open by default
-    await page.goto("/library?chat=open");
+    // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
     await waitForCopilotReady(page);
   });
 

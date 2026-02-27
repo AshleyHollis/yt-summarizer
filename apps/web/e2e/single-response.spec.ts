@@ -28,7 +28,8 @@ test.describe("Single Response Per Message", () => {
   test("simple greeting produces exactly one response", async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library?chat=open");
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
     await waitForCopilotReady(page);
 
     // Send a simple greeting that doesn't trigger tools
@@ -52,7 +53,8 @@ test.describe("Single Response Per Message", () => {
   test("library query produces exactly one tool response card", async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library?chat=open");
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
     await waitForCopilotReady(page);
 
     // Send a query that triggers the queryLibrary tool
@@ -76,7 +78,8 @@ test.describe("Single Response Per Message", () => {
   test("second query produces only one additional response", async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library?chat=open");
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
     await waitForCopilotReady(page);
 
     // First message
@@ -102,7 +105,8 @@ test.describe("Single Response Per Message", () => {
   test("tool result renders exactly once with all components", async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library?chat=open");
+    await page.goto("/library?chat=open", { waitUntil: "commit" });
+    await page.waitForLoadState("domcontentloaded");
     await waitForCopilotReady(page);
 
     // Send query

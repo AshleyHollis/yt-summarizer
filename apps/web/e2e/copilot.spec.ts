@@ -67,7 +67,8 @@ test.describe('Copilot Feature', () => {
   test.describe('Query Interface', () => {
     test.beforeEach(async ({ page }) => {
       // Navigate with chat=open to have the sidebar open by default
-      await page.goto('/library?chat=open');
+      // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
+      await page.goto('/library?chat=open', { waitUntil: 'commit' });
       await page.waitForLoadState('domcontentloaded');
     });
 
@@ -100,7 +101,8 @@ test.describe('Copilot Feature', () => {
   test.describe('Scope Filtering', () => {
     test.beforeEach(async ({ page }) => {
       // Navigate with chat=open to have the sidebar open by default
-      await page.goto('/library?chat=open');
+      // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
+      await page.goto('/library?chat=open', { waitUntil: 'commit' });
       await page.waitForLoadState('domcontentloaded');
     });
 
@@ -258,7 +260,8 @@ test.describe('Copilot Feature', () => {
     test.beforeEach(async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 720 });
       // Navigate with chat=open to have the sidebar open by default
-      await page.goto('/library?chat=open');
+      // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
+      await page.goto('/library?chat=open', { waitUntil: 'commit' });
       await waitForCopilotReady(page);
     });
 
@@ -367,7 +370,9 @@ test.describe('Copilot Feature', () => {
     test('creates thread with proper message structure when sending query', async ({ page, request }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       // Navigate to add page with chat open
-      await page.goto('/add?chat=open');
+      // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
+      await page.goto('/add?chat=open', { waitUntil: 'commit' });
+      await page.waitForLoadState('domcontentloaded');
       await waitForCopilotReady(page);
 
       // Send a message that triggers the queryLibrary tool
@@ -440,7 +445,9 @@ test.describe('Copilot Feature', () => {
     test('thread renders tool call UI correctly when reopened', async ({ page }, testInfo) => {
       test.slow(); // LLM call - needs extra time
       // First, create a new thread
-      await page.goto('/add?chat=open');
+      // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
+      await page.goto('/add?chat=open', { waitUntil: 'commit' });
+      await page.waitForLoadState('domcontentloaded');
       await waitForCopilotReady(page);
 
       // Send query

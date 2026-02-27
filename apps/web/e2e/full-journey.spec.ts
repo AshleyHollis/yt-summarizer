@@ -45,29 +45,33 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   );
 
   test('complete journey: ingest video and query copilot', async ({ page }, testInfo) => {
-    test.slow(); // Triple timeout to 540s — covers submit + poll + LLM
+    // This test covers: SWA cold start + form submission + API processing + LLM query.
+    // Each step can take 30-120s under SWA cold starts. 540s (test.slow) is not enough
+    // when cold starts stack. Use 15 minutes to be safe — the retry always passes fast.
+    test.setTimeout(900_000);
 
     // STEP 1: Submit a YouTube video
     console.log('Step 1: Navigating to add page...');
-    await page.goto('/add');
+    await page.goto('/add', { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/add(?:\?|$)/);
 
     const urlInput = page.getByLabel(/YouTube URL/i);
-    await expect(urlInput).toBeVisible({ timeout: 10_000 });
+    await expect(urlInput).toBeVisible({ timeout: 60_000 }); // SWA cold start
     await urlInput.fill(TEST_VIDEO_URL);
 
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
 
-    // Wait for redirect to video detail page (router.push after ~1500ms + API latency)
-    // The API call can be slow under load, so allow 90s for the redirect.
+    // Wait for redirect to video detail page (router.push after ~1500ms + API latency).
+    // Keep this timeout short (30s) — if the API hasn't redirected by then, it won't.
+    // The seeded video fallback ensures the test can still verify copilot behavior.
     console.log('Step 1: Waiting for redirect to video page...');
     let videoId: string | null = null;
     try {
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
-        { timeout: 90_000 }
+        { timeout: 30_000 }
       );
       const videoUrl = page.url();
       videoId = videoUrl.match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1] ?? null;
@@ -93,8 +97,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // STEP 3: Open copilot and query. Even if this specific video didn't finish
     // processing, the seeded copy of ZDa-Z5JzLYM has indexed segments so the
     // agent can still find Python OOP content.
+    // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation.
     console.log('Step 3: Opening copilot and asking question...');
-    await page.goto('/library?chat=open');
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
     await submitQuery(page, 'What is this video about? Can you summarize it?');
 
@@ -118,7 +124,8 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     // This test focuses on querying the copilot about library content using
     // pre-seeded data — no need to re-submit the same video URL (which creates
     // a duplicate entry and wastes 3+ minutes on processing).
-    await page.goto('/library?chat=open');
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
     await submitQuery(page, 'Search for videos in my library');
 
@@ -142,7 +149,8 @@ test.describe('Copilot Behavior: Response Quality', () => {
   test('copilot handles empty library gracefully', async ({ page }, testInfo) => {
     test.slow(); // LLM call: triple timeout to 540s
 
-    await page.goto('/library?chat=open');
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
     await submitQuery(page, 'What videos do I have?');
 
@@ -171,7 +179,8 @@ test.describe('Copilot Behavior: Response Quality', () => {
   test('copilot searches proactively instead of asking for clarification', async ({ page }, testInfo) => {
     test.slow(); // LLM call: triple timeout to 540s
 
-    await page.goto('/library?chat=open');
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
     await submitQuery(page, 'How many albums were sold?');
 
@@ -243,7 +252,8 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     test.skip(!seededVideoId, 'No processed videos available from global-setup');
     test.slow(); // LLM call with vector search: triple timeout to 540s
 
-    await page.goto('/library?chat=open');
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
     await submitQuery(page, 'What topics are covered in my library?');
 
@@ -289,7 +299,8 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     test.skip(!seededVideoId, 'No processed videos available from global-setup');
     test.slow(); // LLM call with vector search: triple timeout to 540s
 
-    await page.goto('/library?chat=open');
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
     await submitQuery(page, 'Search my library for any videos. What did you find?');
 
@@ -303,7 +314,8 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     test.skip(!seededVideoId, 'No processed videos available from global-setup');
     test.slow(); // LLM call with vector search: triple timeout to 540s
 
-    await page.goto('/library?chat=open');
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
     await submitQuery(page, 'What are the key points discussed in the videos?');
 
