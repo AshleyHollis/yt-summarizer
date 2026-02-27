@@ -372,32 +372,11 @@ export function useThreadPersistence({
         // Allow a brief moment for state to propagate, then allow saving again
         setTimeout(() => setIsRestoringSettings(false), 100);
       })
-      .catch((err) => {
-        console.error('Failed to load thread:', err);
+      .catch(err => {
+        console.error("Failed to load thread:", err);
         setMessages([]);
         setIsRestoringSettings(false);
-        return;
-      }
-
-      setMessages(result.messages);
-      saveStateRef.current.lastHash = computeMessageHash(result.messages);
-      saveStateRef.current.lastCount = result.messages.length;
-
-      // Restore scope and AI settings from the thread
-      if (result.thread.scope && setScope) {
-        setScope(result.thread.scope);
-      }
-      if (result.thread.aiSettings && setAISettings) {
-        setAISettings(result.thread.aiSettings);
-      }
-
-      // Allow a brief moment for state to propagate, then allow saving again
-      setTimeout(() => setIsRestoringSettings(false), 100);
-    }).catch(err => {
-      console.error("Failed to load thread:", err);
-      setMessages([]);
-      setIsRestoringSettings(false);
-    });
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeThreadId, state.isLoading, setMessages, setScope, setAISettings]);
 
