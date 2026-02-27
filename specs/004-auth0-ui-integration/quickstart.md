@@ -110,16 +110,18 @@ If you want a separate development tenant:
 
 ---
 
-## Step 3: Configure Social Connections (Optional)
+## Step 3: Configure Social Connections (Required for Production)
 
-To enable Google and GitHub login:
+> ⚠️ **DEVELOPMENT ONLY** — The manual steps below bypass the IaC mandate. For the shared production tenant, all social connections MUST be configured via Terraform (`infra/terraform/modules/auth0/`). Never manually configure the production tenant.
+
+To enable Google and GitHub login in a **personal development tenant only**:
 
 ### Google OAuth
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select existing
-3. Enable "Google+ API"
-4. Create OAuth 2.0 credentials:
+3. Go to APIs & Services → OAuth consent screen; configure scopes (`email`, `profile`)
+4. Create OAuth 2.0 credentials (Web application type):
    - **Authorized redirect URIs**: `https://YOUR-TENANT.us.auth0.com/login/callback`
 5. Copy Client ID and Client Secret
 6. In Auth0 Dashboard → Authentication → Social:
@@ -169,12 +171,14 @@ Passwords are randomly generated and stored in Azure Key Vault.
 
 ### Option B: Create Manually (Development)
 
+> ⚠️ **DEVELOPMENT ONLY** — This bypasses the IaC mandate. Only use this for personal development tenants. Never manually create users in the production tenant.
+
 For development tenants, create test users manually:
 
 1. In Auth0 Dashboard → User Management → Users
 2. Click "Create User"
 3. Fill in:
-   - **Email**: `admin@test.local`
+   - **Email**: `admin@test.yt-summarizer.internal`
    - **Password**: (choose secure password)
    - **Connection**: "Username-Password-Authentication"
 4. Click "Create"
@@ -187,12 +191,14 @@ For development tenants, create test users manually:
 6. Save
 
 Repeat for normal user:
-- **Email**: `user@test.local`
-- **App Metadata**: `{"role": "user"}`
+- **Email**: `user@test.yt-summarizer.internal`
+- **App Metadata**: `{"role": "normal"}`
 
 ---
 
 ## Step 5: Configure Auth0 Actions (Role Claims)
+
+> ⚠️ **DEVELOPMENT ONLY** — Actions are configured via Terraform (`infra/terraform/modules/auth0/main.tf`) for the production tenant. Only follow these manual steps for a personal development tenant.
 
 This step adds role information to the ID token so the app can enforce RBAC.
 

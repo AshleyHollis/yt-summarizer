@@ -163,7 +163,7 @@ if role != 'admin':
 
 | Field | Type | Required | Description | Example |
 |-------|------|----------|-------------|---------|
-| `email` | string | Yes | Test account email | `"admin@test.yt-summarizer.com"` |
+| `email` | string | Yes | Test account email | `"admin@test.yt-summarizer.internal"` |
 | `password` | string | Yes | Securely generated password | (stored in Key Vault) |
 | `role` | string | Yes | Account role (admin or normal) | `"admin"` |
 | `key_vault_secret_name` | string | Yes | Key Vault secret reference | `"auth0-test-admin-password"` |

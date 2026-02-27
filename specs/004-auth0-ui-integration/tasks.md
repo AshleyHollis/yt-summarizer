@@ -102,7 +102,7 @@ This project uses web application structure:
 
 ### Implementation for User Story 2
 
-- [X] T031 [US2] Implement route protection middleware in apps/web/src/middleware.ts
+- [X] T031 [US2] Implement route protection middleware in apps/web/src/proxy.ts (Next.js 16 proxy file)
 - [X] T032 [P] [US2] Create admin dashboard page at apps/web/src/app/admin/page.tsx
 - [X] T033 [P] [US2] Create access denied page at apps/web/src/app/access-denied/page.tsx
 - [X] T034 [P] [US2] Add role-based navigation menu rendering in apps/web/src/components/Navbar.tsx
@@ -158,8 +158,8 @@ This project uses web application structure:
 
 - [X] T050 [US4] Configure Playwright programmatic authentication in apps/web/playwright/auth.setup.ts
 - [X] T051 [US4] Update Playwright config to use auth setup project in apps/web/playwright.config.ts
-- [ ] T052 [P] [US4] Create admin user auth state fixture in apps/web/playwright/.auth/admin.json
-- [ ] T053 [P] [US4] Create normal user auth state fixture in apps/web/playwright/.auth/user.json
+- [X] T052 [P] [US4] Create admin user auth state placeholder in apps/web/playwright/.auth/admin.json (empty `{"cookies":[],"origins":[]}` — populated at runtime by T050 auth.setup.ts)
+- [X] T053 [P] [US4] Create normal user auth state placeholder in apps/web/playwright/.auth/user.json (empty `{"cookies":[],"origins":[]}` — populated at runtime by T050 auth.setup.ts)
 - [X] T054 [US4] Update existing E2E tests to use auth state where needed in apps/web/e2e/
 - [X] T055 [US4] Add GitHub Actions step to retrieve test credentials from Azure Key Vault in .github/workflows/
 
@@ -174,6 +174,11 @@ This project uses web application structure:
 - [X] T059 [P] [US4] Create E2E test for authenticated user accessing protected page in apps/web/e2e/auth-protected-page.spec.ts
 
 **Checkpoint**: All automated tests pass (100% pass rate required per Constitution VI.10)
+
+### Implementation for FR-017 - Auth State Sync (UI ↔ API)
+
+- [ ] T074 [P] [US4] Create API client utility in apps/web/src/lib/api-client.ts that reads the Auth0 session access token and attaches it as a Bearer token to outgoing API requests. Must handle 401 responses from the API by triggering a session refresh or redirect to login. (Covers FR-017: sync user authentication state between UI and API layers)
+- [ ] T075 [P] [US4] Create unit test for API client token forwarding in apps/web/src/__tests__/lib/api-client.test.ts — mock the Auth0 session, verify token is attached to request headers, verify 401 triggers re-auth flow.
 
 ---
 

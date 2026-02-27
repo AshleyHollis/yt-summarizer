@@ -1,6 +1,6 @@
 # Feature Specification: Auth0 UI Integration with Role-Based Access
 
-**Feature Branch**: `001-auth0-ui-integration`  
+**Feature Branch**: `004-auth0-ui-integration`  
 **Created**: 2026-01-19  
 **Status**: Draft  
 **Input**: User description: "We've implemented Auth0 auth on the API. We now need to implement it E2E in the UI. There needs to be admin users and normal users. I want to use social logins so I don't have to store credentials. We will need to figure out a strategy to enable testers and AI to test/access the app so we will need test accounts. Test account credentials should be stored in Azure Key Vault so we can retrieve them later."
@@ -96,9 +96,9 @@ Existing automated test suites (unit, integration, E2E) must continue to functio
 ### Edge Cases
 
 #### Authentication & Security
-- What happens when a user's social provider account is deleted or suspended after they've created an account in the application?
+- **Social provider account deleted or suspended**: Auth0 will return an authentication error; system displays a graceful error message on the login page informing the user their social account is unavailable and prompts them to try an alternative login method (see FR-015b).
 - **OAuth consent denial or provider errors**: System displays inline error message on login page with retry button and option to choose different login method (see FR-015b)
-- What happens when a user's role is changed while they have an active session?
+- **Role changed while user has an active session**: The stale role persists until the user's session token is refreshed or expires (up to 24 hours). Role changes take effect on the next session. This is an accepted limitation of JWT-based auth with long-lived tokens; administrators should inform affected users to sign out and back in for immediate effect.
 - How does the system handle expired or invalid authentication tokens?
 - **Session expiration during active use**: System redirects to login with "Session expired" message and preserves intended destination URL for post-login redirect (see FR-015a)
 - What happens when secure credential storage is unavailable and test credentials cannot be retrieved?

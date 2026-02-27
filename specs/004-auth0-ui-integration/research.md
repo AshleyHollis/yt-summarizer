@@ -113,7 +113,7 @@ resource "random_password" "test_user" {
 
 resource "auth0_user" "test_admin" {
   connection_name = auth0_connection.database.name
-  email = "admin@test.example.com"
+  email = "admin@test.yt-summarizer.internal"
   password = random_password.test_user.result
   email_verified = true
   app_metadata = jsonencode({ role = "admin" })
@@ -176,7 +176,7 @@ projects: [
 
 **Test Account Strategy**:
 - Use database connection (Username-Password-Authentication)
-- Enable Resource Owner Password Grant in Auth0 Dashboard
+- Authenticate via UI-based login form (Auth0 Free tier compatible — no special grant configuration required)
 - Store credentials in environment variables (GitHub Secrets in CI)
 - Create 2 personas: admin and normal user
 
@@ -186,7 +186,7 @@ projects: [
 - Use conditional authentication for unauthenticated flows
 
 **Alternatives Considered**:
-- **UI-based OAuth flow**: Too slow, flaky redirects
+- **Resource Owner Password Grant (ROPG)**: Requires enabling ROPG in Auth0 Dashboard — a manual step that violates FR-019 (zero manual steps). Requires Auth0 paid tier for passwordless. Rejected.
 - **Mock authentication**: Doesn't test real Auth0 integration
 - **Per-test authentication**: Violates performance constraint
 
@@ -397,7 +397,7 @@ Google/GitHub Developer Console
 
 #### VI.5 Onboarding
 **Decision**: README with architecture diagram, setup guide, usage examples (Phase 1 deliverable)
-- ✅ **README per module**: `specs/001-auth0-ui-integration/quickstart.md` will serve as module README
+- ✅ **README per module**: `specs/004-auth0-ui-integration/quickstart.md` will serve as module README
 - ✅ **Clear examples**: Login component usage, `useAuth` hook examples, role check patterns
 - ✅ **Architecture diagrams**: OAuth flow, token claim injection, session management
 - ✅ **Walkthrough comments**: OAuth redirect flow, refresh token rotation, role claim extraction
