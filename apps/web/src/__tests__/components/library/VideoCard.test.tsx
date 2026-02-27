@@ -39,7 +39,7 @@ describe('VideoCard', () => {
     title: 'Test Video Title',
     channel_id: '123e4567-e89b-12d3-a456-426614174001',
     channel_name: 'Test Channel',
-    channel_thumbnail_url: null,
+    channel_thumbnail_url: 'https://example.com/channel-thumb.jpg',
     duration: 215,
     publish_date: '2024-01-15T10:30:00Z',
     thumbnail_url: 'https://example.com/thumbnail.jpg',

@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Debug page to show build-time environment variables
  * This helps diagnose issues with environment variable injection in deployments
@@ -12,6 +14,7 @@ export default function DebugPage() {
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
     NODE_ENV: process.env.NODE_ENV,
   };
+  const runtimeConfig = typeof window !== 'undefined' ? window.__RUNTIME_CONFIG__ : undefined;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
@@ -59,6 +62,14 @@ export default function DebugPage() {
                 {typeof window !== 'undefined' ? window.location.origin : 'N/A (SSR)'}
               </span>
             </div>
+            <div className="flex gap-4">
+              <span className="font-bold text-blue-600 dark:text-blue-400 min-w-[300px]">
+                window.__RUNTIME_CONFIG__.apiUrl:
+              </span>
+              <span className="text-gray-800 dark:text-gray-200 break-all">
+                {runtimeConfig?.apiUrl || '<empty string>'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -72,7 +83,7 @@ export default function DebugPage() {
                 Expected API Base URL (client):
               </span>
               <span className="text-gray-800 dark:text-gray-200 break-all">
-                {process.env.NEXT_PUBLIC_API_URL || '<empty - will use relative URLs>'}
+                {runtimeConfig?.apiUrl || process.env.NEXT_PUBLIC_API_URL || '<empty string>'}
               </span>
             </div>
             <div className="flex gap-4">
@@ -80,7 +91,7 @@ export default function DebugPage() {
                 Expected CopilotKit URL:
               </span>
               <span className="text-gray-800 dark:text-gray-200 break-all">
-                {`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/copilotkit`}
+                {`${runtimeConfig?.apiUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/copilotkit`}
               </span>
             </div>
           </div>
@@ -92,11 +103,9 @@ export default function DebugPage() {
           </h3>
           <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
             <li>NEXT_PUBLIC_ variables are baked into the build at build time</li>
-            <li>Empty API URL means the app will use relative paths (not what we want for SWA)</li>
+            <li>runtime-config.js is applied at deploy time to set the API URL per environment</li>
             <li>Check the build logs to see what values were set during npm run build</li>
-            <li>
-              If values are empty here but were set in CI, the build may not be using them correctly
-            </li>
+            <li>If runtime-config is empty, the app falls back to NEXT_PUBLIC_API_URL</li>
           </ul>
         </div>
 

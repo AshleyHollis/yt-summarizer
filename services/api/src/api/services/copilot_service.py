@@ -379,7 +379,19 @@ class CopilotService:
             span.set_attribute("copilot.response.answer_length", len(llm_result.get("answer", "")))
             span.set_attribute("copilot.total_duration_ms", total_ms)
 
-            # Step 9: Build final response
+            # Step 9: Detect low-relevance responses where all video cards are below
+            # the frontend rendering threshold (MIN_RELEVANCE = 0.50). When no cards
+            # will be shown, surface an uncertainty message so the UI can indicate
+            # that the library doesn't contain relevant content for this query.
+            FRONTEND_MIN_RELEVANCE = 0.50
+            if (
+                not uncertainty
+                and video_cards
+                and all(vc.relevance_score < FRONTEND_MIN_RELEVANCE for vc in video_cards)
+            ):
+                uncertainty = "No relevant content found in your library for this query."
+
+            # Step 10: Build final response
             return CopilotQueryResponse(
                 answer=llm_result.get("answer", "Unable to generate answer."),
                 video_cards=video_cards,

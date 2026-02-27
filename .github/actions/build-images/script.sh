@@ -28,11 +28,37 @@
 
 set -euo pipefail
 
+# Logging helpers
+print_header() {
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] 🚀 $1"
+  shift
+  for line in "$@"; do
+    echo "[INFO]    $line"
+  done
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+print_footer() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] $1"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+log_info() { echo "[INFO] $1"; }
+log_warn() { echo "[WARN] ⚠️  $1"; }
+log_error() { echo "[ERROR] ✗ $1"; }
+log_success() { echo "[INFO]    ✓ $1"; }
+log_step() { echo "[INFO] $1"; }
+
 service="${SERVICE:-}"
 image_tag="${IMAGE_TAG:-}"
 push_flag="${PUSH_FLAG:-true}"
 
 if [[ -z "$service" ]] || [[ -z "$image_tag" ]]; then
+  log_error "SERVICE and IMAGE_TAG are required"
   echo "::error::SERVICE and IMAGE_TAG are required"
   exit 1
 fi
@@ -47,33 +73,54 @@ case $service in
     image_name="yt-summarizer-workers"
     ;;
   *)
+    log_error "Unknown service: $service"
     echo "::error::Unknown service: $service"
     exit 1
     ;;
 esac
 
-echo "Building $service image..."
-echo "::group::Build $service image"
+if [ "$push_flag" = "true" ]; then
+  if [[ -z "${ACR_LOGIN_SERVER:-}" ]]; then
+    log_error "ACR_LOGIN_SERVER is required for pushing"
+    echo "::error::ACR_LOGIN_SERVER is required for pushing"
+    exit 1
+  fi
+  full_image="$ACR_LOGIN_SERVER/$image_name:$image_tag"
+  print_header "Build & Push Docker Image" \
+    "Service: $service" \
+    "Image: $full_image" \
+    "Dockerfile: $dockerfile"
+else
+  full_image="local/$image_name:validate"
+  print_header "Build Docker Image (Validation)" \
+    "Service: $service" \
+    "Image: $full_image" \
+    "Dockerfile: $dockerfile"
+fi
 
 # Build command
 build_cmd="docker buildx build --file \"$dockerfile\""
 
 if [ "$push_flag" = "true" ]; then
-  if [[ -z "${ACR_LOGIN_SERVER:-}" ]]; then
-    echo "::error::ACR_LOGIN_SERVER is required for pushing"
-    exit 1
-  fi
-
   build_cmd="$build_cmd --tag \"$ACR_LOGIN_SERVER/$image_name:$image_tag\""
   build_cmd="$build_cmd --cache-from \"type=registry,ref=$ACR_LOGIN_SERVER/$image_name:cache-$service\""
-  # build_cmd="$build_cmd --cache-to \"type=registry,ref=$ACR_LOGIN_SERVER/$image_name:cache-$service,mode=max\""
+  build_cmd="$build_cmd --cache-to \"type=registry,ref=$ACR_LOGIN_SERVER/$image_name:cache-$service,mode=max\""
   build_cmd="$build_cmd --push"
-  echo "Pushing to registry: $ACR_LOGIN_SERVER/$image_name:$image_tag"
+  log_step "⏳ Building and pushing to registry..."
 else
-  # For validation, just build without pushing
   build_cmd="$build_cmd --tag \"local/$image_name:validate\""
-  echo "Validation build (not pushing to registry)"
+  log_step "⏳ Building locally for validation..."
 fi
 
-eval "$build_cmd ."
-echo "::endgroup::"
+if eval "$build_cmd ."; then
+  log_success "Build completed"
+  if [ "$push_flag" = "true" ]; then
+    print_footer "✅ Image pushed: $full_image"
+  else
+    print_footer "✅ Validation build successful"
+  fi
+else
+  log_error "Build failed"
+  print_footer "❌ Build failed"
+  exit 1
+fi

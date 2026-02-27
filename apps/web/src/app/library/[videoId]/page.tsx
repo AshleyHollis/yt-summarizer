@@ -212,7 +212,7 @@ export default function VideoDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
+      <main className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
         <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="animate-pulse">
             <div className="h-8 w-48 rounded bg-gray-200 dark:bg-gray-700" />
@@ -221,13 +221,13 @@ export default function VideoDetailPage() {
             <div className="mt-4 h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-700" />
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (error || !video) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
+      <main className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
         <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
           <Link
             href="/library"
@@ -248,7 +248,7 @@ export default function VideoDetailPage() {
             </Link>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -257,7 +257,7 @@ export default function VideoDetailPage() {
     video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_video_id}/maxresdefault.jpg`;
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
+    <main className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Back link */}
         <Link
@@ -441,6 +441,6 @@ export default function VideoDetailPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

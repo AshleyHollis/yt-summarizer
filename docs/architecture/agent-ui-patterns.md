@@ -1,24 +1,24 @@
-# Agent UI Patterns: Frontend-Initiated vs Backend-Initiated Workflows
+# Agent UI Patterns
 
-This document defines two architectural patterns for building rich, interactive agent workflows with Microsoft Agent Framework, AG-UI, and CopilotKit.
+<purpose>
+Architectural patterns for building interactive agent workflows with Microsoft Agent Framework, AG-UI, and CopilotKit.
+</purpose>
 
-## Overview
-
-We support two distinct patterns to cleanly separate concerns while preserving rich frontend interactivity:
+## Two Core Patterns
 
 | Pattern | Description | Initiator | Progress Source |
 |---------|-------------|-----------|-----------------|
-| **Pattern A** | Frontend-initiated UI + Backend streaming work | Frontend tool renders UI first | Backend streams progress via AG-UI state |
-| **Pattern B** | Backend-initiated work with frontend rendering | Backend tool does work | Frontend renders via AG-UI events |
+| **A** | Frontend-initiated UI + Backend streaming | Frontend tool | Backend AG-UI state |
+| **B** | Backend-initiated with frontend rendering | Backend tool | Frontend AG-UI events |
 
 ---
 
-## Pattern A — Frontend-Initiated UI + Backend Streaming Work
+## Pattern A — Frontend-Initiated + Backend Streaming
 
-### When to Use
-- **User-driven flows**: Wizards, confirmations, multi-step forms
-- **User input required before processing**: File uploads, configuration, selections
-- **Interactive progress panels**: The user needs to see and interact with progress
+### Use When
+- User-driven flows (wizards, confirmations, forms)
+- User input required before processing (uploads, config, selections)
+- Interactive progress panels needed
 
 ### Flow Diagram
 ```
@@ -65,13 +65,13 @@ We support two distinct patterns to cleanly separate concerns while preserving r
 
 ---
 
-## Pattern B — Backend-Initiated Work with Frontend Rendering
+## Pattern B — Backend-Initiated + Frontend Rendering
 
-### When to Use
-- **Automated agent workflows**: Agent decides to process without user input
-- **Read-heavy operations**: Search, summarization, analysis
-- **Quick operations**: Operations completing in < 5 seconds
-- **Background processing**: Tasks that continue if browser disconnects
+### Use When
+- Automated agent workflows (no user input needed)
+- Read-heavy operations (search, summarization, analysis)
+- Quick operations (< 5 seconds)
+- Background processing (continues if browser disconnects)
 
 ### Flow Diagram
 ```

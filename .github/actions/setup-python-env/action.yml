@@ -1,0 +1,80 @@
+# Reusable Python setup action for CI/CD pipelines
+# Configures Python, uv package manager, and dependency caching
+# Consolidates setup-python and setup-python-uv functionality
+
+name: 'Setup Python Environment'
+description: 'Setup Python with uv, caching, and optional package installation'
+
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.11'
+
+  install-mode:
+    description: 'Installation mode: none|shared|service|both'
+    required: false
+    default: 'none'
+
+  service-package:
+    description: 'Service package path to install (e.g., services/api)'
+    required: false
+    default: ''
+
+  working-directory:
+    description: 'Working directory for installation (for legacy mode)'
+    required: false
+    default: '.'
+
+  install-pytest-xdist:
+    description: 'Install pytest-xdist for parallel testing'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Cache pip and uv caches
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.cache/uv
+        key: ${{ runner.os }}-pip-uv-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-uv-
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+        cache-dependency-glob: |
+          **/pyproject.toml
+          **/requirements*.txt
+          **/uv.lock
+
+    - name: Install shared package
+      if: inputs.install-mode == 'shared' || inputs.install-mode == 'both'
+      shell: bash
+      run: uv pip install --system --prerelease=allow -e "services/shared[dev]"
+
+    - name: Install service package
+      if: (inputs.install-mode == 'service' || inputs.install-mode == 'both') && inputs.service-package != ''
+      shell: bash
+      run: uv pip install --system --prerelease=allow -e "${{ inputs.service-package }}[dev]"
+
+    - name: Install dependencies (legacy mode)
+      if: inputs.install-mode == 'none' && inputs.working-directory != '.'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: uv pip install --system -e ".[dev]"
+
+    - name: Install pytest-xdist
+      if: inputs.install-pytest-xdist == 'true'
+      shell: bash
+      run: uv pip install --system --prerelease=allow pytest-xdist

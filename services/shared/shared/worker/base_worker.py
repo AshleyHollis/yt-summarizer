@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Generic, TypeVar
 
 from shared.config import get_settings
@@ -32,7 +32,7 @@ from shared.worker.health_server import WorkerHealthServer
 T = TypeVar("T")
 
 
-class WorkerStatus(str, Enum):
+class WorkerStatus(StrEnum):
     """Worker processing status."""
 
     SUCCESS = "success"
@@ -102,8 +102,8 @@ class BaseWorker(ABC, Generic[T]):
 
     def __init__(
         self,
-        poll_interval: float = 1.0,
-        batch_size: int = 1,
+        poll_interval: float | None = None,
+        batch_size: int | None = None,
         visibility_timeout: int | None = None,
         max_retries: int | None = None,
         min_request_delay: float = 0.0,
@@ -113,17 +113,23 @@ class BaseWorker(ABC, Generic[T]):
         """Initialize the worker.
 
         Args:
-            poll_interval: Seconds between queue polls when empty.
-            batch_size: Number of messages to fetch per poll (1-32).
-            visibility_timeout: Seconds to hide message while processing.
-            max_retries: Maximum retry attempts before dead lettering.
+            poll_interval: Seconds between queue polls when empty (default: from settings).
+            batch_size: Number of messages to fetch per poll (default: from settings, max 32).
+            visibility_timeout: Seconds to hide message while processing (default: from settings).
+            max_retries: Maximum retry attempts before dead lettering (default: from settings).
             min_request_delay: Minimum seconds to wait after each request (rate limiting).
             request_delay_jitter: Random additional delay (0 to this value) to avoid patterns.
             health_port: Port for health/debug HTTP server. Uses HEALTH_PORT env var or default.
         """
-        self.poll_interval = poll_interval
-        self.batch_size = min(max(batch_size, 1), 32)
         self._settings = get_settings()
+
+        # Use parameter > environment (via settings) > default
+        self.poll_interval = (
+            poll_interval if poll_interval is not None else self._settings.queue.poll_interval
+        )
+        self.batch_size = batch_size if batch_size is not None else self._settings.queue.batch_size
+        self.batch_size = min(max(self.batch_size, 1), 32)  # Clamp to Azure limits (1-32)
+
         self.visibility_timeout = visibility_timeout or self._settings.queue.visibility_timeout
         self.max_retries = max_retries or self._settings.queue.max_retries
         self.min_request_delay = min_request_delay
@@ -131,6 +137,8 @@ class BaseWorker(ABC, Generic[T]):
         self._running = False
         self._queue_client: QueueClient | None = None
         self._logger = get_logger(self.__class__.__name__)
+        self._semaphore = asyncio.Semaphore(self._settings.proxy.max_concurrency)
+        self._in_flight: set[asyncio.Task] = set()
 
         # Health server port: parameter > env var > default (8090)
         self._health_port = health_port or int(os.environ.get("HEALTH_PORT", "8090"))
@@ -223,6 +231,20 @@ class BaseWorker(ABC, Generic[T]):
                 return {"openai": self._check_openai_connectivity}
         """
         return {}
+
+    def get_proxy_summary_fn(self) -> Callable[[], dict] | None:
+        """Return a callable that provides proxy usage summary for /debug/proxy.
+
+        Override in subclasses that use a ProxyService.
+
+        Returns:
+            Callable returning a dict summary, or None if proxy not used.
+
+        Example:
+            def get_proxy_summary_fn(self):
+                return self._proxy_service.get_usage_summary if self._proxy_service else None
+        """
+        return None
 
     def _check_queue_connectivity(self) -> bool:
         """Check if queue service is reachable.
@@ -512,14 +534,22 @@ class BaseWorker(ABC, Generic[T]):
                 set_correlation_id(None)
                 unbind_context("correlation_id", "queue", "retry_count")
 
+    async def _process_with_semaphore(self, queue_message: Any, raw_message: Any) -> None:
+        """Process a single message under the concurrency semaphore.
+
+        Args:
+            queue_message: Parsed queue message.
+            raw_message: Raw queue message envelope.
+        """
+        async with self._semaphore:
+            await self._process_single_message(queue_message, raw_message)
+
     async def poll_once(self) -> int:
         """Poll the queue once and process any messages.
 
         Returns:
             Number of messages processed.
         """
-        import random
-
         messages = self.queue_client.receive_messages(
             self.queue_name,
             max_messages=self.batch_size,
@@ -527,15 +557,11 @@ class BaseWorker(ABC, Generic[T]):
         )
 
         for queue_message, raw_message in messages:
-            await self._process_single_message(queue_message, raw_message)
+            task = asyncio.ensure_future(self._process_with_semaphore(queue_message, raw_message))
+            self._in_flight.add(task)
+            task.add_done_callback(self._in_flight.discard)
 
-            # Rate limiting: delay after each request to avoid hitting external API limits
-            if self.min_request_delay > 0:
-                delay = self.min_request_delay
-                if self.request_delay_jitter > 0:
-                    delay += random.uniform(0, self.request_delay_jitter)
-                self._logger.debug("Rate limit delay", delay_seconds=delay)
-                await asyncio.sleep(delay)
+        await asyncio.gather(*list(self._in_flight), return_exceptions=True)
 
         return len(messages)
 
@@ -567,6 +593,11 @@ class BaseWorker(ABC, Generic[T]):
         for name, check_fn in self.get_additional_connectivity_checks().items():
             self._health_server.add_connectivity_check(name, check_fn)
 
+        # Wire proxy summary endpoint if subclass provides it
+        proxy_summary_fn = self.get_proxy_summary_fn()
+        if proxy_summary_fn is not None:
+            self._health_server.set_proxy_summary_fn(proxy_summary_fn)
+
         self._health_server.start()
         self._logger.info(
             "Health server started",
@@ -582,6 +613,8 @@ class BaseWorker(ABC, Generic[T]):
             batch_size=self.batch_size,
             visibility_timeout=self.visibility_timeout,
             max_retries=self.max_retries,
+            min_request_delay=self.min_request_delay,
+            request_delay_jitter=self.request_delay_jitter,
         )
 
         # Ensure queue exists
@@ -598,6 +631,11 @@ class BaseWorker(ABC, Generic[T]):
             except Exception:
                 self._logger.exception("Error during poll loop")
                 await asyncio.sleep(self.poll_interval * 2)  # Back off on errors
+
+        # Drain any in-flight tasks before shutdown
+        if self._in_flight:
+            self._logger.info("Draining in-flight tasks", count=len(self._in_flight))
+            await asyncio.gather(*list(self._in_flight), return_exceptions=True)
 
         # Stop health server
         if self._health_server:

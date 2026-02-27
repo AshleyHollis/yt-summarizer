@@ -18,6 +18,15 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Restore Playwright browser cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: >-
+          ${{ runner.os }}-playwright-
+          ${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-
     - name: Install and run Playwright tests
       shell: bash
       working-directory: ${{ inputs.working-directory }}

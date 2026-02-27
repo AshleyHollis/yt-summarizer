@@ -14,7 +14,7 @@
 #   4. Parse JSON to count resource changes (add/change/delete)
 #   5. Create JSON summary object with change counts
 
-set -o pipefail
+set -eo pipefail
 
 terraform plan -no-color -input=false -out=tfplan \
   -var="subscription_id=${SUBSCRIPTION_ID}" \

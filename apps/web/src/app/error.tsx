@@ -19,6 +19,7 @@ export default function Error({ error, reset }: ErrorProps) {
 
   useEffect(() => {
     // Check online status
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsOnline(navigator.onLine);
 
     const handleOnline = () => setIsOnline(true);

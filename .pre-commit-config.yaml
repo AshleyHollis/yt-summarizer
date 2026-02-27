@@ -26,14 +26,14 @@ repos:
         args: ['--markdown-linebreak-ext=md']
 
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.10
+    rev: v1.7.11
     hooks:
       - id: actionlint
         name: Lint GitHub Actions workflows
         files: ^\.github/workflows/.*\.ya?ml$
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.37.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         name: Lint YAML files
@@ -48,7 +48,7 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
-        stages: [commit]
+        stages: [pre-commit]
         verbose: true
 
       - id: always-run-precommit

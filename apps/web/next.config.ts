@@ -9,9 +9,10 @@ const withBundleAnalyzer = bundleAnalyzer({
 const isDev = process.env.NODE_ENV !== 'production';
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for Azure SWA deployment
-  // This reduces app size and is required for hybrid rendering on SWA
-  output: 'standalone',
+  // Enable standalone output for runtime deployments
+  // Disabled for CI artifact builds to create SWA-compatible build output
+  // SWA with skip_app_build needs standard .next directory, not standalone
+  output: process.env.SKIP_STANDALONE === 'true' ? undefined : 'standalone',
 
   // Enable React Compiler only in production (reduces dev memory ~15-20%)
   reactCompiler: !isDev,
@@ -75,24 +76,24 @@ const nextConfig: NextConfig = {
     // let backendUrl = process.env.API_URL || 'http://localhost:8000';
 
     // Attempt to load dynamically injected backend URL (for CI/CD previews)
-    // try {
-    //   // eslint-disable-next-line @typescript-eslint/no-require-imports
-    //   const fs = require('fs');
-    //   // eslint-disable-next-line @typescript-eslint/no-require-imports
-    //   const path = require('path');
-    //   const configPath = path.join(__dirname, 'backend-config.json');
-    //   if (fs.existsSync(configPath)) {
-    //     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    //     if (config.url) {
-    //       backendUrl = config.url;
-    //       // Inject into env for server-side API calls (consumed by api.ts)
-    //       process.env.API_URL = backendUrl;
-    //       console.log(`[Next.js] Loaded backend URL from ${configPath}: ${backendUrl}`);
-    //     }
-    //   }
-    // } catch (e) {
-    //   // Ignore errors in dev environment
-    // }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const path = require('path');
+      const configPath = path.join(__dirname, 'backend-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        if (config.url) {
+            backendUrl = config.url;
+            // Inject into env for server-side API calls (consumed by api.ts)
+            process.env.API_URL = backendUrl;
+            console.log(`[Next.js] Loaded backend URL from ${configPath}: ${backendUrl}`);
+        }
+      }
+    } catch {
+      // Ignore errors in dev environment
+    }
 
     return {
       beforeFiles: [

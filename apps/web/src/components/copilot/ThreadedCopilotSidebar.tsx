@@ -26,24 +26,18 @@
  * @see https://docs.copilotkit.ai/custom-look-and-feel/bring-your-own-components
  */
 
-import { CopilotSidebar as CKSidebar, CopilotKitCSSProperties } from '@copilotkit/react-ui';
-import { useCopilotChatInternal, useCopilotChat } from '@copilotkit/react-core';
-import { useCopilotActions } from '@/hooks/useCopilotActions';
-import { useTheme } from 'next-themes';
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { MessageCircle, X } from 'lucide-react';
-import type { Message } from '@copilotkit/shared';
-import { useThreadPersistence } from '@/hooks/useThreadPersistence';
-import {
-  prepareMessagesForDisplay,
-  copilotToThreadMessages,
-  ChatThread,
-} from '@/services/threadPersistence';
-import { CustomHeader } from './subcomponents/CustomHeader';
-import { Thread } from './ThreadList';
-import { useScope, useAISettings } from '@/app/providers';
-import styles from './ThreadedCopilotSidebar.module.css';
+import { CopilotSidebar as CKSidebar, CopilotKitCSSProperties } from "@copilotkit/react-ui";
+import { useCopilotChatInternal, useCopilotChat, useThreads } from "@copilotkit/react-core";
+import { useCopilotActions } from "@/hooks/useCopilotActions";
+import { useTheme } from "next-themes";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { MessageCircle, X } from "lucide-react";
+import { useThreadPersistence } from "@/hooks/useThreadPersistence";
+import { prepareMessagesForDisplay, copilotToThreadMessages } from "@/services/threadPersistence";
+import { CustomHeader } from "./subcomponents/CustomHeader";
+import { useScope, useAISettings } from "@/app/providers";
+import styles from "./ThreadedCopilotSidebar.module.css";
 
 // ============================================================================
 // Constants
@@ -132,6 +126,8 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
   // CopilotKit hooks
   const { agent, messages: internalMessages } = useCopilotChatInternal();
   const { reset: resetCopilotChat } = useCopilotChat();
+  // CopilotKit's internal thread ID - the ground truth for agent runs
+  const { threadId: copilotThreadId } = useThreads();
 
   // Thread persistence
   const {
@@ -193,6 +189,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
   // ============================================================================
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
 
     const savedSize = localStorage.getItem(SIDEBAR_SIZE_KEY) as SizeMode | null;
@@ -222,7 +219,8 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
         isDeletingThreadRef.current = false;
         return;
       }
-      setThreadNotFoundMessage('The requested chat thread was not found.');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setThreadNotFoundMessage("The requested chat thread was not found.");
       setTimeout(() => setThreadNotFoundMessage(null), 5000);
       const params = new URLSearchParams(searchParams.toString());
       params.delete('thread');
@@ -266,6 +264,33 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     router,
     searchParams,
   ]);
+
+  // Sync CopilotKit's internal thread ID to the URL as early as possible.
+  //
+  // CopilotKit generates its own UUID for each new chat session (when no threadId prop is
+  // supplied, or when the component first mounts before the URL thread has been applied).
+  // The agent backend saves runs under this CopilotKit-internal UUID, but useThreadPersistence
+  // independently creates a *different* thread via POST /api/v1/threads/messages, causing a
+  // mismatch: the browser URL shows the server-generated ID while responses land on
+  // CopilotKit's UUID.
+  //
+  // This effect detects when CopilotKit's thread ID differs from the URL and immediately
+  // updates the URL to match. Once the URL is updated, the Sync thread ID from URL effect
+  // above calls syncThreadIdFromUrl() which aligns useThreadPersistence.activeThreadId with
+  // CopilotKit's UUID. Subsequent saveIfNeeded() calls will then save messages under the
+  // correct ID, eliminating the mismatch.
+  useEffect(() => {
+    if (!mounted || !copilotThreadId) return;
+    if (copilotThreadId === urlThreadId) return; // already in sync
+
+    // Only sync when there is no URL thread (new chat) or when the URL thread is already the
+    // one we want to adopt (never override an explicit user-navigated thread selection).
+    if (!urlThreadId) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("thread", copilotThreadId);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [mounted, copilotThreadId, urlThreadId, pathname, router, searchParams]);
 
   // Resize drag handlers
   useEffect(() => {

@@ -15,7 +15,9 @@ metadata:
     # Argo CD sync hook - runs before deployments and auto-deletes old jobs
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/sync-wave: "1"
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    # Delete old job before creating new one, and delete successful job after completion
+    # This ensures Argo CD waits for job completion and doesn't get stuck
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 spec:
   backoffLimit: 3
   activeDeadlineSeconds: 300

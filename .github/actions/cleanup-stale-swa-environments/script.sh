@@ -40,28 +40,65 @@
 
 set -euo pipefail
 
+# Logging helpers
+print_header() {
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] 🚀 $1"
+  shift
+  for line in "$@"; do
+    echo "[INFO]    $line"
+  done
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+print_footer() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] $1"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+log_info() { echo "[INFO] $1"; }
+log_warn() { echo "[WARN] ⚠️  $1"; }
+log_error() { echo "[ERROR] ✗ $1"; }
+log_success() { echo "[INFO]    ✓ $1"; }
+log_step() { echo "[INFO] $1"; }
+
+print_header "Cleanup Stale SWA Environments" \
+  "SWA: $SWA_NAME" \
+  "Resource Group: $RESOURCE_GROUP" \
+  "Min Age: ${MIN_AGE_HOURS}h" \
+  "Dry Run: ${DRY_RUN:-false}"
+
 # Set subscription context
-echo "🔧 Setting Azure subscription context..."
+log_step "Setting Azure subscription context..."
 az account set --subscription "$SUBSCRIPTION_ID"
+log_success "Subscription set"
 
 # List all SWA environments/builds
-echo "📋 Listing SWA environments for $SWA_NAME..."
+log_step "⏳ Listing SWA environments..."
 environments=$(az staticwebapp environment list \
   -n "$SWA_NAME" \
   -g "$RESOURCE_GROUP" \
   -o json 2>/dev/null || echo "[]")
 
 if [[ "$environments" == "[]" ]]; then
-  echo "⚠️  No environments found or unable to list environments"
+  log_warn "No environments found or unable to list environments"
   echo "deleted_count=0" >> $GITHUB_OUTPUT
   echo "stale_prs=" >> $GITHUB_OUTPUT
+  print_footer "ℹ️  No environments to process"
   exit 0
 fi
 
+env_count=$(echo "$environments" | jq '. | length')
+log_success "Found $env_count environment(s)"
+
 # Get list of all open PRs for quick lookup
-echo "📋 Fetching open PRs from GitHub..."
+log_step "⏳ Fetching open PRs from GitHub..."
 open_prs=$(gh pr list --state open --json number --jq '.[].number' | tr '\n' ' ' || echo "")
-echo "Currently open PRs: ${open_prs:-none}"
+open_pr_count=$(echo "$open_prs" | wc -w | tr -d ' ')
+log_success "Found $open_pr_count open PR(s)"
 
 # Create associative array of open PRs
 declare -A active_prs
@@ -75,7 +112,7 @@ current_time=$(date +%s)
 min_age_seconds=$((MIN_AGE_HOURS * 3600))
 
 echo ""
-echo "🔍 Checking each SWA environment for staleness..."
+log_step "Checking environments for staleness..."
 echo ""
 
 # Process each environment
@@ -91,15 +128,11 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
 
   # Safety: Never delete production/default
   if [[ "$env_name" == "default" ]]; then
-    echo "  ℹ️  Skipping production environment: default"
+    log_info "⏭️  Skipping production environment: default"
     continue
   fi
 
-  echo "📦 Environment: $env_name"
-  echo "  Build ID: $build_id"
-  echo "  Hostname: $hostname"
-  echo "  PR Title: ${pull_request_title:-none}"
-  echo "  Branch: ${source_branch:-none}"
+  log_info "📦 Environment: $env_name"
 
   # Extract PR number from metadata
   pr_number=""
@@ -107,24 +140,20 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
   # Method 1: Check if buildId is numeric (often the PR number)
   if [[ "$build_id" =~ ^[0-9]+$ ]]; then
     pr_number="$build_id"
-    echo "  🔍 Detected PR number from buildId: $pr_number"
   fi
 
   # Method 2: Extract from hostname pattern (e.g., hostname-123.region.azurestaticapps.net)
   if [[ -z "$pr_number" ]] && [[ "$hostname" =~ -([0-9]+)\. ]]; then
     pr_number="${BASH_REMATCH[1]}"
-    echo "  🔍 Detected PR number from hostname: $pr_number"
   fi
 
   # Method 3: Check if pullRequestTitle is set (indicates PR environment)
   if [[ -z "$pr_number" ]] && [[ -n "$pull_request_title" && "$pull_request_title" != "null" ]]; then
-    echo "  🔍 PR environment detected but number unknown, checking branch..."
     # Try to find PR by branch name
     if [[ -n "$source_branch" && "$source_branch" != "null" ]]; then
       branch_pr=$(gh pr list --state all --head "$source_branch" --json number --jq '.[0].number // empty' || echo "")
       if [[ -n "$branch_pr" ]]; then
         pr_number="$branch_pr"
-        echo "  🔍 Found PR number from branch: $pr_number"
       fi
     fi
   fi
@@ -136,7 +165,7 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
   if [[ -n "$pr_number" ]]; then
     # Check if PR exists and is open
     if [[ -v active_prs[$pr_number] ]]; then
-      echo "  ✅ PR #$pr_number is open - keeping environment"
+      log_success "PR #$pr_number is open - keeping"
     else
       # PR is closed or doesn't exist - check age
       pr_closed_at=$(gh pr view "$pr_number" --json closedAt --jq '.closedAt // empty' 2>/dev/null || echo "")
@@ -144,7 +173,7 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
       if [[ -z "$pr_closed_at" ]]; then
         # PR doesn't exist at all (deleted)
         is_stale=true
-        stale_reason="PR #$pr_number doesn't exist (deleted)"
+        stale_reason="PR #$pr_number doesn't exist"
       else
         # PR is closed - check age
         closed_timestamp=$(date -d "$pr_closed_at" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$pr_closed_at" +%s 2>/dev/null || echo "0")
@@ -153,16 +182,15 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
 
         if [[ $age_seconds -ge $min_age_seconds ]]; then
           is_stale=true
-          stale_reason="PR #$pr_number closed ${age_hours}h ago (threshold: ${MIN_AGE_HOURS}h)"
+          stale_reason="PR #$pr_number closed ${age_hours}h ago"
         else
-          echo "  ⏳ PR #$pr_number closed recently (${age_hours}h ago) - keeping for now"
+          log_info "   ⏳ PR #$pr_number closed recently (${age_hours}h) - keeping"
         fi
       fi
     fi
   else
     # No PR number detected - check if it's a branch environment or orphaned
     if [[ -n "$source_branch" && "$source_branch" != "null" ]]; then
-      echo "  🔍 Branch environment: $source_branch"
       # Check if branch still exists
       branch_exists=$(gh api repos/{owner}/{repo}/branches 2>/dev/null | jq -r --arg branch "$source_branch" '.[] | select(.name == $branch) | .name' || echo "")
 
@@ -175,23 +203,19 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
 
           if [[ $age_seconds -ge $min_age_seconds ]]; then
             is_stale=true
-            stale_reason="Branch '$source_branch' doesn't exist, environment ${age_hours}h old"
+            stale_reason="Branch '$source_branch' deleted, env ${age_hours}h old"
           else
-            echo "  ⏳ Branch '$source_branch' doesn't exist but environment too recent (${age_hours}h) - keeping for now"
+            log_info "   ⏳ Branch deleted but env recent (${age_hours}h) - keeping"
           fi
         else
-          # No creation time but branch doesn't exist - assume stale if old enough
           is_stale=true
           stale_reason="Branch '$source_branch' doesn't exist"
         fi
       else
-        echo "  ✅ Branch '$source_branch' exists - keeping environment"
+        log_success "Branch '$source_branch' exists - keeping"
       fi
     else
       # No PR number AND no branch info - orphaned environment
-      echo "  ⚠️  Orphaned environment (no PR/branch metadata)"
-
-      # Check age if available
       if [[ -n "$created_time" && "$created_time" != "null" ]]; then
         created_timestamp=$(date -d "$created_time" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$created_time" +%s 2>/dev/null || echo "0")
         age_seconds=$((current_time - created_timestamp))
@@ -199,9 +223,9 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
 
         if [[ $age_seconds -ge $min_age_seconds ]]; then
           is_stale=true
-          stale_reason="Orphaned environment, ${age_hours}h old (threshold: ${MIN_AGE_HOURS}h)"
+          stale_reason="Orphaned environment, ${age_hours}h old"
         else
-          echo "  ⏳ Orphaned but recent (${age_hours}h) - keeping for now"
+          log_info "   ⏳ Orphaned but recent (${age_hours}h) - keeping"
         fi
       else
         # No metadata at all - orphaned environment, should be deleted
@@ -209,7 +233,6 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
         name_pr=$(gh pr list --state all --json number,title --jq ".[] | select(.title | contains(\"$env_name\")) | .number" | head -1 || echo "")
 
         if [[ -n "$name_pr" ]]; then
-          echo "  🔍 Found potential PR by name search: #$name_pr"
           pr_number="$name_pr"
           # Check PR status
           pr_closed_at=$(gh pr view "$pr_number" --json closedAt --jq '.closedAt // empty' 2>/dev/null || echo "")
@@ -220,14 +243,12 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
 
             if [[ $age_seconds -ge $min_age_seconds ]]; then
               is_stale=true
-              stale_reason="Orphaned environment linked to closed PR #$pr_number (${age_hours}h ago)"
+              stale_reason="Orphaned env linked to closed PR #$pr_number"
             fi
           fi
         else
-          # No PR match and no metadata - delete orphaned environment
-          echo "  🗑️  No PR/branch metadata found - marking as stale orphaned environment"
           is_stale=true
-          stale_reason="Orphaned environment with no PR/branch metadata"
+          stale_reason="Orphaned environment with no metadata"
         fi
       fi
     fi
@@ -235,14 +256,14 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
 
   # Delete if stale
   if [[ "$is_stale" == "true" ]]; then
-    echo "  🗑️  STALE: $stale_reason"
+    log_warn "$stale_reason"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-      echo "  [DRY RUN] Would delete environment: $env_name"
+      log_info "   [DRY RUN] Would delete: $env_name"
       deleted_count=$((deleted_count + 1))
       [[ -n "$pr_number" ]] && deleted_prs+=("$pr_number")
     else
-      echo "  🗑️  Deleting environment: $env_name..."
+      log_info "   ⏳ Deleting environment: $env_name..."
 
       # Delete and capture result (don't pipe through grep as it affects exit code)
       delete_output=$(az staticwebapp environment delete \
@@ -254,12 +275,12 @@ echo "$environments" | jq -r '.[] | @json' | while IFS= read -r env_json; do
       delete_exit_code=$?
 
       if [[ $delete_exit_code -eq 0 ]]; then
-        echo "    ✅ Successfully deleted environment: $env_name"
+        log_success "Deleted: $env_name"
         deleted_count=$((deleted_count + 1))
         [[ -n "$pr_number" ]] && deleted_prs+=("$pr_number")
       else
-        echo "    ❌ Failed to delete environment: $env_name"
-        echo "    Error: $delete_output"
+        log_error "Failed to delete: $env_name"
+        log_info "   Error: $delete_output"
       fi
     fi
   fi
@@ -278,7 +299,7 @@ else
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
-  echo "✅ [DRY RUN] Would delete $deleted_count environment(s)"
+  print_footer "✅ Dry run complete - would delete $deleted_count environment(s)"
 else
-  echo "✅ Deleted $deleted_count environment(s)"
+  print_footer "✅ Cleanup complete - deleted $deleted_count environment(s)"
 fi

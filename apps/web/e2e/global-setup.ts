@@ -67,6 +67,14 @@ const TEST_VIDEOS = [
   'https://www.youtube.com/watch?v=aSYap2yhW8s',
   // How To Do Kettlebell Swings | Proper Form - 4:37 - HAS AUTO CAPTIONS
   'https://www.youtube.com/watch?v=hp3qVqIHNOI',
+
+  // === Heavy Clubs Cluster (2 videos - Mark Wildman) ===
+  // Enables the heavy clubs tests in chat-responses.spec.ts and copilot.spec.ts
+
+  // The Key Part of Heavy Clubs That Most Beginners Miss (Mark Wildman) - HAS AUTO CAPTIONS
+  'https://www.youtube.com/watch?v=ho5Sdof8TXA',
+  // Heavy Clubs Will Change Your Life (Mark Wildman) - HAS AUTO CAPTIONS
+  'https://www.youtube.com/watch?v=sFgWuK4XAo0',
 ];
 
 // === ORDERING VERIFICATION VIDEOS ===
@@ -374,11 +382,12 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  console.log(
-    '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+  console.log('[global-setup] └──────────────────────────────────────────────────────────────────┘');
+  throw new Error(
+    `[global-setup] Timeout waiting for video processing after ${MAX_WAIT_TIME_MS / 1000}s. ` +
+    `Tests require completed videos with ${MIN_SEGMENTS_REQUIRED}+ segments. ` +
+    `Aborting test run to avoid cascading failures.`
   );
-  console.log(`[global-setup] ⚠ Timeout waiting for video processing. Tests may fail.`);
-  return false;
 }
 
 async function waitForVideoProcessing(): Promise<boolean> {
@@ -417,16 +426,72 @@ async function waitForVideoProcessing(): Promise<boolean> {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  console.log(`[global-setup] ⚠ Timeout waiting for video processing. Tests may fail.`);
-  return false;
+  throw new Error(
+    `[global-setup] Timeout waiting for video processing after ${MAX_WAIT_TIME_MS / 1000}s. ` +
+    `Tests require completed videos with ${MIN_SEGMENTS_REQUIRED}+ segments. ` +
+    `Aborting test run to avoid cascading failures.`
+  );
 }
 
-async function globalSetup(config: FullConfig) {
+/**
+ * Warm up the SWA (Static Web App) preview environment.
+ *
+ * SWA preview environments cold-start on first request: the Node.js SSR
+ * container must spin up and compile the Next.js app. This can take 60-120s.
+ *
+ * By absorbing this penalty here (once, before any tests run), individual
+ * tests no longer need try/catch/skip wrappers around page.goto().
+ */
+async function warmUpSwa(): Promise<void> {
+  const WEB_URL = process.env.BASE_URL || 'http://localhost:3000';
+  const maxRetries = 12;
+  const retryDelay = 10_000; // 10 seconds between retries (120s max wait)
+
+  console.log(`[global-setup] Warming up SWA at ${WEB_URL}...`);
+  const startTime = Date.now();
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+
+      const response = await fetch(WEB_URL, {
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (response.ok || response.status === 308 || response.status === 307 || response.status === 302) {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        console.log(`[global-setup] ✓ SWA warm-up complete (${elapsed}s, status=${response.status})`);
+        return;
+      }
+      console.log(`[global-setup] SWA attempt ${attempt}/${maxRetries}: status=${response.status}`);
+    } catch (error) {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[global-setup] SWA attempt ${attempt}/${maxRetries} failed (${elapsed}s): ${error instanceof Error ? error.message : error}`);
+    }
+
+    if (attempt < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  console.log(`[global-setup] ⚠ SWA warm-up did not succeed after ${elapsed}s — tests may experience cold-start delays`);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function globalSetup(_config: FullConfig) {
   // Only run when using external server (Aspire)
   if (!process.env.USE_EXTERNAL_SERVER) {
     console.log('[global-setup] Skipping video seeding (USE_EXTERNAL_SERVER not set)');
     return;
   }
+
+  // Warm up the SWA frontend first — absorbs the cold-start penalty before
+  // any tests attempt page.goto(), eliminating cold-start-related skips.
+  await warmUpSwa();
 
   console.log('[global-setup] Seeding test videos...');
 
@@ -494,6 +559,56 @@ async function globalSetup(config: FullConfig) {
   } else {
     // Fallback to simple wait if we couldn't get video IDs
     await waitForVideoProcessing();
+  }
+
+  // Warm up the CopilotKit agent endpoint.
+  // The first LLM call in a CI run can be very slow (Azure OpenAI cold start).
+  // Sending a warm-up request here ensures the backend is primed before tests start,
+  // preventing flaky timeouts in chat-responses, copilot, and full-journey tests.
+  await warmUpCopilotAgent();
+}
+
+async function warmUpCopilotAgent(): Promise<void> {
+  console.log('[global-setup] Warming up CopilotKit agent endpoint (real LLM call)...');
+  const startTime = Date.now();
+
+  try {
+    // Send a real query (not just 0 messages) to warm up the full pipeline:
+    // Azure OpenAI connection, embedding model, vector search, LLM inference.
+    // The 0-message handshake only tests connectivity, not the LLM cold start.
+    const response = await fetch(`${API_URL}/api/copilotkit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        method: 'run',
+        threadId: 'warmup-global-setup',
+        runId: 'warmup-run',
+        messages: [
+          {
+            id: 'warmup-msg-1',
+            role: 'user',
+            content: 'hello',
+          },
+        ],
+        actions: [],
+        agent: 'video_assistant',
+      }),
+    });
+
+    if (response.ok || response.status === 200) {
+      // Consume the SSE stream to ensure the full round-trip completes
+      const text = await response.text();
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[global-setup] ✓ Agent warm-up complete (${elapsed}s, ${text.length} bytes)`);
+    } else {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[global-setup] ⚠ Agent warm-up returned ${response.status} (${elapsed}s) - tests may be slower on first LLM call`);
+    }
+  } catch (error) {
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    console.log(`[global-setup] ⚠ Agent warm-up failed (${elapsed}s): ${error} - tests may be slower on first LLM call`);
   }
 }
 

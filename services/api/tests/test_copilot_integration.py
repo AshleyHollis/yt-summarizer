@@ -1387,7 +1387,7 @@ class TestModerateRelevanceThreshold:
             start_time=162.16,
             end_time=195.44,
             youtube_url="https://youtube.com/watch?v=0iF7FpvDuRc&t=162s",
-            score=0.70,  # Moderate distance - should still be included
+            score=0.45,  # Moderate distance - relevance_score=0.55, above frontend threshold
         )
 
         another_moderate_segment = ScoredSegment(
@@ -1399,7 +1399,7 @@ class TestModerateRelevanceThreshold:
             start_time=476.8,
             end_time=508.64,
             youtube_url="https://youtube.com/watch?v=0iF7FpvDuRc&t=476s",
-            score=0.65,  # Moderate distance - should still be included
+            score=0.40,  # Moderate distance - relevance_score=0.60, above frontend threshold
         )
 
         mock_search_response = MagicMock()

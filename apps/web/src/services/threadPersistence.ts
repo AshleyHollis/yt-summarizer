@@ -11,8 +11,7 @@
  * 4. Atomic operations - server handles ID generation to avoid conflicts
  */
 
-// API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { getApiBaseUrl } from './runtimeConfig';
 
 // ============================================================================
 // Types
@@ -152,7 +151,6 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
 
   // Track tool call IDs we've seen in "assistant" messages that are actually tool invocations
   let lastToolCallId: string | null = null;
-  let lastToolCallAssistantIdx: number = -1;
 
   for (const msg of copilotMessages) {
     const m = msg as Record<string, unknown>;
@@ -191,7 +189,6 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
           // Attach to existing assistant message that doesn't already have tool calls
           result[lastAssistantIdx].toolCalls = [toolCall];
           lastToolCallId = id;
-          lastToolCallAssistantIdx = lastAssistantIdx;
         } else {
           // Create a new assistant message for this tool call
           result.push({
@@ -201,7 +198,6 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
             toolCalls: [toolCall],
           });
           lastToolCallId = id;
-          lastToolCallAssistantIdx = result.length - 1;
         }
       } else {
         // Regular assistant text message
@@ -266,7 +262,7 @@ function serverDetailToClient(server: ServerThreadDetail): ChatThread {
  * Idempotent - safe to call multiple times
  */
 export async function fetchThreads(): Promise<ChatThread[]> {
-  const response = await fetch(`${API_BASE}/api/v1/threads`);
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads`);
   if (!response.ok) {
     throw new Error(`Failed to fetch threads: ${response.status}`);
   }
@@ -280,10 +276,8 @@ export async function fetchThreads(): Promise<ChatThread[]> {
  * Fetch a single thread with messages
  * Idempotent - safe to call multiple times
  */
-export async function fetchThread(
-  threadId: string
-): Promise<{ thread: ChatThread; messages: ThreadMessage[] } | null> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/${threadId}`);
+export async function fetchThread(threadId: string): Promise<{ thread: ChatThread; messages: ThreadMessage[] } | null> {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Failed to fetch thread: ${response.status}`);
@@ -306,9 +300,9 @@ export async function createThread(
   scope?: QueryScope | null,
   aiSettings?: AISettings | null
 ): Promise<ChatThread | null> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages, title, scope, aiSettings }),
   });
 
@@ -339,9 +333,9 @@ export async function saveMessages(
   scope?: QueryScope | null,
   aiSettings?: AISettings | null
 ): Promise<boolean> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/${threadId}/messages`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}/messages`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages, title, scope, aiSettings }),
   });
   return response.ok;
@@ -356,9 +350,9 @@ export async function updateThreadSettings(
   scope?: QueryScope | null,
   aiSettings?: AISettings | null
 ): Promise<boolean> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/${threadId}/settings`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}/settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scope, aiSettings }),
   });
   return response.ok;
@@ -369,8 +363,8 @@ export async function updateThreadSettings(
  * Idempotent - deleting non-existent thread returns success
  */
 export async function deleteThread(threadId: string): Promise<boolean> {
-  const response = await fetch(`${API_BASE}/api/v1/threads/${threadId}`, {
-    method: 'DELETE',
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}`, {
+    method: "DELETE",
   });
   return response.ok || response.status === 404;
 }

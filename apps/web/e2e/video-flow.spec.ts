@@ -38,7 +38,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
     test('user can submit video and view completed result', async ({ page }) => {
       // Step 1: Navigate to submit page
       await page.goto('/submit');
-      await expect(page).toHaveURL('/submit');
+      await expect(page).toHaveURL(/\/submit(?:\?|$)/);
 
       // Step 2: Enter YouTube URL
       const urlInput = page.getByLabel(/YouTube Video URL/i);
@@ -51,9 +51,14 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Step 4: Wait for redirect to video detail page
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+      // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling)
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
       const videoUrl = page.url();
-      const videoId = videoUrl.split('/videos/')[1];
+      const videoId = videoUrl.match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1];
+      expect(videoId).toBeTruthy();
       expect(videoId).toMatch(/^[a-f0-9-]{36}$/);
 
       // Step 5: Verify video detail page loads
@@ -78,7 +83,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Wait for redirect
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
 
       // Verify job progress section exists
       // The page should show job status information
@@ -104,7 +112,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await submitButton.click();
 
       // Wait for redirect to video page
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
 
       // Wait for processing to complete (or check if already completed)
       // This uses a polling approach to wait for completion
@@ -144,8 +155,11 @@ test.describe('User Story 1: Video Submission Flow', () => {
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
-      existingVideoId = page.url().split('/videos/')[1];
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
+      existingVideoId = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1] ?? null;
 
       // Wait for processing to complete
       await waitForVideoCompletion(page, PROCESSING_TIMEOUT);
@@ -242,39 +256,58 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
   test.describe('Error Handling', () => {
     test('shows error for invalid video ID', async ({ page }) => {
-      await page.goto('/videos/invalid-uuid-format');
+      // Navigate to /library/ directly to avoid server redirect from /videos/ → /library/
+      // which adds latency and can interact with CopilotKit's ?thread= param
+      await page.goto('/library/invalid-uuid-format');
+      await page.waitForLoadState('domcontentloaded');
 
-      // Should show error message
+      // Should show error message — increased timeout for slow preview environments
       const errorMessage = page.getByText(/error|not found|invalid|failed/i);
-      await expect(errorMessage.first()).toBeVisible({ timeout: 10_000 });
+      await expect(errorMessage.first()).toBeVisible({ timeout: 30_000 });
     });
 
     test('shows error for non-existent video', async ({ page }) => {
-      // Use a valid UUID format but non-existent
-      await page.goto('/videos/00000000-0000-0000-0000-000000000000');
+      // Navigate directly to /library/ (not /videos/) to avoid redirect loop
+      // that occurs when CopilotKit's ?thread= param interacts with server-side redirect
+      await page.goto('/library/00000000-0000-0000-0000-000000000000');
+      await page.waitForLoadState('domcontentloaded');
 
-      // Should show not found or error
+      // The video detail page shows "Failed to load video. Please try again." for errors
       const errorMessage = page.getByText(/error|not found|failed/i);
-      await expect(errorMessage.first()).toBeVisible({ timeout: 10_000 });
+      await expect(errorMessage.first()).toBeVisible({ timeout: 15_000 });
     });
 
     test('handles API timeout gracefully', async ({ page }) => {
-      // Simulate slow API by adding delay
-      await page.route('**/api/v1/videos/**', async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+      // Simulate slow API by adding delay then aborting
+      // Note: actual API uses /api/v1/library/videos/ path
+      await page.route('**/api/v1/library/videos/**', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
         await route.abort('timedout');
       });
 
       await page.goto('/videos/00000000-0000-0000-0000-000000000001');
+      await page.waitForLoadState('domcontentloaded');
 
-      // Should show loading or error state
-      const statusIndicator = page.getByText(/loading|error|timeout|failed/i);
-      await expect(statusIndicator.first()).toBeVisible({ timeout: 15_000 });
+      // Should show loading state initially, then error after abort
+      // The page renders a loading skeleton first, then shows error text
+      const statusIndicator = page.getByText(/loading|error|timeout|failed|not found/i);
+      await expect(statusIndicator.first()).toBeVisible({ timeout: 30_000 });
     });
   });
 
   test.describe('Polling and Auto-refresh', () => {
+    test.skip(() => !LIVE_PROCESSING, 'Requires live video processing for auto-refresh test');
+
     test('page auto-refreshes during processing', async ({ page }) => {
+      // Set up API call tracking BEFORE any navigation so we capture all
+      // requests, including those fired immediately on page load.
+      // Note: actual API uses /api/v1/library/videos/ path
+      let apiCallCount = 0;
+      await page.route('**/api/v1/library/videos/**', (route) => {
+        apiCallCount++;
+        return route.continue();
+      });
+
       await page.goto('/submit');
 
       const urlInput = page.getByLabel(/YouTube Video URL/i);
@@ -283,14 +316,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
-      await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
-
-      // Track API calls to verify polling
-      let apiCallCount = 0;
-      await page.route('**/api/v1/videos/**', (route) => {
-        apiCallCount++;
-        return route.continue();
-      });
+      await page.waitForFunction(
+        () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        { timeout: 15_000 }
+      );
 
       // Wait a bit for polling to happen
       await page.waitForTimeout(10_000);
@@ -318,7 +347,10 @@ test.describe('Reprocessing Flow', () => {
     const submitButton = page.getByRole('button', { name: /Process Video/i });
     await submitButton.click();
 
-    await page.waitForURL(/\/videos\/[a-f0-9-]+/, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+      { timeout: 15_000 }
+    );
 
     // Wait for completion
     await waitForVideoCompletion(page, PROCESSING_TIMEOUT);

@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:webpack": "next dev --webpack",
-    "build": "next build && node -e \"const fs=require('fs');const path=require('path');function cpR(s,d){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).forEach(f=>{const sp=path.join(s,f),dp=path.join(d,f);fs.statSync(sp).isDirectory()?cpR(sp,dp):fs.copyFileSync(sp,dp)})};cpR('.next/static','.next/standalone/.next/static');cpR('public','.next/standalone/public');if(fs.existsSync('staticwebapp.config.json'))fs.copyFileSync('staticwebapp.config.json','.next/standalone/staticwebapp.config.json');if(fs.existsSync('backend-config.json'))fs.copyFileSync('backend-config.json','.next/standalone/backend-config.json')\"",
+    "build": "next build --webpack && node -e \"const fs=require('fs');const path=require('path');function cpR(s,d){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).forEach(f=>{const sp=path.join(s,f),dp=path.join(d,f);fs.statSync(sp).isDirectory()?cpR(sp,dp):fs.copyFileSync(sp,dp)})};cpR('.next/static','.next/standalone/.next/static');cpR('public','.next/standalone/public');if(fs.existsSync('staticwebapp.config.json'))fs.copyFileSync('staticwebapp.config.json','.next/standalone/staticwebapp.config.json');if(fs.existsSync('backend-config.json'))fs.copyFileSync('backend-config.json','.next/standalone/backend-config.json')\"",
     "build:dev": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -24,7 +24,6 @@
     "@copilotkit/react-ui": "^1.50.1",
     "@copilotkit/runtime": "^1.50.1",
     "@copilotkit/runtime-client-gql": "^1.50.1",
-    "@copilotkit/shared": "^1.50.1",
     "@heroicons/react": "^2.2.0",
     "lucide-react": "^0.468.0",
     "next": "^16.1.1",
@@ -58,6 +57,7 @@
   "overrides": {
     "prismjs": "^1.30.0",
     "diff": "^8.0.3",
-    "hono": "^4.11.4"
+    "hono": "^4.11.4",
+    "minimatch": ">=10.2.1"
   }
 }

@@ -67,7 +67,7 @@ variable "aks_subnet_prefix" {
 variable "aks_node_size" {
   description = "VM size for AKS nodes"
   type        = string
-  default     = "Standard_B4als_v2"  # 4 vCPUs, 8GB RAM, ~$97/month
+  default     = "Standard_B4als_v2" # 4 vCPUs, 8GB RAM, ~$97/month
 }
 
 variable "aks_node_count" {
@@ -89,7 +89,7 @@ variable "kubernetes_version" {
 variable "acr_sku" {
   description = "SKU for Azure Container Registry"
   type        = string
-  default     = "Basic"  # ~$5/month
+  default     = "Basic" # ~$5/month
 }
 
 # -----------------------------------------------------------------------------
@@ -111,7 +111,7 @@ variable "sql_admin_password" {
 variable "sql_sku_name" {
   description = "SQL Database SKU (serverless for cost savings)"
   type        = string
-  default     = "GP_S_Gen5_1"  # Serverless General Purpose
+  default     = "GP_S_Gen5_1" # Serverless General Purpose
 }
 
 # -----------------------------------------------------------------------------

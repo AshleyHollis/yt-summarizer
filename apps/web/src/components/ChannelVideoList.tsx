@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useCallback } from 'react';
 import { channelApi, ChannelVideosResponse, ChannelVideo, ApiClientError } from '@/services/api';
 import { formatDuration } from '@/utils/formatDuration';
@@ -181,10 +182,11 @@ export function ChannelVideoList({
             {/* Thumbnail */}
             <div className="flex-shrink-0 w-24 h-14 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
               {video.thumbnail_url && (
-                <img
+                <Image
                   src={video.thumbnail_url}
                   alt={video.title}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
                   loading="lazy"
                 />
               )}

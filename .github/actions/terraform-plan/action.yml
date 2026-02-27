@@ -20,9 +20,9 @@ outputs:
   plan_output:
     description: 'Raw terraform plan output'
     value: ${{ steps.plan.outputs.plan_output }}
-  formatted_plan:
-    description: 'Formatted plan for PR comments'
-    value: ${{ steps.format.outputs.formatted_plan }}
+  plan_json_path:
+    description: 'Absolute path to plan.json on disk (avoids GITHUB_OUTPUT size limits)'
+    value: ${{ steps.format.outputs.plan_json_path }}
   plan_summary:
     description: 'JSON summary of plan changes'
     value: ${{ steps.format.outputs.plan_summary }}
@@ -32,20 +32,10 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Initialize Terraform with backend
+    - name: Terraform Init
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      env:
-        AUTH0_DOMAIN: ${{ env.AUTH0_DOMAIN }}
-        AUTH0_CLIENT_ID: ${{ env.AUTH0_CLIENT_ID }}
-        AUTH0_CLIENT_SECRET: ${{ env.AUTH0_CLIENT_SECRET }}
-        ARM_CLIENT_ID: ${{ env.ARM_CLIENT_ID }}
-        ARM_TENANT_ID: ${{ env.ARM_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ env.ARM_SUBSCRIPTION_ID }}
-        ARM_USE_OIDC: ${{ env.ARM_USE_OIDC }}
-      run: |
-        # Re-initialize with backend enabled (validation step used -backend=false)
-        terraform init -backend=true -reconfigure
+      run: terraform init -input=false -no-color
 
     - name: Run terraform plan
       id: plan
@@ -58,8 +48,6 @@ runs:
         CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
         AUTH0_DOMAIN: ${{ env.AUTH0_DOMAIN }}
       run: ${{ github.action_path }}/run-terraform-plan.sh
-      # Do NOT use continue-on-error - we want the step to FAIL when plan fails
-      # Post-plan steps use 'if: always()' to run even on failure
 
     - name: Get JSON plan
       id: format

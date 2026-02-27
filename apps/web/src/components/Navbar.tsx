@@ -70,35 +70,21 @@ export function Navbar() {
               >
                 Jobs
               </Link>
-              {/* Admin link - only visible to users with admin role */}
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    isActive('/admin')
-                      ? 'bg-purple-500 text-white'
-                      : 'text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 hover:text-purple-500 dark:hover:text-purple-400'
-                  }`}
-                  data-testid="admin-nav-link"
-                >
-                  Admin
-                </Link>
-              )}
+              <Link
+                href="/admin"
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isActive('/admin')
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-purple-600/10 hover:text-purple-600 dark:hover:text-purple-400'
+                }`}
+              >
+                Admin
+              </Link>
             </div>
           </div>
 
-          {/* Right section: User profile and theme toggle */}
-          <div className="flex items-center gap-3">
-            {isAuthenticated && user ? (
-              <UserProfile />
-            ) : (
-              <Link
-                href="/login"
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
-              >
-                Sign In
-              </Link>
-            )}
+          {/* Right Side: Theme Toggle */}
+          <div className="flex items-center space-x-3">
             <ThemeToggle />
           </div>
         </div>

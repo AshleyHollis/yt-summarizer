@@ -269,7 +269,7 @@ export function CopilotMessage({
               </svg>
             </div>
             <span className="text-sm font-semibold text-[var(--copilot-kit-secondary-contrast-color)]">
-              Related Videos
+              Recommended Videos
             </span>
             <span className="text-xs font-medium text-[var(--copilot-kit-primary-color)] bg-[var(--copilot-kit-primary-color)]/10 px-2 py-0.5 rounded-full border border-[var(--copilot-kit-primary-color)]/20">
               {videoCards.length}

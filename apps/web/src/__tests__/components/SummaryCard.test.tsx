@@ -8,7 +8,9 @@ import '@testing-library/jest-dom';
 import { SummaryCard } from '@/components/SummaryCard';
 
 describe('SummaryCard', () => {
-  const mockSummaryText = `# Video Summary
+  // Sample summary text with markdown - reserved for markdown rendering tests
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _mockSummaryText = `# Video Summary
 
 This is a test summary with some **bold text** and _italic text_.
 

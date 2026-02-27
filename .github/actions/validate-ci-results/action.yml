@@ -17,8 +17,8 @@ inputs:
   test-workers-result:
     description: 'Result of test-workers job'
     required: true
-  test-frontend-result:
-    description: 'Result of test-frontend job'
+  frontend-quality-result:
+    description: 'Result of frontend-quality job'
     required: true
   # Validation job results
   validate-terraform-result:
@@ -37,9 +37,6 @@ inputs:
   build-images-result:
     description: 'Result of build-images job'
     required: true
-  build-images-validate-result:
-    description: 'Result of build-images-validate job'
-    required: true
   acr-configured:
     description: 'Whether ACR is configured (vars.ACR_NAME is set)'
     required: true
@@ -56,11 +53,10 @@ runs:
         TEST_SHARED_RESULT: ${{ inputs.test-shared-result }}
         TEST_API_RESULT: ${{ inputs.test-api-result }}
         TEST_WORKERS_RESULT: ${{ inputs.test-workers-result }}
-        TEST_FRONTEND_RESULT: ${{ inputs.test-frontend-result }}
+        FRONTEND_QUALITY_RESULT: ${{ inputs.frontend-quality-result }}
         VALIDATE_TERRAFORM_RESULT: ${{ inputs.validate-terraform-result }}
         KUBERNETES_VALIDATE_RESULT: ${{ inputs.kubernetes-validate-result }}
         SECRET_SCANNING_RESULT: ${{ inputs.secret-scanning-result }}
         SECRET_SCANNING_SHOULD_RUN: ${{ inputs.secret-scanning-should-run }}
         BUILD_IMAGES_RESULT: ${{ inputs.build-images-result }}
-        BUILD_IMAGES_VALIDATE_RESULT: ${{ inputs.build-images-validate-result }}
       run: bash ${{ github.action_path }}/script.sh

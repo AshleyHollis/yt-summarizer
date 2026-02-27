@@ -1,0 +1,73 @@
+name: Run Python Tests
+description: Sets up Python with uv, runs pytest, and captures duration
+
+inputs:
+  python-version:
+    description: Python version to use
+    required: true
+  service-package:
+    description: Service path for uv sync (e.g., services/api)
+    required: true
+  working-directory:
+    description: Directory containing tests to run
+    required: true
+  test-name:
+    description: Display name for test duration tracking
+    required: true
+  pytest-args:
+    description: Additional pytest arguments (excluding -m marker expression)
+    required: false
+    default: '-v --tb=short'
+  markers:
+    description: Marker expression for -m option (e.g., "not integration and not live")
+    required: false
+    default: ''
+  parallel:
+    description: Run tests in parallel with pytest-xdist
+    required: false
+    default: 'false'
+  install-pytest-xdist:
+    description: Install pytest-xdist in the environment
+    required: false
+    default: 'false'
+  install-mode:
+    description: 'Installation mode: none|shared|service|both (default: both for API/Workers, shared for Shared)'
+    required: false
+    default: 'both'
+
+outputs:
+  test-duration:
+    description: Total test duration
+    value: ${{ steps.finish.outputs.test_duration }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Python with uv
+      uses: ./.github/actions/setup-python-env
+      with:
+        python-version: ${{ inputs.python-version }}
+        install-mode: ${{ inputs.install-mode }}
+        service-package: ${{ inputs.service-package }}
+        install-pytest-xdist: ${{ inputs.install-pytest-xdist }}
+
+    - name: Record tests start
+      id: start
+      uses: ./.github/actions/record-test-duration
+      with:
+        test-name: ${{ inputs.test-name }}
+
+    - name: Run pytest
+      uses: ./.github/actions/run-pytest
+      with:
+        working-directory: ${{ inputs.working-directory }}
+        pytest-args: ${{ inputs.pytest-args }}
+        markers: ${{ inputs.markers }}
+        parallel: ${{ inputs.parallel }}
+
+    - name: Record tests finish
+      id: finish
+      uses: ./.github/actions/record-test-duration
+      with:
+        start-time: ${{ steps.start.outputs.started_at }}
+        test-name: ${{ inputs.test-name }}

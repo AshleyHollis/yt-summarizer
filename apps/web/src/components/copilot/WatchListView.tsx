@@ -12,14 +12,9 @@ import {
   ArrowUp,
   ArrowRight,
   ArrowDown,
-} from 'lucide-react';
-import {
-  copilotBoxStyles,
-  copilotTextSizes,
-  copilotColors,
-  copilotButtonStyles,
-} from './copilotStyles';
-import { formatDuration } from '@/utils/formatDuration';
+} from "lucide-react";
+import { copilotBoxStyles, copilotTextSizes, copilotColors } from "./copilotStyles";
+import { formatDuration } from "@/utils/formatDuration";
 
 /**
  * Priority levels for watch list items

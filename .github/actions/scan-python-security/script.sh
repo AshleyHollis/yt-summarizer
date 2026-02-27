@@ -34,8 +34,13 @@ CHECK_SECURITY="${CHECK_SECURITY:-true}"
 
 # Install code quality tools
 echo "Installing code quality tools..."
-uv tool install bandit[toml]
-uv tool install mypy
+if [ "$CHECK_SECURITY" = "true" ]; then
+  uv tool install bandit[toml]
+fi
+
+if [ "$CHECK_TYPES" = "true" ]; then
+  uv tool install mypy
+fi
 
 cd "$SERVICE_PATH"
 

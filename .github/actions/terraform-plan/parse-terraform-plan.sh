@@ -2,13 +2,15 @@
 # Purpose: Parse terraform plan JSON and extract summary information
 # Inputs: tfplan file from previous terraform plan step
 # Outputs:
-#   plan_summary: JSON object with add/change/destroy counts
-#   formatted_plan: Full terraform JSON plan output
+#   plan_summary:    JSON object with add/change/destroy counts
+#   plan_json_path:  Absolute path to plan.json on disk (avoids GITHUB_OUTPUT size limits)
 # Logic:
 #   1. Convert binary tfplan to JSON format
 #   2. Parse resource_changes array to count each action type
 #   3. Create JSON summary with counts and has_changes flag
-#   4. Output full JSON plan for downstream parsing
+#   4. Output the path to plan.json (not the content) for downstream steps
+
+set -eo pipefail
 
 # Check if tfplan file exists
 if [ ! -f "tfplan" ]; then
@@ -90,25 +92,15 @@ ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"
 CHANGE=$(jq -r '.resource_changes | map(select(.change.actions | contains(["update"]))) | length' plan.json)
 DESTROY=$(jq -r '.resource_changes | map(select(.change.actions | contains(["delete"]))) | length' plan.json)
 
-# Validate jq outputs
-if [ -z "$ADD" ] || [ -z "$CHANGE" ] || [ -z "$DESTROY" ]; then
-  echo "::error::Failed to parse plan.json with jq"
-  echo "::error::ADD=$ADD, CHANGE=$CHANGE, DESTROY=$DESTROY"
-
-  # Default to 0 if parsing failed
-  ADD=${ADD:-0}
-  CHANGE=${CHANGE:-0}
-  DESTROY=${DESTROY:-0}
-fi
-
 # Create JSON summary
+HAS_CHANGES="false"
+if [ "${ADD}" -gt 0 ] || [ "${CHANGE}" -gt 0 ] || [ "${DESTROY}" -gt 0 ]; then HAS_CHANGES="true"; fi
 SUMMARY=$(cat <<EOF
 {
-  "add": $ADD,
-  "change": $CHANGE,
-  "destroy": $DESTROY,
-  "has_changes": $([ $ADD -gt 0 ] || [ $CHANGE -gt 0 ] || [ $DESTROY -gt 0 ] \
-    && echo "true" || echo "false")
+  "add": ${ADD},
+  "change": ${CHANGE},
+  "destroy": ${DESTROY},
+  "has_changes": ${HAS_CHANGES}
 }
 EOF
 )
@@ -117,20 +109,7 @@ echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
 echo "$SUMMARY" >> "$GITHUB_OUTPUT"
 echo "EOF" >> "$GITHUB_OUTPUT"
 
-# Write plan.json to a dedicated directory to avoid argument length limits
-# DO NOT write to GITHUB_OUTPUT - the file can be too large (>2MB with 16 resources)
-PLAN_DATA_DIR="${RUNNER_TEMP:-/tmp}/terraform-plan-data"
-mkdir -p "$PLAN_DATA_DIR"
-
-cp plan.json "$PLAN_DATA_DIR/formatted-plan.json"
-echo "$SUMMARY" > "$PLAN_DATA_DIR/plan-summary.json"
-
-# Export the directory path for downstream steps
-echo "TERRAFORM_PLAN_DATA_DIR=$PLAN_DATA_DIR" >> "$GITHUB_ENV"
-
-echo "✅ Plan data written to: $PLAN_DATA_DIR"
-echo "  - formatted-plan.json: $(wc -c < plan.json) bytes"
-echo "  - plan-summary.json: $(echo "$SUMMARY" | wc -c) bytes"
-
-# For backward compatibility, output a small marker (NOT the full plan)
-echo "formatted_plan=<file:$PLAN_DATA_DIR/formatted-plan.json>" >> "$GITHUB_OUTPUT"
+# Output the path to plan.json rather than its content to avoid $GITHUB_OUTPUT
+# size limits (plan JSON can be many MB on non-trivial Terraform configs).
+# Downstream steps that need the plan JSON read it directly from disk via this path.
+echo "plan_json_path=$(pwd)/plan.json" >> "$GITHUB_OUTPUT"

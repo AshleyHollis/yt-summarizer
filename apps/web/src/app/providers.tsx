@@ -1,22 +1,14 @@
 'use client';
 
-import { CopilotKit } from '@copilotkit/react-core';
-import '@copilotkit/react-ui/styles.css';
-import { ThemeProvider } from 'next-themes';
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  Suspense,
-} from 'react';
-import { useSearchParams } from 'next/navigation';
-import { ToolResultProvider } from '@/contexts/ToolResultContext';
-import { HealthStatusProvider, useHealthStatus } from '@/contexts/HealthStatusContext';
-import { WarmingUpIndicator, CopilotErrorBoundary } from '@/components/common';
-// DIAGNOSTIC: Temporarily commented out to test SWA warmup timeout
-// import { AuthProvider } from '@/contexts/AuthContext';
+import { CopilotKit } from "@copilotkit/react-core";
+import "@copilotkit/react-ui/styles.css";
+import { ThemeProvider } from "next-themes";
+import React, { createContext, useContext, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { ToolResultProvider } from "@/contexts/ToolResultContext";
+import { HealthStatusProvider, useHealthStatus } from "@/contexts/HealthStatusContext";
+import { WarmingUpIndicator, CopilotErrorBoundary } from "@/components/common";
+import { getClientApiUrl } from "@/services/runtimeConfig";
 
 // Types for scope management
 export interface DateRange {
@@ -288,7 +280,7 @@ export function Providers({ children }: ProvidersProps) {
 function ProvidersInner({ children }: ProvidersProps) {
   // Self-hosted runtime using Microsoft Agent Framework
   // Configure NEXT_PUBLIC_API_URL to point to your backend
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const apiUrl = getClientApiUrl();
   const runtimeUrl = `${apiUrl}/api/copilotkit`;
 
   // Debug logging for production troubleshooting
@@ -296,6 +288,7 @@ function ProvidersInner({ children }: ProvidersProps) {
     console.log('[CopilotKit Debug]', {
       apiUrl,
       runtimeUrl,
+      runtimeConfigApiUrl: window.__RUNTIME_CONFIG__?.apiUrl,
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
       NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
     });
@@ -309,16 +302,14 @@ function ProvidersInner({ children }: ProvidersProps) {
   const searchParams = useSearchParams();
   const urlThreadId = searchParams.get('thread');
 
-  // Track mounted state for hydration
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Always render CopilotKit, but wait for client-side mount
-  // to avoid hydration mismatch with threadId
-  // ThreadedCopilotSidebar handles creating threads and updating the URL
+  // Always render CopilotKit with the URL thread ID from the very first render.
+  // We no longer guard with `mounted` because useSearchParams() returns null on
+  // SSR (no URL), so there is no hydration mismatch risk.  Passing the correct
+  // threadId from the first render prevents CopilotKit from generating its own
+  // ephemeral thread UUID before we can inject the persisted one, which previously
+  // caused agent responses to be saved to a different thread than the one the
+  // browser was listening on.
+  //
   // NOTE: We intentionally DO NOT use key={threadId} here!
   // Using key causes full component remount which destroys UI state and
   // causes the "page refresh" effect. CopilotKit handles threadId changes internally.
@@ -330,7 +321,7 @@ function ProvidersInner({ children }: ProvidersProps) {
         agent="yt-summarizer"
         showDevConsole={false}
         enableInspector={false}
-        threadId={mounted ? (urlThreadId ?? undefined) : undefined}
+        threadId={urlThreadId ?? undefined}
       >
         {/* DIAGNOSTIC: AuthProvider temporarily removed to test SWA warmup timeout */}
         {/* <AuthProvider> */}

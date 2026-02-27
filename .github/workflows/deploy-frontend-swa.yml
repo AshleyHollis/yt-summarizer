@@ -1,0 +1,176 @@
+# =============================================================================
+# Deploy Frontend to Azure Static Web Apps (Reusable Workflow)
+# =============================================================================
+# Unified frontend deployment workflow for both production and preview.
+# Extracts common patterns from deploy-prod.yml and preview.yml to reduce
+# duplication and ensure consistent SWA deployments.
+#
+# WORKFLOW STEPS:
+#   1. Checkout code (with proper ref for preview)
+#   2. Load shared environment
+#   3. Verify SWA token is configured
+#   4. (Preview only) Azure login for SWA cleanup
+#   5. (Preview only) Cleanup stale SWA environments
+#   6. Deploy frontend with CI artifact
+#   7. Verify frontend deployment with health check
+#
+# USAGE:
+#   Production:
+#     uses: ./.github/workflows/deploy-frontend-swa.yml
+#     with:
+#       environment: prod
+#       ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
+#       api-url: https://api.yt-summarizer.example.com
+#       deployment-environment: default
+#
+#   Preview:
+#     uses: ./.github/workflows/deploy-frontend-swa.yml
+#     with:
+#       environment: preview
+#       ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
+#       api-url: https://pr-42.yt-summarizer.apps.ashleyhollis.com
+#       deployment-environment: pr-42
+#       pr-number: '42'
+#       pr-head-sha: abc1234567890
+#       cleanup-stale-environments: 'true'
+# =============================================================================
+
+name: Deploy Frontend to SWA
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment type: prod or preview'
+        required: true
+        type: string
+      ci-run-id:
+        description: 'CI workflow run ID to fetch build artifact'
+        required: true
+        type: string
+      api-url:
+        description: 'API URL for runtime configuration'
+        required: true
+        type: string
+      deployment-environment:
+        description: 'SWA deployment environment (default for prod, pr-N for preview)'
+        required: true
+        type: string
+      # Preview-specific inputs
+      pr-number:
+        description: 'PR number (preview only)'
+        required: false
+        type: string
+        default: ''
+      pr-head-sha:
+        description: 'PR head SHA for checkout (preview only)'
+        required: false
+        type: string
+        default: ''
+      cleanup-stale-environments:
+        description: 'Cleanup stale SWA environments before deploy (preview only)'
+        required: false
+        type: boolean
+        default: false
+
+    outputs:
+      static_web_app_url:
+        description: 'The deployed SWA URL'
+        value: ${{ jobs.deploy.outputs.static_web_app_url }}
+
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      SWA_DEPLOYMENT_TOKEN:
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy Frontend (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      static_web_app_url: ${{ steps.deploy-frontend.outputs.static_web_app_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.pr-head-sha != '' && inputs.pr-head-sha || github.sha }}
+
+      # Fail-fast if PR has been closed to avoid false failures and wasted resources
+      - name: Check if PR is still open
+        if: inputs.environment == 'preview' && inputs.pr-number != ''
+        uses: ./.github/actions/check-pr-open
+        with:
+          pr-number: ${{ inputs.pr-number }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
+      - name: Verify SWA token is configured
+        uses: ./.github/actions/verify-secret
+        with:
+          secret-name: 'SWA_DEPLOYMENT_TOKEN'
+          secret-value: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+
+      # Preview-only: Azure login for SWA cleanup operations
+      - name: Azure Login for SWA cleanup
+        if: inputs.cleanup-stale-environments
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Preview-only: Cleanup stale environments before deploy
+      - name: Cleanup stale SWA environments
+        if: inputs.cleanup-stale-environments
+        id: cleanup-stale
+        continue-on-error: true
+        uses: ./.github/actions/cleanup-stale-swa-environments
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          swa-name: ${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          dry-run: 'false'
+          min-age-hours: '1'
+          max-prs-to-check: '50'
+
+      - name: Report cleanup results
+        if: inputs.cleanup-stale-environments && steps.cleanup-stale.outputs.deleted-count != '0'
+        run: |
+          echo "✅ Cleaned up ${{ steps.cleanup-stale.outputs.deleted-count }} stale SWA environment(s)"
+          echo "💡 Deleted environments for PRs: ${{ steps.cleanup-stale.outputs.stale-prs }}"
+
+      - name: Deploy frontend with CI artifact
+        id: deploy-frontend
+        uses: ./.github/actions/deploy-frontend-swa
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ci-run-id: ${{ inputs.ci-run-id }}
+          api-url: ${{ inputs.api-url }}
+          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          app-location: apps/web
+          runtime-config-path: apps/web/public/runtime-config.js
+          output_location: ""
+          production-branch: main
+          deployment-environment: ${{ inputs.deployment-environment }}
+          verbose: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
+
+      - name: Verify frontend deployment
+        if: steps.deploy-frontend.outputs.static_web_app_url != ''
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ steps.deploy-frontend.outputs.static_web_app_url }}
+          max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
+          interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
+          timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
+          expected-status: '200'
+          service-name: '${{ inputs.environment == ''prod'' && ''Production'' || ''Preview'' }} Web'

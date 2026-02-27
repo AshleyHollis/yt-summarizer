@@ -11,10 +11,11 @@
  * See useBackendToolRenderers.tsx for the query_library renderer.
  */
 
-import { useCopilotAction } from '@copilotkit/react-core';
-import { useScope } from '@/app/providers';
-import { apiPost, API_URL } from './copilot-utils';
-import type { SegmentSearchResponse, CoverageResponse } from '@/types/copilot-types';
+import { useCopilotAction } from "@copilotkit/react-core";
+import { useScope } from "@/app/providers";
+import { apiPost } from "./copilot-utils";
+import { getClientApiUrl } from "@/services/runtimeConfig";
+import type { SegmentSearchResponse, CoverageResponse } from "@/types/copilot-types";
 
 /**
  * Register all frontend tools (Pattern A).
@@ -127,7 +128,9 @@ function useRelatedVideosTool() {
       },
     ],
     handler: async ({ videoId, limit = 10 }) => {
-      const response = await fetch(`${API_URL}/api/v1/copilot/neighbors/${videoId}?limit=${limit}`);
+      const response = await fetch(
+        `${getClientApiUrl()}/api/v1/copilot/neighbors/${videoId}?limit=${limit}`
+      );
       if (!response.ok) {
         throw new Error(`Neighbors failed: ${response.statusText}`);
       }

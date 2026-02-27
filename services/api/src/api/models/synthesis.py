@@ -4,7 +4,7 @@ These models support structured outputs that synthesize content from the library
 into actionable learning experiences.
 """
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -12,14 +12,14 @@ from pydantic import BaseModel, Field
 from .base import BaseResponse
 
 
-class SynthesisType(str, Enum):
+class SynthesisType(StrEnum):
     """Types of synthesis outputs."""
 
     LEARNING_PATH = "learning_path"
     WATCH_LIST = "watch_list"
 
 
-class Priority(str, Enum):
+class Priority(StrEnum):
     """Priority levels for watch list items."""
 
     HIGH = "high"

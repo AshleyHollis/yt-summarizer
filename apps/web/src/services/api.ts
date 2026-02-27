@@ -3,22 +3,26 @@
  */
 
 import { generateCorrelationId } from './correlation';
+import { getApiBaseUrl, getClientApiUrl } from './runtimeConfig';
 
 // API base URL
-// For SWA deployments, NEXT_PUBLIC_API_URL should be the full backend URL
-// For development, it defaults to localhost or can be left empty for rewrites
-const API_BASE_URL =
-  typeof window === 'undefined'
-    ? process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-    : process.env.NEXT_PUBLIC_API_URL || '';
+// IMPORTANT: Do NOT cache this at module init time. The runtime-config.js may not have
+// executed yet when this module first loads (Next.js hydration order). Instead,
+// getApiBaseUrl() is called lazily inside buildUrl() on each request so that
+// window.__RUNTIME_CONFIG__ is read after the page has fully initialized.
+// For SWA deployments, runtime-config.js sets the API URL at deploy time.
+// For development, it defaults to localhost or can be overridden via NEXT_PUBLIC_API_URL.
 
 // Debug logging for production troubleshooting
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENVIRONMENT === 'preview') {
-  console.log('[API Client Debug]', {
-    API_BASE_URL,
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
-  });
+  // Defer debug log until after runtime-config.js has a chance to execute
+  setTimeout(() => {
+    console.log('[API Client Debug]', {
+      RUNTIME_CONFIG_API_URL: window.__RUNTIME_CONFIG__?.apiUrl,
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+      NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
+    });
+  }, 0);
 }
 
 // Correlation ID header name
@@ -94,10 +98,14 @@ function buildUrl(
   endpoint: string,
   params?: Record<string, string | number | boolean | undefined>
 ): string {
+  // Resolve base URL lazily so that window.__RUNTIME_CONFIG__ is read
+  // after runtime-config.js has executed (not at module init time)
+  const baseUrl = getApiBaseUrl();
+
   // For client-side with empty base URL, use relative path
   let urlString: string;
-  if (API_BASE_URL) {
-    const url = new URL(endpoint, API_BASE_URL);
+  if (baseUrl) {
+    const url = new URL(endpoint, baseUrl);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined) {
@@ -1091,7 +1099,7 @@ export const batchApi = {
   ): (() => void) => {
     // Build the SSE URL - use direct backend URL to avoid Next.js proxy buffering
     // SSE connections should bypass the rewrite proxy for proper streaming
-    const directApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const directApiUrl = getClientApiUrl();
     const sseUrl = `${directApiUrl}/api/v1/batches/${batchId}/stream`;
 
     const eventSource = new EventSource(sseUrl);

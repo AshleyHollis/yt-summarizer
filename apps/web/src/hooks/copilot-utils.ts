@@ -3,14 +3,10 @@
  */
 
 import { formatDuration } from '@/utils/formatDuration';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 // Re-export formatDuration as formatTime for backward compatibility
 export const formatTime = formatDuration;
-
-/**
- * API base URL from environment
- */
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 /**
  * Default minimum relevance threshold for filtering results
@@ -20,9 +16,13 @@ export const MIN_RELEVANCE_THRESHOLD = 0.5;
 /**
  * Make an API call with error handling
  */
-export async function apiCall<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+export async function apiCall<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const apiUrl = getClientApiUrl();
+  const response = await fetch(`${apiUrl}${path}`, {
+    headers: { "Content-Type": "application/json" },
     ...options,
   });
 

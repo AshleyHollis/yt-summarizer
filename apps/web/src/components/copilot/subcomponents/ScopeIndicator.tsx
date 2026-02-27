@@ -267,15 +267,9 @@ export function ScopeIndicator() {
                 Toggle what the AI can use in its answers:
               </span>
               <ul className="mt-0.5 ml-3 space-y-0.5 text-[var(--copilot-kit-muted-color)]">
-                <li>
-                  • <strong>Your Videos</strong> — Transcripts and summaries from your library
-                </li>
-                <li>
-                  • <strong>AI Knowledge</strong> — The AI's general training knowledge
-                </li>
-                <li>
-                  • <strong>Web Search</strong> — Live search results from the internet
-                </li>
+                <li>• <strong>{"Your Videos"}</strong> — Transcripts and summaries from your library</li>
+                <li>• <strong>{"AI Knowledge"}</strong> — The AI&apos;s general training knowledge</li>
+                <li>• <strong>{"Web Search"}</strong> — Live search results from the internet</li>
               </ul>
             </div>
           </div>

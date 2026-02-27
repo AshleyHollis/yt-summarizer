@@ -4,8 +4,8 @@ inputs:
   plan-summary:
     description: 'JSON summary of plan changes (add, change, destroy, has_changes)'
     required: true
-  formatted-plan:
-    description: 'Formatted terraform plan output (JSON)'
+  plan-json-path:
+    description: 'Absolute path to plan.json on disk (avoids GITHUB_OUTPUT size limits)'
     required: true
   plan-outcome:
     description: 'Plan outcome (success/failure)'
@@ -29,6 +29,8 @@ runs:
       id: check-files
       shell: bash
       env:
+        PLAN_SUMMARY: ${{ inputs.plan-summary }}
+        PLAN_JSON_PATH: ${{ inputs.plan-json-path }}
         PLAN_OUTCOME: ${{ inputs.plan-outcome }}
       run: |
         # Check if plan data was pre-written by terraform-plan action

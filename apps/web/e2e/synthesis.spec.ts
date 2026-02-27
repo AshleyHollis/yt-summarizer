@@ -27,7 +27,7 @@ test.describe('US6: Synthesis Feature UI', () => {
   test.describe('Chat Interface for Synthesis', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('chat input accepts synthesis requests', async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe('US6: Synthesis Feature UI', () => {
       });
 
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
       // Should have no critical console errors
@@ -98,7 +98,7 @@ test.describe('US6: Synthesis Feature UI', () => {
 
     test('chat interface is accessible on library page', async ({ page }) => {
       await page.goto('/library');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Chat input should be visible
       const chatInput = page.getByRole('textbox').first();

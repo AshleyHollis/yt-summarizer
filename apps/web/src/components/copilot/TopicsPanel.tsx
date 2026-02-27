@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useScope } from '@/app/providers';
+import { useState, useEffect } from "react";
+import { useScope } from "@/app/providers";
+import { getClientApiUrl } from "@/services/runtimeConfig";
 
 interface TopicCount {
   facetId: string;
@@ -15,8 +16,6 @@ interface TopicsPanelProps {
   onTopicClick?: (facetId: string) => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export function TopicsPanel({ onTopicClick }: TopicsPanelProps) {
   const [topics, setTopics] = useState<TopicCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +24,7 @@ export function TopicsPanel({ onTopicClick }: TopicsPanelProps) {
 
   useEffect(() => {
     const fetchTopics = async () => {
+      const API_URL = getClientApiUrl();
       try {
         setLoading(true);
         setError(null);

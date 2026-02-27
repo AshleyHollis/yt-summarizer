@@ -6,7 +6,7 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Generic, TypeVar
 
 # Import shared modules (path will be configured via PYTHONPATH)
@@ -73,7 +73,7 @@ except ImportError:
 T = TypeVar("T")
 
 
-class WorkerStatus(str, Enum):
+class WorkerStatus(StrEnum):
     """Worker processing status."""
 
     SUCCESS = "success"

@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2.10.0",
     "pydantic-settings>=2.6.0",
     "sqlalchemy>=2.0.0",
+    "greenlet>=3.0.0",  # Required for SQLAlchemy asyncio support
     "azure-identity>=1.19.0",
     "azure-storage-queue>=12.12.0",
     "azure-storage-blob>=12.23.0",
@@ -19,10 +20,13 @@ dependencies = [
     "httpx>=0.27.0",
     "yt-dlp>=2024.12.6",
     "youtube-transcript-api>=0.6.2",  # For fetching YouTube transcripts
-    # Agent Framework - pinned to compatible versions to avoid import errors
-    # agent-framework-ag-ui 1.0.0b260107 requires agent-framework with use_instrumentation
-    "agent-framework>=1.0.0b260107",  # Ensure we get latest with required features
-    "agent-framework-ag-ui>=1.0.0b260107",
+    # Agent Framework - upgraded to b260212 which uses opentelemetry-semantic-conventions-ai>=0.4.13
+    # (fixing AttributeError: SpanAttributes has no attribute LLM_SYSTEM on CI)
+    "agent-framework==1.0.0b260212",
+    "agent-framework-ag-ui==1.0.0b260212",
+    # Pin semconv-ai to <0.4.14 because 0.4.14 removed SpanAttributes.LLM_SYSTEM
+    # which agent-framework==b260212/observability.py:1533 still accesses at module import time.
+    "opentelemetry-semantic-conventions-ai>=0.4.13,<0.4.14",
     # OpenTelemetry for observability (T185)
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",

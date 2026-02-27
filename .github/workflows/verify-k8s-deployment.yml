@@ -1,0 +1,202 @@
+# =============================================================================
+# Verify Kubernetes Deployment (Reusable Workflow)
+# =============================================================================
+# Unified deployment verification for both production and preview environments.
+# Extracts common patterns from deploy-prod.yml and preview.yml to reduce
+# duplication and ensure consistent verification across environments.
+#
+# VERIFICATION STEPS:
+#   1. Setup Azure and AKS context
+#   2. Setup Kustomize tooling
+#   3. Wait for Argo CD to sync (with optional auto-recovery for preview)
+#   4. Verify deployed images match expected tag
+#   5. Collect diagnostics on failure
+#   6. Verify TLS certificate
+#   7. Run health checks
+#
+# USAGE:
+#   Production:
+#     uses: ./.github/workflows/verify-k8s-deployment.yml
+#     with:
+#       environment: prod
+#       namespace: yt-summarizer
+#       argocd-app-name: yt-summarizer-prod
+#       expected-image-tag: sha-abc1234
+#       api-url: https://api.yt-summarizer.example.com
+#       host: api.yt-summarizer.apps.ashleyhollis.com
+#
+#   Preview:
+#     uses: ./.github/workflows/verify-k8s-deployment.yml
+#     with:
+#       environment: preview
+#       namespace: preview-pr-42
+#       argocd-app-name: preview-pr-42
+#       expected-image-tag: pr-42-abc1234
+#       api-url: https://pr-42.yt-summarizer.apps.ashleyhollis.com
+#       host: pr-42.yt-summarizer.apps.ashleyhollis.com
+#       pr-number: '42'
+# =============================================================================
+
+name: Verify Kubernetes Deployment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment type: prod or preview'
+        required: true
+        type: string
+      namespace:
+        description: 'Kubernetes namespace for the deployment'
+        required: true
+        type: string
+      argocd-app-name:
+        description: 'Argo CD application name'
+        required: true
+        type: string
+      expected-image-tag:
+        description: 'Expected image tag to verify'
+        required: true
+        type: string
+      api-url:
+        description: 'API URL for health checks'
+        required: true
+        type: string
+      host:
+        description: 'Hostname for TLS certificate verification'
+        required: true
+        type: string
+      pr-number:
+        description: 'PR number (required for preview, ignored for prod)'
+        required: false
+        type: string
+        default: '0'
+      max-wait-seconds:
+        description: 'Max seconds to wait for ArgoCD sync'
+        required: false
+        type: string
+        default: '300'
+      auto-recovery:
+        description: 'Enable auto-recovery for stuck deployments (preview only)'
+        required: false
+        type: boolean
+        default: false
+      run-preview-health-check:
+        description: 'Run preview-specific health checks with DNS/Gateway verification'
+        required: false
+        type: boolean
+        default: false
+
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+
+jobs:
+  verify:
+    name: Verify ${{ inputs.environment }} Deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Fail-fast if PR has been closed to avoid false failures and wasted resources
+      - name: Check if PR is still open
+        if: inputs.environment == 'preview' && inputs.pr-number != '0'
+        uses: ./.github/actions/check-pr-open
+        with:
+          pr-number: ${{ inputs.pr-number }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
+
+      - name: Load shared environment
+        uses: ./.github/actions/load-shared-env
+
+      - name: Setup Azure and AKS
+        uses: ./.github/actions/setup-azure-aks
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+
+      - name: Setup Kustomize
+        uses: ./.github/actions/setup-kustomize
+        with:
+          kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
+
+      - name: Wait for Argo CD sync
+        uses: ./.github/actions/argocd-wait
+        with:
+          app-name: ${{ inputs.argocd-app-name }}
+          namespace: ${{ inputs.namespace }}
+          argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cleanup-stuck-operations: 'true'
+          auto-recovery: ${{ inputs.auto-recovery && 'true' || 'false' }}
+          max-wait-seconds: ${{ inputs.max-wait-seconds }}
+          poll-interval-seconds: ${{ inputs.environment == 'prod' && '5' || '10' }}
+          pr-number: ${{ inputs.pr-number }}
+          max-recovery-attempts: '3'
+          expected-image-tag: ${{ inputs.expected-image-tag }}
+
+      - name: Verify deployments are using correct image tag
+        uses: ./.github/actions/verify-k8s-deployment
+        with:
+          namespace: ${{ inputs.namespace }}
+          deployments: api,transcribe-worker,summarize-worker
+          expected-tag: ${{ inputs.expected-image-tag }}
+          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          image-name: yt-summarizer
+          wait-for-ready: 'true'
+          timeout-seconds: '300'
+          fail-on-mismatch: 'true'
+
+      - name: Collect and upload diagnostics on failure
+        if: failure()
+        uses: ./.github/actions/collect-deployment-diagnostics
+        with:
+          app-name: ${{ inputs.argocd-app-name }}
+          artifact-name: deployment-diagnostics-${{ inputs.environment }}-${{ inputs.pr-number != '0' && format('pr-{0}', inputs.pr-number) || 'prod' }}
+
+      - name: Verify TLS certificate
+        uses: ./.github/actions/verify-certificate
+        with:
+          host: ${{ inputs.host }}
+
+      # Preview-specific health checks with DNS/Gateway verification
+      - name: Run preview health checks
+        if: inputs.run-preview-health-check
+        uses: ./.github/actions/health-check-preview
+        with:
+          namespace: ${{ inputs.namespace }}
+          external-url: ${{ inputs.api-url }}
+          max-attempts: '10'
+          interval-seconds: '10'
+
+      # Standard health checks for production
+      - name: Run API health check (liveness)
+        if: ${{ !inputs.run-preview-health-check }}
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ inputs.api-url }}${{ env.HEALTH_CHECK_PATH }}
+          max-attempts: '20'
+          interval-seconds: '10'
+          timeout-seconds: '5'
+          expected-status: '200'
+          service-name: '${{ inputs.environment == ''prod'' && ''Production'' || ''Preview'' }} API (External)'
+
+      - name: Run API health check (readiness)
+        if: ${{ !inputs.run-preview-health-check }}
+        uses: ./.github/actions/health-check
+        with:
+          url: ${{ inputs.api-url }}/health
+          max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
+          interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
+          timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
+          expected-status: '200'
+          service-name: '${{ inputs.environment == ''prod'' && ''Production'' || ''Preview'' }} API'

@@ -12,6 +12,6 @@ terraform {
     # -backend-config="key=<environment>.tfstate"
 
     # State locking is enabled by default via Azure Blob lease
-    use_oidc = true  # Use OIDC authentication in GitHub Actions
+    use_oidc = true # Use OIDC authentication in GitHub Actions
   }
 }

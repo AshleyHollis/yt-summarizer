@@ -18,14 +18,16 @@ import httpx
 
 # Import Agent Framework components
 try:
-    from agent_framework import BaseChatClient, ChatAgent, ai_function
+    from agent_framework import Agent, BaseChatClient, ChatOptions
+    from agent_framework import tool as agent_tool
     from agent_framework.openai import OpenAIChatClient
 
     AGENT_FRAMEWORK_AVAILABLE = True
 except ImportError:
-    ChatAgent = None  # type: ignore
-    ai_function = None  # type: ignore
+    Agent = None  # type: ignore
+    agent_tool = None  # type: ignore
     BaseChatClient = None  # type: ignore
+    ChatOptions = None  # type: ignore
     OpenAIChatClient = None  # type: ignore
     AGENT_FRAMEWORK_AVAILABLE = False
 
@@ -50,59 +52,77 @@ AGENT_NAME = "yt-summarizer"
 AGENT_DESCRIPTION = "An AI assistant for searching and exploring your YouTube video library"
 
 # System prompt for the agent
-SYSTEM_INSTRUCTIONS = """You are a helpful AI assistant for YT Summarizer, a YouTube video knowledge base application.
+SYSTEM_INSTRUCTIONS = """<role>
+You are an AI assistant for YT Summarizer, a YouTube video knowledge base application.
+Your purpose is to help users search, discover, and learn from their video library.
+</role>
 
-CRITICAL RULES:
-- Use ONE TOOL PER RESPONSE - do not call multiple tools for the same question
-- Do NOT add text after calling a tool - the UI renders the complete response
-- PROACTIVELY search the library when users ask questions
-- Do not ask for clarification - search first, then ask if results are unclear
+<instructions>
+# Tool Usage Rules
 
-PRIMARY TOOL - USE THIS FIRST:
-- query_library: The PRIMARY tool for ALL user questions. Returns a rich answer with video cards, evidence citations, and follow-up suggestions. The frontend renders this as a complete response - no additional text needed.
+## Primary Tool (Use First)
+- **query_library**: The PRIMARY tool for answering user questions
+  - Returns: Rich answer with video cards, evidence citations, and follow-up suggestions
+  - When: Use for ALL user questions unless a specific secondary tool is explicitly needed
+  - Important: Frontend renders the complete response - do NOT add text after calling this tool
 
-SYNTHESIS TOOLS (for structured outputs):
-- synthesize_learning_path: When user asks for a learning path, progression, or ordered sequence of videos. Creates beginner-to-advanced ordered content. Use for: "Create a learning path", "What order should I watch", "Progressive tutorial for", "Beginner to advanced".
-- synthesize_watch_list: When user asks for recommendations or prioritized videos. Creates a prioritized list. Use for: "What should I watch", "Recommend videos", "Best videos on", "Top videos for".
+## Synthesis Tools (Structured Outputs)
+- **synthesize_learning_path**: Creates beginner-to-advanced ordered content
+  - When: "Create a learning path", "What order should I watch", "Progressive tutorial for", "Beginner to advanced"
+- **synthesize_watch_list**: Creates a prioritized recommendation list
+  - When: "What should I watch", "Recommend videos", "Best videos on", "Top videos for"
 
-SECONDARY TOOLS (only use when query_library is not appropriate):
-- search_videos: Only for simple video searches by title
-- search_segments: Only for finding specific quotes/timestamps
-- get_video_summary: Only when user explicitly asks for a summary of a specific video
-- get_library_coverage: Only when user asks "how many videos" or "what's in my library"
-- get_topics_for_channel: Only when user asks about topics/categories
+## Secondary Tools (Specific Use Cases Only)
+- **search_videos**: Simple video search by title (not content)
+- **search_segments**: Find specific quotes/timestamps
+- **get_video_summary**: Get summary of a specific video (when user explicitly requests it)
+- **get_library_coverage**: Library statistics ("how many videos", "what's in my library")
+- **get_topics_for_channel**: Topic/category information
 
-TOOL SELECTION - PICK ONE:
-- "What videos do I have?" → query_library (NOT get_library_coverage + query_library)
-- "Tell me about X" → query_library
-- "How many videos?" → get_library_coverage only
-- "Summarize video Y" → get_video_summary only
-- "Create a learning path for X" → synthesize_learning_path
-- "What order should I watch these?" → synthesize_learning_path
-- "Recommend videos about X" → synthesize_watch_list
-- "Best videos for learning X" → synthesize_watch_list
-- Any other question → query_library
+# Response Protocol
+1. Call ONE tool per response (never multiple tools for the same question)
+2. Do NOT add explanatory text after calling a tool
+3. Let the tool result speak for itself - the UI handles rendering
+4. Be proactive - search first, ask for clarification only if results are unclear
 
-RESPONSE FORMAT:
-- Call ONE tool and let the UI render the response
-- The tool result IS the response - do not add text after it
-- Do not explain what you're doing - just call the tool
+# Context Awareness
 
-CONTEXT AWARENESS:
-The context includes search scope settings that control what to search:
-- If scope has "videoIds", ONLY search those specific videos (pass video_id to query_library)
-- If scope has "channels", ONLY search videos from those channels (pass channel_id to query_library)
-- If scope is empty ({}), search the entire library (pass no video_id or channel_id)
+## Search Scope
+The context may include search scope settings:
+- `videoIds` present: ONLY search those specific videos (pass video_id to query_library)
+- `channels` present: ONLY search videos from those channels (pass channel_id to query_library)
+- Empty scope ({}): Search the entire library (no filters)
 
-AI KNOWLEDGE SETTINGS (CRITICAL - ALWAYS CHECK):
-When the context includes "aiSettings", you MUST pass these values to query_library:
-- useVideoContext: If false, do NOT search the video library (set use_video_context=false)
-- useLLMKnowledge: If false, do NOT use your general knowledge (set use_llm_knowledge=false)
-- useWebSearch: If true, search the web (set use_web_search=true)
+## AI Knowledge Settings (CRITICAL)
+When context includes "aiSettings", ALWAYS pass these to query_library:
+- `useVideoContext`: Controls video library search
+  - false → set use_video_context=false
+- `useLLMKnowledge`: Controls your general knowledge
+  - false → set use_llm_knowledge=false
+- `useWebSearch`: Controls web search
+  - true → set use_web_search=true
 
-Example: If aiSettings shows {"useVideoContext": false, "useLLMKnowledge": true, "useWebSearch": false}
-Then call query_library with: use_video_context=false, use_llm_knowledge=true, use_web_search=false
-This lets the user control whether answers come from their library, AI knowledge, or web search.
+<example>
+User settings: {"useVideoContext": false, "useLLMKnowledge": true, "useWebSearch": false}
+Your call: query_library(query="...", use_video_context=false, use_llm_knowledge=true, use_web_search=false)
+</example>
+
+This gives users full control over knowledge sources (library, AI knowledge, or web).
+</instructions>
+
+<tool_selection_guide>
+| User Query | Tool to Use | Rationale |
+|------------|-------------|-----------|
+| "What videos do I have?" | query_library | Returns contextual answer with video cards |
+| "Tell me about X" | query_library | Primary tool for content questions |
+| "How many videos?" | get_library_coverage | Specific stats request |
+| "Summarize video Y" | get_video_summary | Explicit summary request |
+| "Create a learning path for X" | synthesize_learning_path | Ordered progression |
+| "What order should I watch these?" | synthesize_learning_path | Ordered progression |
+| "Recommend videos about X" | synthesize_watch_list | Prioritized recommendations |
+| "Best videos for learning X" | synthesize_watch_list | Prioritized recommendations |
+| Any other question | query_library | Default primary tool |
+</tool_selection_guide>
 """
 
 # Default configuration values
@@ -176,11 +196,11 @@ async def safe_api_call(
 # Agent Tools
 # =============================================================================
 
-if ai_function is not None:
+if agent_tool is not None:
     # Import the context accessor for AI settings
     from .agui_endpoint import get_current_ai_settings
 
-    @ai_function
+    @agent_tool
     async def query_library(
         query: Annotated[str, "The question to ask about the video library"],
         video_id: Annotated[str | None, "Optional video ID to focus the search on"] = None,
@@ -249,7 +269,7 @@ if ai_function is not None:
             )
         return result
 
-    @ai_function
+    @agent_tool
     async def search_videos(
         query: Annotated[str, "The search query to find videos"],
         channel_filter: Annotated[str | None, "Optional channel name to filter by"] = None,
@@ -274,7 +294,7 @@ if ai_function is not None:
             )
         return result
 
-    @ai_function
+    @agent_tool
     async def search_segments(
         query: Annotated[str, "The search query to find transcript segments"],
         video_ids: Annotated[
@@ -301,7 +321,7 @@ if ai_function is not None:
             )
         return result
 
-    @ai_function
+    @agent_tool
     async def get_video_summary(
         video_id: Annotated[str, "The UUID of the video to get the summary for"],
     ) -> dict[str, Any]:
@@ -315,7 +335,7 @@ if ai_function is not None:
             logger.info(f"get_video_summary retrieved summary for video {video_id}")
         return result
 
-    @ai_function
+    @agent_tool
     async def get_library_coverage(
         channel_id: Annotated[str | None, "Optional channel ID to get coverage for"] = None,
     ) -> dict[str, Any]:
@@ -332,7 +352,7 @@ if ai_function is not None:
             logger.info(f"get_library_coverage: {result.get('videoCount', 0)} videos")
         return result
 
-    @ai_function
+    @agent_tool
     async def get_topics_for_channel(
         channel_id: Annotated[str | None, "Optional UUID of the channel to get topics for"] = None,
     ) -> dict[str, Any]:
@@ -349,7 +369,7 @@ if ai_function is not None:
             logger.info(f"get_topics_for_channel: {len(result.get('topics', []))} topics")
         return result
 
-    @ai_function
+    @agent_tool
     async def synthesize_learning_path(
         query: Annotated[
             str,
@@ -391,7 +411,7 @@ if ai_function is not None:
                 logger.info(f"synthesize_learning_path: {item_count} items for '{query}'")
         return result
 
-    @ai_function
+    @agent_tool
     async def synthesize_watch_list(
         query: Annotated[
             str, "Description of what videos to recommend (e.g., 'fitness for beginners')"
@@ -559,16 +579,16 @@ def get_agent_tools() -> list:
     ]
 
 
-def create_yt_summarizer_agent() -> ChatAgent | None:
+def create_yt_summarizer_agent() -> Agent | None:
     """Create the YT Summarizer agent with tools.
 
-    Creates a ChatAgent configured with:
+    Creates an Agent configured with:
     - System instructions for the YT Summarizer use case
     - Tools for searching videos, segments, and getting summaries
     - Appropriate temperature settings
 
     Returns:
-        Configured ChatAgent or None if dependencies not available.
+        Configured Agent or None if dependencies not available.
     """
     if not AGENT_FRAMEWORK_AVAILABLE:
         logger.warning("agent_framework not installed - agent cannot be created")
@@ -580,21 +600,20 @@ def create_yt_summarizer_agent() -> ChatAgent | None:
 
     tools = get_agent_tools()
 
-    # Create the agent
+    # Create the agent using the new Agent API (b260212+)
     # Note: Reasoning models (o1, o3, gpt-5-mini, etc.) only support:
     # - temperature=1 (the only allowed value)
-    # - max_completion_tokens instead of max_tokens
-    # We explicitly set temperature=1 for compatibility with all models.
-    agent = ChatAgent(
-        chat_client=chat_client,
+    # We explicitly set temperature=1 via default_options for compatibility with all models.
+    agent = Agent(
+        chat_client,
         name=AGENT_NAME,
         description=AGENT_DESCRIPTION,
         instructions=SYSTEM_INSTRUCTIONS,
         tools=tools,
-        temperature=1,  # Only value supported by reasoning models
+        default_options=ChatOptions(temperature=1),  # Only value supported by reasoning models
     )
 
-    # Get tool names - AIFunction objects use .name, not __name__
+    # Get tool names - FunctionTool objects use .name
     tool_names = [getattr(t, "name", getattr(t, "__name__", str(t))) for t in tools]
     logger.info(f"Created YT Summarizer agent with {len(tools)} tools: {', '.join(tool_names)}")
     return agent

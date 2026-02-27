@@ -7,7 +7,6 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { SubmitVideoForm } from '@/components/SubmitVideoForm';
-import { createMockSubmitVideoResponse } from '../helpers/mockFactories';
 import type { SubmitVideoResponse } from '@/services/api';
 
 // Mock the API module
@@ -113,10 +112,7 @@ describe('SubmitVideoForm', () => {
       // Create a deferred promise to control resolution
       let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            resolveSubmit = resolve;
-          })
+        () => new Promise<SubmitVideoResponse>((resolve) => { resolveSubmit = resolve; })
       );
 
       render(<SubmitVideoForm />);
@@ -133,13 +129,15 @@ describe('SubmitVideoForm', () => {
       });
 
       // Resolve the promise to clean up
-      resolveSubmit!(
-        createMockSubmitVideoResponse({
-          video_id: '123',
-          youtube_video_id: 'dQw4w9WgXcQ',
-          title: 'Test',
-        })
-      );
+      resolveSubmit!({
+        video_id: '123',
+        youtube_video_id: 'dQw4w9WgXcQ',
+        title: 'Test',
+        channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
+        processing_status: 'pending',
+        submitted_at: new Date().toISOString(),
+        jobs_queued: 4,
+      });
     });
 
     it('shows success message after successful submission', async () => {
@@ -150,7 +148,7 @@ describe('SubmitVideoForm', () => {
         channel: { channel_id: '1', name: 'Rick Astley', youtube_channel_id: 'UC123' },
         processing_status: 'pending',
         submitted_at: new Date().toISOString(),
-        jobs_queued: 1,
+        jobs_queued: 4,
       });
 
       render(<SubmitVideoForm />);
@@ -239,10 +237,7 @@ describe('SubmitVideoForm', () => {
       // Create a deferred promise to control resolution
       let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            resolveSubmit = resolve;
-          })
+        () => new Promise<SubmitVideoResponse>((resolve) => { resolveSubmit = resolve; })
       );
 
       render(<SubmitVideoForm />);
@@ -259,11 +254,15 @@ describe('SubmitVideoForm', () => {
       });
 
       // Resolve the promise to clean up
-      resolveSubmit!(
-        createMockSubmitVideoResponse({
-          video_id: '123',
-        })
-      );
+      resolveSubmit!({
+        video_id: '123',
+        youtube_video_id: 'dQw4w9WgXcQ',
+        title: 'Test',
+        channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
+        processing_status: 'pending',
+        submitted_at: new Date().toISOString(),
+        jobs_queued: 4,
+      });
     });
   });
 });

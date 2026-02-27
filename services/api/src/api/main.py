@@ -1,6 +1,6 @@
 """FastAPI application factory and main entry point."""
 
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -108,8 +108,38 @@ async def lifespan(app: FastAPI):
     # Store database status on the app for health checks
     app.state.db_initialized = db_initialized
     app.state.db_error = str(last_error) if last_error and not db_initialized else None
+    app.state.db_last_ok_at = datetime.utcnow() if db_initialized else None
 
-    yield
+    async def refresh_database_status() -> None:
+        check_interval = int(os.environ.get("DB_READINESS_REFRESH_SECONDS", "15"))
+        while True:
+            if not app.state.db_initialized:
+                try:
+                    db = get_db()
+                    await db.connect()
+                    await db.create_tables()
+                    app.state.db_initialized = True
+                    app.state.db_error = None
+                    app.state.db_last_ok_at = datetime.utcnow()
+                    logger.info("Database initialized after startup")
+                except Exception as e:
+                    app.state.db_error = str(e)[:200]
+                    logger.warning(
+                        "Database initialization retry failed",
+                        error=app.state.db_error,
+                    )
+                await asyncio.sleep(retry_delay)
+            else:
+                await asyncio.sleep(check_interval)
+
+    db_refresh_task = asyncio.create_task(refresh_database_status())
+
+    try:
+        yield
+    finally:
+        db_refresh_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await db_refresh_task
 
     # Shutdown
     logger.info("Shutting down application")

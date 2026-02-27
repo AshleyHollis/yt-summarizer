@@ -1,0 +1,65 @@
+# Simple SWA deployment for baseline warmup testing
+# This workflow bypasses all the complex orchestration to test SWA in isolation
+
+name: SWA Baseline Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to deploy'
+        required: true
+        type: string
+  push:
+    branches:
+      - test/swa-warmup-baseline
+      - fix/swa-working-baseline
+      - migration/phase-1-env-vars-v2
+      - migration/phase-2-real-auth0-secrets
+      - migration/phase-5-middleware-approach
+      - migration/phase-6-auth-ui
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-swa:
+    name: Deploy SWA Baseline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: "22"
+          working-directory: apps/web
+
+      - name: Build frontend
+        working-directory: apps/web
+        env:
+          # Backend API handles authentication
+          NEXT_PUBLIC_API_URL: "https://api.yt-summarizer.apps.ashleyhollis.com"
+          NEXT_PUBLIC_ENVIRONMENT: "preview"
+        run: |
+          echo "Building Next.js app..."
+          npm run build
+
+      - name: Deploy to SWA
+        id: deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: apps/web
+          output_location: ""
+          skip_app_build: true
+          production_branch: main
+
+      - name: Report deployment URL
+        run: |
+          echo "✅ SWA Deployment completed"
+          echo "📍 URL: ${{ steps.deploy.outputs.static_web_app_url }}"

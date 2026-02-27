@@ -249,7 +249,7 @@ export function useThreadPersistence({
         if (initialThreadId && !validatedId) {
           onThreadIdChange?.(null);
         }
-      } catch (error) {
+      } catch {
         if (!mounted) return;
         setState((prev) => ({
           ...prev,
@@ -261,9 +261,8 @@ export function useThreadPersistence({
 
     loadInitialThreads();
 
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount - don't depend on initialThreadId to avoid re-fetching
 
   /**
@@ -377,7 +376,29 @@ export function useThreadPersistence({
         console.error('Failed to load thread:', err);
         setMessages([]);
         setIsRestoringSettings(false);
-      });
+        return;
+      }
+
+      setMessages(result.messages);
+      saveStateRef.current.lastHash = computeMessageHash(result.messages);
+      saveStateRef.current.lastCount = result.messages.length;
+
+      // Restore scope and AI settings from the thread
+      if (result.thread.scope && setScope) {
+        setScope(result.thread.scope);
+      }
+      if (result.thread.aiSettings && setAISettings) {
+        setAISettings(result.thread.aiSettings);
+      }
+
+      // Allow a brief moment for state to propagate, then allow saving again
+      setTimeout(() => setIsRestoringSettings(false), 100);
+    }).catch(err => {
+      console.error("Failed to load thread:", err);
+      setMessages([]);
+      setIsRestoringSettings(false);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeThreadId, state.isLoading, setMessages, setScope, setAISettings]);
 
   /**
@@ -503,7 +524,7 @@ export function useThreadPersistence({
    */
   const saveIfNeeded = useCallback(() => {
     const messages = getMessages();
-    const { activeThreadId: currentActiveThreadId, threads: currentThreads } = state;
+    const { activeThreadId: currentActiveThreadId } = state;
 
     // Add any pending tool results to the messages
     const toolResultMessages = getToolResultMessages();
@@ -605,7 +626,7 @@ export function useThreadPersistence({
         }
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [getMessages, state, onThreadIdChange, getScope, getAISettings]);
+  }, [getMessages, state, onThreadIdChange, getScope, getAISettings, getToolResultMessages]);
 
   /**
    * Save current scope and AI settings to the active thread.

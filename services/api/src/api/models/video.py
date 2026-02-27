@@ -1,7 +1,7 @@
 """Video Pydantic models for API requests and responses."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from .base import BaseResponse, PaginatedResponse, TimestampMixin
 
 
-class ProcessingStatus(str, Enum):
+class ProcessingStatus(StrEnum):
     """Video processing status."""
 
     PENDING = "pending"

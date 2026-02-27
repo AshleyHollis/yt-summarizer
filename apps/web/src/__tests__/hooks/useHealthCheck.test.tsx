@@ -11,8 +11,6 @@ import { healthApi, HealthStatus } from '@/services/api';
 // Mock the healthApi
 vi.mock('@/services/api');
 
-const mockHealthApi = vi.mocked(healthApi);
-
 describe('useHealthCheck', () => {
   const mockHealthyResponse: HealthStatus = {
     status: 'healthy',
@@ -32,7 +30,9 @@ describe('useHealthCheck', () => {
     started_at: '2026-01-06T11:59:50Z',
   };
 
-  const mockUnhealthyResponse: HealthStatus = {
+  // Mock unhealthy response - reserved for future unhealthy state testing
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _mockUnhealthyResponse: HealthStatus = {
     status: 'unhealthy',
     timestamp: '2026-01-06T12:00:00Z',
     version: '1.0.0',
@@ -50,7 +50,7 @@ describe('useHealthCheck', () => {
   });
 
   it('should fetch health status on mount', async () => {
-    mockHealthApi.getHealth.mockResolvedValue(mockHealthyResponse);
+    vi.mocked(healthApi).getHealth.mockResolvedValue(mockHealthyResponse);
 
     const { result } = renderHook(() => useHealthCheck({ enabled: true }));
 
@@ -58,7 +58,7 @@ describe('useHealthCheck', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(mockHealthApi.getHealth).toHaveBeenCalled();
+    expect(vi.mocked(healthApi).getHealth).toHaveBeenCalled();
     expect(result.current.health).toEqual(mockHealthyResponse);
     expect(result.current.isHealthy).toBe(true);
     expect(result.current.isDegraded).toBe(false);
@@ -66,7 +66,7 @@ describe('useHealthCheck', () => {
   });
 
   it('should detect degraded status correctly', async () => {
-    mockHealthApi.getHealth.mockResolvedValue(mockDegradedResponse);
+    vi.mocked(healthApi).getHealth.mockResolvedValue(mockDegradedResponse);
 
     const { result } = renderHook(() => useHealthCheck({ enabled: true }));
 
@@ -80,7 +80,7 @@ describe('useHealthCheck', () => {
   });
 
   it('should detect unhealthy status when API call fails', async () => {
-    mockHealthApi.getHealth.mockRejectedValue(new Error('Network error'));
+    vi.mocked(healthApi).getHealth.mockRejectedValue(new Error('Network error'));
 
     const { result } = renderHook(() => useHealthCheck({ enabled: true }));
 
@@ -94,7 +94,7 @@ describe('useHealthCheck', () => {
   });
 
   it('should return uptime from health response', async () => {
-    mockHealthApi.getHealth.mockResolvedValue(mockHealthyResponse);
+    vi.mocked(healthApi).getHealth.mockResolvedValue(mockHealthyResponse);
 
     const { result } = renderHook(() => useHealthCheck({ enabled: true }));
 
@@ -111,14 +111,14 @@ describe('useHealthCheck', () => {
     // Wait a bit to ensure no fetch happens
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(mockHealthApi.getHealth).not.toHaveBeenCalled();
+    expect(vi.mocked(healthApi).getHealth).not.toHaveBeenCalled();
     expect(result.current.health).toBeNull();
   });
 
   it('should allow manual refresh', async () => {
     // Start with degraded, but make it return healthy on refresh
     let returnHealthy = false;
-    mockHealthApi.getHealth.mockImplementation(async () => {
+    vi.mocked(healthApi).getHealth.mockImplementation(async () => {
       if (returnHealthy) {
         return mockHealthyResponse;
       }
@@ -143,13 +143,13 @@ describe('useHealthCheck', () => {
     });
 
     // Should have called at least twice (initial + refresh)
-    expect(mockHealthApi.getHealth.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(vi.mocked(healthApi).getHealth.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it('should poll more frequently when degraded', async () => {
     vi.useFakeTimers();
 
-    mockHealthApi.getHealth.mockResolvedValue(mockDegradedResponse);
+    vi.mocked(healthApi).getHealth.mockResolvedValue(mockDegradedResponse);
 
     renderHook(() => useHealthCheck({ enabled: true, pollInterval: 5000 }));
 
@@ -158,7 +158,7 @@ describe('useHealthCheck', () => {
       await vi.runOnlyPendingTimersAsync();
     });
 
-    const initialCallCount = mockHealthApi.getHealth.mock.calls.length;
+    const initialCallCount = vi.mocked(healthApi).getHealth.mock.calls.length;
     expect(initialCallCount).toBeGreaterThanOrEqual(1);
 
     // Should poll at 2s interval when degraded
@@ -167,7 +167,7 @@ describe('useHealthCheck', () => {
     });
 
     // Should have polled again
-    expect(mockHealthApi.getHealth.mock.calls.length).toBeGreaterThan(initialCallCount);
+    expect(vi.mocked(healthApi).getHealth.mock.calls.length).toBeGreaterThan(initialCallCount);
 
     vi.useRealTimers();
   });

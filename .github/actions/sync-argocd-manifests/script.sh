@@ -14,6 +14,31 @@
 
 set -euo pipefail
 
+# Logging helpers
+print_header() {
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] 🚀 $1"
+  shift
+  for line in "$@"; do
+    echo "[INFO]    $line"
+  done
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+print_footer() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "[INFO] $1"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+log_info() { echo "[INFO] $1"; }
+log_warn() { echo "[WARN] ⚠️  $1"; }
+log_error() { echo "[ERROR] ✗ $1"; }
+log_success() { echo "[INFO]    ✓ $1"; }
+log_step() { echo "[INFO] $1"; }
+
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -33,6 +58,7 @@ case "${MODE:-all}" in
         # Default mode, no flag needed
         ;;
     *)
+        log_error "Invalid mode: ${MODE}. Must be 'all', 'infra', or 'apps'"
         echo "::error::Invalid mode: ${MODE}. Must be 'all', 'infra', or 'apps'"
         exit 1
         ;;
@@ -59,23 +85,27 @@ if [[ "${SKIP_VALIDATION:-false}" == "true" ]]; then
 fi
 
 # Run the sync script
-echo "::group::Sync Argo CD Manifests"
-echo "Mode: ${MODE:-all}"
-echo "Dry-run: ${DRY_RUN:-false}"
-echo "Namespace: ${NAMESPACE:-argocd}"
-echo "Verbose: ${VERBOSE:-false}"
-echo ""
+print_header "Sync Argo CD Manifests" \
+  "Mode: ${MODE:-all}" \
+  "Namespace: ${NAMESPACE:-argocd}" \
+  "Dry-run: ${DRY_RUN:-false}" \
+  "Verbose: ${VERBOSE:-false}"
+
+log_step "⏳ Running sync script..."
 
 if "$REPO_ROOT/scripts/sync-argocd-manifests.sh" "${ARGS[@]}"; then
+    log_success "Sync completed"
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
         echo "applied=false" >> "$GITHUB_OUTPUT"
+        print_footer "✅ Dry-run completed successfully (no changes applied)"
     else
         echo "applied=true" >> "$GITHUB_OUTPUT"
+        print_footer "✅ Argo CD manifests synced successfully!"
     fi
-    echo "::endgroup::"
     exit 0
 else
-    echo "::endgroup::"
+    log_error "Failed to sync Argo CD manifests"
     echo "::error::Failed to sync Argo CD manifests"
+    print_footer "❌ Sync failed"
     exit 1
 fi

@@ -1,209 +1,143 @@
-# Agent Instructions (YT Summarizer)
+﻿# Agent Instructions (YT Summarizer)
 
-> This file is the single source of truth for agentic coding guidance. It merges the original
-> Aspire notes with repository rules from `.github/copilot-instructions.md`.
+<purpose>
+Essential rules for AI coding assistants. Discover implementation details by reading files as needed.
+</purpose>
 
-## Critical Rules (Read First)
-1. **Before marking ANY task complete, run** `./scripts/run-tests.ps1`.
-2. **Git hooks will automatically run validation**:
-   - **Pre-commit**: Runs lint-staged (ESLint, Prettier) on changed files
-   - **Pre-push**: Runs full validation (TypeScript, lint, tests, build)
-   - To bypass hooks (NOT recommended): `git commit --no-verify` or `git push --no-verify`
-3. **Manual validation**: Run `npm run validate` or `./scripts/validate-local.ps1` anytime
-4. **E2E tests are mandatory** for completion; do not use `-SkipE2E` for final verification.
-5. If Aspire is not running, start it with the wrapper (see below) before E2E tests.
-6. Prefer official Aspire docs: https://aspire.dev and https://learn.microsoft.com/dotnet/aspire.
-7. **ALL secrets and credentials MUST be stored in Azure Key Vault** and managed via Terraform. Never ask the user to manually store secrets unless Terraform cannot support it. This includes:
-   - API keys (OpenAI, Cloudflare, etc.)
-   - Database passwords
-   - Auth0 credentials (both service account and BFF application)
-   - Session secrets
-   - Storage connection strings
-   - Any other sensitive configuration values
+## Critical Rules
 
-## Repository Map
-- `apps/web`: Next.js frontend (TypeScript, Tailwind).
-- `services/api`: FastAPI backend.
-- `services/workers`: Python background workers.
-- `services/shared`: Shared Python libraries (DB, logging, queue).
-- `services/aspire`: Aspire AppHost + defaults.
-- `scripts`: PowerShell automation for tests, migrations, deploys.
-- `infra`: Terraform and deployment manifests.
+<critical_rules>
+1. **Test before completion**: Run `./scripts/run-tests.ps1` before marking ANY task complete
+2. **Pre-commit checks**: Run `python -m pre_commit run --all-files --verbose` before pushing
+3. **E2E tests required**: Never use `-SkipE2E` for final verification
+4. **Aspire orchestration**: Start Aspire (`aspire run`) before E2E tests if not running
+5. **Secret management**: ALL secrets MUST be in Azure Key Vault via Terraform (never manual)
+6. **Documentation**: Prefer https://aspire.dev and https://learn.microsoft.com/dotnet/aspire
+</critical_rules>
 
-## Aspire Workflow
-- The app is orchestrated via Aspire; resources are defined in `services/aspire/AppHost/AppHost.cs`.
-- Changes to `AppHost.cs` require restarting Aspire.
-- Use the Aspire MCP tools to inspect resources and logs when debugging.
-- The repo includes a wrapper: `tools/aspire.cmd`.
-  - Running `aspire run` uses the wrapper automatically and detaches the process.
-  - Check logs via `Get-Content aspire.log -Tail 50`.
-  - Stop Aspire by closing the detached window or using Task Manager.
+## Architecture Overview
 
-## Dependency Setup
-- **Frontend**: `cd apps/web && npm install`
-- **API**: `cd services/api && uv sync`
-- **Workers**: `cd services/workers && uv sync`
-- **Shared**: `cd services/shared && uv sync`
+<architecture>
+**Stack**: Next.js frontend + FastAPI backend + Python workers orchestrated by .NET Aspire
 
-## Build / Run Commands
-- **Aspire (full stack)**: `aspire run`
-- **Frontend dev server**: `cd apps/web && npm run dev`
-- **API dev server**: `cd services/api && uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000`
-- **Workers (example)**: `cd services/workers && uv run python -m transcribe`
-- **Migrations (shared)**:
-  - `cd services/shared && uv run alembic revision --autogenerate -m "description"`
-  - `cd services/shared && uv run alembic upgrade head`
+**Directories**:
+- `apps/web` - Next.js (TypeScript, Tailwind)
+- `services/api` - FastAPI
+- `services/workers` - Python background workers
+- `services/shared` - Shared Python libs (DB, logging, queue)
+- `services/aspire` - Aspire orchestration (AppHost.cs)
+- `scripts` - PowerShell automation
+- `infra` - Terraform + K8s manifests
+</architecture>
 
-## Test Commands
-### Unified (Required)
-- **All tests (includes E2E)**: `./scripts/run-tests.ps1`
-- **Specific component**: `./scripts/run-tests.ps1 -Component api|workers|shared|web|e2e`
-- **Integration-only**: `./scripts/run-tests.ps1 -Mode integration`
-- **E2E-only**: `./scripts/run-tests.ps1 -Mode e2e`
-- **Smoke test**: `./scripts/smoke-test.ps1` (run after Aspire starts)
+## Quick Start Commands
 
-### Single-test examples
-- **API/Workers/Shared (pytest)**:
-  - `cd services/api && uv run pytest tests/test_file.py::test_name`
-  - `cd services/workers && uv run pytest tests/test_file.py -k "partial_name"`
-  - `cd services/shared && uv run pytest tests/test_file.py -k "partial_name"`
-- **Frontend (Vitest)**:
-  - `cd apps/web && npm run test:run -- src/__tests__/components/SubmitVideoForm.test.tsx`
-  - `cd apps/web && npx vitest run src/__tests__/hooks/useHealthCheck.test.tsx`
-- **E2E (Playwright)**:
-  - `cd apps/web && npx playwright test e2e/smoke.spec.ts`
-  - `cd apps/web && npx playwright test e2e/video-flow.spec.ts --headed`
-
-### Test Notes
-- E2E requires Aspire; the runner will start it if needed.
-- Playwright uses `USE_EXTERNAL_SERVER=true` when running against Aspire.
-- API live E2E tests require `E2E_TESTS_ENABLED=true` and `pytest -m ""`.
-- `./scripts/run-tests.ps1` defaults to `-Component detect` to auto-scope changes.
-- Use `-Component` for quicker iteration, but final run must include E2E.
-
-## Environment Variables
-- `DATABASE_URL`: SQL Server connection string for API/workers.
-- `AZURE_STORAGE_CONNECTION_STRING`: Azure/Azurite storage for queues/blobs.
-- `OPENAI_API_KEY`: Required for summarization workers.
-- `NEXT_PUBLIC_API_URL`: Public API URL for browser clients.
-- `API_URL`: Internal API URL for SSR calls.
-
-## Lint / Format
-- **Frontend lint**: `cd apps/web && npm run lint`
-- **Frontend format**: `cd apps/web && npx prettier --write .`
-- **Python lint**: `cd services/api && uv run ruff check .`
-- **Python format**: `cd services/api && uv run ruff format .`
-- `ruff.toml` defines import sorting (isort) and line length = 100.
-
-## Local Validation & Git Hooks
-
-### Automatic Validation (Git Hooks)
-This repository uses Husky to automatically run validation checks:
-
-**Pre-Commit Hook** (runs on `git commit`):
-- ESLint with auto-fix on changed `.ts/.tsx` files
-- Prettier formatting on changed files
-- Fast and scoped to staged changes only
-
-**Pre-Push Hook** (runs on `git push`):
-- Full TypeScript compilation check (`tsc --noEmit`)
-- ESLint validation (all files)
-- Prettier format check (all files)
-- Frontend tests (`npm run test:run`)
-- Production build validation (`npm run build`)
-
-**Bypassing Hooks** (NOT recommended):
+<commands>
+**Setup**:
 ```bash
-git commit --no-verify   # Skip pre-commit
-git push --no-verify     # Skip pre-push
+# Frontend
+cd apps/web && npm install
+
+# Python services (API/workers/shared)
+cd services/{api|workers|shared} && uv sync
 ```
 
-### Manual Validation
-Run validation checks anytime before committing:
-
+**Run**:
 ```bash
-# Full validation (mirrors pre-push hook)
-npm run validate
-
-# Or directly:
-./scripts/validate-local.ps1
-
-# Fast validation (skip tests and build)
-./scripts/validate-local.ps1 -SkipTests -SkipBuild
-
-# Just tests
-./scripts/validate-local.ps1 -SkipBuild
-
-# Just build
-./scripts/validate-local.ps1 -SkipTests
+aspire run                    # Full stack via Aspire
+./scripts/run-tests.ps1       # All tests including E2E
+./scripts/run-tests.ps1 -Component api  # Specific component
 ```
 
-### Why This Matters
-- **Saves time**: Catch issues locally before CI fails (5-10 min per failed CI run)
-- **Fast feedback**: Pre-commit runs in seconds, pre-push in 1-2 minutes
-- **Prevents broken builds**: TypeScript errors caught before push
-- **Team efficiency**: Fewer "fix CI" commits polluting history
-
-### First-Time Setup
-If hooks aren't working after cloning:
+**Migrations**:
 ```bash
-npm install          # Installs Husky and sets up hooks
+cd services/shared
+uv run alembic revision --autogenerate -m "description"
+uv run alembic upgrade head
+```
+</commands>
+
+## Code Style Essentials
+
+<style>
+**Line length**: 100 chars (Python + TypeScript)
+
+**Python**:
+- Type hints everywhere: `list[str]`, `dict[str, Any]`, `str | None`
+- Use `dataclass` for payloads
+- Structured logging: `get_logger(__name__)` with context fields
+- Async DB: `AsyncSession` from `shared.db.connection`
+
+**TypeScript**:
+- Named exports (rare defaults)
+- PascalCase components/types, camelCase variables/functions
+- Hooks: `useX` naming in `src/hooks`
+- API types: `src/services/api.ts`
+
+**Formatting**:
+- Python: `ruff format .` (100 chars, imports sorted)
+- TypeScript: Prettier (singleQuote, semi, printWidth 100)
+</style>
+
+## Infrastructure Notes
+
+<infra>
+**Validation**: Use `.github/actions/validate` for K8s/Terraform validation
+**Deployment**: Auto-recovery scripts in `scripts/ci/lib/` (validate-deployment.sh, argocd-utils.sh)
+**K8s Previews**: Use placeholders (`__PR_NUMBER__`, `__PREVIEW_HOST__`) in `k8s/overlays/preview/patches/`
+**Queue Config**: `QUEUE_POLL_INTERVAL=10`, `QUEUE_BATCH_SIZE=32` in AppHost.cs
+</infra>
+
+## Discovery Pattern
+
+<discovery>
+When you need implementation details:
+1. Read relevant files (package.json, pyproject.toml, config files)
+2. Explore code using glob/grep
+3. Check scripts/ for automation examples
+4. Read docs/ for architecture patterns
+5. **Reference `docs/ai-skills.md` for available CLIs and tools**
+
+This file provides rules; codebase provides details.
+</discovery>
+
+## AI Skills System
+
+<skills>
+**Location**: `.agents/skills/` - AI skills for OpenCode/Copilot
+
+**Custom Skills** (in repo):
+- `aspire-orchestration` - .NET Aspire patterns and AppHost configuration
+- `azure-cli-operations` - Azure CLI for ACR, AKS, Storage, Key Vault
+- `fastapi-patterns` - FastAPI backend patterns and testing
+- `yt-summarizer-testing` - Testing patterns (pytest, Vitest, Playwright)
+- `github-actions-pipelines` - GitHub Actions workflows and CI/CD pipelines
+
+**Installed Skills** (from skills.sh):
+```bash
+npx skills add https://github.com/hashicorp/agent-skills --skill terraform-style-guide
+npx skills add https://github.com/rmyndharis/antigravity-skills --skill kubernetes-architect
+npx skills add https://github.com/404kidwiz/claude-supercode-skills --skill devops-engineer
 ```
 
+**Usage**: Load skills via `skill` tool when needed for specific tasks
+</skills>
 
-## Code Style Guidelines
-### General
-- Prefer small, focused changes; avoid unrelated refactors.
-- Use `get_logger(__name__)` for Python logging and include context fields.
-- Keep line length to **100** (Python + TS/JS).
-- Preserve existing module boundaries (`api`, `workers`, `shared`, `apps/web`).
+## Available CLIs
 
-### Python (API/Workers/Shared)
-- Use type hints everywhere; prefer `list[str]`, `dict[str, Any]`, and union types (`str | None`).
-- Use `dataclass` for message payloads and small value objects.
-- Follow Ruff import ordering; first-party modules are `api`, `shared`, `workers`.
-- Favor explicit error handling with `try/except` and structured logs (`logger.warning`, `logger.exception`).
-- Raise FastAPI `HTTPException` with clear status + detail when handling routes.
-- Prefer async DB/session patterns from `shared.db.connection` and `AsyncSession`.
-- Use SQLAlchemy models from `shared.db.models` and shared helpers for storage/queues.
+<clis>
+**Reference**: `docs/ai-skills.md` - Complete CLI reference with examples
 
-### TypeScript / React (Frontend)
-- Use named exports for utilities and types; default exports are rare.
-- Components are `PascalCase` file names and functions (`MarkdownRenderer`).
-- Hooks use `useX` naming and live in `src/hooks`.
-- Keep API types in `src/services/api.ts` and shared types in `src/types`.
-- Prefer `type` or `interface` with explicit field docs for API contracts.
-- Use `async/await` for API calls; wrap errors in custom error classes where needed.
-- Keep UI logic in components and data access in `src/services`.
+**Key tools**:
+- Azure CLI (az) - Resource management
+- kubectl - Kubernetes operations
+- Terraform - Infrastructure as Code
+- GitHub CLI (gh) - GitHub operations
+- Kustomize - K8s manifest management
+- npm - Node.js/frontend tooling
+- uv - Python package management
+- PowerShell - Windows automation scripts
+- Playwright MCP - Browser automation
 
-### Formatting
-- Prettier config in `apps/web/.prettierrc`:
-  - `singleQuote: true`, `semi: true`, `printWidth: 100`, `tabWidth: 2`.
-- ESLint config: `apps/web/eslint.config.mjs` (Next.js core-web-vitals + TS).
-- Ruff config: `services/ruff.toml` (imports + lint rules).
-
-### Naming
-- Python: `snake_case` for modules/functions, `PascalCase` for classes.
-- TypeScript: `camelCase` variables/functions, `PascalCase` components/types.
-- Environment variables use `SCREAMING_SNAKE_CASE`.
-
-### Error Handling & Logging
-- Prefer structured log fields over string concatenation.
-- Use `logger.exception` for unexpected failures to capture stack traces.
-- Preserve correlation IDs across HTTP and queue messages.
-- Use retry/backoff patterns for transient failures (see workers).
-
-## Infrastructure & Ops Scripts
-- **Run migrations**: `./scripts/run-migrations.ps1`
-- **Start workers**: `./scripts/start-workers.ps1`
-- **Deploy infra**: `./scripts/deploy-infra.ps1`
-- CI helpers live under `scripts/ci/`.
-
-## Tooling & Automation Rules (Copilot Instructions)
-- Use **PowerShell** for scripts on Windows.
-- Use `gh` (GitHub CLI) for any GitHub operations (PRs, issues, runs).
-- Playwright MCP server is configured; use it for UI checks when needed.
-- Available tooling: .NET CLI, uv/pip, npm/pnpm, pytest, Vitest, Ruff, ESLint, Prettier.
-
-## Cursor Rules
-- No `.cursor/rules` or `.cursorrules` files are present in this repository.
+**Guideline**: Use CLIs directly instead of asking users to run commands manually.
+</clis>

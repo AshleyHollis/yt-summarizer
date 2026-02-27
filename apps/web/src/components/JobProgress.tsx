@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { jobApi, VideoJobsProgress, JobType, JobStatus, JobStage, ETAInfo } from '@/services/api';
 import { formatTimeShort } from '@/utils/formatDate';
 
@@ -33,15 +33,7 @@ const STAGE_LABELS: Record<JobType, string> = {
 /**
  * Stage icons (using simple SVG)
  */
-const StageIcon = ({
-  stage,
-  status,
-  jobStage,
-}: {
-  stage: JobType;
-  status: JobStatus;
-  jobStage?: JobStage;
-}) => {
+const StageIcon = ({ status, jobStage }: { stage: JobType; status: JobStatus; jobStage?: JobStage }) => {
   const baseClass = 'w-6 h-6';
 
   // Completed checkmark
@@ -178,6 +170,7 @@ const TimeUntil = ({ date }: { date: string }) => {
       return `${seconds}s`;
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTimeLeft(calculateTimeLeft());
     const interval = setInterval(() => {
       setTimeLeft(calculateTimeLeft());
@@ -244,6 +237,7 @@ const ETADisplay = ({
   useEffect(() => {
     if (eta.processing_started_at) {
       const newTarget = calculateTargetEndTime();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTargetEndTime(newTarget);
     }
   }, [eta.processing_started_at, calculateTargetEndTime]);
@@ -395,6 +389,7 @@ export function JobProgress({
    */
   useEffect(() => {
     // Initial fetch
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchProgress();
 
     // Set up polling interval
