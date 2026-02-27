@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from "react";
 import { useScope } from "@/app/providers";
@@ -30,19 +30,19 @@ export function TopicsPanel({ onTopicClick }: TopicsPanelProps) {
         setError(null);
 
         const response = await fetch(`${API_URL}/api/v1/copilot/topics`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scope }),
         });
 
         if (!response.ok) {
-          throw new Error("Failed to fetch topics");
+          throw new Error('Failed to fetch topics');
         }
 
         const data = await response.json();
         setTopics(data.topics || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load topics");
+        setError(err instanceof Error ? err.message : 'Failed to load topics');
       } finally {
         setLoading(false);
       }
@@ -100,9 +100,7 @@ export function TopicsPanel({ onTopicClick }: TopicsPanelProps) {
         ))}
       </div>
       {topics.length > 15 && (
-        <p className="mt-2 text-xs text-gray-500">
-          +{topics.length - 15} more topics
-        </p>
+        <p className="mt-2 text-xs text-gray-500">+{topics.length - 15} more topics</p>
       )}
     </div>
   );
@@ -116,14 +114,14 @@ interface TopicChipProps {
 function TopicChip({ topic, onClick }: TopicChipProps) {
   const getTypeColor = (type: string): string => {
     switch (type.toLowerCase()) {
-      case "topic":
-        return "bg-blue-50 text-blue-700 hover:bg-blue-100";
-      case "format":
-        return "bg-green-50 text-green-700 hover:bg-green-100";
-      case "level":
-        return "bg-purple-50 text-purple-700 hover:bg-purple-100";
+      case 'topic':
+        return 'bg-blue-50 text-blue-700 hover:bg-blue-100';
+      case 'format':
+        return 'bg-green-50 text-green-700 hover:bg-green-100';
+      case 'level':
+        return 'bg-purple-50 text-purple-700 hover:bg-purple-100';
       default:
-        return "bg-gray-50 text-gray-700 hover:bg-gray-100";
+        return 'bg-gray-50 text-gray-700 hover:bg-gray-100';
     }
   };
 

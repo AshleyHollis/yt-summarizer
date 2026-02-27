@@ -2,12 +2,7 @@
 
 import Image from 'next/image';
 import { useState, useCallback } from 'react';
-import {
-  channelApi,
-  ChannelVideosResponse,
-  ChannelVideo,
-  ApiClientError,
-} from '@/services/api';
+import { channelApi, ChannelVideosResponse, ChannelVideo, ApiClientError } from '@/services/api';
 import { formatDuration } from '@/utils/formatDuration';
 import { formatDate } from '@/utils/formatDate';
 
@@ -123,7 +118,8 @@ export function ChannelVideoList({
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {videos.length} videos loaded
             {channelData.total_video_count && ` of ${channelData.total_video_count} total`}
-            {notIngestedCount < videos.length && ` (${videos.length - notIngestedCount} already ingested)`}
+            {notIngestedCount < videos.length &&
+              ` (${videos.length - notIngestedCount} already ingested)`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -146,7 +142,8 @@ export function ChannelVideoList({
       {selectedCount > 0 && (
         <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg border border-red-200 dark:border-red-800">
           <p className="text-sm text-red-700 dark:text-red-300">
-            <strong>{selectedCount}</strong> video{selectedCount !== 1 ? 's' : ''} selected for ingestion
+            <strong>{selectedCount}</strong> video{selectedCount !== 1 ? 's' : ''} selected for
+            ingestion
           </p>
         </div>
       )}
@@ -161,8 +158,8 @@ export function ChannelVideoList({
               video.already_ingested
                 ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-60'
                 : selectedIds.has(video.youtube_video_id)
-                ? 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700'
-                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-red-300 dark:hover:border-red-700'
+                  ? 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700'
+                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-red-300 dark:hover:border-red-700'
             }`}
             onClick={() => !video.already_ingested && toggleSelection(video.youtube_video_id)}
           >
@@ -223,9 +220,7 @@ export function ChannelVideoList({
       )}
 
       {/* Error message */}
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400 text-center">{error}</p>
-      )}
+      {error && <p className="text-sm text-red-600 dark:text-red-400 text-center">{error}</p>}
     </div>
   );
 }

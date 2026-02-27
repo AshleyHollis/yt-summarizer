@@ -43,7 +43,9 @@ test.describe('US6: Synthesis Feature UI', () => {
       await chatInput.press('Enter');
 
       // Verify a response area appears (loading state or actual response)
-      const responseArea = page.locator('[class*="message" i], [class*="response" i], [class*="assistant" i]');
+      const responseArea = page.locator(
+        '[class*="message" i], [class*="response" i], [class*="assistant" i]'
+      );
 
       // Wait for agent to start responding
       await expect(responseArea.first()).toBeVisible({ timeout: 30000 });
@@ -68,17 +70,19 @@ test.describe('US6: Synthesis Feature UI', () => {
   test.describe('Component Rendering', () => {
     test('library page loads without critical console errors', async ({ page }) => {
       const errors: string[] = [];
-      page.on('console', msg => {
+      page.on('console', (msg) => {
         if (msg.type() === 'error') {
           const text = msg.text().toLowerCase();
           // Filter out expected/non-critical errors
-          if (!text.includes('failed to fetch') &&
-              !text.includes('net::err') &&
-              !text.includes('dev mode') &&
-              !text.includes('hydrat') &&
-              !text.includes('warning') &&
-              !text.includes('cors') &&
-              !text.includes('favicon')) {
+          if (
+            !text.includes('failed to fetch') &&
+            !text.includes('net::err') &&
+            !text.includes('dev mode') &&
+            !text.includes('hydrat') &&
+            !text.includes('warning') &&
+            !text.includes('cors') &&
+            !text.includes('favicon')
+          ) {
             errors.push(msg.text());
           }
         }

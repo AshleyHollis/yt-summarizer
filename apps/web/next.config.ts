@@ -69,6 +69,10 @@ const nextConfig: NextConfig = {
   // Redirect API requests to the backend during development AND preview
   // Note: Exclude .swa paths for Azure Static Web Apps health checks
   async rewrites() {
+    // TEMPORARY: Simplified rewrites to isolate SWA warmup timeout issue
+    // Testing hypothesis: Next.js might be validating rewrite destinations during startup
+    // and hanging when backend URLs are unreachable in preview environments
+
     let backendUrl = process.env.API_URL || 'http://localhost:8000';
 
     // Attempt to load dynamically injected backend URL (for CI/CD previews)
@@ -93,30 +97,14 @@ const nextConfig: NextConfig = {
 
     return {
       beforeFiles: [
-        // Exclude .swa paths from rewrites (required for SWA deployment validation)
-        // SWA uses /.swa/health.html to verify deployment
-      ],
-      afterFiles: [
-        // Generic proxy for absolute URL handling (mixed content fix)
-        // Matches /api/proxy/v1/... -> http://backend/v1/...
+        // Azure SWA health check: rewrite .html to route handler
+        // SWA requires /.swa/health.html but Next.js ignores dotfiles in public/
         {
-          source: '/api/proxy/:path*',
-          destination: `${backendUrl}/:path*`,
-        },
-        {
-          source: '/api/:path*',
-          destination: `${backendUrl}/api/:path*`,
-        },
-        // Proxy health check endpoints to the backend API
-        {
-          source: '/health/:path*',
-          destination: `${backendUrl}/health/:path*`,
-        },
-        {
-          source: '/health',
-          destination: `${backendUrl}/health`,
+          source: '/.swa/health.html',
+          destination: '/.swa/health',
         },
       ],
+      afterFiles: [], // TEMPORARY: All backend rewrites disabled for testing
       fallback: [],
     };
   },

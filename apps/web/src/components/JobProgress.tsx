@@ -39,7 +39,12 @@ const StageIcon = ({ status, jobStage }: { stage: JobType; status: JobStatus; jo
   // Completed checkmark
   if (status === 'succeeded') {
     return (
-      <svg className={`${baseClass} text-green-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg
+        className={`${baseClass} text-green-500`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
       </svg>
     );
@@ -48,8 +53,18 @@ const StageIcon = ({ status, jobStage }: { stage: JobType; status: JobStatus; jo
   // Failed X
   if (status === 'failed') {
     return (
-      <svg className={`${baseClass} text-red-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      <svg
+        className={`${baseClass} text-red-500`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M6 18L18 6M6 6l12 12"
+        />
       </svg>
     );
   }
@@ -57,8 +72,18 @@ const StageIcon = ({ status, jobStage }: { stage: JobType; status: JobStatus; jo
   // Rate limited - clock/wait icon in orange
   if (jobStage === 'rate_limited') {
     return (
-      <svg className={`${baseClass} text-orange-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <svg
+        className={`${baseClass} text-orange-500`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
       </svg>
     );
   }
@@ -67,7 +92,14 @@ const StageIcon = ({ status, jobStage }: { stage: JobType; status: JobStatus; jo
   if (status === 'running') {
     return (
       <svg className={`${baseClass} text-blue-500 animate-spin`} fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
         <path
           className="opacity-75"
           fill="currentColor"
@@ -79,7 +111,12 @@ const StageIcon = ({ status, jobStage }: { stage: JobType; status: JobStatus; jo
 
   // Pending/queued circle
   return (
-    <svg className={`${baseClass} text-gray-300 dark:text-gray-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg
+      className={`${baseClass} text-gray-300 dark:text-gray-600`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
       <circle cx="12" cy="12" r="10" strokeWidth={2} />
     </svg>
   );
@@ -167,7 +204,13 @@ const formatDuration = (seconds: number): string => {
  * Uses server's processing_started_at and estimated_total_seconds to calculate
  * remaining time, avoiding timer resets on refresh/polling
  */
-const ETADisplay = ({ eta, currentStageName }: { eta: ETAInfo; currentStageName: string | null }) => {
+const ETADisplay = ({
+  eta,
+  currentStageName,
+}: {
+  eta: ETAInfo;
+  currentStageName: string | null;
+}) => {
   // Calculate target end time from server data
   const calculateTargetEndTime = useCallback(() => {
     if (eta.processing_started_at) {
@@ -242,7 +285,8 @@ const ETADisplay = ({ eta, currentStageName }: { eta: ETAInfo; currentStageName:
 
           {/* Ready at time */}
           <p className="text-sm text-blue-600 dark:text-blue-400 mb-2">
-            Ready at approximately <span className="font-mono font-medium">{formatTimeShort(eta.estimated_ready_at)}</span>
+            Ready at approximately{' '}
+            <span className="font-mono font-medium">{formatTimeShort(eta.estimated_ready_at)}</span>
           </p>
 
           {/* Current stage */}
@@ -268,7 +312,9 @@ const ETADisplay = ({ eta, currentStageName }: { eta: ETAInfo; currentStageName:
                 <span className="font-mono font-medium">{eta.total_in_queue}</span> in queue
                 {eta.videos_ahead > 0 && (
                   <span className="text-blue-500 dark:text-blue-400">
-                    {' '}• ~{formatDuration(eta.queue_wait_seconds)} waiting for {eta.videos_ahead} video{eta.videos_ahead > 1 ? 's' : ''} ahead
+                    {' '}
+                    • ~{formatDuration(eta.queue_wait_seconds)} waiting for {eta.videos_ahead} video
+                    {eta.videos_ahead > 1 ? 's' : ''} ahead
                   </span>
                 )}
               </span>
@@ -327,7 +373,7 @@ export function JobProgress({
       } else if (data.overall_status === 'failed') {
         setIsPolling(false);
         // Find the failed job type
-        const failedJob = data.jobs?.find(j => j.status === 'failed');
+        const failedJob = data.jobs?.find((j) => j.status === 'failed');
         if (failedJob) {
           onFailed?.(failedJob.job_type);
         }
@@ -381,17 +427,12 @@ export function JobProgress({
       {/* Header with overall progress */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Processing Progress
-          </h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Processing Progress</h3>
           <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
             {progress?.overall_progress ?? 0}%
           </span>
         </div>
-        <ProgressBar
-          progress={progress?.overall_progress ?? 0}
-          hasError={hasFailed}
-        />
+        <ProgressBar progress={progress?.overall_progress ?? 0} hasError={hasFailed} />
       </div>
 
       {/* ETA display - only show when processing and ETA is available */}
@@ -428,14 +469,12 @@ export function JobProgress({
                   className={`font-medium ${
                     isRateLimited ? 'text-orange-700 dark:text-orange-300' : ''
                   } ${
-                    job.status === 'running' && !isRateLimited ? 'text-blue-700 dark:text-blue-300' : ''
-                  } ${
-                    job.status === 'succeeded' ? 'text-green-700 dark:text-green-300' : ''
-                  } ${
+                    job.status === 'running' && !isRateLimited
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : ''
+                  } ${job.status === 'succeeded' ? 'text-green-700 dark:text-green-300' : ''} ${
                     job.status === 'failed' ? 'text-red-700 dark:text-red-300' : ''
-                  } ${
-                    job.status === 'pending' ? 'text-gray-500 dark:text-gray-400' : ''
-                  }`}
+                  } ${job.status === 'pending' ? 'text-gray-500 dark:text-gray-400' : ''}`}
                 >
                   {STAGE_LABELS[job.job_type]}
                 </p>
@@ -477,9 +516,7 @@ export function JobProgress({
               />
             </svg>
             <div>
-              <p className="font-medium text-green-800 dark:text-green-200">
-                Processing Complete!
-              </p>
+              <p className="font-medium text-green-800 dark:text-green-200">Processing Complete!</p>
               <p className="text-sm text-green-700 dark:text-green-300">
                 Transcript and summary are ready to view.
               </p>
@@ -506,11 +543,9 @@ export function JobProgress({
               />
             </svg>
             <div>
-              <p className="font-medium text-red-800 dark:text-red-200">
-                Processing Failed
-              </p>
+              <p className="font-medium text-red-800 dark:text-red-200">Processing Failed</p>
               {(() => {
-                const failedJob = progress?.jobs?.find(j => j.status === 'failed');
+                const failedJob = progress?.jobs?.find((j) => j.status === 'failed');
                 return (
                   <>
                     <p className="text-sm text-red-700 dark:text-red-300">

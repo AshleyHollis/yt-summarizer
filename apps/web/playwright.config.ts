@@ -33,10 +33,7 @@ export default defineConfig({
   workers: process.env.CI ? 4 : undefined,
 
   // Reporter to use
-  reporter: [
-    ['html', { open: 'never' }],
-    ['list'],
-  ],
+  reporter: [['html', { open: 'never' }], ['list']],
 
   // Shared settings for all the projects below
   use: {
@@ -55,9 +52,33 @@ export default defineConfig({
 
   // Configure projects for major browsers
   projects: [
+    // Setup project runs first - authenticates with Auth0 and saves storage state
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+    },
+    // Chromium tests - use authenticated storage state when available
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Use authenticated storage state for tests that require auth
+        // Tests can override this by setting storageState: undefined in test.use()
+        storageState: 'playwright/.auth/user.json',
+      },
+      // Run setup before chromium tests (only if setup test exists)
+      dependencies: ['setup'],
+    },
+    // Admin-specific tests - use admin auth state
+    {
+      name: 'chromium-admin',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Use admin authenticated storage state for admin-only tests
+        storageState: 'playwright/.auth/admin.json',
+      },
+      // Run setup before admin tests
+      dependencies: ['setup'],
     },
   ],
 

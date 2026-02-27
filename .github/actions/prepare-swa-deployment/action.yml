@@ -1,0 +1,13 @@
+name: "Prepare for SWA Deployment"
+description: "Removes unnecessary files from apps/web to reduce SWA deployment size and time"
+inputs:
+  working-directory:
+    description: "Working directory (apps/web)"
+    required: false
+    default: "apps/web"
+runs:
+  using: composite
+  steps:
+    - name: Clean unnecessary files
+      shell: bash
+      run: bash ${{ github.action_path }}/script.sh

@@ -12,8 +12,80 @@
 
 set -eo pipefail
 
+# Check if tfplan file exists
+if [ ! -f "tfplan" ]; then
+  echo "::error::tfplan file not found - terraform plan may have failed"
+  echo "::error::Check the 'Run terraform plan' step output for errors"
+
+  # Output empty summary to prevent downstream failures
+  SUMMARY=$(cat <<EOF
+{
+  "add": 0,
+  "change": 0,
+  "destroy": 0,
+  "has_changes": false,
+  "error": "tfplan file not found"
+}
+EOF
+)
+
+  echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
+  echo "$SUMMARY" >> "$GITHUB_OUTPUT"
+  echo "EOF" >> "$GITHUB_OUTPUT"
+
+  echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
+  echo "{}" >> "$GITHUB_OUTPUT"
+  echo "EOF" >> "$GITHUB_OUTPUT"
+
+  exit 1
+fi
+
 # Get structured JSON output from terraform
-terraform show -json tfplan > plan.json
+if ! terraform show -json tfplan > plan.json.raw 2>&1; then
+  echo "::error::Failed to convert tfplan to JSON"
+
+  SUMMARY=$(cat <<EOF
+{
+  "add": 0,
+  "change": 0,
+  "destroy": 0,
+  "has_changes": false,
+  "error": "Failed to convert tfplan to JSON"
+}
+EOF
+)
+
+  echo "plan_summary<<EOF" >> "$GITHUB_OUTPUT"
+  echo "$SUMMARY" >> "$GITHUB_OUTPUT"
+  echo "EOF" >> "$GITHUB_OUTPUT"
+
+  echo "formatted_plan<<EOF" >> "$GITHUB_OUTPUT"
+  echo "{}" >> "$GITHUB_OUTPUT"
+  echo "EOF" >> "$GITHUB_OUTPUT"
+
+  exit 1
+fi
+
+# Scrub sensitive data from plan output
+# This prevents password/secret exposure even if sensitive flag is not properly set
+echo "🔒 Scrubbing sensitive fields from plan output..."
+cat plan.json.raw | \
+  jq 'walk(
+    if type == "object" then
+      with_entries(
+        if (.key | test("password|secret|token|key"; "i")) and (.value | type == "string") then
+          .value = "(sensitive value)"
+        else
+          .
+        end
+      )
+    else
+      .
+    end
+  )' > plan.json
+
+# Clean up raw file
+rm -f plan.json.raw
 
 # Parse plan summary from JSON
 ADD=$(jq -r '.resource_changes | map(select(.change.actions | contains(["create"]))) | length' plan.json)

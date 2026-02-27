@@ -65,6 +65,8 @@ next-env.d.ts
 # Package manager locks (keep one, ignore others if switching)
 # yarn.lock
 # pnpm-lock.yaml
+/package.json
+/package-lock.json
 
 # -----------------------------------------------------------------------------
 # .NET / Aspire (services/aspire)

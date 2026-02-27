@@ -204,7 +204,8 @@ while IFS= read -r file; do
       BUILD_COUNT=$((BUILD_COUNT + 1))
       HAS_IMAGE_BUILD=true
       HAS_DEPLOYMENT=true
-    # Check if file triggers deployment (but not image build)
+      HAS_BACKEND_DEPLOYMENT=true
+    # Check for Kubernetes manifests (triggers backend deployment)
     elif [[ "$file" =~ ^k8s/ ]]; then
       DEPLOY_COUNT=$((DEPLOY_COUNT + 1))
       HAS_DEPLOYMENT=true

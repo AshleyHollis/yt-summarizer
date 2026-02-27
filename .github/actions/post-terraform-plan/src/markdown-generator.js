@@ -38,6 +38,98 @@ function badge(label, value, color) {
 }
 
 /**
+ * Extract relevant error information from terraform plan output
+ * @param {string} planOutput - Raw terraform plan output
+ * @returns {object} Extracted error details { type, message, details }
+ */
+function extractErrorDetails(planOutput) {
+  if (!planOutput || planOutput.trim() === '') {
+    return null;
+  }
+
+  const lines = planOutput.split('\n');
+
+  // Detect state lock error
+  if (planOutput.includes('state blob is already locked')) {
+    const lockIdMatch = planOutput.match(/ID:\s+([a-f0-9-]+)/);
+    const lockId = lockIdMatch ? lockIdMatch[1] : 'unknown';
+
+    return {
+      type: 'state_lock',
+      message: 'Terraform state is locked',
+      lockId,
+      details: [
+        `Lock ID: \`${lockId}\``,
+        '',
+        '**To unlock manually:**',
+        '```bash',
+        `terraform force-unlock ${lockId}`,
+        '# OR',
+        `./scripts/unlock-terraform-state.sh ${lockId}`,
+        '```',
+        '',
+        '⚠️ **WARNING:** Only unlock if you\'re certain no other terraform operation is running.'
+      ].join('\n')
+    };
+  }
+
+  // Detect validation errors (Error: Invalid...)
+  const errorLines = lines.filter(line => line.trim().startsWith('Error:'));
+  if (errorLines.length > 0) {
+    // Take first 10 error lines to avoid huge messages
+    const errorSnippet = errorLines.slice(0, 10).join('\n');
+
+    return {
+      type: 'validation',
+      message: 'Terraform validation failed',
+      details: [
+        '**Error details:**',
+        '```',
+        errorSnippet,
+        errorLines.length > 10 ? `\n... and ${errorLines.length - 10} more errors` : '',
+        '```'
+      ].filter(Boolean).join('\n')
+    };
+  }
+
+  // Detect provider/auth errors
+  if (planOutput.includes('Error: reading') || planOutput.includes('Error: retrieving')) {
+    return {
+      type: 'provider',
+      message: 'Provider authentication or connection error',
+      details: [
+        '**Possible causes:**',
+        '- Azure credentials expired or invalid',
+        '- Network connectivity issues',
+        '- Provider API unavailable',
+        '',
+        'Check the workflow logs for detailed error messages.'
+      ].join('\n')
+    };
+  }
+
+  // Generic error fallback - extract first error block
+  const firstErrorIdx = planOutput.indexOf('Error:');
+  if (firstErrorIdx !== -1) {
+    const errorBlock = planOutput.substring(firstErrorIdx, firstErrorIdx + 500);
+    return {
+      type: 'generic',
+      message: 'Terraform plan failed',
+      details: [
+        '**Error snippet:**',
+        '```',
+        errorBlock,
+        '```',
+        '',
+        'Check the workflow logs for complete error output.'
+      ].join('\n')
+    };
+  }
+
+  return null;
+}
+
+/**
  * Build resource item with clean formatting
  * @param {Object} resource - Resource object
  * @returns {string} Markdown for resource item
@@ -99,6 +191,7 @@ function generatePrComment(options) {
     resources,
     summary,
     planOutcome = 'success',
+    planOutput = '',
     runNumber = 1,
     runUrl = '#',
     actor = 'unknown',
@@ -116,7 +209,9 @@ function generatePrComment(options) {
   sections.push('');
 
   // Header with Terraform branding
-  const statusIcon = planOutcome === 'success' ? '✅' : '❌';
+  // Show failure icon if plan failed OR if there's an error in the summary
+  const hasPlanError = planOutcome === 'failure' || planOutcome === 'skipped' || summary.error;
+  const statusIcon = hasPlanError ? '❌' : '✅';
   sections.push(`# ${statusIcon} Terraform Plan`);
   sections.push('');
 
@@ -124,8 +219,38 @@ function generatePrComment(options) {
   sections.push(`> 📋 **Run [#${runNumber}](${runUrl})** · ${timestamp} · @${actor}`);
   sections.push('');
 
-  // Summary badges for visual impact
-  if (hasChanges) {
+  // Check for errors first
+  if (summary.error) {
+    sections.push('```diff');
+    sections.push(`- ❌ Terraform Plan Failed`);
+    sections.push('');
+    sections.push(`Error: ${summary.error}`);
+    sections.push('```');
+    sections.push('');
+    sections.push('> ⚠️ **The plan failed to execute.** Check the workflow logs for detailed error messages.');
+    sections.push('');
+  } else if (planOutcome === 'failure' || planOutcome === 'skipped') {
+    const errorDetails = extractErrorDetails(planOutput);
+
+    sections.push('```diff');
+    sections.push(`- ❌ ${planOutcome === 'skipped' ? 'Could not produce Terraform Plan' : 'Terraform Plan Failed'}`);
+    sections.push('```');
+    sections.push('');
+
+    // Display extracted error details if available
+    if (errorDetails) {
+      sections.push(`### ${errorDetails.message}`);
+      sections.push('');
+      sections.push(errorDetails.details);
+      sections.push('');
+    } else {
+      sections.push('> ⚠️ **Could not determine infrastructure changes.**');
+      sections.push('');
+      sections.push(`Check the [workflow logs](${runUrl}) for detailed error messages.`);
+      sections.push('');
+    }
+  } else if (hasChanges) {
+    // Summary badges for visual impact
     const badges = [];
     if (summary.add > 0) badges.push(badge('add', summary.add, '2eb039'));
     if (summary.change > 0) badges.push(badge('change', summary.change, 'd4a017'));
@@ -142,10 +267,8 @@ function generatePrComment(options) {
     if (summary.destroy > 0) sections.push(`- ${summary.destroy} to destroy`);
     sections.push('```');
     sections.push('');
-  }
-
-  // No changes - success message
-  if (!hasChanges) {
+  } else {
+    // No changes - success message
     sections.push('```');
     sections.push('✨ No changes. Your infrastructure matches the configuration.');
     sections.push('```');

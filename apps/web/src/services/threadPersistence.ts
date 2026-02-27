@@ -42,7 +42,7 @@ export interface AISettings {
 
 export interface ThreadMessage {
   id: string;
-  role: "user" | "assistant" | "tool" | "system";
+  role: 'user' | 'assistant' | 'tool' | 'system';
   content?: string;
   toolCalls?: ToolCall[];
   toolCallId?: string;
@@ -50,7 +50,7 @@ export interface ThreadMessage {
 
 interface ToolCall {
   id: string;
-  type: "function";
+  type: 'function';
   function: {
     name: string;
     arguments: string;
@@ -81,36 +81,38 @@ interface ServerThreadDetail extends ServerThread {
 /**
  * Thread creation states - prevents duplicate creation attempts
  */
-type CreationState = "idle" | "creating" | "created";
+type CreationState = 'idle' | 'creating' | 'created';
 
 class ThreadCreationTracker {
-  private state: CreationState = "idle";
+  private state: CreationState = 'idle';
   private pendingPromise: Promise<ChatThread | null> | null = null;
 
   /**
    * Check if we can start a new creation
    */
   canCreate(): boolean {
-    return this.state === "idle";
+    return this.state === 'idle';
   }
 
   /**
    * Start creation and return the promise to wait on
    */
   startCreation(createFn: () => Promise<ChatThread | null>): Promise<ChatThread | null> {
-    if (this.state !== "idle") {
+    if (this.state !== 'idle') {
       // Already creating - return the existing promise
       return this.pendingPromise || Promise.resolve(null);
     }
 
-    this.state = "creating";
-    this.pendingPromise = createFn().then(result => {
-      this.state = result ? "created" : "idle";
-      return result;
-    }).catch(err => {
-      this.state = "idle";
-      throw err;
-    });
+    this.state = 'creating';
+    this.pendingPromise = createFn()
+      .then((result) => {
+        this.state = result ? 'created' : 'idle';
+        return result;
+      })
+      .catch((err) => {
+        this.state = 'idle';
+        throw err;
+      });
 
     return this.pendingPromise;
   }
@@ -119,7 +121,7 @@ class ThreadCreationTracker {
    * Reset to allow new creations (call when starting a fresh chat)
    */
   reset(): void {
-    this.state = "idle";
+    this.state = 'idle';
     this.pendingPromise = null;
   }
 }
@@ -158,30 +160,30 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
     const name = m.name as string | undefined;
     const args = m.arguments as Record<string, unknown> | string | undefined;
 
-    if (role === "user" || role === "system") {
+    if (role === 'user' || role === 'system') {
       // User/system messages
       result.push({
         id,
-        role: role as "user" | "system",
-        content: content || "",
+        role: role as 'user' | 'system',
+        content: content || '',
       });
-    } else if (role === "assistant") {
+    } else if (role === 'assistant') {
       // Check if this is a tool invocation (ID starts with "call_") or a regular assistant message
-      const isToolInvocation = id.startsWith("call_") || name !== undefined;
+      const isToolInvocation = id.startsWith('call_') || name !== undefined;
 
       if (isToolInvocation) {
         // This is a tool invocation - add it as toolCalls on an assistant message
         const toolCall = {
           id,
-          type: "function" as const,
+          type: 'function' as const,
           function: {
-            name: name || "queryLibrary",
-            arguments: typeof args === "string" ? args : (args ? JSON.stringify(args) : "{}"),
+            name: name || 'queryLibrary',
+            arguments: typeof args === 'string' ? args : args ? JSON.stringify(args) : '{}',
           },
         };
 
         // Find or create an assistant message to attach this to
-        const lastAssistantIdx = result.findLastIndex(msg => msg.role === "assistant");
+        const lastAssistantIdx = result.findLastIndex((msg) => msg.role === 'assistant');
 
         if (lastAssistantIdx >= 0 && !result[lastAssistantIdx].toolCalls?.length) {
           // Attach to existing assistant message that doesn't already have tool calls
@@ -191,8 +193,8 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
           // Create a new assistant message for this tool call
           result.push({
             id: `assistant-${id}`,
-            role: "assistant",
-            content: "",
+            role: 'assistant',
+            content: '',
             toolCalls: [toolCall],
           });
           lastToolCallId = id;
@@ -201,22 +203,20 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
         // Regular assistant text message
         result.push({
           id,
-          role: "assistant",
-          content: content || "",
+          role: 'assistant',
+          content: content || '',
         });
       }
-    } else if (role === "tool") {
+    } else if (role === 'tool') {
       // Tool result message - link to the last tool call we saw
       // CopilotKit may provide toolCallId or actionExecutionId, or we infer it
-      const toolCallId = (m.toolCallId as string) ||
-                         (m.actionExecutionId as string) ||
-                         lastToolCallId ||
-                         "";
+      const toolCallId =
+        (m.toolCallId as string) || (m.actionExecutionId as string) || lastToolCallId || '';
 
       result.push({
         id,
-        role: "tool",
-        content: content || "",
+        role: 'tool',
+        content: content || '',
         toolCallId,
       });
     }
@@ -235,7 +235,7 @@ export function copilotToThreadMessages(copilotMessages: unknown[]): ThreadMessa
 function serverToClient(server: ServerThread): ChatThread {
   return {
     id: server.thread_id,
-    title: server.title || "New Chat",
+    title: server.title || 'New Chat',
     createdAt: server.created_at ? new Date(server.created_at).getTime() : Date.now(),
     updatedAt: server.updated_at ? new Date(server.updated_at).getTime() : Date.now(),
     messageCount: server.message_count,
@@ -248,7 +248,7 @@ function serverToClient(server: ServerThread): ChatThread {
 function serverDetailToClient(server: ServerThreadDetail): ChatThread {
   return {
     id: server.thread_id,
-    title: server.title || "New Chat",
+    title: server.title || 'New Chat',
     createdAt: server.created_at ? new Date(server.created_at).getTime() : Date.now(),
     updatedAt: server.updated_at ? new Date(server.updated_at).getTime() : Date.now(),
     messageCount: server.message_count,
@@ -298,7 +298,7 @@ export async function createThread(
   messages: ThreadMessage[],
   title: string,
   scope?: QueryScope | null,
-  aiSettings?: AISettings | null,
+  aiSettings?: AISettings | null
 ): Promise<ChatThread | null> {
   const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/messages`, {
     method: "POST",
@@ -331,7 +331,7 @@ export async function saveMessages(
   messages: ThreadMessage[],
   title?: string,
   scope?: QueryScope | null,
-  aiSettings?: AISettings | null,
+  aiSettings?: AISettings | null
 ): Promise<boolean> {
   const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}/messages`, {
     method: "PATCH",
@@ -348,7 +348,7 @@ export async function saveMessages(
 export async function updateThreadSettings(
   threadId: string,
   scope?: QueryScope | null,
-  aiSettings?: AISettings | null,
+  aiSettings?: AISettings | null
 ): Promise<boolean> {
   const response = await fetch(`${getApiBaseUrl()}/api/v1/threads/${threadId}/settings`, {
     method: "PATCH",
@@ -423,7 +423,7 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
   // Build map of tool results with parsed content
   const toolResults = new Map<string, { message: ThreadMessage; parsedContent: unknown | null }>();
   for (const msg of messages) {
-    if (msg.role === "tool" && msg.toolCallId) {
+    if (msg.role === 'tool' && msg.toolCallId) {
       let parsedContent: unknown | null = null;
       if (msg.content) {
         try {
@@ -443,10 +443,10 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
-    if (msg.role === "assistant") {
+    if (msg.role === 'assistant') {
       currentAssistantIdx = i;
       assistantToolCalls.set(i, []);
-    } else if (msg.role === "tool" && msg.toolCallId && currentAssistantIdx >= 0) {
+    } else if (msg.role === 'tool' && msg.toolCallId && currentAssistantIdx >= 0) {
       assistantToolCalls.get(currentAssistantIdx)?.push(msg.toolCallId);
     }
   }
@@ -466,29 +466,29 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
    * - get_topics_for_channel: has "topics"
    */
   const inferToolName = (parsedContent: unknown): string => {
-    if (!parsedContent || typeof parsedContent !== 'object') return "query_library";
+    if (!parsedContent || typeof parsedContent !== 'object') return 'query_library';
     const obj = parsedContent as Record<string, unknown>;
 
     // query_library returns: answer, videoCards, evidence, followups
-    if ('answer' in obj && 'videoCards' in obj) return "query_library";
+    if ('answer' in obj && 'videoCards' in obj) return 'query_library';
     // search_videos returns: videos
-    if ('videos' in obj && !('answer' in obj)) return "search_videos";
+    if ('videos' in obj && !('answer' in obj)) return 'search_videos';
     // search_segments returns: segments
-    if ('segments' in obj) return "search_segments";
+    if ('segments' in obj) return 'search_segments';
     // get_video_summary returns: summary
-    if ('summary' in obj && !('answer' in obj)) return "get_video_summary";
+    if ('summary' in obj && !('answer' in obj)) return 'get_video_summary';
     // get_library_coverage returns: coverage
-    if ('coverage' in obj) return "get_library_coverage";
+    if ('coverage' in obj) return 'get_library_coverage';
     // get_topics_for_channel returns: topics
-    if ('topics' in obj) return "get_topics_for_channel";
+    if ('topics' in obj) return 'get_topics_for_channel';
 
-    return "query_library"; // Default fallback
+    return 'query_library'; // Default fallback
   };
 
   // Transform messages
   return messages.map((msg, idx) => {
     // Keep non-assistant messages as-is
-    if (msg.role !== "assistant") return msg;
+    if (msg.role !== 'assistant') return msg;
 
     // If assistant already has toolCalls, keep it
     if (msg.toolCalls && msg.toolCalls.length > 0) return msg;
@@ -498,27 +498,29 @@ export function prepareMessagesForDisplay(messages: ThreadMessage[]): ThreadMess
     if (toolCallIds.length === 0) return msg;
 
     // Check if all tool calls have results
-    const hasAllResults = toolCallIds.every(id => toolResults.has(id));
+    const hasAllResults = toolCallIds.every((id) => toolResults.has(id));
     if (!hasAllResults) {
       // Incomplete - return placeholder
       return {
         ...msg,
         id: `${msg.id}-incomplete`,
-        content: "⚠️ The previous response was interrupted. Please try sending your message again.",
+        content: '⚠️ The previous response was interrupted. Please try sending your message again.',
       };
     }
 
     // Reconstruct toolCalls from results
-    const reconstructedToolCalls = toolCallIds.map(id => {
+    const reconstructedToolCalls = toolCallIds.map((id) => {
       const result = toolResults.get(id);
-      const toolName = result?.parsedContent ? inferToolName(result.parsedContent) : "query_library";
+      const toolName = result?.parsedContent
+        ? inferToolName(result.parsedContent)
+        : 'query_library';
 
       return {
         id,
-        type: "function" as const,
+        type: 'function' as const,
         function: {
           name: toolName,
-          arguments: "{}",
+          arguments: '{}',
         },
       };
     });
@@ -534,7 +536,7 @@ export function generateTitle(content: string): string {
   const maxLength = 50;
   const cleaned = content.trim().replace(/\s+/g, ' ');
 
-  if (!cleaned) return "New Chat";
+  if (!cleaned) return 'New Chat';
 
   const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 
@@ -544,10 +546,10 @@ export function generateTitle(content: string): string {
   const lastSpace = truncated.lastIndexOf(' ');
 
   if (lastSpace > 20) {
-    return truncated.substring(0, lastSpace) + "…";
+    return truncated.substring(0, lastSpace) + '…';
   }
 
-  return truncated.substring(0, maxLength - 1) + "…";
+  return truncated.substring(0, maxLength - 1) + '…';
 }
 
 // ============================================================================
@@ -559,9 +561,12 @@ export function generateTitle(content: string): string {
  * This allows idempotent saves - we only save when content actually changes.
  */
 export function computeMessageHash(messages: ThreadMessage[]): string {
-  return messages.map(m =>
-    `${m.id}:${m.role}:${typeof m.content === 'string' ? m.content.length : 0}:${m.toolCallId || ''}`
-  ).join('|');
+  return messages
+    .map(
+      (m) =>
+        `${m.id}:${m.role}:${typeof m.content === 'string' ? m.content.length : 0}:${m.toolCallId || ''}`
+    )
+    .join('|');
 }
 
 /**

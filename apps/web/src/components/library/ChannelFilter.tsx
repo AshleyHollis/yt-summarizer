@@ -12,10 +12,7 @@ interface ChannelFilterProps {
 /**
  * Channel filter dropdown for filtering videos by channel
  */
-export function ChannelFilter({
-  selectedChannelId,
-  onChannelChange,
-}: ChannelFilterProps) {
+export function ChannelFilter({ selectedChannelId, onChannelChange }: ChannelFilterProps) {
   const [channels, setChannels] = useState<ChannelCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

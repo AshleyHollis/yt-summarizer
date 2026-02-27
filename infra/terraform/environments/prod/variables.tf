@@ -114,6 +114,13 @@ variable "auth0_domain" {
   default     = ""
 }
 
+variable "auth0_terraform_client_id" {
+  description = "Auth0 Terraform service account client ID (for enabling connection access)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "enable_auth0" {
   description = "Enable Auth0 resources (requires proper Auth0 Management API permissions)"
   type        = bool
@@ -148,6 +155,9 @@ variable "auth0_allowed_callback_urls" {
     "https://api-stg.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+    # Azure Static Web Apps (Next.js @auth0/nextjs-auth0)
+    "https://red-grass-06d413100-64.eastasia.6.azurestaticapps.net/api/auth/callback",
+    "http://localhost:3000/api/auth/callback",
   ]
 }
 
@@ -158,6 +168,7 @@ variable "auth0_allowed_logout_urls" {
     "https://web.yt-summarizer.apps.ashleyhollis.com",
     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
     "https://*.azurestaticapps.net",
+    "http://localhost:3000",
   ]
 }
 
@@ -168,6 +179,7 @@ variable "auth0_allowed_web_origins" {
     "https://web.yt-summarizer.apps.ashleyhollis.com",
     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
     "https://*.azurestaticapps.net",
+    "http://localhost:3000",
   ]
 }
 
@@ -189,6 +201,7 @@ variable "auth0_preview_allowed_callback_urls" {
   default = [
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
+    "https://*.azurestaticapps.net/api/auth/callback",
   ]
 }
 
@@ -206,4 +219,73 @@ variable "auth0_preview_allowed_web_origins" {
   default = [
     "https://*.azurestaticapps.net",
   ]
+}
+
+# -----------------------------------------------------------------------------
+# T012: Auth0 Connections and Test Users
+# -----------------------------------------------------------------------------
+
+variable "enable_auth0_database_connection" {
+  description = "Enable Auth0 database connection for username/password auth"
+  type        = bool
+  default     = true
+}
+
+variable "enable_auth0_google_connection" {
+  description = "Enable Google OAuth connection"
+  type        = bool
+  default     = true
+}
+
+variable "auth0_google_client_id" {
+  description = "Google OAuth client ID (from Azure Key Vault)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "auth0_google_client_secret" {
+  description = "Google OAuth client secret (from Azure Key Vault)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "enable_auth0_github_connection" {
+  description = "Enable GitHub OAuth connection"
+  type        = bool
+  default     = true
+}
+
+variable "auth0_github_client_id" {
+  description = "GitHub OAuth client ID (from Azure Key Vault)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "auth0_github_client_secret" {
+  description = "GitHub OAuth client secret (from Azure Key Vault)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "enable_auth0_role_action" {
+  description = "Enable Auth0 Action to add role claims to tokens"
+  type        = bool
+  default     = true
+}
+
+variable "auth0_test_users" {
+  description = "Map of test users to create in Auth0 (key = email address)"
+  type = map(object({
+    password       = string
+    email_verified = bool
+    role           = string # 'admin' or 'normal'
+  }))
+  default   = {}
+  sensitive = true
+  # NOTE: Using sensitive = true with nonsensitive() in for_each allows proper protection
+  # Map keys (emails) are exposed as resource IDs, values (passwords) stay protected
 }

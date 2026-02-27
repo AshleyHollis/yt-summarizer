@@ -1,0 +1,207 @@
+# Reusable Terraform Workflow
+# Handles both terraform plan and terraform apply operations
+# Used by both preview and production deployment workflows
+
+name: Terraform Plan and Apply
+
+on:
+  workflow_call:
+    inputs:
+      # Working directory
+      terraform-working-dir:
+        description: 'Terraform working directory'
+        required: true
+        type: string
+      terraform-version:
+        description: 'Terraform version to use'
+        required: true
+        type: string
+
+      # Job control
+      run-plan:
+        description: 'Whether to run terraform plan'
+        required: false
+        type: boolean
+        default: true
+      run-apply:
+        description: 'Whether to run terraform apply'
+        required: false
+        type: boolean
+        default: false
+
+      # Environment configuration
+      environment-name:
+        description: 'GitHub environment name for apply job (e.g., production). Empty string = no environment.'
+        required: false
+        type: string
+        default: ''
+
+      # PR-specific options
+      post-plan-to-pr:
+        description: 'Whether to post terraform plan to PR comments'
+        required: false
+        type: boolean
+        default: false
+
+    secrets:
+      # Azure credentials
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+
+      # Auth0 credentials
+      AUTH0_DOMAIN:
+        required: true
+      AUTH0_CLIENT_ID:
+        required: true
+      AUTH0_CLIENT_SECRET:
+        required: true
+
+      # Terraform variables
+      SQL_ADMIN_PASSWORD:
+        required: true
+      OPENAI_API_KEY:
+        required: true
+      CLOUDFLARE_API_TOKEN:
+        required: true
+
+    outputs:
+      plan_summary:
+        description: 'JSON summary of terraform plan'
+        value: ${{ jobs.terraform-plan.outputs.plan_summary }}
+      has_changes:
+        description: 'Whether terraform plan has changes'
+        value: ${{ jobs.terraform-plan.outputs.has_changes }}
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    if: inputs.run-plan
+    outputs:
+      plan_summary: ${{ steps.plan.outputs.plan_summary }}
+      has_changes: ${{ fromJson(steps.plan.outputs.plan_summary).has_changes }}
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write  # Needed for PR comments (no-op if not posting to PR)
+    env:
+      # Auth0 Terraform Service Account - M2M credentials for managing Auth0 resources
+      # See docs/auth0-terraform-service-account.md for details
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: true
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform-working-dir }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform with Azure
+        uses: ./.github/actions/setup-terraform-azure
+        with:
+          terraform-version: ${{ inputs.terraform-version }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate Terraform configuration
+        uses: ./.github/actions/validate
+        with:
+          validators: terraform-config
+          terraform-directory: ${{ inputs.terraform-working-dir }}
+          fail-fast: 'true'
+          timeout-seconds: '60'
+
+      - name: Terraform Plan
+        id: plan
+        uses: ./.github/actions/terraform-plan
+        with:
+          working-directory: ${{ inputs.terraform-working-dir }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Post Plan to PR and Summary
+        if: always() && inputs.post-plan-to-pr
+        uses: ./.github/actions/post-terraform-plan
+        with:
+          plan-summary: ${{ steps.plan.outputs.plan_summary }}
+          plan-json-path: ${{ steps.plan.outputs.plan_json_path }}
+          plan-outcome: ${{ steps.plan.outcome }}
+          plan-output: ${{ steps.plan.outputs.plan_output }}
+
+      - name: Upload Terraform plan artifact
+        if: always() && steps.plan.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            ${{ inputs.terraform-working-dir }}/tfplan
+            ${{ inputs.terraform-working-dir }}/plan_output.txt
+            ${{ inputs.terraform-working-dir }}/plan.json
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: |
+      inputs.run-apply &&
+      needs.terraform-plan.result == 'success' &&
+      needs.terraform-plan.outputs.has_changes == 'true'
+    environment:
+      name: ${{ inputs.environment-name != '' && inputs.environment-name || null }}
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      # Auth0 Terraform Service Account - M2M credentials for managing Auth0 resources
+      # See docs/auth0-terraform-service-account.md for details
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: true
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform-working-dir }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform with Azure
+        uses: ./.github/actions/setup-terraform-azure
+        with:
+          terraform-version: ${{ inputs.terraform-version }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download Terraform plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ inputs.terraform-working-dir }}
+
+      - name: Validate Terraform configuration
+        uses: ./.github/actions/validate
+        with:
+          validators: terraform-config
+          terraform-directory: ${{ inputs.terraform-working-dir }}
+          fail-fast: 'true'
+          timeout-seconds: '60'
+
+      - name: Terraform Apply
+        shell: bash
+        run: terraform apply -auto-approve tfplan

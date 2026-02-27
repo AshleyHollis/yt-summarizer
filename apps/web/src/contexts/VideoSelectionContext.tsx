@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
-import type { VideoCard as VideoCardType } from "@/services/api";
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import type { VideoCard as VideoCardType } from '@/services/api';
 
 /**
  * Minimal video info stored in selection (to avoid stale data)
@@ -39,7 +39,7 @@ const VideoSelectionContext = createContext<VideoSelectionContextType | undefine
 export function useVideoSelection(): VideoSelectionContextType {
   const context = useContext(VideoSelectionContext);
   if (!context) {
-    throw new Error("useVideoSelection must be used within a VideoSelectionProvider");
+    throw new Error('useVideoSelection must be used within a VideoSelectionProvider');
   }
   return context;
 }
@@ -130,9 +130,5 @@ export function VideoSelectionProvider({ children }: VideoSelectionProviderProps
     ]
   );
 
-  return (
-    <VideoSelectionContext.Provider value={value}>
-      {children}
-    </VideoSelectionContext.Provider>
-  );
+  return <VideoSelectionContext.Provider value={value}>{children}</VideoSelectionContext.Provider>;
 }

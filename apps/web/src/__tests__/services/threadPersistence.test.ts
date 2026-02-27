@@ -51,7 +51,7 @@ describe('prepareMessagesForDisplay', () => {
       const result = prepareMessagesForDisplay(messages);
 
       // Find the assistant message
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
       expect(assistantMsg).toBeDefined();
       expect(assistantMsg?.toolCalls).toBeDefined();
       expect(assistantMsg?.toolCalls).toHaveLength(1);
@@ -75,7 +75,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('search_videos');
     });
@@ -95,7 +95,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('search_segments');
     });
@@ -115,7 +115,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('get_video_summary');
     });
@@ -135,7 +135,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('get_library_coverage');
     });
@@ -155,7 +155,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('get_topics_for_channel');
     });
@@ -175,7 +175,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('query_library');
     });
@@ -189,11 +189,13 @@ describe('prepareMessagesForDisplay', () => {
           id: 'assistant-1',
           role: 'assistant',
           content: '',
-          toolCalls: [{
-            id: 'call_existing',
-            type: 'function',
-            function: { name: 'custom_tool', arguments: '{}' },
-          }],
+          toolCalls: [
+            {
+              id: 'call_existing',
+              type: 'function',
+              function: { name: 'custom_tool', arguments: '{}' },
+            },
+          ],
         },
         {
           id: 'tool-1',
@@ -204,7 +206,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       // Should keep the original tool name
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('custom_tool');
@@ -214,16 +216,26 @@ describe('prepareMessagesForDisplay', () => {
       const messages: ThreadMessage[] = [
         { id: 'user-1', role: 'user', content: 'Question 1' },
         { id: 'assistant-1', role: 'assistant', content: '' },
-        { id: 'tool-1', role: 'tool', toolCallId: 'call_1', content: '{"answer":"A1","videoCards":[]}' },
+        {
+          id: 'tool-1',
+          role: 'tool',
+          toolCallId: 'call_1',
+          content: '{"answer":"A1","videoCards":[]}',
+        },
         { id: 'user-2', role: 'user', content: 'Question 2' },
         { id: 'assistant-2', role: 'assistant', content: '' },
-        { id: 'tool-2', role: 'tool', toolCallId: 'call_2', content: '{"answer":"A2","videoCards":[]}' },
+        {
+          id: 'tool-2',
+          role: 'tool',
+          toolCallId: 'call_2',
+          content: '{"answer":"A2","videoCards":[]}',
+        },
       ];
 
       const result = prepareMessagesForDisplay(messages);
 
-      const assistant1 = result.find(m => m.id === 'assistant-1');
-      const assistant2 = result.find(m => m.id === 'assistant-2');
+      const assistant1 = result.find((m) => m.id === 'assistant-1');
+      const assistant2 = result.find((m) => m.id === 'assistant-2');
 
       expect(assistant1?.toolCalls?.[0].id).toBe('call_1');
       expect(assistant2?.toolCalls?.[0].id).toBe('call_2');
@@ -240,7 +252,7 @@ describe('prepareMessagesForDisplay', () => {
       // Note: The current implementation doesn't handle empty content as "incomplete"
       // but this test documents the expected behavior for missing results
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       // Should still reconstruct toolCalls since toolCallId exists
       expect(assistantMsg?.toolCalls).toBeDefined();
@@ -259,7 +271,7 @@ describe('prepareMessagesForDisplay', () => {
       ];
 
       const result = prepareMessagesForDisplay(messages);
-      const assistantMsg = result.find(m => m.role === 'assistant');
+      const assistantMsg = result.find((m) => m.role === 'assistant');
 
       // Should default to query_library when can't parse JSON
       expect(assistantMsg?.toolCalls?.[0].function.name).toBe('query_library');
@@ -268,9 +280,7 @@ describe('prepareMessagesForDisplay', () => {
 
   describe('message pass-through', () => {
     it('should pass through user messages unchanged', () => {
-      const messages: ThreadMessage[] = [
-        { id: 'user-1', role: 'user', content: 'Hello world' },
-      ];
+      const messages: ThreadMessage[] = [{ id: 'user-1', role: 'user', content: 'Hello world' }];
 
       const result = prepareMessagesForDisplay(messages);
 
@@ -315,9 +325,7 @@ describe('prepareMessagesForDisplay', () => {
 
 describe('copilotToThreadMessages', () => {
   it('should convert user messages correctly', () => {
-    const copilotMessages = [
-      { id: 'msg-1', role: 'user', content: 'Hello' },
-    ];
+    const copilotMessages = [{ id: 'msg-1', role: 'user', content: 'Hello' }];
 
     const result = copilotToThreadMessages(copilotMessages);
 
@@ -327,9 +335,7 @@ describe('copilotToThreadMessages', () => {
   });
 
   it('should convert assistant text messages correctly', () => {
-    const copilotMessages = [
-      { id: 'msg-1', role: 'assistant', content: 'How can I help?' },
-    ];
+    const copilotMessages = [{ id: 'msg-1', role: 'assistant', content: 'How can I help?' }];
 
     const result = copilotToThreadMessages(copilotMessages);
 
@@ -351,7 +357,7 @@ describe('copilotToThreadMessages', () => {
     const result = copilotToThreadMessages(copilotMessages);
 
     // Should create assistant message with toolCalls
-    const assistantMsg = result.find(m => m.role === 'assistant');
+    const assistantMsg = result.find((m) => m.role === 'assistant');
     expect(assistantMsg?.toolCalls).toBeDefined();
     expect(assistantMsg?.toolCalls?.[0].id).toBe('call_abc123');
     expect(assistantMsg?.toolCalls?.[0].function.name).toBe('query_library');
@@ -375,7 +381,7 @@ describe('copilotToThreadMessages', () => {
 
     const result = copilotToThreadMessages(copilotMessages);
 
-    const toolMsg = result.find(m => m.role === 'tool');
+    const toolMsg = result.find((m) => m.role === 'tool');
     expect(toolMsg?.toolCallId).toBe('call_abc123');
   });
 });
@@ -413,12 +419,8 @@ describe('computeMessageHash', () => {
   });
 
   it('should produce different hash for different messages', () => {
-    const messages1: ThreadMessage[] = [
-      { id: 'msg-1', role: 'user', content: 'Hello' },
-    ];
-    const messages2: ThreadMessage[] = [
-      { id: 'msg-1', role: 'user', content: 'Goodbye' },
-    ];
+    const messages1: ThreadMessage[] = [{ id: 'msg-1', role: 'user', content: 'Hello' }];
+    const messages2: ThreadMessage[] = [{ id: 'msg-1', role: 'user', content: 'Goodbye' }];
 
     const hash1 = computeMessageHash(messages1);
     const hash2 = computeMessageHash(messages2);
@@ -439,9 +441,7 @@ describe('messagesChanged', () => {
   });
 
   it('should detect content changes via hash', () => {
-    const messages: ThreadMessage[] = [
-      { id: 'msg-1', role: 'user', content: 'Hello' },
-    ];
+    const messages: ThreadMessage[] = [{ id: 'msg-1', role: 'user', content: 'Hello' }];
 
     const oldHash = 'different-hash';
     const changed = messagesChanged(messages, oldHash, 1);
@@ -449,9 +449,7 @@ describe('messagesChanged', () => {
   });
 
   it('should return false when no changes', () => {
-    const messages: ThreadMessage[] = [
-      { id: 'msg-1', role: 'user', content: 'Hello' },
-    ];
+    const messages: ThreadMessage[] = [{ id: 'msg-1', role: 'user', content: 'Hello' }];
 
     const hash = computeMessageHash(messages);
     const changed = messagesChanged(messages, hash, 1);
@@ -504,8 +502,18 @@ describe('Thread switching scenarios', () => {
           content: JSON.stringify({
             answer: 'I found several videos about investing...',
             videoCards: [
-              { videoId: 'v1', youTubeVideoId: 'abc', title: 'Investing 101', relevanceScore: 0.95 },
-              { videoId: 'v2', youTubeVideoId: 'def', title: 'Stock Market Basics', relevanceScore: 0.88 },
+              {
+                videoId: 'v1',
+                youTubeVideoId: 'abc',
+                title: 'Investing 101',
+                relevanceScore: 0.95,
+              },
+              {
+                videoId: 'v2',
+                youTubeVideoId: 'def',
+                title: 'Stock Market Basics',
+                relevanceScore: 0.88,
+              },
             ],
             evidence: [],
             followups: ['What about index funds?', 'Tell me about bonds'],
@@ -545,23 +553,38 @@ describe('Thread switching scenarios', () => {
         // Turn 1
         { id: 'user-1', role: 'user', content: 'What investing videos do you have?' },
         { id: 'assistant-1', role: 'assistant', content: '' },
-        { id: 'tool-1', role: 'tool', toolCallId: 'call_1', content: JSON.stringify({ answer: 'A1', videoCards: [] }) },
+        {
+          id: 'tool-1',
+          role: 'tool',
+          toolCallId: 'call_1',
+          content: JSON.stringify({ answer: 'A1', videoCards: [] }),
+        },
         // Turn 2
         { id: 'user-2', role: 'user', content: 'Now find videos about bonds' },
         { id: 'assistant-2', role: 'assistant', content: '' },
-        { id: 'tool-2', role: 'tool', toolCallId: 'call_2', content: JSON.stringify({ answer: 'A2', videoCards: [] }) },
+        {
+          id: 'tool-2',
+          role: 'tool',
+          toolCallId: 'call_2',
+          content: JSON.stringify({ answer: 'A2', videoCards: [] }),
+        },
         // Turn 3
         { id: 'user-3', role: 'user', content: 'What about real estate?' },
         { id: 'assistant-3', role: 'assistant', content: '' },
-        { id: 'tool-3', role: 'tool', toolCallId: 'call_3', content: JSON.stringify({ answer: 'A3', videoCards: [] }) },
+        {
+          id: 'tool-3',
+          role: 'tool',
+          toolCallId: 'call_3',
+          content: JSON.stringify({ answer: 'A3', videoCards: [] }),
+        },
       ];
 
       const displayMessages = prepareMessagesForDisplay(serverMessages);
 
       // Each assistant message should have its own toolCalls reconstructed
-      const assistant1 = displayMessages.find(m => m.id === 'assistant-1');
-      const assistant2 = displayMessages.find(m => m.id === 'assistant-2');
-      const assistant3 = displayMessages.find(m => m.id === 'assistant-3');
+      const assistant1 = displayMessages.find((m) => m.id === 'assistant-1');
+      const assistant2 = displayMessages.find((m) => m.id === 'assistant-2');
+      const assistant3 = displayMessages.find((m) => m.id === 'assistant-3');
 
       expect(assistant1?.toolCalls?.[0].id).toBe('call_1');
       expect(assistant2?.toolCalls?.[0].id).toBe('call_2');
@@ -588,18 +611,23 @@ describe('Thread switching scenarios', () => {
         },
         { id: 'user-1', role: 'user', content: 'What videos about cooking?' },
         { id: 'assistant-1', role: 'assistant', content: '' },
-        { id: 'tool-1', role: 'tool', toolCallId: 'call_1', content: JSON.stringify({ answer: 'Found cooking videos', videoCards: [] }) },
+        {
+          id: 'tool-1',
+          role: 'tool',
+          toolCallId: 'call_1',
+          content: JSON.stringify({ answer: 'Found cooking videos', videoCards: [] }),
+        },
       ];
 
       const displayMessages = prepareMessagesForDisplay(serverMessages);
 
       // Greeting should be unchanged (no toolCalls added)
-      const greeting = displayMessages.find(m => m.id === 'greeting');
+      const greeting = displayMessages.find((m) => m.id === 'greeting');
       expect(greeting?.content).toBe('Hello! I can help you search your video library.');
       expect(greeting?.toolCalls).toBeUndefined();
 
       // But the second assistant message should have toolCalls
-      const assistant1 = displayMessages.find(m => m.id === 'assistant-1');
+      const assistant1 = displayMessages.find((m) => m.id === 'assistant-1');
       expect(assistant1?.toolCalls).toBeDefined();
     });
 
@@ -615,9 +643,7 @@ describe('Thread switching scenarios', () => {
      * Tests conversation with only user messages (no assistant response yet).
      */
     it('should handle user-only messages', () => {
-      const serverMessages: ThreadMessage[] = [
-        { id: 'user-1', role: 'user', content: 'Hello?' },
-      ];
+      const serverMessages: ThreadMessage[] = [{ id: 'user-1', role: 'user', content: 'Hello?' }];
 
       const displayMessages = prepareMessagesForDisplay(serverMessages);
       expect(displayMessages).toHaveLength(1);

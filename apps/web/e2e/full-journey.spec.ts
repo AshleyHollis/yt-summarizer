@@ -205,7 +205,7 @@ test.describe('Copilot Behavior: Response Quality', () => {
     ];
 
     const lowerResponse = responseContent.toLowerCase();
-    const askedForClarification = clarificationPhrases.some(phrase =>
+    const askedForClarification = clarificationPhrases.some((phrase) =>
       lowerResponse.includes(phrase)
     );
     expect(askedForClarification).toBe(false);

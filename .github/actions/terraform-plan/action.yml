@@ -51,6 +51,10 @@ runs:
 
     - name: Get JSON plan
       id: format
+      if: always()
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      # Always run to provide output even if plan failed
+      # Returns empty summary with error flag if tfplan doesn't exist
       run: ${{ github.action_path }}/parse-terraform-plan.sh
+      continue-on-error: true

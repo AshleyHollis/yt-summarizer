@@ -7,18 +7,18 @@ import { Navbar } from "@/components/Navbar";
 import { CopilotSidebar } from "@/components/copilot";
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "YouTube Summarizer",
-  description: "Transform YouTube videos into actionable AI-powered summaries",
+  title: 'YouTube Summarizer',
+  description: 'Transform YouTube videos into actionable AI-powered summaries',
 };
 
 export default function RootLayout({

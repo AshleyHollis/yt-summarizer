@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { ReactNode } from "react";
+import { ReactNode } from 'react';
 
 interface ToolLoadingStateProps {
   /** Primary loading message */
@@ -41,12 +41,12 @@ export function ToolLoadingState({ title, description }: ToolLoadingStateProps) 
  * Check if tool is in a loading state
  */
 export function isToolLoading(status: string): boolean {
-  return status === "inProgress" || status === "executing";
+  return status === 'inProgress' || status === 'executing';
 }
 
 /**
  * Check if tool is complete
  */
 export function isToolComplete(status: string): boolean {
-  return status === "complete";
+  return status === 'complete';
 }

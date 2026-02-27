@@ -42,26 +42,25 @@ on:
   workflow_dispatch:
     inputs:
       run_terraform:
-        description: 'Run terraform plan/apply'
+        description: "Run terraform plan/apply"
         required: false
         type: boolean
         default: true
       run_deploy:
-        description: 'Build and deploy backend'
+        description: "Build and deploy backend"
         required: false
         type: boolean
         default: true
       run_frontend:
-        description: 'Deploy frontend'
+        description: "Deploy frontend"
         required: false
         type: boolean
         default: true
       run_health_check:
-        description: 'Run post-deploy health checks'
+        description: "Run post-deploy health checks"
         required: false
         type: boolean
         default: true
-
 
 concurrency:
   group: deploy-prod
@@ -105,7 +104,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ github.sha }}
-          timeout-seconds: '1800'
+          timeout-seconds: "1800"
+
+  # ---------------------------------------------------------------------------
+  # Resolve Terraform Configuration
+  # ---------------------------------------------------------------------------
+  # Calls reusable workflow to resolve Terraform configuration from Actions Variables
+  # See .github/workflows/resolve-terraform-config.yml for details
+  tf-config:
+    uses: ./.github/workflows/resolve-terraform-config.yml
 
   # ---------------------------------------------------------------------------
   # Terraform (Plan + Apply)

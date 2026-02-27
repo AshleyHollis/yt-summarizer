@@ -39,12 +39,12 @@ on:
         required: false
         type: string
       force_deploy:
-        description: 'Force deployment even without code changes'
+        description: "Force deployment even without code changes"
         required: false
         type: boolean
         default: false
       run_preview:
-        description: 'Run preview deployment jobs'
+        description: "Run preview deployment jobs"
         required: false
         type: boolean
         default: true
@@ -59,7 +59,7 @@ on:
         type: boolean
         default: true
       run_e2e:
-        description: 'Run E2E tests'
+        description: "Run E2E tests"
         required: false
         type: boolean
         default: true
@@ -94,6 +94,7 @@ jobs:
     outputs:
       needs_image_build: ${{ steps.finalize.outputs.needs_image_build }}
       needs_deployment: ${{ steps.finalize.outputs.needs_deployment }}
+      needs_backend_deployment: ${{ steps.check.outputs.needs_backend_deployment }}
       infra_changed: ${{ steps.infra.outputs.infra_changed }}
       pr_number: ${{ steps.set-pr.outputs.pr_number }}
       pr_head_ref: ${{ steps.set-pr.outputs.pr_head_ref }}
@@ -129,6 +130,11 @@ jobs:
       - name: Finalize deployment flags
         id: finalize
         shell: bash
+        env:
+          INITIAL_NEEDS_IMAGE_BUILD: ${{ steps.check.outputs.needs_image_build }}
+          INITIAL_NEEDS_DEPLOYMENT: ${{ steps.check.outputs.needs_deployment }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_PREVIEW: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_preview || 'true' }}
         run: scripts/workflows/preview-finalize-flags.sh
 
       - name: Detect infra changes
@@ -314,6 +320,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true'
     needs: [check-concurrency, detect-changes]
@@ -383,6 +390,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success' &&
@@ -416,6 +424,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.update-overlay.result == 'success'
@@ -554,11 +563,11 @@ jobs:
         uses: ./.github/actions/health-check
         with:
           url: ${{ needs.get-ingress.outputs.preview_url }}/health/live
-          max-attempts: '20'
-          interval-seconds: '15'
-          timeout-seconds: '5'
-          expected-status: '200'
-          service-name: 'Preview API (E2E)'
+          max-attempts: "20"
+          interval-seconds: "15"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Preview API (E2E)"
 
       - name: Determine E2E base URL
         id: base-url

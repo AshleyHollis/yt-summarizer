@@ -88,9 +88,7 @@ function FeatureCard({ icon, title, description }: FeatureCardProps) {
       <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 mb-3">
         {icon}
       </div>
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-        {title}
-      </h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{title}</h3>
       <p className="text-xs text-gray-600 dark:text-gray-300">{description}</p>
     </div>
   );

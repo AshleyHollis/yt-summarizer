@@ -106,12 +106,9 @@ export function Pagination({
       <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            Showing{' '}
-            <span className="font-medium">{(page - 1) * pageSize + 1}</span> to{' '}
-            <span className="font-medium">
-              {Math.min(page * pageSize, totalCount)}
-            </span>{' '}
-            of <span className="font-medium">{totalCount}</span> results
+            Showing <span className="font-medium">{(page - 1) * pageSize + 1}</span> to{' '}
+            <span className="font-medium">{Math.min(page * pageSize, totalCount)}</span> of{' '}
+            <span className="font-medium">{totalCount}</span> results
           </p>
         </div>
         <div>

@@ -9,11 +9,7 @@ import { useHealthCheck } from '@/hooks/useHealthCheck';
 import { healthApi, HealthStatus } from '@/services/api';
 
 // Mock the healthApi
-vi.mock('@/services/api', () => ({
-  healthApi: {
-    getHealth: vi.fn(),
-  },
-}));
+vi.mock('@/services/api');
 
 describe('useHealthCheck', () => {
   const mockHealthyResponse: HealthStatus = {

@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MarkdownRenderer, PROSE_CLASSES, PROSE_VARIANTS } from '@/components/common/MarkdownRenderer';
+import {
+  MarkdownRenderer,
+  PROSE_CLASSES,
+  PROSE_VARIANTS,
+} from '@/components/common/MarkdownRenderer';
 import { CollapsibleContent } from '@/components/common/CollapsibleContent';
 
 describe('MarkdownRenderer', () => {
@@ -97,11 +101,7 @@ describe('CollapsibleContent', () => {
 
   it('uses custom expand/collapse labels', () => {
     render(
-      <CollapsibleContent
-        collapsedHeight={100}
-        expandLabel="Read more"
-        collapseLabel="Read less"
-      >
+      <CollapsibleContent collapsedHeight={100} expandLabel="Read more" collapseLabel="Read less">
         <p>Test content</p>
       </CollapsibleContent>
     );

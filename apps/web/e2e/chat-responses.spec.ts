@@ -64,15 +64,15 @@ test.describe("Chat Response Quality", () => {
     const lowerContent = pageContent.toLowerCase();
 
     // Should mention at least some of these push-up form cues
-    const formCues = ["plank", "elbow", "shoulder", "chest", "straight", "body", "core", "arms"];
-    const foundCues = formCues.filter(cue => lowerContent.includes(cue));
+    const formCues = ['plank', 'elbow', 'shoulder', 'chest', 'straight', 'body', 'core', 'arms'];
+    const foundCues = formCues.filter((cue) => lowerContent.includes(cue));
     expect(foundCues.length).toBeGreaterThan(2);
 
     // 4. Should cite the push-up videos (check for video titles)
     const hasPushUpVideo =
-      lowerContent.includes("perfect push up") ||
-      lowerContent.includes("the push-up") ||
-      lowerContent.includes("push up");
+      lowerContent.includes('perfect push up') ||
+      lowerContent.includes('the push-up') ||
+      lowerContent.includes('push up');
     expect(hasPushUpVideo).toBe(true);
 
     // 5. Video cards should link to video detail pages
@@ -95,10 +95,10 @@ test.describe("Chat Response Quality", () => {
 
     // Should mention kettlebell-related content
     const hasKettlebellContent =
-      lowerContent.includes("kettlebell") ||
-      lowerContent.includes("pavel") ||
-      lowerContent.includes("swing") ||
-      lowerContent.includes("cassiusk");
+      lowerContent.includes('kettlebell') ||
+      lowerContent.includes('pavel') ||
+      lowerContent.includes('swing') ||
+      lowerContent.includes('cassiusk');
     expect(hasKettlebellContent).toBe(true);
 
     // 3. Should have proper video card structure
@@ -120,10 +120,10 @@ test.describe("Chat Response Quality", () => {
     const lowerContent = pageContent.toLowerCase();
 
     const hasHeavyClubsContent =
-      lowerContent.includes("heavy club") ||
-      lowerContent.includes("mark wildman") ||
-      lowerContent.includes("beginner") ||
-      lowerContent.includes("club");
+      lowerContent.includes('heavy club') ||
+      lowerContent.includes('mark wildman') ||
+      lowerContent.includes('beginner') ||
+      lowerContent.includes('club');
     expect(hasHeavyClubsContent).toBe(true);
 
     // 3. If video cards are present, verify they link to video detail pages
@@ -146,9 +146,9 @@ test.describe("Chat Response Quality", () => {
     const sourcesSection = page.getByText('Sources');
 
     // At least one of these should be present
-    const hasVideoLinks = await videoLinks.count() > 0;
-    const hasCitations = await citations.count() > 0;
-    const hasSources = await sourcesSection.count() > 0;
+    const hasVideoLinks = (await videoLinks.count()) > 0;
+    const hasCitations = (await citations.count()) > 0;
+    const hasSources = (await sourcesSection.count()) > 0;
 
     expect(hasVideoLinks || hasCitations || hasSources).toBe(true);
 
@@ -158,11 +158,11 @@ test.describe("Chat Response Quality", () => {
 
     // Should mention exercise-related content
     const hasExerciseContent =
-      lowerContent.includes("exercise") ||
-      lowerContent.includes("push") ||
-      lowerContent.includes("kettlebell") ||
-      lowerContent.includes("workout") ||
-      lowerContent.includes("training");
+      lowerContent.includes('exercise') ||
+      lowerContent.includes('push') ||
+      lowerContent.includes('kettlebell') ||
+      lowerContent.includes('workout') ||
+      lowerContent.includes('training');
     expect(hasExerciseContent).toBe(true);
   });
 
@@ -179,15 +179,15 @@ test.describe("Chat Response Quality", () => {
 
     // Should have structured content - check for lists or paragraphs in HTML
     const hasStructuredContent =
-      pageContent.includes("<li") ||
-      pageContent.includes("<ul") ||
-      pageContent.includes("<ol") ||
-      pageContent.includes("<p") ||
-      pageContent.includes("list");
+      pageContent.includes('<li') ||
+      pageContent.includes('<ul') ||
+      pageContent.includes('<ol') ||
+      pageContent.includes('<p') ||
+      pageContent.includes('list');
     expect(hasStructuredContent).toBe(true);
 
     // 3. Should mention "mistakes" since that's what was asked
-    expect(pageContent.toLowerCase()).toContain("mistake");
+    expect(pageContent.toLowerCase()).toContain('mistake');
   });
 
   test("irrelevant query shows Limited Information indicator", async ({}, testInfo) => {
@@ -208,7 +208,7 @@ test.describe("Chat Response Quality", () => {
     await expect(page.getByText("Limited Information")).toBeVisible();
 
     // 3. Should NOT show "Recommended Videos" section
-    await expect(page.getByText("Recommended Videos")).not.toBeVisible();
+    await expect(page.getByText('Recommended Videos')).not.toBeVisible();
 
     // 4. The LLM response text is non-deterministic — no exact text assertions.
     // The "Limited Information" heading being visible is sufficient to prove
@@ -226,7 +226,7 @@ test.describe("Chat Response Quality", () => {
     // If no links found, skip this test (citations may be text-only)
     const linkCount = await videoLink.count();
     if (linkCount === 0) {
-      console.log("No video links found in copilot response - citations may be text-only");
+      console.log('No video links found in copilot response - citations may be text-only');
       return;
     }
 
@@ -254,7 +254,7 @@ test.describe("Chat Response Quality", () => {
   });
 });
 
-test.describe("Chat Edge Cases", () => {
+test.describe('Chat Edge Cases', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // Navigate with chat=open to have the sidebar open by default
@@ -264,24 +264,24 @@ test.describe("Chat Edge Cases", () => {
     await waitForCopilotReady(page);
   });
 
-  test("handles empty and whitespace-only queries gracefully", async ({ page }) => {
-    const input = page.getByPlaceholder("Ask about your videos...");
+  test('handles empty and whitespace-only queries gracefully', async ({ page }) => {
+    const input = page.getByPlaceholder('Ask about your videos...');
     await expect(input).toBeVisible();
 
     // Try to submit empty query - send button should be disabled
-    const sendButton = page.getByRole("button", { name: /send/i });
+    const sendButton = page.getByRole('button', { name: /send/i });
 
     // With empty input, send should be disabled
     await expect(sendButton).toBeDisabled();
 
     // Try whitespace only
-    await input.fill("   ");
+    await input.fill('   ');
     // Send should still be disabled or the query should be trimmed
     const isDisabled = await sendButton.isDisabled();
 
     // Either button is disabled OR if we can submit, it handles gracefully
     if (!isDisabled) {
-      await input.press("Enter");
+      await input.press('Enter');
       // Should not crash - either shows error or ignores
       await page.waitForTimeout(2000);
       await expect(page).toHaveURL(/library/);
@@ -333,6 +333,6 @@ test.describe("Chat Edge Cases", () => {
 
     // Should show new results
     const pageContent = await page.content();
-    expect(pageContent.toLowerCase()).toContain("kettlebell");
+    expect(pageContent.toLowerCase()).toContain('kettlebell');
   });
 });

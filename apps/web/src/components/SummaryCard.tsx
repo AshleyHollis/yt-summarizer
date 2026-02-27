@@ -16,10 +16,7 @@ export interface SummaryCardProps {
 /**
  * Component for displaying AI-generated video summaries
  */
-export function SummaryCard({
-  summaryUrl,
-  className = '',
-}: SummaryCardProps) {
+export function SummaryCard({ summaryUrl, className = '' }: SummaryCardProps) {
   const [summary, setSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +97,11 @@ export function SummaryCard({
         <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-4 w-1/3" />
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-4 bg-gray-200 dark:bg-gray-700 rounded" style={{ width: `${90 - i * 10}%` }} />
+            <div
+              key={i}
+              className="h-4 bg-gray-200 dark:bg-gray-700 rounded"
+              style={{ width: `${90 - i * 10}%` }}
+            />
           ))}
         </div>
       </div>
@@ -110,20 +111,22 @@ export function SummaryCard({
   // Error state
   if (error) {
     return (
-      <div className={`rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-6 ${className}`}>
+      <div
+        className={`rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-6 ${className}`}
+      >
         <p className="text-red-600 dark:text-red-400">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden ${className}`}>
+    <div
+      className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden ${className}`}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            AI Summary
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Summary</h3>
 
           {/* Copy button */}
           <button
@@ -133,8 +136,18 @@ export function SummaryCard({
           >
             {isCopied ? (
               <>
-                <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-4 h-4 text-green-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 Copied!
               </>

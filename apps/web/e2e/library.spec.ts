@@ -48,12 +48,17 @@ test.describe('User Story 3: Browse the Library', () => {
       await page.goto('/library');
 
       // Wait for loading to finish (loading skeleton or actual content)
-      await page.waitForFunction(() => {
-        const loading = document.querySelector('.animate-pulse');
-        return !loading || loading.closest('.hidden');
-      }, { timeout: 10000 }).catch(() => {
-        // Loading might already be done
-      });
+      await page
+        .waitForFunction(
+          () => {
+            const loading = document.querySelector('.animate-pulse');
+            return !loading || loading.closest('.hidden');
+          },
+          { timeout: 10000 }
+        )
+        .catch(() => {
+          // Loading might already be done
+        });
 
       // Either show videos or "No videos found" message
       // Use more specific selectors for video cards
@@ -184,7 +189,9 @@ test.describe('User Story 3: Browse the Library', () => {
       await searchInput.fill('test query');
 
       // Look for clear button
-      const clearButton = page.locator('button[aria-label*="clear"], button:has(svg[data-testid="x-mark"])').first();
+      const clearButton = page
+        .locator('button[aria-label*="clear"], button:has(svg[data-testid="x-mark"])')
+        .first();
 
       if (await clearButton.isVisible()) {
         await clearButton.click();
@@ -254,7 +261,7 @@ test.describe('User Story 3: Browse the Library', () => {
 
       const nextButton = page.getByRole('button', { name: /Next/i }).first();
 
-      if (await nextButton.isVisible() && await nextButton.isEnabled()) {
+      if ((await nextButton.isVisible()) && (await nextButton.isEnabled())) {
         await nextButton.click();
 
         // Page should update
@@ -269,17 +276,24 @@ test.describe('User Story 3: Browse the Library', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Wait for channels to load (loading skeleton should disappear)
-      await page.waitForFunction(() => {
-        const channelSection = document.querySelector('[class*="Channel"]');
-        if (!channelSection) return true;
-        return !channelSection.querySelector('.animate-pulse');
-      }, { timeout: 5000 }).catch(() => {});
+      await page
+        .waitForFunction(
+          () => {
+            const channelSection = document.querySelector('[class*="Channel"]');
+            if (!channelSection) return true;
+            return !channelSection.querySelector('.animate-pulse');
+          },
+          { timeout: 5000 }
+        )
+        .catch(() => {});
 
       // Check if channel select or list exists
       const channelFilter = page.locator('select, [role="listbox"], .channel-filter').first();
-      await expect(channelFilter).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Channel filter might not be rendered if no channels
-      });
+      await expect(channelFilter)
+        .toBeVisible({ timeout: 5000 })
+        .catch(() => {
+          // Channel filter might not be rendered if no channels
+        });
     });
   });
 
@@ -318,9 +332,11 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Should show segments section or transcript
       const segmentsSection = page.getByText(/Segments|Transcript|Timeline/i);
-      await expect(segmentsSection.first()).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Video might not have segments yet
-      });
+      await expect(segmentsSection.first())
+        .toBeVisible({ timeout: 5000 })
+        .catch(() => {
+          // Video might not have segments yet
+        });
     });
 
     test('back to library link works', async ({ page }) => {
@@ -407,7 +423,9 @@ test.describe('User Story 3: Browse the Library', () => {
       await expect(transcriptText).toBeVisible({ timeout: 5000 });
 
       // Get the parent container and verify there's substantial content
-      const contentArea = page.locator('h3:has-text("Transcript") + div, h3:has-text("Transcript") ~ div').first();
+      const contentArea = page
+        .locator('h3:has-text("Transcript") + div, h3:has-text("Transcript") ~ div')
+        .first();
       if (await contentArea.isVisible()) {
         const allText = await contentArea.textContent();
         // Transcript should have substantial content (at least 100 chars for a real video)
@@ -450,9 +468,11 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // Should show not found or error
       const errorContent = page.getByText(/not found|error|doesn't exist/i);
-      await expect(errorContent.first()).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Page might just redirect or show empty state
-      });
+      await expect(errorContent.first())
+        .toBeVisible({ timeout: 5000 })
+        .catch(() => {
+          // Page might just redirect or show empty state
+        });
     });
   });
 
@@ -634,7 +654,9 @@ test.describe('User Story 3: Browse the Library', () => {
 
       // The summary section should be visible and contain content
       // This catches UI issues where summary is fetched but not displayed
-      const summarySection = page.locator('[data-testid="summary-content"], .summary-content, .markdown-body').first();
+      const summarySection = page
+        .locator('[data-testid="summary-content"], .summary-content, .markdown-body')
+        .first();
 
       // Allow for either summary section or markdown content
       const summaryText = page.getByText(/summary|overview|key points/i).first();

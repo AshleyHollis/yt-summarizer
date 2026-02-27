@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * ThreadedCopilotSidebar Component (Refactored)
@@ -43,40 +43,40 @@ import styles from "./ThreadedCopilotSidebar.module.css";
 // Constants
 // ============================================================================
 
-const SIDEBAR_SIZE_KEY = "copilot-sidebar-size";
-const THREADS_COLLAPSED_KEY = "copilot-threads-collapsed";
+const SIDEBAR_SIZE_KEY = 'copilot-sidebar-size';
+const THREADS_COLLAPSED_KEY = 'copilot-threads-collapsed';
 const MOBILE_BREAKPOINT = 768;
 
-type SizeMode = "compact" | "default" | "half" | "full";
+type SizeMode = 'compact' | 'default' | 'half' | 'full';
 
-const SIZE_MODES: SizeMode[] = ["compact", "default", "half", "full"];
+const SIZE_MODES: SizeMode[] = ['compact', 'default', 'half', 'full'];
 
 const SIZE_CONFIG: Record<SizeMode, { width: string; minPx: number }> = {
-  compact: { width: "20vw", minPx: 320 },
-  default: { width: "30vw", minPx: 380 },
-  half: { width: "50vw", minPx: 400 },
-  full: { width: "100vw", minPx: 0 },
+  compact: { width: '20vw', minPx: 320 },
+  default: { width: '30vw', minPx: 380 },
+  half: { width: '50vw', minPx: 400 },
+  full: { width: '100vw', minPx: 0 },
 };
 
 // Theme colors
 const THEME_DARK: CopilotKitCSSProperties = {
-  "--copilot-kit-primary-color": "#ff0000",
-  "--copilot-kit-contrast-color": "#ffffff",
-  "--copilot-kit-background-color": "#0f0f0f",
-  "--copilot-kit-secondary-color": "#212121",
-  "--copilot-kit-secondary-contrast-color": "#f1f1f1",
-  "--copilot-kit-separator-color": "#3f3f3f",
-  "--copilot-kit-muted-color": "#aaaaaa",
+  '--copilot-kit-primary-color': '#ff0000',
+  '--copilot-kit-contrast-color': '#ffffff',
+  '--copilot-kit-background-color': '#0f0f0f',
+  '--copilot-kit-secondary-color': '#212121',
+  '--copilot-kit-secondary-contrast-color': '#f1f1f1',
+  '--copilot-kit-separator-color': '#3f3f3f',
+  '--copilot-kit-muted-color': '#aaaaaa',
 };
 
 const THEME_LIGHT: CopilotKitCSSProperties = {
-  "--copilot-kit-primary-color": "#cc0000",
-  "--copilot-kit-contrast-color": "#ffffff",
-  "--copilot-kit-background-color": "#ffffff",
-  "--copilot-kit-secondary-color": "#f2f2f2",
-  "--copilot-kit-secondary-contrast-color": "#0f0f0f",
-  "--copilot-kit-separator-color": "#e5e5e5",
-  "--copilot-kit-muted-color": "#606060",
+  '--copilot-kit-primary-color': '#cc0000',
+  '--copilot-kit-contrast-color': '#ffffff',
+  '--copilot-kit-background-color': '#ffffff',
+  '--copilot-kit-secondary-color': '#f2f2f2',
+  '--copilot-kit-secondary-contrast-color': '#0f0f0f',
+  '--copilot-kit-separator-color': '#e5e5e5',
+  '--copilot-kit-muted-color': '#606060',
 };
 
 // ============================================================================
@@ -84,7 +84,7 @@ const THEME_LIGHT: CopilotKitCSSProperties = {
 // ============================================================================
 
 function cn(...classes: (string | boolean | undefined | null)[]): string {
-  return classes.filter(Boolean).join(" ");
+  return classes.filter(Boolean).join(' ');
 }
 
 // ============================================================================
@@ -113,15 +113,15 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
 
   // UI State
   const [mounted, setMounted] = useState(false);
-  const [sizeMode, setSizeMode] = useState<SizeMode>("default");
+  const [sizeMode, setSizeMode] = useState<SizeMode>('default');
   const [threadsCollapsed, setThreadsCollapsed] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [threadNotFoundMessage, setThreadNotFoundMessage] = useState<string | null>(null);
 
   // URL-based state
-  const isOpen = searchParams.get("chat") === "open" || defaultOpen;
-  const urlThreadId = searchParams.get("thread");
+  const isOpen = searchParams.get('chat') === 'open' || defaultOpen;
+  const urlThreadId = searchParams.get('thread');
 
   // CopilotKit hooks
   const { agent, messages: internalMessages } = useCopilotChatInternal();
@@ -155,9 +155,9 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     onThreadIdChange: (threadId) => {
       const params = new URLSearchParams(searchParams.toString());
       if (threadId) {
-        params.set("thread", threadId);
+        params.set('thread', threadId);
       } else {
-        params.delete("thread");
+        params.delete('thread');
       }
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
@@ -180,7 +180,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
 
   // Memoized theme
   const copilotStyles = useMemo(() => {
-    const isDark = mounted && resolvedTheme === "dark";
+    const isDark = mounted && resolvedTheme === 'dark';
     return isDark ? THEME_DARK : THEME_LIGHT;
   }, [mounted, resolvedTheme]);
 
@@ -199,13 +199,13 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
 
     const savedThreadsCollapsed = localStorage.getItem(THREADS_COLLAPSED_KEY);
     if (savedThreadsCollapsed !== null) {
-      setThreadsCollapsed(savedThreadsCollapsed === "true");
+      setThreadsCollapsed(savedThreadsCollapsed === 'true');
     }
 
     const checkMobile = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
     checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Sync thread ID from URL
@@ -223,12 +223,21 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
       setThreadNotFoundMessage("The requested chat thread was not found.");
       setTimeout(() => setThreadNotFoundMessage(null), 5000);
       const params = new URLSearchParams(searchParams.toString());
-      params.delete("thread");
+      params.delete('thread');
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     } else if (!urlThreadId) {
       syncThreadIdFromUrl(null);
     }
-  }, [mounted, threadsLoading, urlThreadId, threads, syncThreadIdFromUrl, pathname, router, searchParams]);
+  }, [
+    mounted,
+    threadsLoading,
+    urlThreadId,
+    threads,
+    syncThreadIdFromUrl,
+    pathname,
+    router,
+    searchParams,
+  ]);
 
   // Save messages when they change
   useEffect(() => {
@@ -242,10 +251,19 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
 
     if (activeThreadId && !urlThreadId) {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("thread", activeThreadId);
+      params.set('thread', activeThreadId);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     }
-  }, [mounted, threadsLoading, isOpen, activeThreadId, urlThreadId, pathname, router, searchParams]);
+  }, [
+    mounted,
+    threadsLoading,
+    isOpen,
+    activeThreadId,
+    urlThreadId,
+    pathname,
+    router,
+    searchParams,
+  ]);
 
   // Sync CopilotKit's internal thread ID to the URL as early as possible.
   //
@@ -282,10 +300,10 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
       const widthPercent = ((window.innerWidth - e.clientX) / window.innerWidth) * 100;
 
       let newMode: SizeMode;
-      if (widthPercent >= 75) newMode = "full";
-      else if (widthPercent >= 40) newMode = "half";
-      else if (widthPercent >= 25) newMode = "default";
-      else newMode = "compact";
+      if (widthPercent >= 75) newMode = 'full';
+      else if (widthPercent >= 40) newMode = 'half';
+      else if (widthPercent >= 25) newMode = 'default';
+      else newMode = 'compact';
 
       setSizeMode(newMode);
     };
@@ -295,12 +313,12 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
       localStorage.setItem(SIDEBAR_SIZE_KEY, sizeMode);
     };
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing, sizeMode]);
 
@@ -311,9 +329,9 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
   const handleSetOpen = useCallback(
     (open: boolean) => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("chat", open ? "open" : "closed");
+      params.set('chat', open ? 'open' : 'closed');
       if (open && activeThreadId) {
-        params.set("thread", activeThreadId);
+        params.set('thread', activeThreadId);
       }
       const newUrl = `${pathname}?${params.toString()}`;
       router.push(newUrl, { scroll: false });
@@ -368,9 +386,9 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
   // ============================================================================
 
   const displayThreadId = urlThreadId || activeThreadId;
-  const activeThreadTitle = threads.find((t) => t.id === displayThreadId)?.title || "New Chat";
+  const activeThreadTitle = threads.find((t) => t.id === displayThreadId)?.title || 'New Chat';
   const currentSize = SIZE_CONFIG[sizeMode];
-  const chatWidth = isMobile ? "100%" : `max(${currentSize.minPx}px, ${currentSize.width})`;
+  const chatWidth = isMobile ? '100%' : `max(${currentSize.minPx}px, ${currentSize.width})`;
 
   // ============================================================================
   // Custom Header Component
@@ -440,7 +458,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
   const wrapperClasses = cn(
     styles.wrapper,
     isOpen ? styles.open : styles.closed,
-    !isMobile && sizeMode === "full" && styles.sizeFull
+    !isMobile && sizeMode === 'full' && styles.sizeFull
   );
 
   return (
@@ -470,7 +488,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
         style={{ ...(copilotStyles as React.CSSProperties), width: chatWidth }}
       >
         {/* Resize handle */}
-        {!isMobile && sizeMode !== "full" && (
+        {!isMobile && sizeMode !== 'full' && (
           <div
             className={cn(styles.resizeHandle, isResizing && styles.active)}
             onMouseDown={handleMouseDown}
@@ -486,9 +504,9 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
             clickOutsideToClose={false}
             Header={HeaderComponent}
             labels={{
-              title: "AI Assistant",
-              placeholder: "Ask about your videos...",
-              initial: "How can I help you with your video library?",
+              title: 'AI Assistant',
+              placeholder: 'Ask about your videos...',
+              initial: 'How can I help you with your video library?',
             }}
           />
         </div>

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Copilot Actions Hook (Optimized)
@@ -21,8 +21,8 @@ import { useCallback } from "react";
 import { getClientApiUrl } from "@/services/runtimeConfig";
 
 // Modular hooks
-import { useFrontendTools } from "./useFrontendTools";
-import { useBackendToolRenderers } from "./useBackendToolRenderers";
+import { useFrontendTools } from './useFrontendTools';
+import { useBackendToolRenderers } from './useBackendToolRenderers';
 
 // Re-export types for consumers
 export type {
@@ -32,7 +32,7 @@ export type {
   CoverageResponse,
   ScoredSegment,
   SegmentSearchResponse,
-} from "@/types/copilot-types";
+} from '@/types/copilot-types';
 
 // Re-export utils
 export { formatTime } from "./copilot-utils";
@@ -56,21 +56,21 @@ export function useCopilotActions() {
   // Provide current scope to the agent - THIS CONTROLS WHAT TO SEARCH
   useCopilotReadable({
     description:
-      "The current search scope filters. IMPORTANT: This controls what videos to search. " +
-      "If videoIds is set, ONLY search those videos. " +
-      "If channels is set, ONLY search videos from those channels. " +
-      "If empty ({}), search the ENTIRE library.",
+      'The current search scope filters. IMPORTANT: This controls what videos to search. ' +
+      'If videoIds is set, ONLY search those videos. ' +
+      'If channels is set, ONLY search videos from those channels. ' +
+      'If empty ({}), search the ENTIRE library.',
     value: scope,
   });
 
   // Provide AI knowledge settings to the agent
   useCopilotReadable({
     description:
-      "AI knowledge source settings that control what the agent can use to answer questions. " +
-      "useVideoContext: Whether to search the video library for context (RAG retrieval). " +
-      "useLLMKnowledge: Whether the AI can use its general trained knowledge in answers. " +
-      "useWebSearch: Whether to search the web for current information. " +
-      "IMPORTANT: Pass these settings to the query_library tool to respect user preferences.",
+      'AI knowledge source settings that control what the agent can use to answer questions. ' +
+      'useVideoContext: Whether to search the video library for context (RAG retrieval). ' +
+      'useLLMKnowledge: Whether the AI can use its general trained knowledge in answers. ' +
+      'useWebSearch: Whether to search the web for current information. ' +
+      'IMPORTANT: Pass these settings to the query_library tool to respect user preferences.',
     value: aiSettings,
   });
 

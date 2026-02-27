@@ -63,7 +63,8 @@ export class CopilotErrorBoundary extends Component<Props, State> {
             </h2>
 
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              The AI assistant backend is currently unreachable. The application will work in limited mode without AI features.
+              The AI assistant backend is currently unreachable. The application will work in
+              limited mode without AI features.
             </p>
 
             <button

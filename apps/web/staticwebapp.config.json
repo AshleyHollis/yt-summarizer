@@ -1,13 +1,5 @@
 {
   "platform": {
     "apiRuntime": "node:20"
-  },
-  "routes": [
-    {
-      "route": "/.swa/*",
-      "headers": {
-        "Cache-Control": "no-cache"
-      }
-    }
-  ]
+  }
 }

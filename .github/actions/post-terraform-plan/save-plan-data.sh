@@ -37,3 +37,6 @@ $PLAN_OUTCOME
 PLAN_OUTCOME_EOF
 
 echo "✅ Plan data files created"
+echo "  - plan-summary.json: $(wc -c < plan-summary.json) bytes"
+echo "  - formatted-plan.json: $(wc -c < formatted-plan.json) bytes"
+echo "  - plan-outcome.txt: $(wc -c < plan-outcome.txt) bytes"
