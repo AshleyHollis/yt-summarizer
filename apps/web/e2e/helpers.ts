@@ -115,7 +115,8 @@ export async function submitQuery(page: Page, query: string): Promise<void> {
  * 1. Wait for the tool loading indicator ("Searching your video library...")
  *    to appear and then disappear — this confirms the backend is processing.
  * 2. Wait for actual response content (video cards, headings, or uncertainty
- *    indicators) to become visible.
+ *    indicators) to become visible, OR detect that the agent has finished
+ *    responding (input re-enabled) even if the response is plain text.
  *
  * IMPORTANT: The loading indicator must NOT be in the final response locator
  * because it appears transiently during tool execution. Including it causes
@@ -149,7 +150,15 @@ export async function waitForResponse(
   }
 
   // Phase 2: Wait for actual response content. These are the FINAL rendered
-  // elements, not transient loading states.
+  // elements, not transient loading states. We race two strategies:
+  //
+  // Strategy A: Detect specific tool-rendered content (video cards, headings,
+  //   uncertainty indicators). This is the preferred path when the agent uses tools.
+  //
+  // Strategy B: Detect that the agent finished responding by waiting for the chat
+  //   input to be re-enabled AND a new assistant message to appear. This handles
+  //   plain-text responses where the agent doesn't invoke tools (CopilotKit hides
+  //   non-greeting markdown, but the response lifecycle still completes).
   const responseIndicator = page
     .getByText("Recommended Videos")
     .or(page.getByText("Sources"))
@@ -157,7 +166,35 @@ export async function waitForResponse(
     .or(page.getByText("Limited Information"))
     .or(page.getByText("No relevant content"));
 
-  await expect(responseIndicator.first()).toBeVisible({ timeout });
+  // Strategy A: wait for tool-rendered content
+  const strategyA = expect(responseIndicator.first()).toBeVisible({ timeout })
+    .then(() => 'tool-rendered');
+
+  // Strategy B: wait for response lifecycle to complete (input re-enabled after
+  // being disabled during agent processing, plus at least one assistant message
+  // exists beyond the initial greeting)
+  const strategyB = (async () => {
+    const chatInput = page.getByPlaceholder("Ask about your videos...");
+    // Wait for the input to become disabled (agent is processing)
+    try {
+      await expect(chatInput).toBeDisabled({ timeout: 30_000 });
+    } catch {
+      // Input may never have been disabled if response was instant
+    }
+    // Wait for the input to be re-enabled (agent finished)
+    await expect(chatInput).toBeEnabled({ timeout });
+    // Give a brief moment for any remaining renders to complete
+    await page.waitForTimeout(2_000);
+    // Verify at least 2 assistant message divs exist (greeting + response)
+    const assistantMessages = page.locator('.copilotKitAssistantMessage');
+    const count = await assistantMessages.count();
+    if (count < 2) {
+      throw new Error(`Expected at least 2 assistant messages, found ${count}`);
+    }
+    return 'lifecycle-complete';
+  })();
+
+  await Promise.race([strategyA, strategyB]);
 }
 
 /**
