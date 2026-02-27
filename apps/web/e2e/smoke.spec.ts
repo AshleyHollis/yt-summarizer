@@ -202,10 +202,11 @@ test.describe('Video Submission (Requires Backend)', () => {
   });
 
   test('submits video and redirects to video detail page', async ({ page }) => {
-    // Generous timeout: SWA cold start on page.goto can consume 30-60s,
-    // plus API call + 1500ms redirect delay.
-    test.setTimeout(180_000);
+    // Triple timeout to 540s: SWA cold start can consume 30-60s on page.goto,
+    // then API call latency + 1500ms redirect delay.
+    test.slow();
     await page.goto('/add');
+    await page.waitForLoadState('domcontentloaded');
 
     const input = page.getByLabel(/YouTube URL/i);
     await input.fill(SUBMIT_VIDEO_URL);
@@ -226,7 +227,8 @@ test.describe('Video Submission (Requires Backend)', () => {
   });
 
   test('video detail page shows processing status', async ({ page }) => {
-    test.setTimeout(120_000);
+    // Triple timeout to 540s: SWA cold start + API call + redirect + second navigation
+    test.slow();
     await page.goto('/add');
     await page.waitForLoadState('domcontentloaded');
 
