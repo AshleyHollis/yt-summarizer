@@ -8,11 +8,12 @@
 
 'use client';
 
-import { Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
-function ErrorContent({ searchParams }: { searchParams: { error?: string } }) {
-  const error = searchParams.error || 'Auth0 configuration is missing or invalid';
+export default function AuthConfigErrorPage() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get('error') || 'Auth0 configuration is missing or invalid';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
@@ -110,12 +111,4 @@ function ErrorContent({ searchParams }: { searchParams: { error?: string } }) {
       </div>
     </div>
   );
-}
-
-export default function AuthConfigErrorPage({
-  searchParams,
-}: {
-  searchParams: { error?: string };
-}) {
-  return <ErrorContent searchParams={searchParams} />;
 }
