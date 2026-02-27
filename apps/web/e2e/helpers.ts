@@ -34,7 +34,9 @@ const RETRY_DELAY_MS = 3000;
  */
 export async function waitForCopilotReady(page: Page): Promise<void> {
   const input = page.getByPlaceholder(CHAT_INPUT_PLACEHOLDER);
-  await expect(input).toBeVisible({ timeout: 30_000 });
+  // 60s timeout: SWA cold starts can delay page load by 30-60s before the
+  // CopilotKit chat panel renders and the input becomes visible.
+  await expect(input).toBeVisible({ timeout: 60_000 });
 
   // Wait for CopilotKit's initial handshake request to complete.
   // CopilotKit sends a POST to /api/copilotkit with 0 messages on mount.
