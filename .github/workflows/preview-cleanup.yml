@@ -17,7 +17,7 @@ on:
 permissions:
   id-token: write
   pull-requests: write
-  contents: write  # Need write to delete overlay files from preview-overlays branch
+  contents: write # Need write to delete overlay files from preview-overlays branch
 
 jobs:
   cleanup:
@@ -121,6 +121,12 @@ jobs:
             > - Azure Static Web Apps staging environment is being deleted
             > - All preview resources will be removed within ~5 minutes`
             });
+
+      - name: Restore main branch for local actions
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Create cleanup summary
         uses: ./.github/actions/create-pipeline-summary
