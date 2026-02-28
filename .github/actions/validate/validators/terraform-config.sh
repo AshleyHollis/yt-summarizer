@@ -53,15 +53,10 @@ echo ""
 # Check 2: Terraform validate
 log_info "Check 2: Terraform validation"
 
-# Initialize if not already done (required for validate)
-if [[ ! -d ".terraform" ]]; then
-  log_info "Initializing Terraform..."
-  if [[ "$BACKEND_CONFIG" == "true" ]]; then
-    terraform init -backend=true
-  else
-    terraform init -backend=false
-  fi
-fi
+# Always re-initialize to ensure provider checksums match the lock file.
+# Skipping init when .terraform exists can cause stale cache mismatches.
+log_info "Initializing Terraform (backend=false)..."
+terraform init -backend=false -reconfigure
 
 if terraform validate; then
   log_success "Terraform configuration is valid"
