@@ -75,7 +75,7 @@
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [x] T026 Update `services/workers/.env.example` and `services/api/.env.example` with complete PROXY_* variable documentation and example values
-- [ ] T027 Verify all existing tests pass with `PROXY_ENABLED=false` (default) — no regressions from proxy code paths by running `./scripts/run-tests.ps1`
+- [x] T027 Verify all existing tests pass with `PROXY_ENABLED=false` (default) — no regressions from proxy code paths by running `./scripts/run-tests.ps1`
 
 ---
 

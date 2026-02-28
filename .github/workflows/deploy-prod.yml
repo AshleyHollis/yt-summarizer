@@ -75,11 +75,11 @@ env:
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
 
   # Production-specific values
-  ARGOCD_APP_NAME_PROD: 'yt-summarizer-prod'
-  NAMESPACE_PROD: 'yt-summarizer'
+  ARGOCD_APP_NAME_PROD: "yt-summarizer-prod"
+  NAMESPACE_PROD: "yt-summarizer"
   PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
-  ARGOCD_SYNC_TIMEOUT: '360'
-  KUSTOMIZE_OVERLAY_PROD: 'k8s/overlays/prod'
+  ARGOCD_SYNC_TIMEOUT: "360"
+  KUSTOMIZE_OVERLAY_PROD: "k8s/overlays/prod"
 
 permissions:
   id-token: write
@@ -170,7 +170,7 @@ jobs:
         with:
           mode: all
           namespace: ${{ env.NAMESPACE_ARGOCD }}
-          verbose: 'true'
+          verbose: "true"
 
   # ---------------------------------------------------------------------------
   # Get Image Tag from CI
@@ -227,7 +227,7 @@ jobs:
           image-tag: ${{ steps.normalize-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ---------------------------------------------------------------------------
   # Update Production Overlay (Reusable Workflow)
@@ -274,7 +274,7 @@ jobs:
       expected-image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
       api-url: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
       host: api.yt-summarizer.apps.ashleyhollis.com
-      max-wait-seconds: '360'
+      max-wait-seconds: "360"
       auto-recovery: false
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -334,7 +334,7 @@ jobs:
             echo "- Wait for CI: ${{ needs.wait-for-ci.result }}"
             terraform_plan_changes="n/a"
             if [[ "${{ needs.terraform.result }}" == 'success' ]]; then
-              terraform_plan_changes="${{ fromJson(needs.terraform.outputs.plan-summary).has_changes }}"
+              terraform_plan_changes="${{ fromJson(needs.terraform.outputs.plan-summary || '{}').has_changes || 'unknown' }}"
             fi
             echo "- Terraform plan: ${{ needs.terraform.result }}"
             echo "  changes: ${terraform_plan_changes}"

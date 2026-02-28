@@ -150,14 +150,17 @@
 
 ### Preview Hostname & TLS (Free)
 
-- [ ] T095 [US2] Install cert-manager in cluster and expose via Argo CD (add to `k8s/argocd/infra-apps.yaml` or Helm chart)
-- [ ] T096 [US2] Add `ClusterIssuer` manifests for Let's Encrypt staging (`letsencrypt-staging`) and production (`letsencrypt-prod`) using HTTP-01 solver
-- [ ] T097 [US2] Update preview Ingress template (`k8s/overlays/previews/_template/patches/ingress-patch.yaml`) to:
+- [x] T095 [US2] Install cert-manager in cluster and expose via Argo CD (add to `k8s/argocd/infra-apps.yaml` or Helm chart)
+- [x] T096 [US2] Add `ClusterIssuer` manifests for Let's Encrypt staging (`letsencrypt-staging`) and production (`letsencrypt-prod`) using HTTP-01 solver
+- [x] T097 [US2] Update preview Ingress template (`k8s/overlays/previews/_template/patches/ingress-patch.yaml`) to:
   - use host `api.preview-pr-<num>.<ingress-ip-dashed>.nip.io`
   - include TLS block with `secretName: preview-pr-<num>-tls`
   - annotate with `cert-manager.io/cluster-issuer: letsencrypt-staging` for issuance
-- [ ] T098 [US2] Update preview workflow to compute the preview host and set `REAL_BACKEND_URL` to `https://api.preview-pr-<num>.<ip>.nip.io/api` (injected at build time)
-- [ ] T099 [US2] Create task to validate certificate issuance (watch `Certificate` and confirm TLS secret created)
+  - **Note**: Implemented via Cloudflare wildcard cert + Gateway API (supersedes nip.io/cert-manager per-PR approach)
+- [x] T098 [US2] Update preview workflow to compute the preview host and set `REAL_BACKEND_URL` to `https://api.preview-pr-<num>.<ip>.nip.io/api` (injected at build time)
+  - **Note**: `compute-preview-urls` action outputs `https://` URLs using wildcard TLS secret `yt-summarizer-wildcard-tls`
+- [x] T099 [US2] Create task to validate certificate issuance (watch `Certificate` and confirm TLS secret created)
+  - **Note**: `.github/actions/verify-certificate/` composite action handles this
 - [ ] T100 [US2] Validate secure preview end-to-end (frontend -> HTTPS backend) and run Playwright E2E against `https://<preview-host>`
 - [ ] T101 [US2] Document preview hostname & TLS approach in `specs/002-azure-cicd/spec.md`, `quickstart.md`, and `tasks.md` (this task)
 
