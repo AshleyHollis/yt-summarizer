@@ -8,7 +8,8 @@ module "swa" {
   name                = "swa-${local.name_prefix}"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
-  sku_tier            = "Free"
+  sku_tier            = "Standard"
+  sku_size            = "Standard"
 
   tags = local.common_tags
 }
