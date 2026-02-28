@@ -8,7 +8,7 @@
  * Implementation: T022 (social login), T042 (username/password)
  */
 
-import { LoginButton } from '@/components/auth`/sign-in`Button';
+import { LoginButton } from '@/components/auth/LoginButton';
 import { UsernamePasswordForm } from '@/components/auth/UsernamePasswordForm';
 import type { Metadata } from 'next';
 
