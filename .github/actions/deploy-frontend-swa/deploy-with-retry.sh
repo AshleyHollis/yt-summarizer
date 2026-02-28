@@ -11,7 +11,7 @@ set -euo pipefail
 : "${DEPLOYMENT_ENVIRONMENT:=preview}"  # Default to preview, override for production or pr-{number}
 : "${VERBOSE:=false}"
 : "${MAX_ATTEMPTS:=3}"
-: "${TIMEOUT_SECONDS:=480}"  # 8 minutes per attempt (SWA binary has 15min internal timeout)
+: "${TIMEOUT_SECONDS:=1200}"  # 20 minutes per attempt (SWA binary has 15min internal timeout)
 
 # Export GitHub context for SWA CLI (fixes "Could not get repository branch/url" warnings)
 # These are automatically available in GitHub Actions but need to be explicitly exported
