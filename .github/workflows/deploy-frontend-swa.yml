@@ -206,13 +206,14 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Configure SWA app settings from Key Vault
+        continue-on-error: true  # don't block deploy if environment not yet ready
         shell: bash
         run: |
           KV_NAME="${{ vars.KEY_VAULT_NAME || 'kv-ytsumm-prd' }}"
           SWA_NAME="${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}"
           RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}"
-          # deployment-environment is 'default' for prod, 'pr-N' for preview
-          DEPLOY_ENV="${{ inputs.deployment-environment }}"
+          # Azure SWA environment name = PR number (e.g. '160'), not deployment-environment (e.g. 'pr-160')
+          PR_NUM="${{ inputs.pr-number }}"
 
           if [[ "${{ inputs.environment }}" == "prod" ]]; then
             AUTH0_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-session-secret" --query value -o tsv)
@@ -225,16 +226,16 @@ jobs:
             AUTH0_DOMAIN=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-domain" --query value -o tsv)
             AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-client-id" --query value -o tsv)
             AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-client-secret" --query value -o tsv)
-            # Use the same environment name as the SWA deployment (e.g. 'pr-160')
-            ENV_FLAG="--environment-name ${DEPLOY_ENV}"
+            # Azure SWA uses PR number as the environment name (not the deployment_environment value)
+            ENV_FLAG="--environment-name ${PR_NUM}"
           fi
 
           SWA_HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv)
 
           # For preview: use the preview environment hostname pattern
-          if [[ "${{ inputs.environment }}" == "preview" && -n "$DEPLOY_ENV" ]]; then
+          if [[ "${{ inputs.environment }}" == "preview" && -n "$PR_NUM" ]]; then
             PREVIEW_SUFFIX="${SWA_HOSTNAME#white-meadow-0b8e2e000.}"
-            SWA_BASE_URL="https://white-meadow-0b8e2e000-${DEPLOY_ENV}.${PREVIEW_SUFFIX}"
+            SWA_BASE_URL="https://white-meadow-0b8e2e000-${PR_NUM}.${PREVIEW_SUFFIX}"
           else
             SWA_BASE_URL="https://${SWA_HOSTNAME}"
           fi
@@ -260,20 +261,30 @@ jobs:
           DEPLOY_URL="${{ steps.deploy-swa.outputs.static_web_app_url }}"
           if [[ -n "$DEPLOY_URL" ]]; then
             echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ inputs.environment }}" == "prod" ]]; then
-            # Warmup timeout on cold start - deployment still succeeds; fetch URL from Azure
+          else
+            # Warmup/cold-start timeout - deployment may still succeed; resolve URL from Azure
             SWA_NAME="${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}"
             RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}"
-            HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv 2>/dev/null || echo "")
-            if [[ -n "$HOSTNAME" ]]; then
-              echo "url=https://$HOSTNAME" >> "$GITHUB_OUTPUT"
+            PR_NUM="${{ inputs.pr-number }}"
+            if [[ "${{ inputs.environment }}" == "prod" ]]; then
+              HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv 2>/dev/null || echo "")
+              if [[ -n "$HOSTNAME" ]]; then
+                echo "url=https://$HOSTNAME" >> "$GITHUB_OUTPUT"
+              else
+                echo "::error::Could not resolve production deployment URL"
+                exit 1
+              fi
             else
-              echo "::error::Could not resolve production deployment URL"
-              exit 1
+              # For preview: construct URL from environment name (Azure uses PR number as env name)
+              HOSTNAME=$(az staticwebapp environment show --name "$SWA_NAME" --resource-group "$RG" \
+                --environment-name "$PR_NUM" --query hostname -o tsv 2>/dev/null || echo "")
+              if [[ -n "$HOSTNAME" ]]; then
+                echo "url=https://$HOSTNAME" >> "$GITHUB_OUTPUT"
+              else
+                echo "::error::Preview deployment failed - no URL available (environment '$PR_NUM' not found)"
+                exit 1
+              fi
             fi
-          else
-            echo "::error::Preview deployment failed - no URL available"
-            exit 1
           fi
 
       - name: Verify frontend deployment
