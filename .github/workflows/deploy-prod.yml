@@ -189,6 +189,7 @@ jobs:
        (github.event_name != 'workflow_dispatch'))
     outputs:
       image_tag: ${{ steps.normalize-tag.outputs.image_tag }}
+      commit_sha: ${{ steps.extract-commit-sha.outputs.commit_sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -218,6 +219,20 @@ jobs:
             echo "::warning::Image tag output was empty; falling back to ${image_tag}"
           fi
           echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Extract commit SHA from image tag
+        id: extract-commit-sha
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ steps.normalize-tag.outputs.image_tag }}
+        run: |
+          # Derive commit SHA from image tag so overlay validation doesn't break
+          # when workflow_dispatch is triggered from a CI bot commit on main
+          if [[ "$IMAGE_TAG" =~ ^sha-([0-9a-f]+)$ ]]; then
+            echo "commit_sha=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "commit_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Azure Login and ACR authentication
         uses: ./.github/actions/azure-acr-login
@@ -253,7 +268,7 @@ jobs:
       environment: prod
       overlay-path: k8s/overlays/prod
       image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
-      commit-sha: ${{ github.sha }}
+      commit-sha: ${{ needs.get-image-tag.outputs.commit_sha }}
       git-branch: main
       template-path: scripts/ci/templates/prod-kustomization-template.yaml
       run-k8s-pull-test: true
