@@ -91,7 +91,7 @@ runs:
     # Deploy with retry logic using wrapper script with per-attempt timeout
     # Timeout strategy:
     #   - Attempts 1-2: 300s (5 min) for fail-fast retry
-    #   - Attempt 3: 600s (10 min) for final attempt
+    #   - Attempt 3: 1200s (20 min) for final attempt (SWA uploads can take 10+ min)
     - name: Deploy to Static Web Apps with retry
       id: deploy
       shell: bash
@@ -102,7 +102,7 @@ runs:
         DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment-environment }}
         VERBOSE: ${{ inputs.verbose }}
         MAX_ATTEMPTS: "3"
-        TIMEOUT_SECONDS: "600"  # Final attempt timeout (attempts 1-2 use 300s)
+        TIMEOUT_SECONDS: "1200" # Final attempt timeout (attempts 1-2 use 300s)
       run: |
         chmod +x .github/actions/deploy-frontend-swa/deploy-with-retry.sh
         .github/actions/deploy-frontend-swa/deploy-with-retry.sh
