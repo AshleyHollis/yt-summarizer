@@ -2,6 +2,17 @@
 # Azure Key Vault
 # =============================================================================
 
+# Import existing secrets that were created outside Terraform state
+import {
+  to = module.key_vault.azurerm_key_vault_secret.secrets["webshare-proxy-password"]
+  id = "https://kv-ytsumm-prd.vault.azure.net/secrets/webshare-proxy-password/8a2287910ec6476eb2774e5738fd019e"
+}
+
+import {
+  to = module.key_vault.azurerm_key_vault_secret.secrets["webshare-proxy-username"]
+  id = "https://kv-ytsumm-prd.vault.azure.net/secrets/webshare-proxy-username/c5b190b9862b4906a60d0b5b220ab631"
+}
+
 module "key_vault" {
   source = "../../modules/key-vault"
 
