@@ -254,11 +254,30 @@ jobs:
 
           echo "✅ SWA app settings configured for ${{ inputs.environment }} environment (base URL: ${SWA_BASE_URL})"
 
+      # Re-deploy after setting app settings so the managed function starts with correct env vars.
+      # The first deploy creates the environment but warm-up times out without env vars.
+      # This second deploy triggers a new warm-up with the env vars now in place.
+      - name: Re-deploy to Azure Static Web Apps (with app settings)
+        id: deploy-swa-2
+        continue-on-error: true
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "apps/web"
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
+          skip_api_build: true
+          deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
+          production_branch: "main"
+
       - name: Resolve deployment URL
         id: resolve-url
         shell: bash
         run: |
-          DEPLOY_URL="${{ steps.deploy-swa.outputs.static_web_app_url }}"
+          DEPLOY_URL="${{ steps.deploy-swa-2.outputs.static_web_app_url || steps.deploy-swa.outputs.static_web_app_url }}"
           if [[ -n "$DEPLOY_URL" ]]; then
             echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
           else
