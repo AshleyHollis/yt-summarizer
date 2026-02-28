@@ -69,10 +69,10 @@ jobs:
             # Retrieve test user credentials from Azure Key Vault
             # These are created by Terraform in infra/terraform/environments/prod/auth0.tf
 
-            AUTH0_ADMIN_EMAIL=$(az keyvault secret show --vault-name "yt-summarizer-kv" --name "auth0-admin-test-email" --query "value" -o tsv)
-            AUTH0_ADMIN_PASSWORD=$(az keyvault secret show --vault-name "yt-summarizer-kv" --name "auth0-admin-test-password" --query "value" -o tsv)
-            AUTH0_USER_EMAIL=$(az keyvault secret show --vault-name "yt-summarizer-kv" --name "auth0-user-test-email" --query "value" -o tsv)
-            AUTH0_USER_PASSWORD=$(az keyvault secret show --vault-name "yt-summarizer-kv" --name "auth0-user-test-password" --query "value" -o tsv)
+            AUTH0_ADMIN_EMAIL=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-admin-test-email" --query "value" -o tsv)
+            AUTH0_ADMIN_PASSWORD=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-admin-test-password" --query "value" -o tsv)
+            AUTH0_USER_EMAIL=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-user-test-email" --query "value" -o tsv)
+            AUTH0_USER_PASSWORD=$(az keyvault secret show --vault-name "kv-ytsumm-prd" --name "auth0-user-test-password" --query "value" -o tsv)
 
             # Export to GitHub Actions environment
             echo "AUTH0_ADMIN_TEST_EMAIL=$AUTH0_ADMIN_EMAIL" >> $GITHUB_ENV
