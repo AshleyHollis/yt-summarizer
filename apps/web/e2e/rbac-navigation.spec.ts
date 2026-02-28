@@ -128,7 +128,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
         // Check if we're actually on admin page (user has admin role)
         const currentUrl = page.url();
-        if (!currentUrl.includes('/admin') || currentUrl.includes('/access-denied')) {
+        if (!currentUrl.includes('/admin') || currentUrl.includes('/forbidden')) {
           test.skip(true, 'Test user does not have admin role');
         }
 

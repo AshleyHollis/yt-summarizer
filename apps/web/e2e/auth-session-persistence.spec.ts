@@ -287,7 +287,7 @@ test.describe('Session Persistence @auth', () => {
       await logoutButton.click();
 
       // Wait for logout to complete
-      await page1.waitForURL((url) => url.pathname.includes('/login'), {
+      await page1.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -295,7 +295,7 @@ test.describe('Session Persistence @auth', () => {
       await page2.reload();
 
       // Second tab should now show login page or redirect to login
-      await page2.waitForURL((url) => url.pathname.includes('/login'), {
+      await page2.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -330,7 +330,7 @@ test.describe('Session Persistence @auth', () => {
       // await page.reload();
 
       // Should redirect to login
-      // await expect(page).toHaveURL(/\/login/);
+      // await expect(page).toHaveURL(/\`/sign-in`/);
     });
 
     test.skip('session is refreshed on activity (rolling session)', async ({ page }) => {

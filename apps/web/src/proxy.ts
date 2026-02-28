@@ -57,17 +57,17 @@ export async function proxy(request: Request) {
 
       // No session → redirect to login
       if (!session) {
-        return NextResponse.redirect(new URL('/login', request.url));
+        return NextResponse.redirect(new URL('/sign-in', request.url));
       }
 
       // Has session but not admin → redirect to access-denied
       const role = (session.user as Record<string, unknown>)?.['https://yt-summarizer.com/role'];
       if (role !== 'admin') {
-        return NextResponse.redirect(new URL('/access-denied', request.url));
+        return NextResponse.redirect(new URL('/forbidden', request.url));
       }
     } catch (err) {
       console.error('[proxy] Auth check error on admin route:', err);
-      return NextResponse.redirect(new URL('/login', request.url));
+      return NextResponse.redirect(new URL('/sign-in', request.url));
     }
   }
 

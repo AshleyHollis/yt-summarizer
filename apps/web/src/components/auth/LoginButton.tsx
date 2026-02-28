@@ -25,7 +25,7 @@ type Provider = 'google-oauth2' | 'github';
  *
  * @example
  * ```tsx
- * import { LoginButton } from '@/components/auth/LoginButton';
+ * import { LoginButton } from '@/components/auth`/sign-in`Button';
  *
  * export default function LoginPage() {
  *   return (

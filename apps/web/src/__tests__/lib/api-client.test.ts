@@ -5,7 +5,7 @@
  * 1. Access token is attached as Bearer header on GET and POST requests
  * 2. Requests succeed when token is available
  * 3. No Authorization header is sent when unauthenticated (no token)
- * 4. 401 response triggers cache clear and browser redirect to /login
+ * 4. 401 response triggers cache clear and browser redirect to /sign-in
  * 5. Token is cached after the first fetch (single /api/auth/me call per session)
  * 6. clearAccessTokenCache resets the cache
  *
@@ -225,7 +225,7 @@ describe('apiPost', () => {
     expect(init.body).toBe(JSON.stringify({ url: 'https://youtube.com/watch?v=abc' }));
   });
 
-  it('throws and redirects to /login when API returns 401', async () => {
+  it('throws and redirects to /sign-in when API returns 401', async () => {
     global.fetch = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       if (String(url).includes('/api/auth/me')) {
         return { ok: true, status: 200, json: async () => ({ accessToken: 'tok' }) } as Response;
@@ -234,6 +234,6 @@ describe('apiPost', () => {
     }) as typeof global.fetch;
 
     await expect(apiPost('/protected', {})).rejects.toThrow('Unauthorized');
-    expect(window.location.href).toBe('/login');
+    expect(window.location.href).toBe('/sign-in');
   });
 });

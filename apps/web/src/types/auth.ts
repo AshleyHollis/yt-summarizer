@@ -68,7 +68,7 @@ export class AuthError extends Error {
  *
  * // In error boundary or catch block:
  * if (error instanceof SessionExpiredError) {
- *   router.push(`/login?returnTo=${currentPath}&message=session-expired`);
+ *   router.push(`/sign-in?returnTo=${currentPath}&message=session-expired`);
  * }
  * ```
  */

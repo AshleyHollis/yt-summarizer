@@ -5,7 +5,7 @@
  *
  * Test Coverage:
  * 1. Normal user cannot access /admin routes
- * 2. Normal user is redirected to /access-denied page
+ * 2. Normal user is redirected to /forbidden page
  * 3. Access denied page displays properly
  * 4. Access denied page shows user's role
  * 5. Normal user does not see admin navigation links
@@ -57,19 +57,19 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
         // Should redirect to access-denied page
         // (This will only work if the authenticated user is NOT an admin)
         await page.waitForURL(
-          (url) => url.pathname.includes('/access-denied') || url.pathname.includes('/admin'),
+          (url) => url.pathname.includes('/forbidden') || url.pathname.includes('/admin'),
           { timeout: 10000 }
         );
 
         const currentUrl = page.url();
 
         // If user is admin, this test is not applicable
-        if (currentUrl.includes('/admin') && !currentUrl.includes('/access-denied')) {
+        if (currentUrl.includes('/admin') && !currentUrl.includes('/forbidden')) {
           test.skip(true, 'Test user has admin role - cannot test normal user denial');
         }
 
         // Should be on access-denied page
-        expect(currentUrl).toContain('/access-denied');
+        expect(currentUrl).toContain('/forbidden');
       } finally {
         await context.close();
       }
@@ -77,7 +77,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
 
     test('access-denied page loads correctly', async ({ page }) => {
       // Navigate directly to access-denied page
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Should show access denied heading
       const heading = page.getByRole('heading', { name: /access denied/i });
@@ -85,7 +85,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     });
 
     test('access-denied page explains why access was denied', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Should have explanatory text
       const explanationText = page.getByText(/don't have permission/i);
@@ -93,7 +93,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     });
 
     test('access-denied page shows user information', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Should show "Why am I seeing this?" section
       const whySection = page.getByText(/why am i seeing this/i);
@@ -101,7 +101,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     });
 
     test('access-denied page provides navigation options', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Should have a "Return Home" button or link
       const returnHomeLink = page.getByRole('link', { name: /return home/i });
@@ -111,7 +111,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
 
   test.describe('Access Denied Page Features', () => {
     test('access-denied page shows appropriate error icon', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Page should have visual error indicators
       const heading = page.getByRole('heading', { name: /access denied/i });
@@ -124,7 +124,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     });
 
     test('access-denied page displays user role if available', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Should show user's current role (if they have one)
       const pageContent = await page.textContent('body');
@@ -135,7 +135,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     });
 
     test('access-denied page shows "What can I do?" section', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Should have helpful next steps
       const whatCanIDo = page.getByText(/what can i do/i);
@@ -143,7 +143,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     });
 
     test('access-denied page suggests contacting administrator', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Should mention contacting admin
       const contactAdmin = page.getByText(/contact.*administrator/i);
@@ -151,7 +151,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     });
 
     test('access-denied page has return home link that works', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Click return home link
       const returnHomeLink = page.getByRole('link', { name: /return home/i });
@@ -214,7 +214,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
       await page.goto('/add');
       // Should successfully load (not redirect to access-denied)
       const currentUrl = page.url();
-      expect(currentUrl).not.toContain('/access-denied');
+      expect(currentUrl).not.toContain('/forbidden');
     });
   });
 
@@ -225,7 +225,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/access-denied');
+        await page.goto('http://localhost:3000/forbidden');
 
         // Page should load (it's a public error page)
         const heading = page.getByRole('heading', { name: /access denied/i });
@@ -242,7 +242,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/access-denied');
+        await page.goto('http://localhost:3000/forbidden');
 
         // Should suggest signing in
         const signInText = page.getByText(/sign in/i);
@@ -272,7 +272,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
 
           await page.waitForURL(
             (url) =>
-              url.pathname.includes('/access-denied') ||
+              url.pathname.includes('/forbidden') ||
               url.pathname.includes('/admin') ||
               url.pathname.includes('/404'),
             { timeout: 10000 }
@@ -281,12 +281,12 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
           const currentUrl = page.url();
 
           // If user landed on admin page, they have admin role (skip test)
-          if (currentUrl.includes('/admin') && !currentUrl.includes('/access-denied')) {
+          if (currentUrl.includes('/admin') && !currentUrl.includes('/forbidden')) {
             test.skip(true, 'Test user has admin role');
           }
 
           // Should be denied access
-          expect(currentUrl.includes('/access-denied') || currentUrl.includes('/404')).toBeTruthy();
+          expect(currentUrl.includes('/forbidden') || currentUrl.includes('/404')).toBeTruthy();
         } finally {
           await context.close();
         }
@@ -296,7 +296,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
 
   test.describe('User Experience', () => {
     test('access-denied page has gradient background', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Verify page loads with proper styling
       const heading = page.getByRole('heading', { name: /access denied/i });
@@ -308,7 +308,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     });
 
     test('access-denied page is mobile responsive', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Test on mobile viewport
       await page.setViewportSize({ width: 375, height: 667 });
@@ -338,7 +338,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
         }
       });
 
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
       await expect(page.getByRole('heading', { name: /access denied/i })).toBeVisible();
 
       expect(errors).toHaveLength(0);

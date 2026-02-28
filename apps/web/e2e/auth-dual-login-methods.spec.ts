@@ -24,7 +24,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Dual Login Methods UI @auth', () => {
   test.describe('Visual Layout and Structure', () => {
     test('displays both social login and username/password options', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Social login section
       const googleButton = page.getByRole('button', { name: /google/i });
@@ -44,7 +44,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('displays divider between authentication methods', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Should have divider text
       const divider = page.getByText(/or continue with email/i);
@@ -60,7 +60,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('divider text is clear and readable', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const divider = page.getByText(/or continue with email/i);
 
@@ -74,7 +74,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('social login section appears before username/password', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Get positions of elements
       const googleButton = page.getByRole('button', { name: /google/i });
@@ -88,7 +88,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('all login elements are within the same card container', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // All login elements should be in the same visual container
       // Check that they're all visible and part of the login flow
@@ -104,7 +104,7 @@ test.describe('Dual Login Methods UI @auth', () => {
 
   test.describe('Functionality of Both Methods', () => {
     test('social login buttons are clickable and functional', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const googleButton = page.getByRole('button', { name: /google/i });
       const githubButton = page.getByRole('button', { name: /github/i });
@@ -122,7 +122,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('username/password form is functional', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
       const passwordInput = page.getByLabel('Password');
@@ -141,7 +141,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('user can switch focus between both authentication methods', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const googleButton = page.getByRole('button', { name: /google/i });
       const emailInput = page.getByLabel(/email/i);
@@ -162,7 +162,7 @@ test.describe('Dual Login Methods UI @auth', () => {
 
   test.describe('User Choice and Flow', () => {
     test('user can choose to use social login', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const googleButton = page.getByRole('button', { name: /google/i });
 
@@ -177,7 +177,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('user can choose to use username/password', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
       const passwordInput = page.getByLabel('Password');
@@ -196,7 +196,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('no conflicts between authentication methods', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Fill in email/password
       const emailInput = page.getByLabel(/email/i);
@@ -225,7 +225,7 @@ test.describe('Dual Login Methods UI @auth', () => {
   test.describe('Responsive Design', () => {
     test('both methods visible on desktop viewport', async ({ page }) => {
       await page.setViewportSize({ width: 1920, height: 1080 });
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const googleButton = page.getByRole('button', { name: /google/i });
       const emailInput = page.getByLabel(/email/i);
@@ -236,7 +236,7 @@ test.describe('Dual Login Methods UI @auth', () => {
 
     test('both methods visible on tablet viewport', async ({ page }) => {
       await page.setViewportSize({ width: 768, height: 1024 });
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const googleButton = page.getByRole('button', { name: /google/i });
       const emailInput = page.getByLabel(/email/i);
@@ -247,7 +247,7 @@ test.describe('Dual Login Methods UI @auth', () => {
 
     test('both methods visible on mobile viewport', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const googleButton = page.getByRole('button', { name: /google/i });
       const emailInput = page.getByLabel(/email/i);
@@ -265,7 +265,7 @@ test.describe('Dual Login Methods UI @auth', () => {
 
       for (const viewport of viewports) {
         await page.setViewportSize(viewport);
-        await page.goto('/login', { waitUntil: 'networkidle' });
+        await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
         // All key elements should be visible
         const googleButton = page.getByRole('button', { name: /google/i });
@@ -281,7 +281,7 @@ test.describe('Dual Login Methods UI @auth', () => {
 
   test.describe('Accessibility for Both Methods', () => {
     test('both methods are keyboard accessible', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Tab through all interactive elements
       await page.keyboard.press('Tab');
@@ -299,7 +299,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('both methods have proper ARIA attributes', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Social login buttons should have accessible names
       const googleButton = page.getByRole('button', { name: /google/i });
@@ -315,7 +315,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('screen reader can distinguish between authentication methods', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Divider should help screen readers understand the separation
       const divider = page.getByText(/or continue with email/i);
@@ -338,7 +338,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     test('US3 Scenario 2: User sees both Google OAuth and username/password options', async ({
       page,
     }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Social login options
       const googleButton = page.getByRole('button', { name: /google/i });
@@ -362,7 +362,7 @@ test.describe('Dual Login Methods UI @auth', () => {
     });
 
     test('US3 Scenario 2: User can choose either authentication method', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // User can choose social login
       const googleButton = page.getByRole('button', { name: /google/i });

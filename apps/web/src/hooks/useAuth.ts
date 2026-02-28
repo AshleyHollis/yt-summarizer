@@ -47,7 +47,7 @@ import {
  *   const { isAuthenticated } = useAuth();
  *
  *   if (!isAuthenticated) {
- *     return <Navigate to="/login" />;
+ *     return <Navigate to="/sign-in" />;
  *   }
  *
  *   return <div>Protected content</div>;

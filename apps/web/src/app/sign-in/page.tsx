@@ -24,7 +24,7 @@ export const metadata: Metadata = {
  * Accessible to unauthenticated users.
  *
  * @example
- * Navigate to /login to access this page
+ * Navigate to /sign-in to access this page
  */
 export default function LoginPage() {
   return (

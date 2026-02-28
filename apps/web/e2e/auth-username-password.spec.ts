@@ -26,7 +26,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Username/Password Authentication @auth', () => {
   test.describe('Login Form UI', () => {
     test('renders username/password form on login page', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Should show email input
       const emailInput = page.getByLabel(/email/i);
@@ -42,7 +42,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('shows divider between social login and username/password', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Should have social login buttons
       const googleButton = page.getByRole('button', { name: /google/i });
@@ -58,7 +58,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('email input has correct type and attributes', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
 
@@ -73,7 +73,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('password input has correct type and attributes', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const passwordInput = page.getByLabel('Password');
 
@@ -88,7 +88,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('password visibility toggle button is present', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Should have toggle button (by aria-label)
       const toggleButton = page.getByLabel(/show password|hide password/i);
@@ -98,7 +98,7 @@ test.describe('Username/Password Authentication @auth', () => {
 
   test.describe('Form Validation', () => {
     test('submit button is disabled when form is empty', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const submitButton = page.getByRole('button', { name: /sign in/i }).last();
 
@@ -107,7 +107,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('submit button is disabled when email is invalid', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
       const passwordInput = page.getByLabel('Password');
@@ -122,7 +122,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('shows error message for invalid email format', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
 
@@ -135,7 +135,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('submit button is enabled when form is valid', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
       const passwordInput = page.getByLabel('Password');
@@ -152,7 +152,7 @@ test.describe('Username/Password Authentication @auth', () => {
 
   test.describe('Password Visibility Toggle', () => {
     test('password visibility toggle shows/hides password', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const passwordInput = page.getByLabel('Password');
       const toggleButton = page.getByLabel(/show password/i);
@@ -171,7 +171,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('password toggle has accessible labels', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Initially should say "Show password"
       const showButton = page.getByLabel(/show password/i);
@@ -201,7 +201,7 @@ test.describe('Username/Password Authentication @auth', () => {
       const freshPage = await context.newPage();
 
       try {
-        await freshPage.goto('http://localhost:3000/login', { waitUntil: 'networkidle' });
+        await freshPage.goto('http://localhost:3000/sign-in', { waitUntil: 'networkidle' });
 
         const emailInput = freshPage.getByLabel(/email/i);
         const passwordInput = freshPage.getByLabel('Password');
@@ -215,12 +215,12 @@ test.describe('Username/Password Authentication @auth', () => {
         await submitButton.click();
 
         // Should redirect away from login page after successful auth
-        await freshPage.waitForURL((url) => !url.pathname.includes('/login'), {
+        await freshPage.waitForURL((url) => !url.pathname.includes('/sign-in'), {
           timeout: 10000,
         });
 
         // Verify we're authenticated
-        expect(freshPage.url()).not.toContain('/login');
+        expect(freshPage.url()).not.toContain('/sign-in');
       } finally {
         await context.close();
       }
@@ -231,7 +231,7 @@ test.describe('Username/Password Authentication @auth', () => {
       const freshPage = await context.newPage();
 
       try {
-        await freshPage.goto('http://localhost:3000/login', { waitUntil: 'networkidle' });
+        await freshPage.goto('http://localhost:3000/sign-in', { waitUntil: 'networkidle' });
 
         const emailInput = freshPage.getByLabel(/email/i);
         const passwordInput = freshPage.getByLabel('Password');
@@ -260,7 +260,7 @@ test.describe('Username/Password Authentication @auth', () => {
 
   test.describe('Accessibility', () => {
     test('form is keyboard navigable', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Tab through form elements
       await page.keyboard.press('Tab');
@@ -277,7 +277,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('form has proper ARIA labels and roles', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
       const passwordInput = page.getByLabel('Password');
@@ -290,7 +290,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('validation errors have role="alert"', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
 
@@ -308,7 +308,7 @@ test.describe('Username/Password Authentication @auth', () => {
       // Note: This is the same as the "successful login" test above
       // Included here for traceability to the user story
 
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Should see username/password form
       const emailInput = page.getByLabel(/email/i);
@@ -323,7 +323,7 @@ test.describe('Username/Password Authentication @auth', () => {
     });
 
     test('US3 Scenario 2: Dual authentication methods available', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Should have BOTH social login buttons
       const googleButton = page.getByRole('button', { name: /google/i });

@@ -6,8 +6,8 @@
  *
  * Protection:
  * - Middleware checks authentication and admin role
- * - Unauthenticated users → Redirected to /login
- * - Non-admin users → Redirected to /access-denied
+ * - Unauthenticated users → Redirected to /sign-in
+ * - Non-admin users → Redirected to /forbidden
  *
  * Features:
  * - User management overview
@@ -31,9 +31,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
-      router.replace('/login');
+      router.replace('/sign-in');
     } else if (!hasRole('admin')) {
-      router.replace('/access-denied');
+      router.replace('/forbidden');
     }
   }, [isLoading, isAuthenticated, hasRole, router]);
 

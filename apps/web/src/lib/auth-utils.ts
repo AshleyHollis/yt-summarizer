@@ -34,7 +34,7 @@ import { User, Role } from '@/contexts/AuthContext';
  * // In middleware
  * const user = await getSession();
  * if (!hasRole(user, 'admin') && isAdminRoute(request.url)) {
- *   return NextResponse.redirect(new URL('/access-denied', request.url));
+ *   return NextResponse.redirect(new URL('/forbidden', request.url));
  * }
  * ```
  *
