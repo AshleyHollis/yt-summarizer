@@ -286,7 +286,7 @@ describe('Middleware Route Protection', () => {
 
     it('should handle paths with trailing slashes', () => {
       expect(shouldProtectRoute('/admin/')).toBe(true);
-      expect(isPublicRoute('`/sign-in`/')).toBe(true);
+      expect(isPublicRoute('/sign-in/')).toBe(true);
     });
 
     it('should handle case sensitivity', () => {
