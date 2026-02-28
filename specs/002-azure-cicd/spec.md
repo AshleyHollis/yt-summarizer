@@ -41,20 +41,24 @@ As a developer, I want a live preview environment deployed for each pull request
 
 ---
 
-#### Preview Hostnames & TLS (Free solution)
+#### Preview Hostnames & TLS
 
-To ensure each preview is addressable and serves TLS (HTTPS) for the frontend and API without requiring a paid DNS provider, we will use a free wildcard IP-to-hostname resolver (e.g., `nip.io` or `sslip.io`) combined with `cert-manager` and Let's Encrypt.
+Preview environments are served over HTTPS using a **Cloudflare wildcard certificate** combined with **Gateway API** routing. This approach avoids per-PR certificate provisioning latency and eliminates dependency on nip.io or HTTP-01 ACME solvers.
+
+> **Note**: The original design proposed nip.io + per-PR cert-manager certificates. The actual implementation uses a shared wildcard certificate for zero-latency TLS and simpler routing.
 
 - Implementation:
-  - Generate a preview-specific host that encodes the preview ingress IP, e.g. `api.preview-pr-<num>.<ingress-ip-with-dashes>.nip.io` which resolves to the cluster LB IP automatically.
-  - Install `cert-manager` and create a staging `ClusterIssuer` (Let's Encrypt staging) for non-production testing, and a production `ClusterIssuer` for issuance after validation.
-  - Annotate preview `Ingress` to request a certificate (HTTP-01 solver) and add a TLS block referencing the secret created by cert-manager.
-  - Update the preview workflow to inject the HTTPS backend URL (e.g., `REAL_BACKEND_URL=https://api.preview-pr-<num>.<ip>.nip.io/api`) into the frontend build.
+  - **Wildcard DNS**: Preview subdomains follow the pattern `api-pr-<num>.yt-summarizer.apps.ashleyhollis.com`, resolved via Cloudflare DNS wildcard `*.yt-summarizer.apps.ashleyhollis.com → cluster LB IP`.
+  - **cert-manager**: Deployed via Argo CD (`k8s/argocd/infra-apps.yaml`). Manages a single wildcard certificate using DNS-01 solver via `ClusterIssuer: letsencrypt-cloudflare` (see `k8s/argocd/cert-manager/clusterissuer-cloudflare.yaml`). The resulting secret `yt-summarizer-wildcard-tls` is shared across all preview namespaces.
+  - **Gateway API**: Preview traffic is routed through an HTTPRoute on the cluster gateway. TLS is terminated at the gateway using the shared wildcard secret — no per-PR `Ingress` TLS annotations needed.
+  - **`compute-preview-urls` action** (`.github/actions/compute-preview-urls/`): Computes the preview URL `https://api-pr-<num>.yt-summarizer.apps.ashleyhollis.com` and outputs the shared `tls_secret: yt-summarizer-wildcard-tls`. The preview workflow injects this URL as `REAL_BACKEND_URL` into the SWA frontend build.
+  - **`verify-certificate` action** (`.github/actions/verify-certificate/`): Verifies TLS secret exists and is valid before reporting preview as ready.
 
 - Acceptance Criteria:
-  - Preview Ingress accepts the preview host + TLS and cert-manager successfully provisions a certificate (staging first).
-  - `https://api.preview-pr-<num>.<ip>.nip.io/debug` returns `database_initialized: true` and the frontend stops showing the "warming up" state.
-  - The solution uses only free services (nip.io + Let's Encrypt).  
+  - Preview URL `https://api-pr-<num>.yt-summarizer.apps.ashleyhollis.com/debug` returns `database_initialized: true`.
+  - Frontend SWA staging environment is deployed with the HTTPS backend URL injected.
+  - TLS uses the shared wildcard certificate — no per-PR cert provisioning required.
+  - The solution uses only free/existing services (Cloudflare DNS + Let's Encrypt wildcard).
 
 ---
 

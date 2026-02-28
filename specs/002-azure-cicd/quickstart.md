@@ -291,8 +291,24 @@ After CI passes, a preview environment is deployed:
    - Link to Argo CD sync status
 
 **View preview**:
-- URL posted as PR comment (e.g., `https://pr-123.preview.ytsummarizer.dev`)
+- URL posted as PR comment (e.g., `https://api-pr-123.yt-summarizer.apps.ashleyhollis.com`)
 - Argo CD: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
+
+### Preview TLS Architecture
+
+Preview environments use **HTTPS by default** via a shared wildcard certificate — no per-PR certificate provisioning required.
+
+**How it works**:
+1. **Wildcard DNS**: Cloudflare wildcard record `*.yt-summarizer.apps.ashleyhollis.com` points to the cluster's Load Balancer IP. Preview URLs follow the pattern `https://api-pr-<num>.yt-summarizer.apps.ashleyhollis.com`.
+2. **Shared TLS certificate**: cert-manager manages a single wildcard certificate (`yt-summarizer-wildcard-tls`) using DNS-01 challenge via the `letsencrypt-cloudflare` ClusterIssuer. This secret is shared across all preview namespaces.
+3. **Gateway API routing**: The cluster gateway terminates TLS using the wildcard secret and routes traffic to the correct preview namespace based on hostname. No Ingress TLS annotations needed per preview.
+4. **URL injection**: The `compute-preview-urls` action (`.github/actions/compute-preview-urls/`) calculates the HTTPS preview URL and injects it as `REAL_BACKEND_URL` into the SWA frontend build.
+5. **TLS verification**: After deployment, the `verify-certificate` action (`.github/actions/verify-certificate/`) confirms the TLS secret is available before marking the preview as ready.
+
+**Key files**:
+- `k8s/argocd/cert-manager/clusterissuer-cloudflare.yaml` — DNS-01 ClusterIssuer for wildcard cert
+- `.github/actions/compute-preview-urls/` — Computes preview hostname + HTTPS URL
+- `.github/actions/verify-certificate/` — Validates TLS secret is provisioned
 
 ### Pull Request: Cleanup
 
