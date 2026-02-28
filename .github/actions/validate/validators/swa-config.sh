@@ -41,19 +41,22 @@ for workflow_file in "${WORKFLOW_FILES[@]}"; do
 
     log_verbose "Checking: $workflow_file"
 
-    # Look for output_location lines and check they're empty strings
-    # Match patterns like: output_location: "" or output_location: ''
+    # Look for output_location lines and check they're empty strings or .next/standalone
+    # Valid values: "" (static) or ".next/standalone" (hybrid SSR)
     if grep -q "output_location:" "$workflow_file"; then
         # Extract output_location values
         while IFS= read -r line; do
             # Check if the value is an empty string
             if echo "$line" | grep -qE 'output_location:\s*["\x27]{2}\s*$'; then
-                # Empty string - correct
+                # Empty string - correct (static site mode)
+                continue
+            elif echo "$line" | grep -qE 'output_location:\s*["\x27]\.next/standalone["\x27]'; then
+                # .next/standalone - correct (hybrid SSR mode)
                 continue
             elif echo "$line" | grep -qE 'output_location:\s*["\x27][^\x27"]+["\x27]'; then
-                # Non-empty string - error
+                # Non-empty, non-standalone string - error
                 value=$(echo "$line" | sed -E 's/.*output_location:\s*(["\x27][^\x27"]*["\x27]).*/\1/')
-                log_error "Invalid output_location in $workflow_file. Expected empty string, found: $value"
+                log_error "Invalid output_location in $workflow_file. Expected empty string or \".next/standalone\", found: $value"
                 ERRORS=$((ERRORS + 1))
             fi
         done < <(grep "output_location:" "$workflow_file")
@@ -140,7 +143,7 @@ if [[ $ERRORS -eq 0 ]]; then
     log_success "All SWA configuration checks passed"
     echo ""
     echo "Validated:"
-    echo "  - output_location: \"\" (empty string)"
+    echo "  - output_location: \"\" or \".next/standalone\""
     echo "  - SWA token: SWA_DEPLOYMENT_TOKEN"
     echo "  - Build script: next build --webpack"
     echo "  - No root lockfiles"
@@ -149,7 +152,7 @@ else
     log_error "Found $ERRORS SWA configuration error(s)"
     echo ""
     echo "SWA Configuration Requirements:"
-    echo "  - output_location must be empty string (\"\") in workflow files"
+    echo "  - output_location must be \"\" or \".next/standalone\" in workflow files"
     echo "  - SWA token must be SWA_DEPLOYMENT_TOKEN"
     echo "  - Build script must start with 'next build --webpack'"
     echo "  - No package.json/package-lock.json at repo root"
