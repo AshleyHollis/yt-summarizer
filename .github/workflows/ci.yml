@@ -104,10 +104,8 @@ jobs:
         working-directory: apps/web
         run: npx tsc --noEmit
 
-      - name: Build Next.js application
+      - name: Build Next.js application (standalone for SWA)
         working-directory: apps/web
-        env:
-          SKIP_STANDALONE: 'true'
         run: npm run build
 
       - name: Upload frontend build artifact
