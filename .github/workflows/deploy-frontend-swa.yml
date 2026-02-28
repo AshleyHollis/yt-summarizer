@@ -199,7 +199,6 @@ jobs:
           app_location: "apps/web"
           api_location: ""
           output_location: ".next/standalone"
-          skip_app_build: true
           skip_api_build: true
           deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
           production_branch: "main"
@@ -276,7 +275,6 @@ jobs:
           app_location: "apps/web"
           api_location: ""
           output_location: ".next/standalone"
-          skip_app_build: true
           skip_api_build: true
           deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
           production_branch: "main"

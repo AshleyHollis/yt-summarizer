@@ -117,8 +117,8 @@ else
     if [[ -z "$build_script" ]]; then
         log_error "Missing build script in $package_json"
         ERRORS=$((ERRORS + 1))
-    elif [[ ! "$build_script" =~ ^next\ build\ --webpack ]]; then
-        log_error "Invalid build script in $package_json. Expected to start with 'next build --webpack', found: $build_script"
+    elif [[ ! "$build_script" =~ ^next\ build\ --webpack ]] && [[ ! "$build_script" =~ ^node\ scripts/swa-build\.js ]]; then
+        log_error "Invalid build script in $package_json. Expected 'next build --webpack' or 'node scripts/swa-build.js', found: $build_script"
         ERRORS=$((ERRORS + 1))
     fi
 fi
@@ -145,7 +145,7 @@ if [[ $ERRORS -eq 0 ]]; then
     echo "Validated:"
     echo "  - output_location: \"\" or \".next/standalone\""
     echo "  - SWA token: SWA_DEPLOYMENT_TOKEN"
-    echo "  - Build script: next build --webpack"
+    echo "  - Build script: next build --webpack OR node scripts/swa-build.js"
     echo "  - No root lockfiles"
     exit 0
 else
@@ -154,7 +154,7 @@ else
     echo "SWA Configuration Requirements:"
     echo "  - output_location must be \"\" or \".next/standalone\" in workflow files"
     echo "  - SWA token must be SWA_DEPLOYMENT_TOKEN"
-    echo "  - Build script must start with 'next build --webpack'"
+    echo "  - build script must be 'next build --webpack' or 'node scripts/swa-build.js'"
     echo "  - No package.json/package-lock.json at repo root"
     exit 1
 fi
