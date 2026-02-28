@@ -74,7 +74,9 @@ on:
         default: false
 
     outputs:
-      static_web_app_url: ${{ jobs.deploy.outputs.static_web_app_url }}
+      static_web_app_url:
+        description: "The deployed SWA URL"
+        value: ${{ jobs.deploy.outputs.static_web_app_url }}
 
     secrets:
       AZURE_CLIENT_ID:
