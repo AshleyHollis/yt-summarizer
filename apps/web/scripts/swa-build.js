@@ -50,4 +50,11 @@ if (fs.existsSync('backend-config.json')) {
   fs.copyFileSync('backend-config.json', '.next/standalone/backend-config.json');
 }
 
+// Replace the monorepo root package.json (copied by Next.js output tracing) with a clean
+// minimal one. The original has "prepare": "husky" which causes Azure Functions to fail
+// on warm-up because Azure runs "npm install" on the function package and the prepare
+// hook tries to invoke husky (not present in the deployed package).
+const cleanPkg = { name: 'yt-summarizer-web', version: '0.1.0', private: true, engines: { node: '>=20.0.0' } };
+fs.writeFileSync('.next/standalone/package.json', JSON.stringify(cleanPkg, null, 2) + '\n');
+
 console.log('[swa-build] Done');
