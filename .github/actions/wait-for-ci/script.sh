@@ -126,6 +126,28 @@ print_header "Wait for CI Workflow" \
   "Interval: ${INTERVAL_SECONDS}s" \
   "Workflow: $WORKFLOW_FILE"
 
+# Check if the commit message contains [skip ci] - if so, fall back to most recent successful CI run
+commit_message=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$COMMIT_SHA" | jq -r '.commit.message // empty')
+
+if echo "$commit_message" | grep -q '\[skip ci\]'; then
+  log_info "Commit has [skip ci] - falling back to most recent successful CI run"
+  fallback_response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github.v3+json" \
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW_FILE/runs?status=success&per_page=1&branch=main")
+  fallback_run_id=$(echo "$fallback_response" | jq -r '.workflow_runs[0].id // empty')
+  if [ -n "$fallback_run_id" ]; then
+    log_success "Using most recent successful CI run: $fallback_run_id"
+    echo "ci_run_id=$fallback_run_id" >> ${GITHUB_OUTPUT:-/dev/null}
+    echo "image_tag=" >> ${GITHUB_OUTPUT:-/dev/null}
+    print_footer "✅ Skipped (skip ci) - using run $fallback_run_id"
+    exit 0
+  else
+    log_warn "No successful CI run found to fall back to; proceeding normally"
+  fi
+fi
+
 start_time=$(date +%s)
 end_time=$((start_time + TIMEOUT_SECONDS))
 attempt=1
