@@ -53,8 +53,8 @@ setup('authenticate as admin', async ({ page }) => {
   console.log('[auth-setup] Authenticating as admin user...');
 
   try {
-    // Navigate to login page
-    await page.goto('http://localhost:3000/login');
+    // Navigate to login page (relative URL respects baseURL from playwright.config.ts)
+    await page.goto('/login');
 
     // Fill in username/password form
     const emailInput = page.getByLabel(/email/i);
@@ -110,8 +110,8 @@ setup('authenticate as normal user', async ({ page }) => {
   console.log('[auth-setup] Authenticating as normal user...');
 
   try {
-    // Navigate to login page
-    await page.goto('http://localhost:3000/login');
+    // Navigate to login page (relative URL respects baseURL from playwright.config.ts)
+    await page.goto('/login');
 
     // Fill in username/password form
     const emailInput = page.getByLabel(/email/i);
