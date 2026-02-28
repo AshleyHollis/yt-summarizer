@@ -211,7 +211,8 @@ jobs:
           KV_NAME="${{ vars.KEY_VAULT_NAME || 'kv-ytsumm-prd' }}"
           SWA_NAME="${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}"
           RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}"
-          ENV="${{ inputs.pr-number }}"  # empty for prod (default env), pr-N for preview
+          # deployment-environment is 'default' for prod, 'pr-N' for preview
+          DEPLOY_ENV="${{ inputs.deployment-environment }}"
 
           if [[ "${{ inputs.environment }}" == "prod" ]]; then
             AUTH0_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-session-secret" --query value -o tsv)
@@ -224,15 +225,16 @@ jobs:
             AUTH0_DOMAIN=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-domain" --query value -o tsv)
             AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-client-id" --query value -o tsv)
             AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-client-secret" --query value -o tsv)
-            ENV_FLAG="--environment-name ${ENV}"
+            # Use the same environment name as the SWA deployment (e.g. 'pr-160')
+            ENV_FLAG="--environment-name ${DEPLOY_ENV}"
           fi
 
           SWA_HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv)
 
           # For preview: use the preview environment hostname pattern
-          if [[ "${{ inputs.environment }}" == "preview" && -n "$ENV" ]]; then
+          if [[ "${{ inputs.environment }}" == "preview" && -n "$DEPLOY_ENV" ]]; then
             PREVIEW_SUFFIX="${SWA_HOSTNAME#white-meadow-0b8e2e000.}"
-            SWA_BASE_URL="https://white-meadow-0b8e2e000-${ENV}.${PREVIEW_SUFFIX}"
+            SWA_BASE_URL="https://white-meadow-0b8e2e000-${DEPLOY_ENV}.${PREVIEW_SUFFIX}"
           else
             SWA_BASE_URL="https://${SWA_HOSTNAME}"
           fi
