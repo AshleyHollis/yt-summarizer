@@ -94,6 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ci_run_id: ${{ steps.wait.outputs.ci_run_id }}
+      image_tag: ${{ steps.wait.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -203,8 +204,14 @@ jobs:
       - name: Normalize image tag
         id: normalize-tag
         shell: bash
+        env:
+          WAIT_FOR_CI_TAG: ${{ needs.wait-for-ci.outputs.image_tag }}
         run: |
-          image_tag="${{ steps.extract.outputs.image_tag }}"
+          # Prefer image tag from wait-for-ci (correctly resolves [skip ci] bot commits)
+          image_tag="${WAIT_FOR_CI_TAG:-}"
+          if [ -z "$image_tag" ]; then
+            image_tag="${{ steps.extract.outputs.image_tag }}"
+          fi
           if [ -z "$image_tag" ]; then
             short_sha="${GITHUB_SHA:0:7}"
             image_tag="sha-${short_sha}"
