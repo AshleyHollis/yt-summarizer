@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import bundleAnalyzer from '@next/bundle-analyzer';
+import path from 'path';
 // build: auth.setup.ts uses Auth0 Universal Login (PR #160)
 
 const withBundleAnalyzer = bundleAnalyzer({
@@ -14,6 +15,12 @@ const nextConfig: NextConfig = {
   // Disabled for CI artifact builds to create SWA-compatible build output
   // SWA with skip_app_build needs standard .next directory, not standalone
   output: process.env.SKIP_STANDALONE === 'true' ? undefined : 'standalone',
+
+  // Fix monorepo standalone structure for Azure SWA hybrid mode.
+  // Without this, Next.js detects the root node_modules/ and uses the monorepo
+  // root as the tracing root, creating apps/web/ nesting in the standalone output.
+  // Setting to __dirname forces a flat standalone (server.js, .next/, node_modules/ at root).
+  outputFileTracingRoot: path.resolve(__dirname),
 
   // Enable React Compiler only in production (reduces dev memory ~15-20%)
   reactCompiler: !isDev,

@@ -4,6 +4,9 @@
  * When running in Azure SWA's Oryx build context (without skip_app_build),
  * detects pre-built .next output from CI and skips the expensive Next.js rebuild.
  * Falls back to full build if .next/BUILD_ID is not present.
+ *
+ * next.config.ts sets outputFileTracingRoot: path.resolve(__dirname) which forces
+ * a flat standalone structure (server.js, .next/, node_modules/ at root, no apps/web/ nesting).
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -27,23 +30,27 @@ if (fs.existsSync('.next/BUILD_ID')) {
   execSync('npx next build --webpack', { stdio: 'inherit' });
 }
 
-// Set up standalone output for SWA hybrid mode
+// Copy static assets and public files into the standalone directory.
+// With outputFileTracingRoot = __dirname (apps/web/), the standalone is FLAT:
+//   standalone/server.js       ← actual Next.js server
+//   standalone/.next/server/   ← server-side bundles (traced by Next.js)
+//   standalone/node_modules/   ← traced runtime deps
+// We only need to copy the client-side static assets and public files.
 const monoServer = '.next/standalone/apps/web/server.js';
 if (fs.existsSync(monoServer)) {
-  // Monorepo layout: copy static/public to nested path, create wrapper
+  // Legacy monorepo layout (outputFileTracingRoot not effective yet): copy to nested path
   cpR('.next/static', '.next/standalone/apps/web/.next/static');
   cpR('public', '.next/standalone/apps/web/public');
-  // Always write the wrapper (overwrite to ensure latest fix is applied).
-  // Force HOSTNAME=0.0.0.0 so Next.js 15+ binds to all interfaces.
-  // Azure sets HOSTNAME to the container hostname, causing the server to bind
-  // to a specific container IP. Azure's health probe uses loopback (127.0.0.1)
-  // and can't reach the server → 582s warm-up timeout.
+  // Write wrapper that forces binding to all interfaces
   fs.writeFileSync(
     '.next/standalone/server.js',
     'process.env.HOSTNAME = \'0.0.0.0\';\nrequire("./apps/web/server.js");\n'
   );
+  // Replace monorepo root package.json (has "prepare": "husky") with a clean version
+  const cleanPkg = { name: 'yt-summarizer-web', version: '0.1.0', private: true, engines: { node: '>=20.0.0' } };
+  fs.writeFileSync('.next/standalone/package.json', JSON.stringify(cleanPkg, null, 2) + '\n');
 } else {
-  // Standard layout: copy static/public to flat path
+  // Flat layout (outputFileTracingRoot = apps/web/): standard Next.js standalone structure
   cpR('.next/static', '.next/standalone/.next/static');
   cpR('public', '.next/standalone/public');
 }
@@ -55,12 +62,5 @@ if (fs.existsSync('staticwebapp.config.json')) {
 if (fs.existsSync('backend-config.json')) {
   fs.copyFileSync('backend-config.json', '.next/standalone/backend-config.json');
 }
-
-// Replace the monorepo root package.json (copied by Next.js output tracing) with a clean
-// minimal one. The original has "prepare": "husky" which causes Azure Functions to fail
-// on warm-up because Azure runs "npm install" on the function package and the prepare
-// hook tries to invoke husky (not present in the deployed package).
-const cleanPkg = { name: 'yt-summarizer-web', version: '0.1.0', private: true, engines: { node: '>=20.0.0' } };
-fs.writeFileSync('.next/standalone/package.json', JSON.stringify(cleanPkg, null, 2) + '\n');
 
 console.log('[swa-build] Done');
