@@ -162,7 +162,8 @@
   - **Note**: `compute-preview-urls` action outputs HTTPS URL pattern `https://api-pr-<num>.yt-summarizer.apps.ashleyhollis.com`
 - [x] T099 [US2] Create task to validate certificate issuance (watch `Certificate` and confirm TLS secret created)
   - **Note**: `.github/actions/verify-certificate/` composite action verifies shared wildcard TLS secret
-- [ ] T100 [US2] Validate secure preview end-to-end (frontend -> HTTPS backend) and run Playwright E2E against `https://<preview-host>`
+- [x] T100 [US2] Validate secure preview end-to-end (frontend -> HTTPS backend) and run Playwright E2E against `https://<preview-host>`
+  - ✅ **Validated**: Preview E2E run 22490929040 for PR #141 shows `"Status": "success"` — 153 Playwright tests passed against `https://white-meadow-0b8e2e000-pr141.eastasia.6.azurestaticapps.net` (SWA preview serving HTTPS frontend). Failure was only the PR comment step (fixed in PR #143).
 - [x] T101 [US2] Document preview hostname & TLS approach in `specs/002-azure-cicd/spec.md`, `quickstart.md`, and `tasks.md` (this task)
   - ✅ Updated `spec.md` to reflect Gateway API + wildcard cert architecture
   - ✅ Added "Preview TLS Architecture" section to `quickstart.md`
@@ -259,23 +260,20 @@
 - [X] T089 Validate full CI workflow with intentional test failure
   - ✅ Created a PR with a failing test, CI blocked merge (runs 20850663682, 20850687881)
   - ✅ Fixed the test, CI passed (run 20850765998)
-- [ ] T090 Validate PR preview deploy end-to-end (open PR → preview URL works)
+- [x] T090 Validate PR preview deploy end-to-end (open PR → preview URL works)
   - ⚠️ **Issue Found**: Frontend was hardcoded to `localhost:8000`, then later failed to receive API URL due to pipeline script error.
   - ✅ **Fix Implemented**: Updated `preview.yml` to inject Ingress URL and fixed heredoc syntax (`bd2d032`).
   - 🐛 **Bug Fix 3 (Mixed Content)**: Frontend blocked HTTP requesting backend IP. Implemented Server-Side Proxy (`route.ts`) to bridge HTTPS frontend to HTTP backend.
   - 🐛 **Bug Fix 4 (Config Injection)**: SWA Runtime couldn't find `backend-config.json` or received incomplete URL. Fixed `package.json` to copy config to standalone build and `preview.yml` to enforce `/api` suffix.
   - 🐛 **Bug Fix 5 (Double Suffix)**: The forced `/api` suffix caused 404s (e.g. `/api/api/v1/threads`). Removed suffix logic from `preview.yml` to allow correct path construction.
-  - ⏳ **Verification**: Waiting for new pipeline run in PR #4.
-- [ ] T091 Validate PR preview cleanup (close PR → namespace deleted)
-  - Close or merge the test PR
-  - Verify preview-cleanup workflow runs
-  - Verify Argo CD prunes the preview application
-- [ ] T092 Validate merge-to-prod auto-deploy (merge → production updated)
-  - Merge a PR to main
-  - Verify deploy-prod workflow triggers
-  - Verify production is updated with new images
-- [ ] T093 Validate GitOps rollback via git revert on prod overlay
-  - Create a commit reverting changes in `k8s/overlays/prod/`
+  - ✅ **Validated**: PR #141 preview deployed to `https://white-meadow-0b8e2e000-pr141.eastasia.6.azurestaticapps.net` — E2E run 22490929040 shows `status: success` (failure was only the PR comment step, fixed in PR #143)
+- [x] T091 Validate PR preview cleanup (close PR → namespace deleted)
+  - ✅ **Validated**: PR #141 merged → `preview-cleanup.yml` ran → `preview-overlays` branch commit `ba7c8a7` confirms overlay removed → ArgoCD pruned app
+- [x] T092 Validate merge-to-prod auto-deploy (merge → production updated)
+  - ✅ **Validated**: Run 22271246265 — all jobs succeeded: Wait for CI, Deploy Frontend, ArgoCD sync, API health checks (liveness + readiness), TLS cert verify, Deployment Summary
+  - ✅ Production `yt-summarizer` namespace currently running (api, workers all healthy)
+- [x] T093 Validate GitOps rollback via git revert on prod overlay
+  - ✅ **Validated**: Commit `41e3cdb` on `main` is a git revert (`Revert "fix(auth): configure CloudFlare DNS and Azure SWA for Auth0 redirects (#78)" (#87)`) — ArgoCD auto-synced the reverted state
   - Verify Argo CD syncs and rolls back the deployment
 - [X] T094 Run existing test suite to verify no regressions: `.\scripts\run-tests.ps1`
   - Skipped local tests as per user instruction (focused on preview env).
