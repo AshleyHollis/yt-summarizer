@@ -110,10 +110,11 @@ if [ "$FORCE_DEPLOY" = "true" ]; then
   echo "[INFO] 🚀 Force deploying - using existing images"
   echo "needs_image_build=false" >> $GITHUB_OUTPUT
   echo "needs_deployment=true" >> $GITHUB_OUTPUT
+  echo "needs_backend_deployment=true" >> $GITHUB_OUTPUT
   echo ""
   echo "╔══════════════════════════════════════════════════════════════════════════════╗"
   echo "║  Result: Force deploy enabled                                                ║"
-  echo "║  needs_image_build=false | needs_deployment=true                             ║"
+  echo "║  needs_image_build=false | needs_deployment=true | needs_backend_deployment=true ║"
   echo "╚══════════════════════════════════════════════════════════════════════════════╝"
   exit 0
 fi
@@ -151,10 +152,11 @@ if [ -z "$FILES" ]; then
   echo "[WARN] ⚠️ Could not fetch changed files - assuming no deployment needed"
   echo "needs_image_build=false" >> $GITHUB_OUTPUT
   echo "needs_deployment=false" >> $GITHUB_OUTPUT
+  echo "needs_backend_deployment=false" >> $GITHUB_OUTPUT
   echo ""
   echo "╔══════════════════════════════════════════════════════════════════════════════╗"
   echo "║  Result: No changes detected (conservative)                                  ║"
-  echo "║  needs_image_build=false | needs_deployment=false                            ║"
+  echo "║  needs_image_build=false | needs_deployment=false | needs_backend_deployment=false ║"
   echo "╚══════════════════════════════════════════════════════════════════════════════╝"
   exit 0
 fi
@@ -224,6 +226,7 @@ echo "[INFO]   Skipped:         $SKIP_COUNT file(s)"
 ################################################################################
 echo "needs_image_build=$HAS_IMAGE_BUILD" >> $GITHUB_OUTPUT
 echo "needs_deployment=$HAS_DEPLOYMENT" >> $GITHUB_OUTPUT
+echo "needs_backend_deployment=$HAS_BACKEND_DEPLOYMENT" >> $GITHUB_OUTPUT
 
 ################################################################################
 # Summary
@@ -231,5 +234,5 @@ echo "needs_deployment=$HAS_DEPLOYMENT" >> $GITHUB_OUTPUT
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════════════════╗"
 echo "║  Result: Analysis complete                                                   ║"
-echo "║  needs_image_build=${HAS_IMAGE_BUILD} | needs_deployment=${HAS_DEPLOYMENT}"
+echo "║  needs_image_build=${HAS_IMAGE_BUILD} | needs_deployment=${HAS_DEPLOYMENT} | needs_backend_deployment=${HAS_BACKEND_DEPLOYMENT}"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
