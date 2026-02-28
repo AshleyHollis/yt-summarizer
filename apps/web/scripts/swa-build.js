@@ -33,9 +33,15 @@ if (fs.existsSync(monoServer)) {
   // Monorepo layout: copy static/public to nested path, create wrapper
   cpR('.next/static', '.next/standalone/apps/web/.next/static');
   cpR('public', '.next/standalone/apps/web/public');
-  if (!fs.existsSync('.next/standalone/server.js')) {
-    fs.writeFileSync('.next/standalone/server.js', 'require("./apps/web/server.js");\n');
-  }
+  // Always write the wrapper (overwrite to ensure latest fix is applied).
+  // Force HOSTNAME=0.0.0.0 so Next.js 15+ binds to all interfaces.
+  // Azure sets HOSTNAME to the container hostname, causing the server to bind
+  // to a specific container IP. Azure's health probe uses loopback (127.0.0.1)
+  // and can't reach the server → 582s warm-up timeout.
+  fs.writeFileSync(
+    '.next/standalone/server.js',
+    'process.env.HOSTNAME = \'0.0.0.0\';\nrequire("./apps/web/server.js");\n'
+  );
 } else {
   // Standard layout: copy static/public to flat path
   cpR('.next/static', '.next/standalone/.next/static');
