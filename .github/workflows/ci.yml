@@ -36,7 +36,7 @@ env:
 
 defaults:
   run:
-    shell: bash -e {0}  # Exit immediately if any command fails
+    shell: bash -e {0} # Exit immediately if any command fails
 
 jobs:
   # ===========================================================================
@@ -55,7 +55,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           install-mode: service
           service-package: services/shared
-          install-pytest-xdist: 'true'
+          install-pytest-xdist: "true"
 
       - name: Run ruff checks
         uses: ./.github/actions/run-ruff-check
@@ -81,9 +81,9 @@ jobs:
         uses: ./.github/actions/scan-javascript-dependencies
         with:
           working-directory: apps/web
-          check-missing-deps: 'true'
-          check-security: 'true'
-          audit-level: 'high'
+          check-missing-deps: "true"
+          check-security: "true"
+          audit-level: "high"
 
       - name: Run Vitest
         uses: ./.github/actions/run-frontend-tests
@@ -118,6 +118,7 @@ jobs:
             apps/web/public
             apps/web/package.json
             apps/web/staticwebapp.config.json
+            !apps/web/.next/cache
 
   # ===========================================================================
   # PHASE 2: SECURITY SCANNING
@@ -141,34 +142,33 @@ jobs:
         uses: ./.github/actions/scan-python-security
         with:
           service-path: services/api
-          check-security: 'true'
-          check-types: 'false'
+          check-security: "true"
+          check-types: "false"
 
       - name: Scan Workers security
         uses: ./.github/actions/scan-python-security
         with:
           service-path: services/workers
-          check-security: 'true'
-          check-types: 'false'
+          check-security: "true"
+          check-types: "false"
 
       - name: Validate API dependencies
         uses: ./.github/actions/validate-python-dependencies
         with:
           service-path: services/api
-          check-missing: 'true'
-          check-unused: 'false'
-          check-security: 'true'
-          fail-on-warnings: 'false'
+          check-missing: "true"
+          check-unused: "false"
+          check-security: "true"
+          fail-on-warnings: "false"
 
       - name: Validate Workers dependencies
         uses: ./.github/actions/validate-python-dependencies
         with:
           service-path: services/workers
-          check-missing: 'true'
-          check-unused: 'false'
-          check-security: 'true'
-          fail-on-warnings: 'false'
-
+          check-missing: "true"
+          check-unused: "false"
+          check-security: "true"
+          fail-on-warnings: "false"
 
   # ===========================================================================
   # PHASE 3: PYTHON UNIT TESTS (MATRIX)
@@ -184,20 +184,20 @@ jobs:
           - name: Shared
             path: shared
             package: services/shared
-            markers: ''
-            pytest-args: ''
+            markers: ""
+            pytest-args: ""
             install-mode: shared
           - name: API
             path: api
             package: services/api
             markers: not integration and not live
-            pytest-args: '-v --tb=short'
+            pytest-args: "-v --tb=short"
             install-mode: both
           - name: Workers
             path: workers
             package: services/workers
-            markers: ''
-            pytest-args: ''
+            markers: ""
+            pytest-args: ""
             install-mode: both
 
     outputs:
@@ -214,8 +214,8 @@ jobs:
           service-package: ${{ matrix.service.package }}
           working-directory: ${{ matrix.service.package }}
           test-name: ${{ matrix.service.name }} Tests
-          parallel: 'true'
-          install-pytest-xdist: 'true'
+          parallel: "true"
+          install-pytest-xdist: "true"
           pytest-args: ${{ matrix.service.pytest-args }}
           markers: ${{ matrix.service.markers }}
           install-mode: ${{ matrix.service.install-mode }}
@@ -233,7 +233,7 @@ jobs:
       - name: Setup Kustomize
         uses: ./.github/actions/setup-kustomize
         with:
-          kustomize-version: '5.8.0'
+          kustomize-version: "5.8.0"
 
       - name: Validate Kubernetes manifests
         uses: ./.github/actions/validate
@@ -242,27 +242,26 @@ jobs:
           k8s-directory: k8s
           overlay-paths: k8s/overlays/preview,k8s/overlays/prod,k8s/overlays/prod-secretstore
           base-paths: k8s/base
-          fail-fast: 'true'
-          timeout-seconds: '90'
+          fail-fast: "true"
+          timeout-seconds: "90"
 
       - name: Validate Argo CD manifest syntax
         uses: ./.github/actions/validate
         with:
           validators: yaml-syntax
           k8s-directory: k8s/argocd
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Validate preview deployment manifests
         uses: ./.github/actions/deployment-validate
         with:
           overlay-path: k8s/overlays/preview
           target-namespace: preview-pr-test
-          skip-image-validation: 'true'
-          skip-secret-validation: 'true'
-          max-cpu-millicores: '1500'
-          max-memory-mi: '2560'
-
+          skip-image-validation: "true"
+          skip-secret-validation: "true"
+          max-cpu-millicores: "1500"
+          max-memory-mi: "2560"
 
   # ===========================================================================
   # PHASE 5: IMAGE BUILDING
@@ -361,8 +360,8 @@ jobs:
         with:
           validators: terraform-config
           terraform-directory: infra/terraform/environments/prod
-          fail-fast: 'true'
-          timeout-seconds: '60'
+          fail-fast: "true"
+          timeout-seconds: "60"
 
   # ===========================================================================
   # PHASE 7: SECRET SCANNING
@@ -396,10 +395,10 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: swa-config
-          swa-workflow-files: '.github/workflows/deploy-frontend-swa.yml,.github/workflows/swa-baseline-deploy.yml'
-          swa-app-dir: 'apps/web'
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          swa-workflow-files: ".github/workflows/deploy-frontend-swa.yml,.github/workflows/swa-baseline-deploy.yml"
+          swa-app-dir: "apps/web"
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -427,8 +426,8 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: reusable-workflows
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Install pre-commit
         run: pip install pre-commit
@@ -440,7 +439,7 @@ jobs:
         uses: ./.github/actions/validate
         with:
           validators: workflow-env-consistency,workflow-composite-actions
-          verbose: 'false'
+          verbose: "false"
 
   # ===========================================================================
   # PHASE 9: FINAL STATUS CHECK
@@ -486,7 +485,7 @@ jobs:
         uses: ./.github/actions/create-pipeline-summary
         with:
           summary-type: ci
-          changed-areas: ''
+          changed-areas: ""
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           pr-number: ${{ github.event.pull_request.number }}
           lint-python-result: ${{ needs.lint-python.result }}
@@ -496,9 +495,9 @@ jobs:
           test-shared-result: ${{ needs.test-python.result }}
           test-shared-duration: ${{ needs.test-python.outputs.test_duration }}
           test-api-result: ${{ needs.test-python.result }}
-          test-api-duration: ''
+          test-api-duration: ""
           test-workers-result: ${{ needs.test-python.result }}
-          test-workers-duration: ''
+          test-workers-duration: ""
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           build-images-result: ${{ needs.build-images.result }}
@@ -509,8 +508,8 @@ jobs:
       - name: Check all jobs passed
         uses: ./.github/actions/validate-ci-results
         with:
-          changed-areas: ''
-          is-main-branch: 'false'
+          changed-areas: ""
+          is-main-branch: "false"
           test-shared-result: ${{ needs.test-python.result }}
           test-api-result: ${{ needs.test-python.result }}
           test-workers-result: ${{ needs.test-python.result }}
@@ -518,6 +517,6 @@ jobs:
           validate-terraform-result: ${{ needs.validate-terraform.result }}
           kubernetes-validate-result: ${{ needs.kubernetes-validate.result }}
           secret-scanning-result: ${{ needs.secret-scanning.result }}
-          secret-scanning-should-run: 'true'
+          secret-scanning-should-run: "true"
           build-images-result: ${{ needs.build-images.result }}
           acr-configured: ${{ vars.ACR_NAME != '' }}
