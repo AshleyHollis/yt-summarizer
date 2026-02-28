@@ -231,12 +231,13 @@ jobs:
 
           # For preview: use the preview environment hostname pattern
           if [[ "${{ inputs.environment }}" == "preview" && -n "$ENV" ]]; then
-            PREVIEW_SUFFIX=$(echo "$SWA_HOSTNAME" | sed 's/white-meadow-0b8e2e000\.//')
+            PREVIEW_SUFFIX="${SWA_HOSTNAME#white-meadow-0b8e2e000.}"
             SWA_BASE_URL="https://white-meadow-0b8e2e000-${ENV}.${PREVIEW_SUFFIX}"
           else
             SWA_BASE_URL="https://${SWA_HOSTNAME}"
           fi
 
+          # shellcheck disable=SC2086
           az staticwebapp appsettings set \
             --name "$SWA_NAME" \
             --resource-group "$RG" \
