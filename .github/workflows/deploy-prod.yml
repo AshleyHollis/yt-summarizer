@@ -294,10 +294,11 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend
     uses: ./.github/workflows/deploy-frontend-swa.yml
-    needs: [wait-for-ci]
+    needs: [wait-for-ci, terraform]
     if: |
       !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
+      (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_frontend != false) ||
        (github.event_name != 'workflow_dispatch'))
     with:
