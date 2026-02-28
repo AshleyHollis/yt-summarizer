@@ -179,6 +179,14 @@ jobs:
           bash scripts/workflows/write-runtime-config.sh \
             "apps/web/public/runtime-config.js" \
             "${{ inputs.api-url }}"
+          # Copy to standalone public dirs (for output_location: .next/standalone deployment)
+          for pub_dir in \
+            "apps/web/.next/standalone/apps/web/public" \
+            "apps/web/.next/standalone/public"; do
+            if [ -d "$pub_dir" ]; then
+              cp apps/web/public/runtime-config.js "$pub_dir/runtime-config.js"
+            fi
+          done
 
       - name: Deploy to Azure Static Web Apps
         id: deploy-swa
@@ -190,7 +198,7 @@ jobs:
           action: "upload"
           app_location: "apps/web"
           api_location: ""
-          output_location: ""
+          output_location: ".next/standalone"
           skip_app_build: true
           skip_api_build: true
           deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
@@ -267,7 +275,7 @@ jobs:
           action: "upload"
           app_location: "apps/web"
           api_location: ""
-          output_location: ""
+          output_location: ".next/standalone"
           skip_app_build: true
           skip_api_build: true
           deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
