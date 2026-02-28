@@ -52,7 +52,7 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
 
       // Page should not redirect to login
       const currentUrl = page.url();
-      expect(currentUrl).not.toContain('/login');
+      expect(currentUrl).not.toContain('/sign-in');
     });
 
     test('authenticated user can access /library page', async ({ page }) => {
@@ -63,7 +63,7 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
 
       // Page should not redirect to login
       const currentUrl = page.url();
-      expect(currentUrl).not.toContain('/login');
+      expect(currentUrl).not.toContain('/sign-in');
     });
 
     test('authenticated user without admin role cannot access /admin', async ({ page }) => {
@@ -71,19 +71,19 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
 
       // Should redirect to access-denied (unless user has admin role)
       await page.waitForURL(
-        (url) => url.pathname.includes('/access-denied') || url.pathname.includes('/admin'),
+        (url) => url.pathname.includes('/forbidden') || url.pathname.includes('/admin'),
         { timeout: 10000 }
       );
 
       const currentUrl = page.url();
 
       // If user landed on admin page, they have admin role (different test file handles this)
-      if (currentUrl.includes('/admin') && !currentUrl.includes('/access-denied')) {
+      if (currentUrl.includes('/admin') && !currentUrl.includes('/forbidden')) {
         test.skip(true, 'Test user has admin role - see rbac-admin-access.spec.ts instead');
       }
 
       // Normal users should be denied
-      expect(currentUrl).toContain('/access-denied');
+      expect(currentUrl).toContain('/forbidden');
     });
   });
 
@@ -402,7 +402,7 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       await logoutButton.click();
 
       // Should redirect to login or home page
-      await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 

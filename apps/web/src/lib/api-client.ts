@@ -56,7 +56,7 @@ async function authHeader(): Promise<Record<string, string>> {
 
 /**
  * Handle a 401 response from the API by clearing the token cache and
- * optionally redirecting the browser to /login for re-authentication.
+ * optionally redirecting the browser to /sign-in for re-authentication.
  *
  * @internal
  */
@@ -64,7 +64,7 @@ function handleUnauthorized(): void {
   clearAccessTokenCache();
   // Only redirect in the browser
   if (typeof window !== 'undefined') {
-    window.location.href = '/login';
+    window.location.href = '/sign-in';
   }
 }
 

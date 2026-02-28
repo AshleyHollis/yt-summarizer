@@ -25,11 +25,11 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       await page.goto('/admin');
 
       // Should redirect to login page
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
-      expect(page.url()).toContain('/login');
+      expect(page.url()).toContain('/sign-in');
 
       // Should show login page
       await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
@@ -41,18 +41,18 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       // Should redirect to login page
       // Note: /add may be public in some implementations
       // This test will need to be adjusted based on your route protection strategy
-      await page.waitForURL((url) => url.pathname === '/add' || url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname === '/add' || url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
       const currentUrl = page.url();
 
       // If the page stayed on /add, it's a public route (skip the redirect test)
-      if (currentUrl.includes('/add') && !currentUrl.includes('/login')) {
+      if (currentUrl.includes('/add') && !currentUrl.includes('/sign-in')) {
         test.skip(true, '/add is a public route - no redirect expected');
       }
 
-      expect(currentUrl).toContain('/login');
+      expect(currentUrl).toContain('/sign-in');
     });
 
     test('unauthenticated user accessing /library is redirected to login', async ({ page }) => {
@@ -60,7 +60,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
 
       // Should redirect to login page
       await page.waitForURL(
-        (url) => url.pathname === '/library' || url.pathname.includes('/login'),
+        (url) => url.pathname === '/library' || url.pathname.includes('/sign-in'),
         {
           timeout: 10000,
         }
@@ -69,17 +69,17 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       const currentUrl = page.url();
 
       // If the page stayed on /library, it's a public route (skip the redirect test)
-      if (currentUrl.includes('/library') && !currentUrl.includes('/login')) {
+      if (currentUrl.includes('/library') && !currentUrl.includes('/sign-in')) {
         test.skip(true, '/library is a public route - no redirect expected');
       }
 
-      expect(currentUrl).toContain('/login');
+      expect(currentUrl).toContain('/sign-in');
     });
   });
 
   test.describe('Login Page for Unauthenticated Users', () => {
     test('login page renders correctly for unauthenticated users', async ({ page }) => {
-      await page.goto('/login');
+      await page.goto('/sign-in');
 
       // Should show sign in heading
       await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
@@ -93,7 +93,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
     });
 
     test('login page shows username/password form', async ({ page }) => {
-      await page.goto('/login');
+      await page.goto('/sign-in');
 
       // Should show email input
       const emailInput = page.getByLabel(/email/i);
@@ -109,7 +109,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
     });
 
     test('login page has gradient background', async ({ page }) => {
-      await page.goto('/login');
+      await page.goto('/sign-in');
 
       // Verify page loads with proper styling
       const heading = page.getByRole('heading', { name: /sign in/i });
@@ -121,7 +121,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
     });
 
     test('login page is mobile responsive', async ({ page }) => {
-      await page.goto('/login');
+      await page.goto('/sign-in');
 
       // Test on mobile viewport
       await page.setViewportSize({ width: 375, height: 667 });
@@ -150,10 +150,10 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
     });
 
     test('unauthenticated user can access access-denied page', async ({ page }) => {
-      await page.goto('/access-denied');
+      await page.goto('/forbidden');
 
       // Access denied page is public (it's an error page)
-      await expect(page).toHaveURL('/access-denied');
+      await expect(page).toHaveURL('/forbidden');
 
       // Should show access denied heading
       await expect(page.getByRole('heading', { name: /access denied/i })).toBeVisible();
@@ -198,11 +198,11 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       // This could be in the navbar or elsewhere
       const loginLink = page.getByRole('link', { name: /sign in|log in/i });
 
-      // If no login link, that's okay - user can navigate to /login directly
+      // If no login link, that's okay - user can navigate to /sign-in directly
       // This test is just checking that the navigation makes sense for unauthenticated users
       const loginLinkCount = await loginLink.count();
 
-      // Either there's a login link, or the user can access /login directly
+      // Either there's a login link, or the user can access /sign-in directly
       // Both are valid implementations
       expect(loginLinkCount >= 0).toBeTruthy();
     });
@@ -214,7 +214,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       await page.goto('/admin');
 
       // Should redirect to login
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -223,7 +223,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       // May have returnTo parameter (implementation-specific)
       // This is optional behavior - some apps use returnTo, others use session state
       // Just verify we're on the login page
-      expect(currentUrl.pathname).toContain('/login');
+      expect(currentUrl.pathname).toContain('/sign-in');
     });
   });
 
@@ -241,7 +241,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
         }
       });
 
-      await page.goto('/login');
+      await page.goto('/sign-in');
       await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
 
       expect(errors).toHaveLength(0);
@@ -262,7 +262,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       await page.goto('/admin');
 
       // Wait for redirect
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 

@@ -8,7 +8,7 @@
  * Implementation: T022 (social login), T042 (username/password)
  */
 
-import { LoginButton } from '@/components/auth/LoginButton';
+import { LoginButton } from '@/components/auth`/sign-in`Button';
 import { UsernamePasswordForm } from '@/components/auth/UsernamePasswordForm';
 import type { Metadata } from 'next';
 
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
  * Accessible to unauthenticated users.
  *
  * @example
- * Navigate to /login to access this page
+ * Navigate to /sign-in to access this page
  */
 export default function LoginPage() {
   return (

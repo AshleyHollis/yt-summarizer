@@ -45,7 +45,7 @@ function shouldProtectRoute(pathname: string): boolean {
 }
 
 function isPublicRoute(pathname: string): boolean {
-  const publicRoutes = ['/login', '/access-denied', '/api/auth'];
+  const publicRoutes = ['/sign-in', '/forbidden', '/api/auth'];
   return publicRoutes.some((route) => pathname.startsWith(route));
 }
 
@@ -72,12 +72,12 @@ function getRedirectUrl(
   if (shouldProtectRoute(pathname)) {
     // No session -> redirect to login
     if (!session) {
-      return `${baseUrl}/login`;
+      return `${baseUrl}/sign-in`;
     }
 
     // Has session but not admin -> redirect to access denied
     if (!hasAdminRole(session)) {
-      return `${baseUrl}/access-denied`;
+      return `${baseUrl}/forbidden`;
     }
   }
 
@@ -102,18 +102,18 @@ describe('Middleware Route Protection', () => {
     });
 
     it('should not protect auth routes', () => {
-      expect(shouldProtectRoute('/login')).toBe(false);
-      expect(shouldProtectRoute('/access-denied')).toBe(false);
+      expect(shouldProtectRoute('/sign-in')).toBe(false);
+      expect(shouldProtectRoute('/forbidden')).toBe(false);
     });
   });
 
   describe('isPublicRoute', () => {
     it('should identify login page as public', () => {
-      expect(isPublicRoute('/login')).toBe(true);
+      expect(isPublicRoute('/sign-in')).toBe(true);
     });
 
     it('should identify access-denied page as public', () => {
-      expect(isPublicRoute('/access-denied')).toBe(true);
+      expect(isPublicRoute('/forbidden')).toBe(true);
     });
 
     it('should identify auth API routes as public', () => {
@@ -173,7 +173,7 @@ describe('Middleware Route Protection', () => {
     describe('Admin Routes', () => {
       it('should redirect unauthenticated user to login', () => {
         const redirectUrl = getRedirectUrl('/admin', null, baseUrl);
-        expect(redirectUrl).toBe(`${baseUrl}/login`);
+        expect(redirectUrl).toBe(`${baseUrl}/sign-in`);
       });
 
       it('should redirect non-admin user to access-denied', () => {
@@ -186,7 +186,7 @@ describe('Middleware Route Protection', () => {
         };
 
         const redirectUrl = getRedirectUrl('/admin', session, baseUrl);
-        expect(redirectUrl).toBe(`${baseUrl}/access-denied`);
+        expect(redirectUrl).toBe(`${baseUrl}/forbidden`);
       });
 
       it('should allow admin user to access admin route', () => {
@@ -212,18 +212,18 @@ describe('Middleware Route Protection', () => {
         };
 
         const redirectUrl = getRedirectUrl('/admin/users', session, baseUrl);
-        expect(redirectUrl).toBe(`${baseUrl}/access-denied`);
+        expect(redirectUrl).toBe(`${baseUrl}/forbidden`);
       });
     });
 
     describe('Public Routes', () => {
       it('should allow access to login page without authentication', () => {
-        const redirectUrl = getRedirectUrl('/login', null, baseUrl);
+        const redirectUrl = getRedirectUrl('/sign-in', null, baseUrl);
         expect(redirectUrl).toBeNull();
       });
 
       it('should allow access to access-denied page without authentication', () => {
-        const redirectUrl = getRedirectUrl('/access-denied', null, baseUrl);
+        const redirectUrl = getRedirectUrl('/forbidden', null, baseUrl);
         expect(redirectUrl).toBeNull();
       });
 
@@ -241,8 +241,8 @@ describe('Middleware Route Protection', () => {
           },
         };
 
-        expect(getRedirectUrl('/login', session, baseUrl)).toBeNull();
-        expect(getRedirectUrl('/access-denied', session, baseUrl)).toBeNull();
+        expect(getRedirectUrl('/sign-in', session, baseUrl)).toBeNull();
+        expect(getRedirectUrl('/forbidden', session, baseUrl)).toBeNull();
       });
     });
 
@@ -286,7 +286,7 @@ describe('Middleware Route Protection', () => {
 
     it('should handle paths with trailing slashes', () => {
       expect(shouldProtectRoute('/admin/')).toBe(true);
-      expect(isPublicRoute('/login/')).toBe(true);
+      expect(isPublicRoute('`/sign-in`/')).toBe(true);
     });
 
     it('should handle case sensitivity', () => {
@@ -328,7 +328,7 @@ describe('Middleware Route Protection', () => {
 
       adminPaths.forEach((path) => {
         const redirectUrl = getRedirectUrl(path, session, baseUrl);
-        expect(redirectUrl).toBe(`${baseUrl}/access-denied`);
+        expect(redirectUrl).toBe(`${baseUrl}/forbidden`);
       });
     });
 

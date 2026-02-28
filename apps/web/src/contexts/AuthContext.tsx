@@ -277,7 +277,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
    *
    * // Navigation guard
    * if (!hasRole('admin')) {
-   *   router.push('/access-denied');
+   *   router.push('/forbidden');
    * }
    * ```
    */

@@ -40,7 +40,7 @@ test.describe('Social Login Authentication @auth', () => {
   test.describe('Login Page UI', () => {
     test('renders login page with social login buttons', async ({ page }) => {
       // Navigate to login page WITHOUT authentication (override storage state)
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Should show login page header
       await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
@@ -55,7 +55,7 @@ test.describe('Social Login Authentication @auth', () => {
     });
 
     test('Google login button has correct styling and icon', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const googleButton = page.getByRole('button', { name: /google/i });
 
@@ -69,7 +69,7 @@ test.describe('Social Login Authentication @auth', () => {
     });
 
     test('GitHub login button has correct styling and icon', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const githubButton = page.getByRole('button', { name: /github/i });
 
@@ -83,7 +83,7 @@ test.describe('Social Login Authentication @auth', () => {
     });
 
     test('login page has beautiful gradient design', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       // Check for main content container
       const mainContent = page.locator('main');
@@ -118,17 +118,17 @@ test.describe('Social Login Authentication @auth', () => {
 
     test('authenticated user is redirected from login page to dashboard', async ({ page }) => {
       // Navigate to login page while authenticated
-      await page.goto('/login');
+      await page.goto('/sign-in');
 
       // Should redirect away from login page (already authenticated)
       // The exact redirect location depends on the app's auth flow
       // It might go to /dashboard, /, or /add
-      await page.waitForURL((url) => !url.pathname.includes('/login'), {
+      await page.waitForURL((url) => !url.pathname.includes('/sign-in'), {
         timeout: 5000,
       });
 
       // Verify we're not on the login page anymore
-      expect(page.url()).not.toContain('/login');
+      expect(page.url()).not.toContain('/sign-in');
     });
 
     test('authenticated user can see user profile component', async ({ page }) => {
@@ -215,7 +215,7 @@ test.describe('Social Login Authentication @auth', () => {
      *
      * To manually test the OAuth flow:
      * 1. Start the dev server: npm run dev
-     * 2. Navigate to http://localhost:3000/login
+     * 2. Navigate to http://localhost:3000/sign-in
      * 3. Click "Sign in with Google" or "Sign in with GitHub"
      * 4. Complete the OAuth flow in the popup/redirect
      * 5. Verify you're redirected back to the app with an active session
@@ -225,7 +225,7 @@ test.describe('Social Login Authentication @auth', () => {
       // This test would require handling OAuth popups/redirects
       // For now, it's documented as a manual test case
 
-      await page.goto('/login');
+      await page.goto('/sign-in');
       const googleButton = page.getByRole('button', { name: /google/i });
       await googleButton.click();
 
@@ -238,7 +238,7 @@ test.describe('Social Login Authentication @auth', () => {
       // This test would require handling OAuth popups/redirects
       // For now, it's documented as a manual test case
 
-      await page.goto('/login');
+      await page.goto('/sign-in');
       const githubButton = page.getByRole('button', { name: /github/i });
       await githubButton.click();
 
@@ -264,11 +264,11 @@ test.describe('Social Login Authentication @auth', () => {
         await page.goto('http://localhost:3000/');
 
         // Should redirect to login page
-        await page.waitForURL((url) => url.pathname.includes('/login'), {
+        await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
           timeout: 5000,
         });
 
-        expect(page.url()).toContain('/login');
+        expect(page.url()).toContain('/sign-in');
       } finally {
         await context.close();
       }
@@ -279,7 +279,7 @@ test.describe('Social Login Authentication @auth', () => {
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/login');
+        await page.goto('http://localhost:3000/sign-in');
 
         // Should see login page with social buttons
         const googleButton = page.getByRole('button', { name: /google/i });

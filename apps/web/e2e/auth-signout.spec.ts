@@ -66,7 +66,7 @@ test.describe('Sign Out Flow @auth', () => {
       // The URL will change as part of the logout process
       await page.waitForURL(
         (url) => {
-          return url.pathname.includes('/login') || url.pathname.includes('/auth/logout');
+          return url.pathname.includes('/sign-in') || url.pathname.includes('/auth/logout');
         },
         { timeout: 10000 }
       );
@@ -93,7 +93,7 @@ test.describe('Sign Out Flow @auth', () => {
       await logoutButton.click();
 
       // Wait for logout to complete
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -119,7 +119,7 @@ test.describe('Sign Out Flow @auth', () => {
       await logoutButton.click();
 
       // Wait for logout
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -138,7 +138,7 @@ test.describe('Sign Out Flow @auth', () => {
       await logoutButton.click();
 
       // Wait for logout
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -146,7 +146,7 @@ test.describe('Sign Out Flow @auth', () => {
       await page.goto('/');
 
       // Should redirect to login (not authenticated)
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 5000,
       });
     });
@@ -164,11 +164,11 @@ test.describe('Sign Out Flow @auth', () => {
       await logoutButton.click();
 
       // Should redirect to login page
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
-      expect(page.url()).toContain('/login');
+      expect(page.url()).toContain('/sign-in');
     });
 
     test('login page shows social login buttons after logout', async ({ page }) => {
@@ -179,7 +179,7 @@ test.describe('Sign Out Flow @auth', () => {
       await logoutButton.click();
 
       // Wait for redirect to login
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -199,7 +199,7 @@ test.describe('Sign Out Flow @auth', () => {
       await logoutButton.click();
 
       // Wait for logout
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -207,11 +207,11 @@ test.describe('Sign Out Flow @auth', () => {
       await page.goto('/');
 
       // Should redirect to login
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 5000,
       });
 
-      expect(page.url()).toContain('/login');
+      expect(page.url()).toContain('/sign-in');
     });
 
     test('browser back button after logout keeps user on login page', async ({ page }) => {
@@ -225,7 +225,7 @@ test.describe('Sign Out Flow @auth', () => {
       await logoutButton.click();
 
       // Wait for login page
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
 
@@ -234,11 +234,11 @@ test.describe('Sign Out Flow @auth', () => {
 
       // Should still be on login page or redirect to login
       // (cannot access previous authenticated page)
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 5000,
       });
 
-      expect(page.url()).toContain('/login');
+      expect(page.url()).toContain('/sign-in');
     });
   });
 
@@ -262,7 +262,7 @@ test.describe('Sign Out Flow @auth', () => {
         await logoutButton.click();
 
         // Wait for logout
-        await page.waitForURL((url) => url.pathname.includes('/login'), {
+        await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
           timeout: 10000,
         });
 
@@ -296,7 +296,7 @@ test.describe('Sign Out Flow @auth', () => {
         await logoutButton.click();
 
         // Wait for logout
-        await page.waitForURL((url) => url.pathname.includes('/login'), {
+        await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
           timeout: 10000,
         });
 
@@ -341,7 +341,7 @@ test.describe('Sign Out Flow @auth', () => {
         await logoutButton.click();
 
         // Wait for logout in first tab
-        await page1.waitForURL((url) => url.pathname.includes('/login'), {
+        await page1.waitForURL((url) => url.pathname.includes('/sign-in'), {
           timeout: 10000,
         });
 
@@ -349,11 +349,11 @@ test.describe('Sign Out Flow @auth', () => {
         await page2.reload();
 
         // Second tab should also be logged out
-        await page2.waitForURL((url) => url.pathname.includes('/login'), {
+        await page2.waitForURL((url) => url.pathname.includes('/sign-in'), {
           timeout: 10000,
         });
 
-        expect(page2.url()).toContain('/login');
+        expect(page2.url()).toContain('/sign-in');
       } finally {
         await context.close();
       }
@@ -377,11 +377,11 @@ test.describe('Sign Out Flow @auth', () => {
       await logoutButton.click();
 
       // Should still redirect to login (may take longer)
-      await page.waitForURL((url) => url.pathname.includes('/login'), {
+      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
         timeout: 15000, // Extended timeout for slow network
       });
 
-      expect(page.url()).toContain('/login');
+      expect(page.url()).toContain('/sign-in');
     });
 
     test('logout gracefully handles API errors', async ({ page }) => {

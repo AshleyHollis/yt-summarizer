@@ -269,11 +269,11 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
         await page.goto('http://localhost:3000/admin');
 
         // Should redirect to login
-        await page.waitForURL((url) => url.pathname.includes('/login'), {
+        await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
           timeout: 10000,
         });
 
-        expect(page.url()).toContain('/login');
+        expect(page.url()).toContain('/sign-in');
       } finally {
         await context.close();
       }
