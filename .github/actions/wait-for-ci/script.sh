@@ -140,6 +140,25 @@ if echo "$commit_message" | grep -q '\[skip ci\]'; then
   if [ -n "$fallback_run_id" ]; then
     log_success "Using most recent successful CI run: $fallback_run_id"
     echo "ci_run_id=$fallback_run_id" >> ${GITHUB_OUTPUT:-/dev/null}
+    # Download image-tag artifact from the fallback CI run so callers use the correct image tag
+    fallback_artifacts=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Accept: application/vnd.github.v3+json" \
+      "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$fallback_run_id/artifacts")
+    fallback_artifact_id=$(echo "$fallback_artifacts" | jq -r '.artifacts[] | select(.name == "image-tag") | .id' 2>/dev/null | head -1)
+    if [ -n "$fallback_artifact_id" ]; then
+      fallback_archive_url=$(echo "$fallback_artifacts" | jq -r ".artifacts[] | select(.id == ($fallback_artifact_id | tonumber)) | .archive_download_url")
+      if curl -s -L -H "Authorization: token $GITHUB_TOKEN" -o /tmp/fallback-artifacts.zip "$fallback_archive_url"; then
+        mkdir -p /tmp/fallback-artifacts && unzip -o /tmp/fallback-artifacts.zip -d /tmp/fallback-artifacts >/dev/null 2>&1
+        if [ -f /tmp/fallback-artifacts/image-tag.txt ]; then
+          FALLBACK_TAG=$(cat /tmp/fallback-artifacts/image-tag.txt | tr -d '\r\n')
+          log_success "Image tag from fallback CI: $FALLBACK_TAG"
+          echo "image_tag=$FALLBACK_TAG" >> ${GITHUB_OUTPUT:-/dev/null}
+          print_footer "✅ Skipped (skip ci) - using run $fallback_run_id (tag: $FALLBACK_TAG)"
+          exit 0
+        fi
+      fi
+    fi
+    log_warn "Could not download image-tag artifact from fallback CI run; image_tag will be empty"
     echo "image_tag=" >> ${GITHUB_OUTPUT:-/dev/null}
     print_footer "✅ Skipped (skip ci) - using run $fallback_run_id"
     exit 0
