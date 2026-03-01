@@ -169,88 +169,11 @@ jobs:
           deployment-environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
           verbose: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
 
-      # Configure Auth0 app settings AFTER deploy so the SWA environment exists
-      # (for preview, the environment is created by the deploy step above)
-      - name: Azure Login (SWA app settings)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Configure SWA app settings from Key Vault
-        continue-on-error: true # don't block deploy if environment not yet ready
-        shell: bash
-        run: |
-          KV_NAME="${{ vars.KEY_VAULT_NAME || 'kv-ytsumm-prd' }}"
-          SWA_NAME="${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}"
-          RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}"
-          # Azure SWA environment name = PR number (e.g. '160'), not deployment-environment (e.g. 'pr-160')
-          PR_NUM="${{ inputs.pr-number }}"
-
-          if [[ "${{ inputs.environment }}" == "prod" ]]; then
-            AUTH0_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-session-secret" --query value -o tsv)
-            AUTH0_DOMAIN=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-domain" --query value -o tsv)
-            AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-client-id" --query value -o tsv)
-            AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-client-secret" --query value -o tsv)
-            ENV_FLAG=""
-          else
-            AUTH0_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-session-secret" --query value -o tsv)
-            AUTH0_DOMAIN=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-domain" --query value -o tsv)
-            AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-client-id" --query value -o tsv)
-            AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-client-secret" --query value -o tsv)
-            # Azure SWA uses PR number as the environment name (not the deployment_environment value)
-            ENV_FLAG="--environment-name ${PR_NUM}"
-          fi
-
-          SWA_HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv)
-
-          # For preview: use the preview environment hostname pattern
-          if [[ "${{ inputs.environment }}" == "preview" && -n "$PR_NUM" ]]; then
-            PREVIEW_SUFFIX="${SWA_HOSTNAME#white-meadow-0b8e2e000.}"
-            SWA_BASE_URL="https://white-meadow-0b8e2e000-${PR_NUM}.${PREVIEW_SUFFIX}"
-          else
-            SWA_BASE_URL="https://${SWA_HOSTNAME}"
-          fi
-
-          # shellcheck disable=SC2086
-          az staticwebapp appsettings set \
-            --name "$SWA_NAME" \
-            --resource-group "$RG" \
-            $ENV_FLAG \
-            --setting-names \
-              "AUTH0_SECRET=${AUTH0_SECRET}" \
-              "AUTH0_BASE_URL=${SWA_BASE_URL}" \
-              "AUTH0_ISSUER_BASE_URL=https://${AUTH0_DOMAIN}" \
-              "AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}" \
-              "AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}"
-
-          echo "✅ SWA app settings configured for ${{ inputs.environment }} environment (base URL: ${SWA_BASE_URL})"
-
-      # Re-deploy after setting app settings so the managed function starts with correct env vars.
-      # The first deploy creates the environment but warm-up times out without env vars.
-      # This second deploy triggers a new warm-up with the env vars now in place.
-      - name: Re-deploy frontend with CI artifact (with app settings)
-        id: deploy-swa-2
-        continue-on-error: true
-        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v3
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ci-run-id: ${{ inputs.ci-run-id }}
-          api-url: ${{ inputs.api-url }}
-          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          app-location: apps/web
-          runtime-config-path: apps/web/public/runtime-config.js
-          output_location: ""
-          production-branch: main
-          deployment-environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
-          verbose: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
-
       - name: Resolve deployment URL
         id: resolve-url
         shell: bash
         run: |
-          DEPLOY_URL="${{ steps.deploy-swa-2.outputs.static_web_app_url || steps.deploy-swa.outputs.static_web_app_url }}"
+          DEPLOY_URL="${{ steps.deploy-swa.outputs.static_web_app_url }}"
           if [[ -n "$DEPLOY_URL" ]]; then
             echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
           else
