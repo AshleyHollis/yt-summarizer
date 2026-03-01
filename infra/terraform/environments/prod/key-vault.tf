@@ -33,3 +33,23 @@ module "key_vault" {
 
   tags = local.common_tags
 }
+
+# =============================================================================
+# Removed blocks - resources migrated to shared-infra
+# =============================================================================
+
+removed {
+  from = module.key_vault.azurerm_key_vault.vault
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.key_vault.azurerm_role_assignment.secrets_officer[0]
+
+  lifecycle {
+    destroy = false
+  }
+}

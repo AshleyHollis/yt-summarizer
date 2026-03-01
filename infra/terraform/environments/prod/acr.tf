@@ -13,3 +13,15 @@ module "acr" {
 
   tags = local.common_tags
 }
+
+# =============================================================================
+# Removed blocks - resources migrated to shared-infra
+# =============================================================================
+
+removed {
+  from = module.acr.azurerm_container_registry.acr
+
+  lifecycle {
+    destroy = false
+  }
+}
