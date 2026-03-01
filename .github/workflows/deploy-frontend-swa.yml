@@ -149,60 +149,25 @@ jobs:
           echo "✅ Cleaned up ${{ steps.cleanup-stale.outputs.deleted-count }} stale SWA environment(s)"
           echo "💡 Deleted environments for PRs: ${{ steps.cleanup-stale.outputs.stale-prs }}"
 
-      - name: Download frontend build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-build
-          path: /tmp/frontend-build
-          run-id: ${{ inputs.ci-run-id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Apply CI build artifact
-        run: |
-          source_dir="/tmp/frontend-build"
-          app_dir="apps/web"
-          if [[ ! -d "$source_dir" ]]; then
-            echo "::error::Expected CI build directory not found at $source_dir"
-            exit 1
-          fi
-          rm -rf "$app_dir/.next" "$app_dir/public"
-          cp -R "$source_dir/.next" "$app_dir/.next"
-          cp -R "$source_dir/public" "$app_dir/public"
-          if [[ -f "$source_dir/staticwebapp.config.json" ]]; then
-            cp "$source_dir/staticwebapp.config.json" "$app_dir/staticwebapp.config.json"
-          fi
-          # Keep standalone: swa-build.js creates a flat standalone with FUNCTIONS_CUSTOMHANDLER_PORT
-          # patch so SWA uses it as a pre-bundled custom handler (fast warm-up ~30-90s).
-          # Removing standalone forces SWA to npm-install + next-start from scratch, causing
-          # the 582s warm-up timeout. The standalone only contains traced runtime deps (~67MB).
-          echo "=== ${app_dir} structure ===" && ls -la "$app_dir/"
-          echo "=== ${app_dir}/.next structure ===" && ls -la "$app_dir/.next/" || echo "No .next directory"
-
-      - name: Write runtime config
-        run: |
-          bash scripts/workflows/write-runtime-config.sh \
-            "apps/web/public/runtime-config.js" \
-            "${{ inputs.api-url }}"
-          # Also copy into standalone/public so it's available in hybrid mode
-          if [[ -d "apps/web/.next/standalone/public" ]]; then
-            cp "apps/web/public/runtime-config.js" "apps/web/.next/standalone/public/runtime-config.js"
-          fi
-
-      - name: Deploy to Azure Static Web Apps
+      # Downloads CI artifact, applies it, writes runtime config, then deploys with retry:
+      #   Attempts 1-2: 300s fail-fast timeout
+      #   Attempt 3:    1200s extended timeout
+      # SWA warm-up may time out on cold start (continue-on-error: true); deployment still succeeds.
+      - name: Deploy frontend with CI artifact
         id: deploy-swa
-        continue-on-error: true # SWA warmup can timeout on cold start; deployment still succeeds
-        uses: Azure/static-web-apps-deploy@v1
+        continue-on-error: true
+        uses: ./.github/actions/deploy-frontend-swa
         with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          app_location: "apps/web"
-          api_location: ""
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ci-run-id: ${{ inputs.ci-run-id }}
+          api-url: ${{ inputs.api-url }}
+          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          app-location: apps/web
+          runtime-config-path: apps/web/public/runtime-config.js
           output_location: ""
-          skip_app_build: true
-          skip_api_build: true
-          deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
-          production_branch: "main"
+          production-branch: main
+          deployment-environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
+          verbose: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
 
       # Configure Auth0 app settings AFTER deploy so the SWA environment exists
       # (for preview, the environment is created by the deploy step above)
@@ -265,21 +230,22 @@ jobs:
       # Re-deploy after setting app settings so the managed function starts with correct env vars.
       # The first deploy creates the environment but warm-up times out without env vars.
       # This second deploy triggers a new warm-up with the env vars now in place.
-      - name: Re-deploy to Azure Static Web Apps (with app settings)
+      # Uses retry script directly (artifact already applied by first deploy).
+      - name: Re-deploy frontend with CI artifact (with app settings)
         id: deploy-swa-2
         continue-on-error: true
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          app_location: "apps/web"
-          api_location: ""
-          output_location: ""
-          skip_app_build: true
-          skip_api_build: true
-          deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
-          production_branch: "main"
+        shell: bash
+        env:
+          AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          APP_LOCATION: apps/web
+          OUTPUT_LOCATION: ""
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
+          VERBOSE: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
+          MAX_ATTEMPTS: "3"
+          TIMEOUT_SECONDS: "1200"
+        run: |
+          chmod +x .github/actions/deploy-frontend-swa/deploy-with-retry.sh
+          .github/actions/deploy-frontend-swa/deploy-with-retry.sh
 
       - name: Resolve deployment URL
         id: resolve-url
