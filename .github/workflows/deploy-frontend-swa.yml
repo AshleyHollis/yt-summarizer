@@ -156,7 +156,7 @@ jobs:
       - name: Deploy frontend with CI artifact
         id: deploy-swa
         continue-on-error: true
-        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v2
+        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ci-run-id: ${{ inputs.ci-run-id }}
@@ -233,7 +233,7 @@ jobs:
       - name: Re-deploy frontend with CI artifact (with app settings)
         id: deploy-swa-2
         continue-on-error: true
-        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v2
+        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ci-run-id: ${{ inputs.ci-run-id }}

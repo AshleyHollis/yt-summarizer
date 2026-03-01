@@ -130,7 +130,7 @@ jobs:
           kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
       - name: Wait for Argo CD sync
-        uses: AshleyHollis/shared-infra/.github/actions/argocd-wait@v2
+        uses: AshleyHollis/shared-infra/.github/actions/argocd-wait@v3
         with:
           app-name: ${{ inputs.argocd-app-name }}
           namespace: ${{ inputs.namespace }}
