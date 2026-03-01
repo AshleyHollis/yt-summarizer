@@ -66,8 +66,27 @@ async def update_job_status(
         elif status in ("succeeded", "failed"):
             job.completed_at = datetime.utcnow()
 
+        # Always sync video.processing_status based on job transitions
+        if old_status != status:
+            video_status = None
+            if status == "running" and old_status == "pending":
+                video_status = "processing"
+            elif status == "failed":
+                video_status = "failed"
+            elif status == "succeeded" and job_type == "build_relationships":
+                video_status = "completed"
+
+            if video_status:
+                video_result = await session.execute(
+                    select(Video).where(Video.video_id == job.video_id)
+                )
+                video = video_result.scalar_one_or_none()
+                if video:
+                    video.processing_status = video_status
+                    if status == "failed" and error_message:
+                        video.error_message = error_message
+
         # Update batch item and batch counts if this is a batch job
-        # Only update if job has a batch_id and status actually changed
         if job.batch_id and old_status != status:
             # Determine the batch item status based on job type and new status
             # - "running": when first job starts running
@@ -234,7 +253,9 @@ async def mark_job_completed(job_id: str) -> None:
     Args:
         job_id: The job ID to update.
     """
-    await update_job_status(job_id, status="succeeded", stage="completed", progress=100)
+    await update_job_status(
+        job_id, status="succeeded", stage="completed", progress=100, error_message=""
+    )
 
     # Record in job history for ETA calculations
     await _record_job_history(job_id, success=True)
