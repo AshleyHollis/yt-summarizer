@@ -171,10 +171,10 @@ jobs:
           if [[ -f "$source_dir/staticwebapp.config.json" ]]; then
             cp "$source_dir/staticwebapp.config.json" "$app_dir/staticwebapp.config.json"
           fi
-          # Remove standalone directory: Azure SWA detects .next/standalone and triggers hybrid
-          # repackaging which always times out at 582s. Without standalone, SWA serves the
-          # standard Next.js output via its own runtime (API routes work as Azure Functions).
-          rm -rf "$app_dir/.next/standalone"
+          # Keep standalone: swa-build.js creates a flat standalone with FUNCTIONS_CUSTOMHANDLER_PORT
+          # patch so SWA uses it as a pre-bundled custom handler (fast warm-up ~30-90s).
+          # Removing standalone forces SWA to npm-install + next-start from scratch, causing
+          # the 582s warm-up timeout. The standalone only contains traced runtime deps (~67MB).
           echo "=== ${app_dir} structure ===" && ls -la "$app_dir/"
           echo "=== ${app_dir}/.next structure ===" && ls -la "$app_dir/.next/" || echo "No .next directory"
 
@@ -183,6 +183,10 @@ jobs:
           bash scripts/workflows/write-runtime-config.sh \
             "apps/web/public/runtime-config.js" \
             "${{ inputs.api-url }}"
+          # Also copy into standalone/public so it's available in hybrid mode
+          if [[ -d "apps/web/.next/standalone/public" ]]; then
+            cp "apps/web/public/runtime-config.js" "apps/web/.next/standalone/public/runtime-config.js"
+          fi
 
       - name: Deploy to Azure Static Web Apps
         id: deploy-swa
