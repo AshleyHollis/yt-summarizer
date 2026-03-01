@@ -9,36 +9,36 @@ on:
     inputs:
       # Working directory
       terraform-working-dir:
-        description: 'Terraform working directory'
+        description: "Terraform working directory"
         required: true
         type: string
       terraform-version:
-        description: 'Terraform version to use'
+        description: "Terraform version to use"
         required: true
         type: string
 
       # Job control
       run-plan:
-        description: 'Whether to run terraform plan'
+        description: "Whether to run terraform plan"
         required: false
         type: boolean
         default: true
       run-apply:
-        description: 'Whether to run terraform apply'
+        description: "Whether to run terraform apply"
         required: false
         type: boolean
         default: false
 
       # Environment configuration
       environment-name:
-        description: 'GitHub environment name for apply job (e.g., production). Empty string = no environment.'
+        description: "GitHub environment name for apply job (e.g., production). Empty string = no environment."
         required: false
         type: string
-        default: ''
+        default: ""
 
       # PR-specific options
       post-plan-to-pr:
-        description: 'Whether to post terraform plan to PR comments'
+        description: "Whether to post terraform plan to PR comments"
         required: false
         type: boolean
         default: false
@@ -70,10 +70,10 @@ on:
 
     outputs:
       plan_summary:
-        description: 'JSON summary of terraform plan'
+        description: "JSON summary of terraform plan"
         value: ${{ jobs.terraform-plan.outputs.plan_summary }}
       has_changes:
-        description: 'Whether terraform plan has changes'
+        description: "Whether terraform plan has changes"
         value: ${{ jobs.terraform-plan.outputs.has_changes }}
 
 jobs:
@@ -87,7 +87,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      pull-requests: write  # Needed for PR comments (no-op if not posting to PR)
+      pull-requests: write # Needed for PR comments (no-op if not posting to PR)
     env:
       # Auth0 Terraform Service Account - M2M credentials for managing Auth0 resources
       # See docs/auth0-terraform-service-account.md for details
@@ -106,7 +106,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Terraform with Azure
-        uses: ./.github/actions/setup-terraform-azure
+        uses: AshleyHollis/shared-infra/.github/actions/setup-terraform-azure@v1
         with:
           terraform-version: ${{ inputs.terraform-version }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -114,16 +114,16 @@ jobs:
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: terraform-config
           terraform-directory: ${{ inputs.terraform-working-dir }}
-          fail-fast: 'true'
-          timeout-seconds: '60'
+          fail-fast: "true"
+          timeout-seconds: "60"
 
       - name: Terraform Plan
         id: plan
-        uses: ./.github/actions/terraform-plan
+        uses: AshleyHollis/shared-infra/.github/actions/terraform-plan@v1
         with:
           working-directory: ${{ inputs.terraform-working-dir }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -133,7 +133,7 @@ jobs:
 
       - name: Post Plan to PR and Summary
         if: always() && inputs.post-plan-to-pr
-        uses: ./.github/actions/post-terraform-plan
+        uses: AshleyHollis/shared-infra/.github/actions/post-terraform-plan@v1
         with:
           plan-summary: ${{ steps.plan.outputs.plan_summary }}
           plan-json-path: ${{ steps.plan.outputs.plan_json_path }}
@@ -181,7 +181,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Terraform with Azure
-        uses: ./.github/actions/setup-terraform-azure
+        uses: AshleyHollis/shared-infra/.github/actions/setup-terraform-azure@v1
         with:
           terraform-version: ${{ inputs.terraform-version }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -195,12 +195,12 @@ jobs:
           path: ${{ inputs.terraform-working-dir }}
 
       - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: terraform-config
           terraform-directory: ${{ inputs.terraform-working-dir }}
-          fail-fast: 'true'
-          timeout-seconds: '60'
+          fail-fast: "true"
+          timeout-seconds: "60"
 
       - name: Terraform Apply
         shell: bash
