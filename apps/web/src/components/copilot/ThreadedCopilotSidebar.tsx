@@ -215,6 +215,9 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     if (urlThreadId && threads.some((t) => t.id === urlThreadId)) {
       syncThreadIdFromUrl(urlThreadId);
     } else if (urlThreadId && !threads.some((t) => t.id === urlThreadId) && threads.length > 0) {
+      // Don't remove the thread param if it matches CopilotKit's internal thread ID —
+      // this is a new chat that hasn't been persisted yet, not a missing thread.
+      if (urlThreadId === copilotThreadId) return;
       if (isDeletingThreadRef.current) {
         isDeletingThreadRef.current = false;
         return;
@@ -233,6 +236,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     threadsLoading,
     urlThreadId,
     threads,
+    copilotThreadId,
     syncThreadIdFromUrl,
     pathname,
     router,
@@ -265,22 +269,15 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     searchParams,
   ]);
 
-  // Sync CopilotKit's internal thread ID to the URL as early as possible.
+  // Sync CopilotKit's internal thread ID to the URL when the sidebar is open.
   //
-  // CopilotKit generates its own UUID for each new chat session (when no threadId prop is
-  // supplied, or when the component first mounts before the URL thread has been applied).
-  // The agent backend saves runs under this CopilotKit-internal UUID, but useThreadPersistence
-  // independently creates a *different* thread via POST /api/v1/threads/messages, causing a
-  // mismatch: the browser URL shows the server-generated ID while responses land on
-  // CopilotKit's UUID.
-  //
-  // This effect detects when CopilotKit's thread ID differs from the URL and immediately
-  // updates the URL to match. Once the URL is updated, the Sync thread ID from URL effect
-  // above calls syncThreadIdFromUrl() which aligns useThreadPersistence.activeThreadId with
-  // CopilotKit's UUID. Subsequent saveIfNeeded() calls will then save messages under the
-  // correct ID, eliminating the mismatch.
+  // CopilotKit generates its own UUID for each new chat session. We only write
+  // this to the URL when the sidebar is open to avoid an infinite loop: without
+  // the isOpen guard, this effect adds ?thread=<copilotId> → the "Sync thread
+  // ID from URL" effect sees the ID isn't in the persisted threads list and
+  // removes it → this effect re-adds it → infinite replaceState loop.
   useEffect(() => {
-    if (!mounted || !copilotThreadId) return;
+    if (!mounted || !copilotThreadId || !isOpen) return;
     if (copilotThreadId === urlThreadId) return; // already in sync
 
     // Only sync when there is no URL thread (new chat) or when the URL thread is already the
@@ -290,7 +287,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
       params.set("thread", copilotThreadId);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     }
-  }, [mounted, copilotThreadId, urlThreadId, pathname, router, searchParams]);
+  }, [mounted, copilotThreadId, urlThreadId, isOpen, pathname, router, searchParams]);
 
   // Resize drag handlers
   useEffect(() => {
