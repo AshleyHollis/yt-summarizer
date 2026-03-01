@@ -470,7 +470,7 @@ jobs:
       environment: preview
       ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
       api-url: ${{ needs.get-ingress.outputs.preview_url }}
-      deployment-environment: pr-${{ needs.detect-changes.outputs.pr_number }}
+      deployment-environment: ${{ needs.detect-changes.outputs.pr_number }}
       pr-number: ${{ needs.detect-changes.outputs.pr_number }}
       pr-head-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
       cleanup-stale-environments: true

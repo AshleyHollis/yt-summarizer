@@ -29,7 +29,7 @@
 #       environment: preview
 #       ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
 #       api-url: https://pr-42.yt-summarizer.apps.ashleyhollis.com
-#       deployment-environment: pr-42
+#       deployment-environment: '42'
 #       pr-number: '42'
 #       pr-head-sha: abc1234567890
 #       cleanup-stale-environments: 'true'
@@ -53,7 +53,7 @@ on:
         required: true
         type: string
       deployment-environment:
-        description: "SWA deployment environment (default for prod, pr-N for preview)"
+        description: "SWA deployment environment (default for prod, PR number for preview)"
         required: true
         type: string
       # Preview-specific inputs
