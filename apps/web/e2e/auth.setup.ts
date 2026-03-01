@@ -34,9 +34,13 @@ const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
 /**
  * Authenticate via Auth0 Universal Login.
  *
- * Navigates directly to /api/auth/login (which redirects to Auth0), then fills
- * the password on Auth0's own login page. This avoids the app's UsernamePasswordForm
- * which only sends the email hint (not the password) to Auth0.
+ * Navigates directly to the API's /api/auth/login endpoint (which redirects to Auth0),
+ * then fills the password on Auth0's own login page.
+ *
+ * IMPORTANT: We navigate to the API URL directly, NOT through the SWA. Azure SWA
+ * intercepts /api/* as Azure Functions routes (returns 500 since we have no Functions).
+ * The API sets the session cookie on its own domain, which is correct since the frontend
+ * makes API calls directly to the API URL (via getClientApiUrl()).
  */
 async function authenticateViaAuth0(
   page: import('@playwright/test').Page,
@@ -44,8 +48,11 @@ async function authenticateViaAuth0(
   password: string,
   label: string
 ): Promise<void> {
-  const loginUrl = `/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}`;
-  console.log(`[auth-setup] Navigating to Auth0 login for ${label}...`);
+  // Use the API URL directly — SWA returns 500 for /api/* (Azure Functions interception)
+  const apiUrl = process.env.API_URL || 'http://localhost:8000';
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+  const loginUrl = `${apiUrl}/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}&returnTo=${encodeURIComponent(baseUrl)}`;
+  console.log(`[auth-setup] Navigating to Auth0 login for ${label} via ${apiUrl}...`);
   await page.goto(loginUrl);
 
   // Wait for redirect to Auth0's login page
