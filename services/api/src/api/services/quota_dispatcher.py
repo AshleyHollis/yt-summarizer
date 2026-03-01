@@ -73,9 +73,7 @@ class QuotaDispatcher:
 
         # Find all users with quota_queued jobs
         users_with_queued = await self.session.execute(
-            select(Job.user_id)
-            .where(Job.quota_status == "quota_queued")
-            .group_by(Job.user_id)
+            select(Job.user_id).where(Job.quota_status == "quota_queued").group_by(Job.user_id)
         )
         user_ids = [row[0] for row in users_with_queued.fetchall() if row[0] is not None]
 
@@ -105,9 +103,7 @@ class QuotaDispatcher:
     ) -> int:
         """Dispatch queued jobs for a single user up to their daily quota."""
         # Get user's tier
-        user_result = await self.session.execute(
-            select(User).where(User.user_id == user_id)
-        )
+        user_result = await self.session.execute(select(User).where(User.user_id == user_id))
         user = user_result.scalar_one_or_none()
         if not user:
             return 0
@@ -126,18 +122,14 @@ class QuotaDispatcher:
         window_seconds = video_limit["window_seconds"]
 
         # Count how many videos processed today
-        used_today = await get_usage_count(
-            self.session, user_id, "video_submit", window_seconds
-        )
+        used_today = await get_usage_count(self.session, user_id, "video_submit", window_seconds)
         remaining = max(0, max_count - used_today)
 
         if remaining == 0:
             result.jobs_skipped += 1
             return 0
 
-        return await self._release_queued_jobs(
-            user_id, remaining, correlation_id, result
-        )
+        return await self._release_queued_jobs(user_id, remaining, correlation_id, result)
 
     async def _release_all_queued(
         self,

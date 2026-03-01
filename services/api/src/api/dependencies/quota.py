@@ -46,9 +46,7 @@ async def get_or_create_user(
     auth_user: AuthenticatedUser,
 ) -> User:
     """Find existing user by Auth0 ID or create a new one."""
-    result = await session.execute(
-        select(User).where(User.auth0_id == auth_user.sub)
-    )
+    result = await session.execute(select(User).where(User.auth0_id == auth_user.sub))
     user = result.scalar_one_or_none()
 
     if not user:
