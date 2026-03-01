@@ -30,19 +30,21 @@ DEFAULT_POOL_RECYCLE = 1800  # 30 minutes
 def get_database_url() -> str:
     """Get database URL from environment.
 
-    Supports multiple environment variable formats:
-    1. DATABASE_URL - Standard SQLAlchemy-style URL
-    2. ConnectionStrings__ytsummarizer - .NET Aspire-injected connection string
-    3. ConnectionStrings__sql - Alternative Aspire format
-    """
-    # Try standard DATABASE_URL first
-    url = os.environ.get("DATABASE_URL")
+    Supports multiple environment variable formats (in priority order):
+    1. ConnectionStrings__ytsummarizer - .NET Aspire-injected connection string (preferred when running under Aspire)
+    2. ConnectionStrings__sql - Alternative Aspire format
+    3. DATABASE_URL - Standard SQLAlchemy-style URL (fallback for non-Aspire environments)
 
-    # Try Aspire-injected connection strings
-    if not url:
-        url = os.environ.get("ConnectionStrings__ytsummarizer")
+    When running under Aspire, YTSUMMARIZER_PORT overrides the port in any URL format
+    (Aspire maps container ports dynamically).
+    """
+    # Prefer Aspire-injected connection strings (they have correct credentials + ports)
+    url = os.environ.get("ConnectionStrings__ytsummarizer")
     if not url:
         url = os.environ.get("ConnectionStrings__sql")
+    # Fall back to standard DATABASE_URL
+    if not url:
+        url = os.environ.get("DATABASE_URL")
 
     if not url:
         raise ValueError(
@@ -63,6 +65,25 @@ def get_database_url() -> str:
             f"mssql+aioodbc://{url}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
         )
 
+    # Aspire maps container ports dynamically; override if YTSUMMARIZER_PORT is set
+    port_override = os.environ.get("YTSUMMARIZER_PORT")
+    if port_override and "://" in url:
+        url = _override_port_in_url(url, port_override)
+
+    return url
+
+
+def _override_port_in_url(url: str, new_port: str) -> str:
+    """Replace the port in a SQLAlchemy-style database URL."""
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(url)
+    if parsed.hostname:
+        new_netloc = parsed.netloc.replace(
+            f":{parsed.port}" if parsed.port else parsed.hostname,
+            f":{new_port}" if parsed.port else f"{parsed.hostname}:{new_port}",
+        )
+        return urlunparse(parsed._replace(netloc=new_netloc))
     return url
 
 
@@ -98,6 +119,11 @@ def convert_ado_connection_string(ado_string: str) -> str:
         host, port = server.split(":", 1)
     else:
         host, port = server, "1433"
+
+    # Aspire injects the actual mapped port via YTSUMMARIZER_PORT (dynamic port mapping)
+    port_override = os.environ.get("YTSUMMARIZER_PORT")
+    if port_override:
+        port = port_override
 
     # URL-encode the password in case it contains special characters
     from urllib.parse import quote_plus

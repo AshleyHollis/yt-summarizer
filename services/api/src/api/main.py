@@ -28,6 +28,7 @@ except ImportError:
             class api:
                 cors_origins = [
                     "http://localhost:3000",
+                    "http://localhost:3001",
                     "https://web.yt-summarizer.apps.ashleyhollis.com",
                     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
                 ]
