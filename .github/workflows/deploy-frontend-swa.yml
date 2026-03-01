@@ -156,7 +156,7 @@ jobs:
       - name: Deploy frontend with CI artifact
         id: deploy-swa
         continue-on-error: true
-        uses: ./.github/actions/deploy-frontend-swa
+        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ci-run-id: ${{ inputs.ci-run-id }}
@@ -230,22 +230,21 @@ jobs:
       # Re-deploy after setting app settings so the managed function starts with correct env vars.
       # The first deploy creates the environment but warm-up times out without env vars.
       # This second deploy triggers a new warm-up with the env vars now in place.
-      # Uses retry script directly (artifact already applied by first deploy).
       - name: Re-deploy frontend with CI artifact (with app settings)
         id: deploy-swa-2
         continue-on-error: true
-        shell: bash
-        env:
-          AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          APP_LOCATION: apps/web
-          OUTPUT_LOCATION: ""
-          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
-          VERBOSE: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
-          MAX_ATTEMPTS: "3"
-          TIMEOUT_SECONDS: "1200"
-        run: |
-          chmod +x .github/actions/deploy-frontend-swa/deploy-with-retry.sh
-          .github/actions/deploy-frontend-swa/deploy-with-retry.sh
+        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ci-run-id: ${{ inputs.ci-run-id }}
+          api-url: ${{ inputs.api-url }}
+          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          app-location: apps/web
+          runtime-config-path: apps/web/public/runtime-config.js
+          output_location: ""
+          production-branch: main
+          deployment-environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
+          verbose: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
 
       - name: Resolve deployment URL
         id: resolve-url
