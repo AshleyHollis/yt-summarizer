@@ -26,6 +26,7 @@ except ImportError:
 
     def get_logger(name):
         import logging
+
         return logging.getLogger(name)
 
     def get_queue_client():
@@ -177,18 +178,14 @@ class RecoveryService:
 
         await self.session.commit()
 
-    async def _recover_orphaned_videos(
-        self, result: RecoveryResult, correlation_id: str
-    ) -> None:
+    async def _recover_orphaned_videos(self, result: RecoveryResult, correlation_id: str) -> None:
         """Find videos stuck in 'processing' with no active/queued jobs.
 
         These are videos where all jobs completed or failed but the video
         never advanced to the next pipeline stage.
         """
         # Find videos in "processing" status
-        processing_videos_stmt = select(Video).where(
-            Video.processing_status == "processing"
-        )
+        processing_videos_stmt = select(Video).where(Video.processing_status == "processing")
         videos_result = await self.session.execute(processing_videos_stmt)
         processing_videos = videos_result.scalars().all()
 
@@ -215,9 +212,7 @@ class RecoveryService:
                 # Determine which stages have succeeded
                 succeeded_types = {j.job_type for j in jobs if j.status == "succeeded"}
                 failed_types = {
-                    j.job_type
-                    for j in jobs
-                    if j.status == "failed" or j.stage == "dead_lettered"
+                    j.job_type for j in jobs if j.status == "failed" or j.stage == "dead_lettered"
                 } - succeeded_types
 
                 # If there are failed stages with no success, retry the earliest failed stage
@@ -225,18 +220,14 @@ class RecoveryService:
                     # Find the earliest failed stage in pipeline order
                     for stage in PIPELINE_STAGES:
                         if stage in failed_types:
-                            await self._create_and_queue_job(
-                                video, stage, correlation_id, result
-                            )
+                            await self._create_and_queue_job(video, stage, correlation_id, result)
                             break
                     continue
 
                 # All existing jobs succeeded — check if next stage is needed
                 next_stage = self._get_next_stage(succeeded_types)
                 if next_stage:
-                    await self._create_and_queue_job(
-                        video, next_stage, correlation_id, result
-                    )
+                    await self._create_and_queue_job(video, next_stage, correlation_id, result)
                 else:
                     # All stages complete, update video status
                     video.processing_status = "completed"
@@ -259,23 +250,15 @@ class RecoveryService:
 
         await self.session.commit()
 
-    async def _cleanup_stale_jobs(
-        self, result: RecoveryResult, correlation_id: str
-    ) -> None:
+    async def _cleanup_stale_jobs(self, result: RecoveryResult, correlation_id: str) -> None:
         """Find jobs stuck in 'running' for too long and mark them failed.
 
         This handles cases where a worker crashed without updating the job status.
         The dead-letter recovery will pick these up on the next sweep.
         """
-        stale_threshold = datetime.utcnow() - timedelta(
-            minutes=STALE_JOB_THRESHOLD_MINUTES
-        )
+        stale_threshold = datetime.utcnow() - timedelta(minutes=STALE_JOB_THRESHOLD_MINUTES)
 
-        stmt = (
-            select(Job)
-            .where(Job.stage == "running")
-            .where(Job.started_at < stale_threshold)
-        )
+        stmt = select(Job).where(Job.stage == "running").where(Job.started_at < stale_threshold)
         jobs_result = await self.session.execute(stmt)
         stale_jobs = jobs_result.scalars().all()
 
@@ -317,9 +300,7 @@ class RecoveryService:
     # --- Helper methods ---
 
     async def _get_video(self, video_id: UUID) -> Video | None:
-        result = await self.session.execute(
-            select(Video).where(Video.video_id == video_id)
-        )
+        result = await self.session.execute(select(Video).where(Video.video_id == video_id))
         return result.scalar_one_or_none()
 
     async def _has_succeeded_job(self, video_id: UUID, job_type: str) -> bool:

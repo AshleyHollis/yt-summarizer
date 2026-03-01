@@ -76,9 +76,7 @@ async def recovery_status(
 
     # Count processing videos with no active jobs
     processing_result = await session.execute(
-        select(func.count())
-        .select_from(Video)
-        .where(Video.processing_status == "processing")
+        select(func.count()).select_from(Video).where(Video.processing_status == "processing")
     )
     processing_count = processing_result.scalar() or 0
 
