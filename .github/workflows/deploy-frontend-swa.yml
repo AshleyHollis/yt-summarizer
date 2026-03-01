@@ -171,6 +171,10 @@ jobs:
           if [[ -f "$source_dir/staticwebapp.config.json" ]]; then
             cp "$source_dir/staticwebapp.config.json" "$app_dir/staticwebapp.config.json"
           fi
+          # Remove standalone directory: Azure SWA detects .next/standalone and triggers hybrid
+          # repackaging which always times out at 582s. Without standalone, SWA serves the
+          # standard Next.js output via its own runtime (API routes work as Azure Functions).
+          rm -rf "$app_dir/.next/standalone"
           echo "=== ${app_dir} structure ===" && ls -la "$app_dir/"
           echo "=== ${app_dir}/.next structure ===" && ls -la "$app_dir/.next/" || echo "No .next directory"
 
@@ -179,14 +183,6 @@ jobs:
           bash scripts/workflows/write-runtime-config.sh \
             "apps/web/public/runtime-config.js" \
             "${{ inputs.api-url }}"
-          # Copy to standalone public dirs so runtime-config.js is available to the Node server
-          for pub_dir in \
-            "apps/web/.next/standalone/apps/web/public" \
-            "apps/web/.next/standalone/public"; do
-            if [ -d "$pub_dir" ]; then
-              cp apps/web/public/runtime-config.js "$pub_dir/runtime-config.js"
-            fi
-          done
 
       - name: Deploy to Azure Static Web Apps
         id: deploy-swa
