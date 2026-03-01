@@ -1,0 +1,55 @@
+# =============================================================================
+# Recovery CronJob - Automatic self-healing for stuck/failed video processing
+# Runs every 5 minutes, calls the API recovery endpoint
+# =============================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: recovery-sweep
+  namespace: yt-summarizer
+  labels:
+    app.kubernetes.io/name: recovery-sweep
+    app.kubernetes.io/component: maintenance
+    app.kubernetes.io/part-of: yt-summarizer
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 60
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: recovery-sweep
+        spec:
+          serviceAccountName: yt-summarizer
+          restartPolicy: Never
+          containers:
+            - name: recovery
+              image: curlimages/curl:8.5.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Running recovery sweep..."
+                  RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://api.yt-summarizer.svc.cluster.local/api/v1/admin/recovery/run)
+                  HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+                  BODY=$(echo "$RESPONSE" | head -n -1)
+                  echo "Response ($HTTP_CODE): $BODY"
+                  if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+                    echo "Recovery sweep completed successfully"
+                    exit 0
+                  else
+                    echo "Recovery sweep failed with HTTP $HTTP_CODE"
+                    exit 1
+                  fi
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  cpu: 50m
+                  memory: 32Mi
