@@ -42,6 +42,8 @@ from ..models.video import (
     VideoResponse,
 )
 from ..services.video_service import VideoNotFoundError, VideoService
+from ..dependencies.auth import AuthenticatedUser, require_auth
+from ..dependencies.quota import check_video_quota, get_or_create_user, record_usage
 
 router = APIRouter(prefix="/api/v1/videos", tags=["Videos"])
 
@@ -61,18 +63,41 @@ def get_video_service(session: AsyncSession = Depends(get_session)) -> VideoServ
 async def submit_video(
     request: Request,
     body: SubmitVideoRequest,
+    user: AuthenticatedUser = Depends(require_auth),
     service: VideoService = Depends(get_video_service),
+    session: AsyncSession = Depends(get_session),
 ) -> SubmitVideoResponse:
     """Submit a video for processing.
 
     Accepts a YouTube URL, validates it, fetches metadata,
     and queues the video for transcription, summarization,
     embedding, and relationship extraction.
+    Quota-aware: if daily limit reached, job is quota_queued.
     """
     correlation_id = get_correlation_id(request)
 
+    # Check quota and determine dispatch status
+    db_user = await get_or_create_user(session, user)
+    quota_info = await check_video_quota(session, db_user)
+
+    # Determine quota_status for this single video
+    quota_status = "released" if quota_info["remaining"] > 0 else "quota_queued"
+
     try:
-        result = await service.submit_video(body.url, correlation_id)
+        result = await service.submit_video(
+            body.url,
+            correlation_id,
+            user_id=str(db_user.user_id),
+            quota_status=quota_status,
+        )
+
+        # Record usage if dispatched
+        if quota_status == "released":
+            await record_usage(
+                session, db_user.user_id, "video_submit", str(result.video_id)
+            )
+            await session.commit()
+
         return result
     except ValueError as e:
         raise HTTPException(
@@ -128,6 +153,7 @@ async def get_video(
 )
 async def delete_video(
     video_id: UUID,
+    user: AuthenticatedUser = Depends(require_auth),
     service: VideoService = Depends(get_video_service),
 ) -> None:
     """Delete a video by ID.
@@ -153,6 +179,7 @@ async def reprocess_video(
     request: Request,
     video_id: UUID,
     body: ReprocessVideoRequest | None = None,
+    user: AuthenticatedUser = Depends(require_auth),
     service: VideoService = Depends(get_video_service),
 ) -> SubmitVideoResponse:
     """Reprocess a video.
@@ -257,6 +284,7 @@ async def get_video_summary(
 )
 async def refresh_video_metadata(
     video_id: UUID,
+    user: AuthenticatedUser = Depends(require_auth),
     service: VideoService = Depends(get_video_service),
 ) -> VideoResponse:
     """Refresh video metadata from YouTube.

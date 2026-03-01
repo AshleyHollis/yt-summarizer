@@ -28,7 +28,7 @@ except ImportError:
     def get_settings():
         class MockSettings:
             class api:
-                cors_origins = ["http://localhost:3000"]
+                cors_origins = ["http://localhost:3000", "http://localhost:3001"]
                 cors_origin_regex = r"^https://.*\.azurestaticapps\.net$"
 
             class auth:

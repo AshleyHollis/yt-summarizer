@@ -35,7 +35,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to deploy preview for (optional)'
+        description: "PR number to deploy preview for (optional)"
         required: false
         type: string
       force_deploy:
@@ -49,12 +49,12 @@ on:
         type: boolean
         default: true
       run_terraform:
-        description: 'Run terraform plan'
+        description: "Run terraform plan"
         required: false
         type: boolean
         default: true
       apply_terraform:
-        description: 'Apply terraform changes'
+        description: "Apply terraform changes"
         required: false
         type: boolean
         default: true
@@ -71,10 +71,10 @@ concurrency:
 env:
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-  PREVIEW_NAMESPACE_PREFIX: 'preview-pr-'
-  APPS_BASE_DOMAIN: 'yt-summarizer.apps.ashleyhollis.com'
-  ARGOCD_SYNC_TIMEOUT: '180'
-  KUSTOMIZE_OVERLAY_PREVIEW: 'k8s/overlays/preview'
+  PREVIEW_NAMESPACE_PREFIX: "preview-pr-"
+  APPS_BASE_DOMAIN: "yt-summarizer.apps.ashleyhollis.com"
+  ARGOCD_SYNC_TIMEOUT: "180"
+  KUSTOMIZE_OVERLAY_PREVIEW: "k8s/overlays/preview"
   MAX_PREVIEWS: 3
 
 permissions:
@@ -107,7 +107,7 @@ jobs:
 
       - name: Get PR metadata
         id: set-pr
-        uses: ./.github/actions/get-pr-metadata
+        uses: AshleyHollis/shared-infra/.github/actions/get-pr-metadata@v1
         with:
           event-name: ${{ github.event_name }}
           pr-number-input: ${{ github.event.inputs.pr_number }}
@@ -120,7 +120,7 @@ jobs:
 
       - name: Check if commit has code changes
         id: check
-        uses: ./.github/actions/detect-pr-code-changes
+        uses: AshleyHollis/shared-infra/.github/actions/detect-pr-code-changes@v1
         with:
           base-sha: ${{ steps.set-pr.outputs.base_sha }}
           head-sha: ${{ steps.set-pr.outputs.pr_head_sha }}
@@ -158,21 +158,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Wait for CI workflow to complete
         id: wait
-        uses: ./.github/actions/wait-for-ci
+        uses: AshleyHollis/shared-infra/.github/actions/wait-for-ci@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          timeout-seconds: '1800'
+          timeout-seconds: "1800"
           workflow-event: pull_request
 
       - name: Azure Login and ACR authentication
         if: steps.wait.outputs.image_tag != ''
-        uses: ./.github/actions/azure-acr-login
+        uses: AshleyHollis/shared-infra/.github/actions/azure-acr-login@v1
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -181,13 +181,13 @@ jobs:
 
       - name: Validate image exists in ACR
         if: steps.wait.outputs.image_tag != ''
-        uses: ./.github/actions/validate-docker-image
+        uses: AshleyHollis/shared-infra/.github/actions/validate-docker-image@v1
         with:
           validation-type: acr-exists
           image-tag: ${{ steps.wait.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ===========================================================================
   # PHASE 2C: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
@@ -211,7 +211,7 @@ jobs:
           fetch-depth: 0
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Find most recent image-building commit in PR
         id: find-tag
@@ -221,7 +221,7 @@ jobs:
             "${{ needs.detect-changes.outputs.pr_number }}"
 
       - name: Azure Login and ACR authentication
-        uses: ./.github/actions/azure-acr-login
+        uses: AshleyHollis/shared-infra/.github/actions/azure-acr-login@v1
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -229,13 +229,13 @@ jobs:
           acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate image exists in ACR
-        uses: ./.github/actions/validate-docker-image
+        uses: AshleyHollis/shared-infra/.github/actions/validate-docker-image@v1
         with:
           validation-type: acr-exists
           image-tag: ${{ steps.find-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ===========================================================================
   # PHASE 2D: TERRAFORM (INFRASTRUCTURE CHANGES ONLY)
@@ -250,7 +250,7 @@ jobs:
        (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.infra_changed == 'true'))
     with:
       environment: preview
-      terraform-version: ${{ vars.TERRAFORM_VERSION || '1.5.7' }}
+      terraform-version: ${{ vars.TERRAFORM_VERSION || '1.9' }}
       working-directory: infra/terraform/environments/prod
       run-plan: true
       run-apply: ${{ github.event_name == 'workflow_dispatch' && inputs.apply_terraform == true }}
@@ -283,11 +283,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Check preview concurrency limit
         id: check
-        uses: ./.github/actions/check-preview-concurrency
+        uses: AshleyHollis/shared-infra/.github/actions/check-preview-concurrency@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           max-previews: ${{ env.MAX_PREVIEWS }}
@@ -333,11 +333,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Compute Preview URLs
         id: compute
-        uses: ./.github/actions/compute-preview-urls
+        uses: AshleyHollis/shared-infra/.github/actions/compute-preview-urls@v1
         with:
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
           app-name: ${{ env.APP_NAME }}
@@ -363,10 +363,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Setup Azure and AKS
-        uses: ./.github/actions/setup-azure-aks
+        uses: AshleyHollis/shared-infra/.github/actions/setup-azure-aks@v1
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -375,11 +375,11 @@ jobs:
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Sync ArgoCD manifests
-        uses: ./.github/actions/sync-argocd-manifests
+        uses: AshleyHollis/shared-infra/.github/actions/sync-argocd-manifests@v1
         with:
           mode: all
           namespace: ${{ env.NAMESPACE_ARGOCD }}
-          verbose: 'true'
+          verbose: "true"
 
   # ===========================================================================
   # PHASE 5: UPDATE KUBERNETES OVERLAY (Reusable Workflow)
@@ -396,7 +396,15 @@ jobs:
       needs.get-ingress.result == 'success' &&
       (needs.terraform.result != 'failure') &&
       needs.sync-argocd-manifests.result == 'success'
-    needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform, sync-argocd-manifests]
+    needs:
+      [
+        check-concurrency,
+        wait-for-ci,
+        get-ingress,
+        detect-changes,
+        terraform,
+        sync-argocd-manifests,
+      ]
     with:
       environment: preview
       # PR-specific overlay path - each PR gets its own directory
@@ -437,7 +445,7 @@ jobs:
       api-url: ${{ needs.get-ingress.outputs.preview_url }}
       host: ${{ needs.get-ingress.outputs.preview_host }}
       pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-      max-wait-seconds: '300'
+      max-wait-seconds: "300"
       auto-recovery: true
       run-preview-health-check: true
     secrets:
@@ -462,7 +470,7 @@ jobs:
       environment: preview
       ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
       api-url: ${{ needs.get-ingress.outputs.preview_url }}
-      deployment-environment: pr-${{ needs.detect-changes.outputs.pr_number }}
+      deployment-environment: ${{ needs.detect-changes.outputs.pr_number }}
       pr-number: ${{ needs.detect-changes.outputs.pr_number }}
       pr-head-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
       cleanup-stale-environments: true
@@ -498,10 +506,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Post preview URL to PR
-        uses: ./.github/actions/post-preview-comment
+        uses: AshleyHollis/shared-infra/.github/actions/post-preview-comment@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
@@ -513,7 +521,7 @@ jobs:
           repository: ${{ github.repository }}
 
       - name: Create deployment summary
-        uses: ./.github/actions/create-pipeline-summary
+        uses: AshleyHollis/shared-infra/.github/actions/create-pipeline-summary@v1
         with:
           summary-type: preview
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
@@ -551,16 +559,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+        uses: AshleyHollis/shared-infra/.github/actions/setup-node@v1
         with:
-          node-version: '22'
+          node-version: "22"
           working-directory: apps/web
 
       - name: Wait for API to be ready
-        uses: ./.github/actions/health-check
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
         with:
           url: ${{ needs.get-ingress.outputs.preview_url }}/health/live
           max-attempts: "20"
@@ -581,7 +589,7 @@ jobs:
 
       - name: Run E2E tests
         id: run-tests
-        uses: ./.github/actions/run-playwright-tests
+        uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ steps.base-url.outputs.base_url }}
@@ -598,7 +606,7 @@ jobs:
 
       - name: Comment E2E results on PR
         if: always()
-        uses: ./.github/actions/post-e2e-results
+        uses: AshleyHollis/shared-infra/.github/actions/post-e2e-results@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
@@ -630,7 +638,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Write execution rationale
         env:
@@ -670,7 +678,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check preview pipeline status
-        uses: ./.github/actions/check-preview-status
+        uses: AshleyHollis/shared-infra/.github/actions/check-preview-status@v1
         with:
           needs-image-build: ${{ needs.detect-changes.outputs.needs_image_build }}
           needs-deployment: ${{ needs.detect-changes.outputs.needs_deployment }}

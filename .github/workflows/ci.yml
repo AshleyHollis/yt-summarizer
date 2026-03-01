@@ -50,7 +50,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: ./.github/actions/setup-python-env
+        uses: AshleyHollis/shared-infra/.github/actions/setup-python-env@v1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           install-mode: service
@@ -58,7 +58,7 @@ jobs:
           install-pytest-xdist: "true"
 
       - name: Run ruff checks
-        uses: ./.github/actions/run-ruff-check
+        uses: AshleyHollis/shared-infra/.github/actions/run-ruff-check@v1
 
   frontend-quality:
     name: Frontend Quality
@@ -68,7 +68,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+        uses: AshleyHollis/shared-infra/.github/actions/setup-node@v1
         with:
           node-version: ${{ env.NODE_VERSION }}
           working-directory: apps/web
@@ -78,7 +78,7 @@ jobs:
         run: npm run lint
 
       - name: Scan JavaScript dependencies
-        uses: ./.github/actions/scan-javascript-dependencies
+        uses: AshleyHollis/shared-infra/.github/actions/scan-javascript-dependencies@v1
         with:
           working-directory: apps/web
           check-missing-deps: "true"
@@ -86,7 +86,7 @@ jobs:
           audit-level: "high"
 
       - name: Run Vitest
-        uses: ./.github/actions/run-frontend-tests
+        uses: AshleyHollis/shared-infra/.github/actions/run-frontend-tests@v1
 
       - name: Restore Next.js build cache
         uses: actions/cache@v4
@@ -132,28 +132,28 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python with uv
-        uses: ./.github/actions/setup-python-env
+        uses: AshleyHollis/shared-infra/.github/actions/setup-python-env@v1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           install-mode: service
           service-package: services/api
 
       - name: Scan API security
-        uses: ./.github/actions/scan-python-security
+        uses: AshleyHollis/shared-infra/.github/actions/scan-python-security@v1
         with:
           service-path: services/api
           check-security: "true"
           check-types: "false"
 
       - name: Scan Workers security
-        uses: ./.github/actions/scan-python-security
+        uses: AshleyHollis/shared-infra/.github/actions/scan-python-security@v1
         with:
           service-path: services/workers
           check-security: "true"
           check-types: "false"
 
       - name: Validate API dependencies
-        uses: ./.github/actions/validate-python-dependencies
+        uses: AshleyHollis/shared-infra/.github/actions/validate-python-dependencies@v1
         with:
           service-path: services/api
           check-missing: "true"
@@ -162,7 +162,7 @@ jobs:
           fail-on-warnings: "false"
 
       - name: Validate Workers dependencies
-        uses: ./.github/actions/validate-python-dependencies
+        uses: AshleyHollis/shared-infra/.github/actions/validate-python-dependencies@v1
         with:
           service-path: services/workers
           check-missing: "true"
@@ -208,7 +208,7 @@ jobs:
 
       - name: Run ${{ matrix.service.name }} tests
         id: tests
-        uses: ./.github/actions/run-python-tests
+        uses: AshleyHollis/shared-infra/.github/actions/run-python-tests@v1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           service-package: ${{ matrix.service.package }}
@@ -231,12 +231,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Kustomize
-        uses: ./.github/actions/setup-kustomize
+        uses: AshleyHollis/shared-infra/.github/actions/setup-kustomize@v1
         with:
           kustomize-version: "5.8.0"
 
       - name: Validate Kubernetes manifests
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: yaml-syntax,kustomize-build,argocd-paths
           k8s-directory: k8s
@@ -246,7 +246,7 @@ jobs:
           timeout-seconds: "90"
 
       - name: Validate Argo CD manifest syntax
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: yaml-syntax
           k8s-directory: k8s/argocd
@@ -284,13 +284,13 @@ jobs:
 
       - name: Generate image tag
         id: tag
-        uses: ./.github/actions/generate-image-tag
+        uses: AshleyHollis/shared-infra/.github/actions/generate-image-tag@v1
         with:
           pr-number: ${{ github.event.pull_request.number }}
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Publish image tag artifact
-        uses: ./.github/actions/publish-image-tag
+        uses: AshleyHollis/shared-infra/.github/actions/publish-image-tag@v1
         with:
           image-tag: ${{ steps.tag.outputs.image-tag }}
 
@@ -316,7 +316,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login to Azure Container Registry
-        uses: ./.github/actions/azure-acr-login
+        uses: AshleyHollis/shared-infra/.github/actions/azure-acr-login@v1
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -324,7 +324,7 @@ jobs:
           acr-name: ${{ env.ACR_NAME }}
 
       - name: Build and push ${{ matrix.service }} image
-        uses: ./.github/actions/build-images
+        uses: AshleyHollis/shared-infra/.github/actions/build-images@v1
         with:
           service: ${{ matrix.service }}
           image-tag: ${{ needs.build-images-meta.outputs.image_tag }}
@@ -353,10 +353,10 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.5"
+          terraform_version: "1.9"
 
       - name: Validate Terraform configuration
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: terraform-config
           terraform-directory: infra/terraform/environments/prod
@@ -392,7 +392,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate SWA configuration
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: swa-config
           swa-workflow-files: ".github/workflows/deploy-frontend-swa.yml,.github/workflows/swa-baseline-deploy.yml"
@@ -423,7 +423,7 @@ jobs:
           reporter: github-pr-review
 
       - name: Validate reusable workflows
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: reusable-workflows
           fail-fast: "true"
@@ -436,7 +436,7 @@ jobs:
         run: scripts/workflows/ci-run-precommit-workflows.sh
 
       - name: Validate workflows (env vars & composite actions)
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: workflow-env-consistency,workflow-composite-actions
           verbose: "false"
@@ -482,7 +482,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create CI Summary
-        uses: ./.github/actions/create-pipeline-summary
+        uses: AshleyHollis/shared-infra/.github/actions/create-pipeline-summary@v1
         with:
           summary-type: ci
           changed-areas: ""
@@ -506,7 +506,7 @@ jobs:
           run-id: ${{ github.run_id }}
 
       - name: Check all jobs passed
-        uses: ./.github/actions/validate-ci-results
+        uses: AshleyHollis/shared-infra/.github/actions/validate-ci-results@v1
         with:
           changed-areas: ""
           is-main-branch: "false"

@@ -9,7 +9,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .middleware import CorrelationIdMiddleware
-from .routes import auth, batches, channels, copilot, health, jobs, library, threads, videos
+from .routes import admin, auth, batches, channels, copilot, health, jobs, library, threads, videos
+from .routes import admin_quota, quota
 
 # Import shared modules (path will be configured via PYTHONPATH)
 try:
@@ -27,6 +28,7 @@ except ImportError:
             class api:
                 cors_origins = [
                     "http://localhost:3000",
+                    "http://localhost:3001",
                     "https://web.yt-summarizer.apps.ashleyhollis.com",
                     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
                 ]
@@ -229,6 +231,9 @@ def create_app() -> FastAPI:
     app.include_router(batches.router)
     app.include_router(copilot.router)
     app.include_router(threads.router)
+    app.include_router(admin.router)
+    app.include_router(quota.router)
+    app.include_router(admin_quota.router)
 
     # Add Microsoft Agent Framework AG-UI endpoint for CopilotKit
     # See: https://docs.copilotkit.ai/microsoft-agent-framework

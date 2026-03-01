@@ -49,71 +49,71 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: 'Environment type: prod or preview'
+        description: "Environment type: prod or preview"
         required: true
         type: string
       overlay-path:
-        description: 'Path to kustomize overlay directory'
+        description: "Path to kustomize overlay directory"
         required: true
         type: string
       image-tag:
-        description: 'Docker image tag to deploy'
+        description: "Docker image tag to deploy"
         required: true
         type: string
       commit-sha:
-        description: 'Git commit SHA for traceability'
+        description: "Git commit SHA for traceability"
         required: true
         type: string
       git-branch:
-        description: 'Git branch to commit to (prod: main, preview: PR branch)'
+        description: "Git branch to commit to (prod: main, preview: PR branch)"
         required: false
         type: string
-        default: 'main'
+        default: "main"
       # Preview-specific inputs
       pr-number:
-        description: 'PR number (preview only)'
+        description: "PR number (preview only)"
         required: false
         type: string
-        default: ''
+        default: ""
       pr-branch:
-        description: 'PR branch name (preview only)'
+        description: "PR branch name (preview only)"
         required: false
         type: string
-        default: ''
+        default: ""
       pr-head-sha:
-        description: 'PR head SHA for checkout (preview only)'
+        description: "PR head SHA for checkout (preview only)"
         required: false
         type: string
-        default: ''
+        default: ""
       preview-host:
-        description: 'Preview hostname (preview only)'
+        description: "Preview hostname (preview only)"
         required: false
         type: string
-        default: ''
+        default: ""
       preview-url:
-        description: 'Preview URL (preview only)'
+        description: "Preview URL (preview only)"
         required: false
         type: string
-        default: ''
+        default: ""
       tls-secret:
-        description: 'TLS secret name (preview only)'
+        description: "TLS secret name (preview only)"
         required: false
         type: string
-        default: ''
+        default: ""
       template-path:
-        description: 'Path to kustomization template (prod only)'
+        description: "Path to kustomization template (prod only)"
         required: false
         type: string
-        default: 'scripts/ci/templates/prod-kustomization-template.yaml'
+        default: "scripts/ci/templates/prod-kustomization-template.yaml"
       run-k8s-pull-test:
-        description: 'Test that AKS can pull the image'
+        description: "Test that AKS can pull the image"
         required: false
         type: boolean
         default: true
 
     outputs:
       image_tag:
-        description: 'The image tag that was deployed'
+        description: "The image tag that was deployed"
         value: ${{ jobs.update.outputs.image_tag }}
 
     secrets:
@@ -153,32 +153,32 @@ jobs:
       # Fail-fast if PR has been closed to avoid false failures and wasted resources
       - name: Check if PR is still open
         if: inputs.environment == 'preview' && inputs.pr-number != ''
-        uses: ./.github/actions/check-pr-open
+        uses: AshleyHollis/shared-infra/.github/actions/check-pr-open@v1
         with:
           pr-number: ${{ inputs.pr-number }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: false
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Setup Kustomize with Python
-        uses: ./.github/actions/setup-kustomize
+        uses: AshleyHollis/shared-infra/.github/actions/setup-kustomize@v1
         with:
-          install-python: 'true'
+          install-python: "true"
 
       # Baseline validation only for prod (preview overlays don't exist yet in PR branch)
       - name: Validate current overlay (baseline)
         if: inputs.environment == 'prod'
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: kustomize-build
           overlay-paths: ${{ inputs.overlay-path }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Azure ACR Login
-        uses: ./.github/actions/azure-acr-login
+        uses: AshleyHollis/shared-infra/.github/actions/azure-acr-login@v1
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -186,30 +186,30 @@ jobs:
           acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate image exists in ACR
-        uses: ./.github/actions/validate-docker-image
+        uses: AshleyHollis/shared-infra/.github/actions/validate-docker-image@v1
         with:
           validation-type: acr-exists
           image-tag: ${{ inputs.image-tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
       # Production overlay update
       - name: Update production kustomization
         if: inputs.environment == 'prod'
-        uses: ./.github/actions/manage-kustomization
+        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@v1
         with:
           operation: update-prod
           image-tag: ${{ inputs.image-tag }}
           kustomization-path: ${{ inputs.overlay-path }}
           template-path: ${{ inputs.template-path }}
-          auto-commit: 'true'
+          auto-commit: "true"
           git-branch: ${{ inputs.git-branch }}
 
       # Preview overlay update
       - name: Update preview kustomization
         if: inputs.environment == 'preview'
-        uses: ./.github/actions/manage-kustomization
+        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@v1
         with:
           operation: update-preview
           pr-number: ${{ inputs.pr-number }}
@@ -219,7 +219,7 @@ jobs:
           tls-secret: ${{ inputs.tls-secret }}
           preview-url: ${{ inputs.preview-url }}
           commit-sha: ${{ inputs.commit-sha }}
-          auto-commit: 'true'
+          auto-commit: "true"
           pr-branch: ${{ inputs.pr-branch }}
 
       # Post-update validation
@@ -228,12 +228,12 @@ jobs:
       # For prod, we also validate here as a double-check after the update
       - name: Validate updated overlay
         if: inputs.environment == 'prod'
-        uses: ./.github/actions/validate
+        uses: AshleyHollis/shared-infra/.github/actions/validate@v1
         with:
           validators: kustomize-build
           overlay-paths: ${{ inputs.overlay-path }}
-          fail-fast: 'true'
-          timeout-seconds: '30'
+          fail-fast: "true"
+          timeout-seconds: "30"
 
       - name: Setup AKS context for pull test
         if: inputs.run-k8s-pull-test
@@ -244,16 +244,16 @@ jobs:
 
       - name: Verify cluster can pull image
         if: inputs.run-k8s-pull-test
-        uses: ./.github/actions/validate-docker-image
+        uses: AshleyHollis/shared-infra/.github/actions/validate-docker-image@v1
         with:
           validation-type: acr-exists
           image-tag: ${{ inputs.image-tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          run-k8s-pull-test: 'true'
+          run-k8s-pull-test: "true"
 
       - name: Validate image tag format
-        uses: ./.github/actions/validate-docker-image
+        uses: AshleyHollis/shared-infra/.github/actions/validate-docker-image@v1
         with:
           validation-type: tag-format
           image-tag: ${{ inputs.image-tag }}

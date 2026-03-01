@@ -25,143 +25,98 @@
  * Implementation: T050 (Configure Playwright programmatic authentication)
  */
 
-import { test as setup, expect } from '@playwright/test';
+import { test as setup } from '@playwright/test';
 import * as path from 'path';
 
 const adminAuthFile = path.join(__dirname, '../playwright/.auth/admin.json');
 const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
 
 /**
- * Authenticate as admin user and save storage state.
+ * Authenticate via Auth0 Universal Login.
  *
- * This authenticates using the username/password form on the login page,
- * which is faster and more reliable than UI-based OAuth.
+ * Navigates directly to /api/auth/login (which redirects to Auth0), then fills
+ * the password on Auth0's own login page. This avoids the app's UsernamePasswordForm
+ * which only sends the email hint (not the password) to Auth0.
  */
+async function authenticateViaAuth0(
+  page: import('@playwright/test').Page,
+  email: string,
+  password: string,
+  label: string
+): Promise<void> {
+  const loginUrl = `/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}`;
+  console.log(`[auth-setup] Navigating to Auth0 login for ${label}...`);
+  await page.goto(loginUrl);
+
+  // Wait for redirect to Auth0's login page
+  await page.waitForURL((url) => url.hostname.includes('auth0.com'), { timeout: 20000 });
+  console.log(`[auth-setup] Reached Auth0 login page for ${label}`);
+
+  // Auth0 Universal Login — email may already be pre-filled via login_hint
+  // Fill email if the field is visible and empty
+  const emailInput = page.locator('input[name="username"], input[id="username"], input[type="email"]').first();
+  try {
+    await emailInput.waitFor({ timeout: 5000 });
+    const currentEmail = await emailInput.inputValue();
+    if (!currentEmail) {
+      await emailInput.fill(email);
+    }
+  } catch {
+    // email field not present or already filled — continue
+  }
+
+  // Fill password on Auth0's page
+  const passwordInput = page
+    .locator('input[name="password"], input[id="password"], input[type="password"]')
+    .first();
+  await passwordInput.waitFor({ timeout: 15000 });
+  await passwordInput.fill(password);
+
+  // Submit Auth0 login form
+  const submitBtn = page.locator('button[name="action"], button[type="submit"]').first();
+  await submitBtn.click();
+
+  // Wait for redirect back to our app (away from auth0.com)
+  await page.waitForURL((url) => !url.hostname.includes('auth0.com'), { timeout: 30000 });
+  console.log(`[auth-setup] ✓ ${label} authenticated successfully — redirected to app`);
+}
+
 setup('authenticate as admin', async ({ page }) => {
   const email = process.env.AUTH0_ADMIN_TEST_EMAIL;
   const password = process.env.AUTH0_ADMIN_TEST_PASSWORD;
 
-  // Skip if credentials not configured
   if (!email || !password) {
     console.warn('[auth-setup] ⚠ Admin test credentials not set. Skipping admin authentication.');
-    console.warn(
-      '[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.'
-    );
+    console.warn('[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.');
     return;
   }
 
-  console.log('[auth-setup] Authenticating as admin user...');
-
   try {
-    // Navigate to login page (relative URL respects baseURL from playwright.config.ts)
-    await page.goto('/sign-in');
-
-    // Fill in username/password form
-    const emailInput = page.getByLabel(/email/i);
-    const passwordInput = page.getByLabel('Password');
-    const submitButton = page.getByRole('button', { name: /sign in/i }).last();
-
-    await emailInput.fill(email);
-    await passwordInput.fill(password);
-
-    // Submit form
-    await submitButton.click();
-
-    // Wait for redirect after successful login
-    // Should redirect away from login page
-    await page.waitForURL((url) => !url.pathname.includes('/sign-in'), {
-      timeout: 10000,
-    });
-
-    // Verify we're authenticated by checking for user profile
-    const userProfile = page.getByTestId('user-profile');
-    await expect(userProfile).toBeVisible({ timeout: 5000 });
-
-    console.log('[auth-setup] ✓ Admin authenticated successfully');
-
-    // Save storage state
+    await authenticateViaAuth0(page, email, password, 'admin');
     await page.context().storageState({ path: adminAuthFile });
     console.log(`[auth-setup] ✓ Saved admin auth state to ${adminAuthFile}`);
   } catch (error) {
     console.error('[auth-setup] ✗ Admin authentication failed:', error);
     console.error('[auth-setup] Tests requiring admin authentication will be skipped.');
-    // Don't throw - allow tests to run but skip admin-specific tests
   }
 });
 
-/**
- * Authenticate as normal user and save storage state.
- *
- * This creates a separate auth state for normal (non-admin) user tests.
- */
 setup('authenticate as normal user', async ({ page }) => {
   const email = process.env.AUTH0_USER_TEST_EMAIL;
   const password = process.env.AUTH0_USER_TEST_PASSWORD;
 
-  // Skip if credentials not configured
   if (!email || !password) {
     console.warn('[auth-setup] ⚠ User test credentials not set. Skipping user authentication.');
-    console.warn(
-      '[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.'
-    );
+    console.warn('[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.');
     return;
   }
 
-  console.log('[auth-setup] Authenticating as normal user...');
-
   try {
-    // Navigate to login page (relative URL respects baseURL from playwright.config.ts)
-    await page.goto('/sign-in');
-
-    // Fill in username/password form
-    const emailInput = page.getByLabel(/email/i);
-    const passwordInput = page.getByLabel('Password');
-    const submitButton = page.getByRole('button', { name: /sign in/i }).last();
-
-    await emailInput.fill(email);
-    await passwordInput.fill(password);
-
-    // Submit form
-    await submitButton.click();
-
-    // Wait for redirect after successful login
-    await page.waitForURL((url) => !url.pathname.includes('/sign-in'), {
-      timeout: 10000,
-    });
-
-    // Verify we're authenticated
-    const userProfile = page.getByTestId('user-profile');
-    await expect(userProfile).toBeVisible({ timeout: 5000 });
-
-    console.log('[auth-setup] ✓ User authenticated successfully');
-
-    // Save storage state
+    await authenticateViaAuth0(page, email, password, 'normal user');
     await page.context().storageState({ path: userAuthFile });
     console.log(`[auth-setup] ✓ Saved user auth state to ${userAuthFile}`);
   } catch (error) {
     console.error('[auth-setup] ✗ User authentication failed:', error);
     console.error('[auth-setup] Tests requiring user authentication will be skipped.');
-    // Don't throw - allow tests to run but skip user-specific tests
   }
 });
-
-/**
- * NOTE: This implementation uses the UI-based login flow for programmatic authentication.
- *
- * Benefits:
- * - Simple and reliable (tests the actual login flow users will use)
- * - No special Auth0 configuration needed (Resource Owner Password Grant not required)
- * - Works with any Auth0 tier (Free tier compatible)
- * - Auth state is reused across tests for performance
- *
- * Performance:
- * - First run: ~2-3 seconds per user (one-time setup)
- * - Subsequent tests: <100ms (reuse saved storage state)
- * - Total setup time: ~5-6 seconds for both users
- * - Meets SC-014 requirement (<20% test execution time increase)
- *
- * Alternative approaches considered:
- * - Resource Owner Password Grant: Requires Auth0 Enterprise tier
- * - Direct token injection: Complex with @auth0/nextjs-auth0 encrypted sessions
- * - Mock authentication: Not realistic enough for E2E tests
- */

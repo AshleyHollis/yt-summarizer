@@ -43,46 +43,46 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: 'Environment type: prod or preview'
+        description: "Environment type: prod or preview"
         required: true
         type: string
       namespace:
-        description: 'Kubernetes namespace for the deployment'
+        description: "Kubernetes namespace for the deployment"
         required: true
         type: string
       argocd-app-name:
-        description: 'Argo CD application name'
+        description: "Argo CD application name"
         required: true
         type: string
       expected-image-tag:
-        description: 'Expected image tag to verify'
+        description: "Expected image tag to verify"
         required: true
         type: string
       api-url:
-        description: 'API URL for health checks'
+        description: "API URL for health checks"
         required: true
         type: string
       host:
-        description: 'Hostname for TLS certificate verification'
+        description: "Hostname for TLS certificate verification"
         required: true
         type: string
       pr-number:
-        description: 'PR number (required for preview, ignored for prod)'
+        description: "PR number (required for preview, ignored for prod)"
         required: false
         type: string
-        default: '0'
+        default: "0"
       max-wait-seconds:
-        description: 'Max seconds to wait for ArgoCD sync'
+        description: "Max seconds to wait for ArgoCD sync"
         required: false
         type: string
-        default: '300'
+        default: "300"
       auto-recovery:
-        description: 'Enable auto-recovery for stuck deployments (preview only)'
+        description: "Enable auto-recovery for stuck deployments (preview only)"
         required: false
         type: boolean
         default: false
       run-preview-health-check:
-        description: 'Run preview-specific health checks with DNS/Gateway verification'
+        description: "Run preview-specific health checks with DNS/Gateway verification"
         required: false
         type: boolean
         default: false
@@ -106,17 +106,17 @@ jobs:
       # Fail-fast if PR has been closed to avoid false failures and wasted resources
       - name: Check if PR is still open
         if: inputs.environment == 'preview' && inputs.pr-number != '0'
-        uses: ./.github/actions/check-pr-open
+        uses: AshleyHollis/shared-infra/.github/actions/check-pr-open@v1
         with:
           pr-number: ${{ inputs.pr-number }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: false
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Setup Azure and AKS
-        uses: ./.github/actions/setup-azure-aks
+        uses: AshleyHollis/shared-infra/.github/actions/setup-azure-aks@v1
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -125,78 +125,78 @@ jobs:
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Setup Kustomize
-        uses: ./.github/actions/setup-kustomize
+        uses: AshleyHollis/shared-infra/.github/actions/setup-kustomize@v1
         with:
           kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
 
       - name: Wait for Argo CD sync
-        uses: ./.github/actions/argocd-wait
+        uses: AshleyHollis/shared-infra/.github/actions/argocd-wait@v3
         with:
           app-name: ${{ inputs.argocd-app-name }}
           namespace: ${{ inputs.namespace }}
           argocd-namespace: ${{ env.NAMESPACE_ARGOCD }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          cleanup-stuck-operations: 'true'
+          cleanup-stuck-operations: "true"
           auto-recovery: ${{ inputs.auto-recovery && 'true' || 'false' }}
           max-wait-seconds: ${{ inputs.max-wait-seconds }}
           poll-interval-seconds: ${{ inputs.environment == 'prod' && '5' || '10' }}
           pr-number: ${{ inputs.pr-number }}
-          max-recovery-attempts: '3'
+          max-recovery-attempts: "3"
           expected-image-tag: ${{ inputs.expected-image-tag }}
 
       - name: Verify deployments are using correct image tag
-        uses: ./.github/actions/verify-k8s-deployment
+        uses: AshleyHollis/shared-infra/.github/actions/verify-k8s-deployment@v1
         with:
           namespace: ${{ inputs.namespace }}
           deployments: api,transcribe-worker,summarize-worker
           expected-tag: ${{ inputs.expected-image-tag }}
           registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
           image-name: yt-summarizer
-          wait-for-ready: 'true'
-          timeout-seconds: '300'
-          fail-on-mismatch: 'true'
+          wait-for-ready: "true"
+          timeout-seconds: "300"
+          fail-on-mismatch: "true"
 
       - name: Collect and upload diagnostics on failure
         if: failure()
-        uses: ./.github/actions/collect-deployment-diagnostics
+        uses: AshleyHollis/shared-infra/.github/actions/collect-deployment-diagnostics@v1
         with:
           app-name: ${{ inputs.argocd-app-name }}
           artifact-name: deployment-diagnostics-${{ inputs.environment }}-${{ inputs.pr-number != '0' && format('pr-{0}', inputs.pr-number) || 'prod' }}
 
       - name: Verify TLS certificate
-        uses: ./.github/actions/verify-certificate
+        uses: AshleyHollis/shared-infra/.github/actions/verify-certificate@v1
         with:
           host: ${{ inputs.host }}
 
       # Preview-specific health checks with DNS/Gateway verification
       - name: Run preview health checks
         if: inputs.run-preview-health-check
-        uses: ./.github/actions/health-check-preview
+        uses: AshleyHollis/shared-infra/.github/actions/health-check-preview@v1
         with:
           namespace: ${{ inputs.namespace }}
           external-url: ${{ inputs.api-url }}
-          max-attempts: '10'
-          interval-seconds: '10'
+          max-attempts: "10"
+          interval-seconds: "10"
 
       # Standard health checks for production
       - name: Run API health check (liveness)
         if: ${{ !inputs.run-preview-health-check }}
-        uses: ./.github/actions/health-check
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
         with:
           url: ${{ inputs.api-url }}${{ env.HEALTH_CHECK_PATH }}
-          max-attempts: '20'
-          interval-seconds: '10'
-          timeout-seconds: '5'
-          expected-status: '200'
-          service-name: '${{ inputs.environment == ''prod'' && ''Production'' || ''Preview'' }} API (External)'
+          max-attempts: "20"
+          interval-seconds: "10"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "${{ inputs.environment == 'prod' && 'Production' || 'Preview' }} API (External)"
 
       - name: Run API health check (readiness)
         if: ${{ !inputs.run-preview-health-check }}
-        uses: ./.github/actions/health-check
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
         with:
           url: ${{ inputs.api-url }}/health
           max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}
           interval-seconds: ${{ env.HEALTH_CHECK_INTERVAL }}
           timeout-seconds: ${{ env.HEALTH_CHECK_TIMEOUT }}
-          expected-status: '200'
-          service-name: '${{ inputs.environment == ''prod'' && ''Production'' || ''Preview'' }} API'
+          expected-status: "200"
+          service-name: "${{ inputs.environment == 'prod' && 'Production' || 'Preview' }} API"

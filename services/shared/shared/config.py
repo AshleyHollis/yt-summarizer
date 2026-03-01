@@ -395,6 +395,7 @@ class APISettings(BaseSettings):
     cors_origins: list[str] = Field(
         default=[
             "http://localhost:3000",
+            "http://localhost:3001",
             "https://web.yt-summarizer.apps.ashleyhollis.com",
             "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
         ],

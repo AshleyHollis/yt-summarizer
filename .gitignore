@@ -165,6 +165,8 @@ lerna-debug.log*
 *.tmp
 *.temp
 test-req.json
+ci-logs*.txt
+ci-failure*.txt
 
 # -----------------------------------------------------------------------------
 # .NET Aspire Local Settings

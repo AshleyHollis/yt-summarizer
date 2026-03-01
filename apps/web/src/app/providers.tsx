@@ -9,6 +9,7 @@ import { ToolResultProvider } from "@/contexts/ToolResultContext";
 import { HealthStatusProvider, useHealthStatus } from "@/contexts/HealthStatusContext";
 import { WarmingUpIndicator, CopilotErrorBoundary } from "@/components/common";
 import { getClientApiUrl } from "@/services/runtimeConfig";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 // Types for scope management
 export interface DateRange {
@@ -323,16 +324,15 @@ function ProvidersInner({ children }: ProvidersProps) {
         enableInspector={false}
         threadId={urlThreadId ?? undefined}
       >
-        {/* DIAGNOSTIC: AuthProvider temporarily removed to test SWA warmup timeout */}
-        {/* <AuthProvider> */}
-        <ToolResultProvider>
-          <VideoContextProvider>
-            <ScopeProvider>
-              <AISettingsProvider>{children}</AISettingsProvider>
-            </ScopeProvider>
-          </VideoContextProvider>
-        </ToolResultProvider>
-        {/* </AuthProvider> */}
+        <AuthProvider>
+          <ToolResultProvider>
+            <VideoContextProvider>
+              <ScopeProvider>
+                <AISettingsProvider>{children}</AISettingsProvider>
+              </ScopeProvider>
+            </VideoContextProvider>
+          </ToolResultProvider>
+        </AuthProvider>
       </CopilotKit>
     </CopilotErrorBoundary>
   );

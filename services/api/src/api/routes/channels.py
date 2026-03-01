@@ -16,6 +16,7 @@ from ..models.channel import (
     FetchChannelRequest,
 )
 from ..services.channel_service import ChannelService
+from ..dependencies.auth import AuthenticatedUser, require_auth
 
 router = APIRouter(prefix="/api/v1/channels", tags=["Channels"])
 
@@ -37,6 +38,7 @@ def get_channel_service(
 async def fetch_channel_videos(
     request: Request,
     body: FetchChannelRequest,
+    user: AuthenticatedUser = Depends(require_auth),
     service: ChannelService = Depends(get_channel_service),
 ) -> ChannelVideosResponse:
     """Fetch videos from a YouTube channel.

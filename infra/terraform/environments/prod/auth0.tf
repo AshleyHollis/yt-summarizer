@@ -115,36 +115,28 @@ resource "azurerm_key_vault_secret" "auth0_domain" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-domain"
   value        = module.auth0[0].auth0_domain
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_client_id" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-client-id"
   value        = module.auth0[0].application_client_id
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_client_secret" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-client-secret"
   value        = module.auth0[0].application_client_secret
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_session_secret" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-session-secret"
   value        = random_password.auth0_session_secret.result
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 # -----------------------------------------------------------------------------
@@ -157,36 +149,28 @@ resource "azurerm_key_vault_secret" "auth0_preview_domain" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-preview-domain"
   value        = module.auth0_preview[0].auth0_domain
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_preview_client_id" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-preview-client-id"
   value        = module.auth0_preview[0].application_client_id
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_preview_client_secret" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-preview-client-secret"
   value        = module.auth0_preview[0].application_client_secret
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_preview_session_secret" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-preview-session-secret"
   value        = random_password.auth0_preview_session_secret.result
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 # -----------------------------------------------------------------------------
@@ -199,34 +183,26 @@ resource "azurerm_key_vault_secret" "auth0_admin_test_email" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-admin-test-email"
   value        = "admin@test.yt-summarizer.internal"
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_admin_test_password" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-admin-test-password"
   value        = random_password.admin_test_password.result
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_user_test_email" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-user-test-email"
   value        = "user@test.yt-summarizer.internal"
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }
 
 resource "azurerm_key_vault_secret" "auth0_user_test_password" {
   count        = var.enable_auth0 ? 1 : 0
   name         = "auth0-user-test-password"
   value        = random_password.normal_test_password.result
-  key_vault_id = module.key_vault.id
-
-  depends_on = [module.key_vault]
+  key_vault_id = module.shared.key_vault_id
 }

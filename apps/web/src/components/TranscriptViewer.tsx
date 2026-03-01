@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 /**
  * Props for TranscriptViewer
@@ -39,7 +40,9 @@ export function TranscriptViewer({
       setError(null);
 
       try {
-        const response = await fetch(transcriptUrl);
+        const baseUrl = getClientApiUrl();
+        const fullUrl = transcriptUrl.startsWith('http') ? transcriptUrl : `${baseUrl}${transcriptUrl}`;
+        const response = await fetch(fullUrl);
         if (!response.ok) {
           throw new Error('Failed to fetch transcript');
         }

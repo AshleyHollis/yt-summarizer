@@ -11,6 +11,7 @@
 'use client';
 
 import React, { useState, FormEvent } from 'react';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 /**
  * UsernamePasswordForm Component
@@ -64,8 +65,9 @@ export function UsernamePasswordForm() {
     setError('');
 
     try {
-      // Redirect to Auth0 login endpoint with Username-Password-Authentication connection
-      window.location.href = `/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}`;
+      const apiUrl = getClientApiUrl();
+      const returnTo = encodeURIComponent(window.location.origin);
+      window.location.href = `${apiUrl}/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}&returnTo=${returnTo}`;
     } catch (err) {
       setError('Login failed. Please check your credentials.');
       setLoading(false);

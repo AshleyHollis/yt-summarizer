@@ -1,31 +1,22 @@
 # =============================================================================
-# ArgoCD Installation
+# ArgoCD Installation (MIGRATING TO shared-infra)
 # =============================================================================
-# Installs ArgoCD via Helm so it is always present after `terraform apply`.
-# This prevents the cluster-stopped / ArgoCD-missing scenario.
-#
-# Disaster recovery:
-#   terraform apply -target=module.argocd
-#
-# To upgrade ArgoCD, bump chart_version below and apply.
+# ArgoCD is moving to shared-infra as a platform component.
+# These removed blocks ensure resources stay in Azure but are no longer
+# managed by yt-summarizer's Terraform state.
 
-# Import pre-existing resources created by bootstrap-argocd.ps1 (Helm install).
-# These blocks are one-time imports; once resources are in state they are no-ops.
-import {
-  to = module.argocd.kubernetes_namespace.argocd
-  id = "argocd"
+removed {
+  from = module.argocd.kubernetes_namespace.argocd
+
+  lifecycle {
+    destroy = false
+  }
 }
 
-import {
-  to = module.argocd.helm_release.argocd
-  id = "argocd/argocd"
-}
+removed {
+  from = module.argocd.helm_release.argocd
 
-module "argocd" {
-  source = "../../modules/argocd"
-
-  namespace     = "argocd"
-  chart_version = "7.3.11"
-
-  depends_on = [module.aks]
+  lifecycle {
+    destroy = false
+  }
 }

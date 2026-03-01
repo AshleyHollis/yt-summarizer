@@ -37,6 +37,9 @@ import { useThreadPersistence } from "@/hooks/useThreadPersistence";
 import { prepareMessagesForDisplay, copilotToThreadMessages } from "@/services/threadPersistence";
 import { CustomHeader } from "./subcomponents/CustomHeader";
 import { useScope, useAISettings } from "@/app/providers";
+import { useAuth } from "@/hooks/useAuth";
+import { CopilotQuotaIndicator } from "./CopilotQuotaIndicator";
+import { getClientApiUrl } from "@/services/runtimeConfig";
 import styles from "./ThreadedCopilotSidebar.module.css";
 
 // ============================================================================
@@ -98,6 +101,7 @@ interface ThreadedCopilotSidebarProps {
 export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotSidebarProps) {
   useCopilotActions();
 
+  const { isAuthenticated } = useAuth();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
@@ -215,6 +219,9 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     if (urlThreadId && threads.some((t) => t.id === urlThreadId)) {
       syncThreadIdFromUrl(urlThreadId);
     } else if (urlThreadId && !threads.some((t) => t.id === urlThreadId) && threads.length > 0) {
+      // Don't remove the thread param if it matches CopilotKit's internal thread ID —
+      // this is a new chat that hasn't been persisted yet, not a missing thread.
+      if (urlThreadId === copilotThreadId) return;
       if (isDeletingThreadRef.current) {
         isDeletingThreadRef.current = false;
         return;
@@ -233,6 +240,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     threadsLoading,
     urlThreadId,
     threads,
+    copilotThreadId,
     syncThreadIdFromUrl,
     pathname,
     router,
@@ -265,22 +273,15 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
     searchParams,
   ]);
 
-  // Sync CopilotKit's internal thread ID to the URL as early as possible.
+  // Sync CopilotKit's internal thread ID to the URL when the sidebar is open.
   //
-  // CopilotKit generates its own UUID for each new chat session (when no threadId prop is
-  // supplied, or when the component first mounts before the URL thread has been applied).
-  // The agent backend saves runs under this CopilotKit-internal UUID, but useThreadPersistence
-  // independently creates a *different* thread via POST /api/v1/threads/messages, causing a
-  // mismatch: the browser URL shows the server-generated ID while responses land on
-  // CopilotKit's UUID.
-  //
-  // This effect detects when CopilotKit's thread ID differs from the URL and immediately
-  // updates the URL to match. Once the URL is updated, the Sync thread ID from URL effect
-  // above calls syncThreadIdFromUrl() which aligns useThreadPersistence.activeThreadId with
-  // CopilotKit's UUID. Subsequent saveIfNeeded() calls will then save messages under the
-  // correct ID, eliminating the mismatch.
+  // CopilotKit generates its own UUID for each new chat session. We only write
+  // this to the URL when the sidebar is open to avoid an infinite loop: without
+  // the isOpen guard, this effect adds ?thread=<copilotId> → the "Sync thread
+  // ID from URL" effect sees the ID isn't in the persisted threads list and
+  // removes it → this effect re-adds it → infinite replaceState loop.
   useEffect(() => {
-    if (!mounted || !copilotThreadId) return;
+    if (!mounted || !copilotThreadId || !isOpen) return;
     if (copilotThreadId === urlThreadId) return; // already in sync
 
     // Only sync when there is no URL thread (new chat) or when the URL thread is already the
@@ -290,7 +291,7 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
       params.set("thread", copilotThreadId);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     }
-  }, [mounted, copilotThreadId, urlThreadId, pathname, router, searchParams]);
+  }, [mounted, copilotThreadId, urlThreadId, isOpen, pathname, router, searchParams]);
 
   // Resize drag handlers
   useEffect(() => {
@@ -498,17 +499,43 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
 
         {/* Chat panel */}
         <div className={styles.container}>
-          {/* CopilotKit Sidebar with custom Header */}
-          <CKSidebar
-            defaultOpen={true}
-            clickOutsideToClose={false}
-            Header={HeaderComponent}
-            labels={{
-              title: 'AI Assistant',
-              placeholder: 'Ask about your videos...',
-              initial: 'How can I help you with your video library?',
-            }}
-          />
+          {isAuthenticated ? (
+            <>
+              <CKSidebar
+                defaultOpen={true}
+                clickOutsideToClose={false}
+                Header={HeaderComponent}
+                labels={{
+                  title: 'AI Assistant',
+                  placeholder: 'Ask about your videos...',
+                  initial: 'How can I help you with your video library?',
+                }}
+              />
+              <CopilotQuotaIndicator />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-4">
+              <MessageCircle className="w-10 h-10 text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Sign in to chat
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                Sign in to ask questions about your video library using the AI assistant.
+              </p>
+              <a
+                href={`${typeof window !== 'undefined' ? '' : ''}/api/auth/login`}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const apiUrl = getClientApiUrl();
+                  const returnTo = encodeURIComponent(window.location.href);
+                  window.location.href = `${apiUrl}/api/auth/login?returnTo=${returnTo}`;
+                }}
+              >
+                Sign In
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -35,62 +35,62 @@ description: Pre-deployment validation for Kubernetes manifests
 
 inputs:
   overlay-path:
-    description: 'Kustomize overlay path to validate (e.g., k8s/overlays/preview)'
+    description: "Kustomize overlay path to validate (e.g., k8s/overlays/preview)"
     required: true
 
   target-namespace:
-    description: 'Target namespace for deployment (e.g., preview-pr-110)'
+    description: "Target namespace for deployment (e.g., preview-pr-110)"
     required: true
 
   acr-login-server:
-    description: 'Azure Container Registry login server (e.g., acrytsummprd.azurecr.io)'
+    description: "Azure Container Registry login server (e.g., acrytsummprd.azurecr.io)"
     required: false
-    default: 'acrytsummprd.azurecr.io'
+    default: "acrytsummprd.azurecr.io"
 
   query-aks:
-    description: 'Query AKS cluster for actual resource quotas (requires Azure login)'
+    description: "Query AKS cluster for actual resource quotas (requires Azure login)"
     required: false
-    default: 'false'
+    default: "false"
 
   aks-resource-group:
-    description: 'AKS resource group (required if query-aks=true)'
+    description: "AKS resource group (required if query-aks=true)"
     required: false
 
   aks-cluster-name:
-    description: 'AKS cluster name (required if query-aks=true)'
+    description: "AKS cluster name (required if query-aks=true)"
     required: false
 
   max-cpu-millicores:
-    description: 'Maximum CPU in millicores (default: 1500 for preview, ignored if query-aks=true)'
+    description: "Maximum CPU in millicores (default: 1500 for preview, ignored if query-aks=true)"
     required: false
-    default: '1500'
+    default: "1500"
 
   max-memory-mi:
-    description: 'Maximum memory in Mi (default: 2560 for preview, ignored if query-aks=true)'
+    description: "Maximum memory in Mi (default: 2560 for preview, ignored if query-aks=true)"
     required: false
-    default: '2560'
+    default: "2560"
 
   skip-image-validation:
-    description: 'Skip validation that images exist in ACR (useful for local testing)'
+    description: "Skip validation that images exist in ACR (useful for local testing)"
     required: false
-    default: 'false'
+    default: "false"
 
   skip-secret-validation:
-    description: 'Skip validation of secrets/ServiceAccounts (useful for new environments)'
+    description: "Skip validation of secrets/ServiceAccounts (useful for new environments)"
     required: false
-    default: 'false'
+    default: "false"
 
 outputs:
   validation-passed:
-    description: 'Boolean indicating if validation passed'
+    description: "Boolean indicating if validation passed"
     value: ${{ steps.validate.outputs.validation-passed }}
 
   errors:
-    description: 'Number of validation errors found'
+    description: "Number of validation errors found"
     value: ${{ steps.validate.outputs.errors }}
 
   warnings:
-    description: 'Number of validation warnings found'
+    description: "Number of validation warnings found"
     value: ${{ steps.validate.outputs.warnings }}
 
 runs:

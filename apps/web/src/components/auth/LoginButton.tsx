@@ -11,6 +11,7 @@
 'use client';
 
 import React from 'react';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 /**
  * Social login provider type
@@ -43,8 +44,9 @@ export function LoginButton() {
    * @param provider - OAuth provider to use
    */
   const handleLogin = (provider: Provider) => {
-    // Redirect to Auth0 login endpoint with connection parameter
-    window.location.href = `/api/auth/login?connection=${provider}`;
+    const apiUrl = getClientApiUrl();
+    const returnTo = encodeURIComponent(window.location.origin);
+    window.location.href = `${apiUrl}/api/auth/login?connection=${provider}&returnTo=${returnTo}`;
   };
 
   return (

@@ -2,37 +2,37 @@
 # Configures Python, uv package manager, and dependency caching
 # Consolidates setup-python and setup-python-uv functionality
 
-name: 'Setup Python Environment'
-description: 'Setup Python with uv, caching, and optional package installation'
+name: "Setup Python Environment"
+description: "Setup Python with uv, caching, and optional package installation"
 
 inputs:
   python-version:
-    description: 'Python version to use'
+    description: "Python version to use"
     required: false
-    default: '3.11'
+    default: "3.11"
 
   install-mode:
-    description: 'Installation mode: none|shared|service|both'
+    description: "Installation mode: none|shared|service|both"
     required: false
-    default: 'none'
+    default: "none"
 
   service-package:
-    description: 'Service package path to install (e.g., services/api)'
+    description: "Service package path to install (e.g., services/api)"
     required: false
-    default: ''
+    default: ""
 
   working-directory:
-    description: 'Working directory for installation (for legacy mode)'
+    description: "Working directory for installation (for legacy mode)"
     required: false
-    default: '.'
+    default: "."
 
   install-pytest-xdist:
-    description: 'Install pytest-xdist for parallel testing'
+    description: "Install pytest-xdist for parallel testing"
     required: false
-    default: 'false'
+    default: "false"
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Set up Python ${{ inputs.python-version }}
       uses: actions/setup-python@v5

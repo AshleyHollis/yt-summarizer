@@ -8,15 +8,15 @@ inputs:
   pytest-args:
     description: Additional pytest arguments (excluding -m marker expression)
     required: false
-    default: '-v --tb=short'
+    default: "-v --tb=short"
   markers:
     description: Marker expression for -m option (e.g., "not integration and not live")
     required: false
-    default: ''
+    default: ""
   parallel:
     description: Run tests in parallel with pytest-xdist
     required: false
-    default: 'false'
+    default: "false"
 
 runs:
   using: composite
