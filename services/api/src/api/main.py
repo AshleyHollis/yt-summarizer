@@ -9,8 +9,20 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .middleware import CorrelationIdMiddleware
-from .routes import admin, auth, batches, channels, copilot, health, jobs, library, threads, videos
-from .routes import admin_quota, quota
+from .routes import (
+    admin,
+    admin_quota,
+    auth,
+    batches,
+    channels,
+    copilot,
+    health,
+    jobs,
+    library,
+    quota,
+    threads,
+    videos,
+)
 
 # Import shared modules (path will be configured via PYTHONPATH)
 try:
