@@ -15,16 +15,16 @@ import {
 
 locals {
   app_secrets = {
-    "sql-connection-string"              = module.sql.connection_string
-    "storage-connection"                 = module.storage.primary_connection_string
-    "openai-api-key"                     = var.openai_api_key
-    "azure-openai-api-key"               = var.azure_openai_api_key
-    "azure-openai-endpoint"              = var.azure_openai_endpoint
-    "azure-openai-deployment"            = var.azure_openai_deployment
-    "azure-openai-embedding-deployment"  = var.azure_openai_embedding_deployment
-    "cloudflare-api-token"               = var.cloudflare_api_token
-    "webshare-proxy-username"            = var.webshare_proxy_username
-    "webshare-proxy-password"            = var.webshare_proxy_password
+    "sql-connection-string"             = module.sql.connection_string
+    "storage-connection"                = module.storage.primary_connection_string
+    "openai-api-key"                    = var.openai_api_key
+    "azure-openai-api-key"              = var.azure_openai_api_key
+    "azure-openai-endpoint"             = var.azure_openai_endpoint
+    "azure-openai-deployment"           = var.azure_openai_deployment
+    "azure-openai-embedding-deployment" = var.azure_openai_embedding_deployment
+    "cloudflare-api-token"              = var.cloudflare_api_token
+    "webshare-proxy-username"           = var.webshare_proxy_username
+    "webshare-proxy-password"           = var.webshare_proxy_password
   }
 }
 
