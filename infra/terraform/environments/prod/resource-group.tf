@@ -7,3 +7,11 @@ resource "azurerm_resource_group" "main" {
   location = var.location
   tags     = local.common_tags
 }
+
+removed {
+  from = azurerm_resource_group.main
+
+  lifecycle {
+    destroy = false
+  }
+}
