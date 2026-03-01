@@ -254,7 +254,7 @@ jobs:
           timeout-seconds: "30"
 
       - name: Validate preview deployment manifests
-        uses: AshleyHollis/shared-infra/.github/actions/deployment-validate@v1
+        uses: ./.github/actions/deployment-validate
         with:
           overlay-path: k8s/overlays/preview
           target-namespace: preview-pr-test
