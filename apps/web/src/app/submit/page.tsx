@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import SubmitVideoForm from '@/components/SubmitVideoForm';
+import { AuthGatedSubmitForm } from './AuthGatedSubmitForm';
 
 export const metadata: Metadata = {
   title: 'Submit Video | YouTube Summarizer',
@@ -29,7 +29,7 @@ export default function SubmitPage() {
 
         {/* Submit Form */}
         <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-5 md:p-6">
-          <SubmitVideoForm />
+          <AuthGatedSubmitForm />
         </section>
 
         {/* Channel Ingestion CTA */}

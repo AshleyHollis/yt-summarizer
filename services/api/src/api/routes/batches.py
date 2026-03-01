@@ -25,6 +25,7 @@ from ..models.batch import (
     CreateBatchRequest,
 )
 from ..services.batch_service import BatchService
+from ..dependencies.auth import AuthenticatedUser, require_auth
 
 router = APIRouter(prefix="/api/v1/batches", tags=["Batches"])
 
@@ -44,6 +45,7 @@ def get_batch_service(session: AsyncSession = Depends(get_session)) -> BatchServ
 async def create_batch(
     request: Request,
     body: CreateBatchRequest,
+    user: AuthenticatedUser = Depends(require_auth),
     service: BatchService = Depends(get_batch_service),
 ) -> BatchResponse:
     """Create a batch for video ingestion.
@@ -187,6 +189,7 @@ async def stream_batch_progress(
 async def retry_batch_failures(
     request: Request,
     batch_id: UUID,
+    user: AuthenticatedUser = Depends(require_auth),
     service: BatchService = Depends(get_batch_service),
 ) -> BatchRetryResponse:
     """Retry all failed items in a batch.
@@ -224,6 +227,7 @@ async def retry_batch_item(
     request: Request,
     batch_id: UUID,
     video_id: UUID,
+    user: AuthenticatedUser = Depends(require_auth),
     service: BatchService = Depends(get_batch_service),
 ) -> BatchRetryResponse:
     """Retry a single failed item in a batch.

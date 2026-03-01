@@ -11,6 +11,7 @@ from .base import Base, TimestampMixin, generate_uuid
 
 if TYPE_CHECKING:
     from .channel import Channel, Video
+    from .user import User
 
 
 class Batch(Base):
@@ -138,6 +139,17 @@ class Job(Base, TimestampMixin):
         nullable=True,
         comment="Predicted queue wait time at job creation",
     )
+    quota_status: Mapped[str] = mapped_column(
+        String(50),
+        default="released",
+        nullable=False,
+        comment="'quota_queued' (awaiting quota) or 'released' (dispatched to worker queue)",
+    )
+    user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("Users.user_id"),
+        nullable=True,
+        comment="User who submitted this job",
+    )
 
     # Relationships
     video: Mapped["Video"] = relationship(
@@ -148,6 +160,7 @@ class Job(Base, TimestampMixin):
         "Batch",
         back_populates="jobs",
     )
+    user: Mapped["User | None"] = relationship("User")
 
     __table_args__ = (
         Index("ix_jobs_video", "video_id"),
@@ -155,6 +168,8 @@ class Job(Base, TimestampMixin):
         Index("ix_jobs_status", "status"),
         Index("ix_jobs_correlation", "correlation_id"),
         Index("ix_jobs_created", "created_at"),
+        Index("ix_jobs_quota_status", "quota_status"),
+        Index("ix_jobs_user_id", "user_id"),
     )
 
 

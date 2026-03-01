@@ -37,6 +37,9 @@ import { useThreadPersistence } from "@/hooks/useThreadPersistence";
 import { prepareMessagesForDisplay, copilotToThreadMessages } from "@/services/threadPersistence";
 import { CustomHeader } from "./subcomponents/CustomHeader";
 import { useScope, useAISettings } from "@/app/providers";
+import { useAuth } from "@/hooks/useAuth";
+import { CopilotQuotaIndicator } from "./CopilotQuotaIndicator";
+import { getClientApiUrl } from "@/services/runtimeConfig";
 import styles from "./ThreadedCopilotSidebar.module.css";
 
 // ============================================================================
@@ -98,6 +101,7 @@ interface ThreadedCopilotSidebarProps {
 export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotSidebarProps) {
   useCopilotActions();
 
+  const { isAuthenticated } = useAuth();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
@@ -495,17 +499,43 @@ export function ThreadedCopilotSidebar({ defaultOpen = false }: ThreadedCopilotS
 
         {/* Chat panel */}
         <div className={styles.container}>
-          {/* CopilotKit Sidebar with custom Header */}
-          <CKSidebar
-            defaultOpen={true}
-            clickOutsideToClose={false}
-            Header={HeaderComponent}
-            labels={{
-              title: 'AI Assistant',
-              placeholder: 'Ask about your videos...',
-              initial: 'How can I help you with your video library?',
-            }}
-          />
+          {isAuthenticated ? (
+            <>
+              <CKSidebar
+                defaultOpen={true}
+                clickOutsideToClose={false}
+                Header={HeaderComponent}
+                labels={{
+                  title: 'AI Assistant',
+                  placeholder: 'Ask about your videos...',
+                  initial: 'How can I help you with your video library?',
+                }}
+              />
+              <CopilotQuotaIndicator />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-4">
+              <MessageCircle className="w-10 h-10 text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Sign in to chat
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                Sign in to ask questions about your video library using the AI assistant.
+              </p>
+              <a
+                href={`${typeof window !== 'undefined' ? '' : ''}/api/auth/login`}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const apiUrl = getClientApiUrl();
+                  const returnTo = encodeURIComponent(window.location.href);
+                  window.location.href = `${apiUrl}/api/auth/login?returnTo=${returnTo}`;
+                }}
+              >
+                Sign In
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </>
