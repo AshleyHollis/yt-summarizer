@@ -35,7 +35,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to deploy preview for (optional)'
+        description: "PR number to deploy preview for (optional)"
         required: false
         type: string
       force_deploy:
@@ -49,12 +49,12 @@ on:
         type: boolean
         default: true
       run_terraform:
-        description: 'Run terraform plan'
+        description: "Run terraform plan"
         required: false
         type: boolean
         default: true
       apply_terraform:
-        description: 'Apply terraform changes'
+        description: "Apply terraform changes"
         required: false
         type: boolean
         default: true
@@ -71,10 +71,10 @@ concurrency:
 env:
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
-  PREVIEW_NAMESPACE_PREFIX: 'preview-pr-'
-  APPS_BASE_DOMAIN: 'yt-summarizer.apps.ashleyhollis.com'
-  ARGOCD_SYNC_TIMEOUT: '180'
-  KUSTOMIZE_OVERLAY_PREVIEW: 'k8s/overlays/preview'
+  PREVIEW_NAMESPACE_PREFIX: "preview-pr-"
+  APPS_BASE_DOMAIN: "yt-summarizer.apps.ashleyhollis.com"
+  ARGOCD_SYNC_TIMEOUT: "180"
+  KUSTOMIZE_OVERLAY_PREVIEW: "k8s/overlays/preview"
   MAX_PREVIEWS: 3
 
 permissions:
@@ -167,7 +167,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha || github.sha }}
           pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-          timeout-seconds: '1800'
+          timeout-seconds: "1800"
           workflow-event: pull_request
 
       - name: Azure Login and ACR authentication
@@ -187,7 +187,7 @@ jobs:
           image-tag: ${{ steps.wait.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ===========================================================================
   # PHASE 2C: FIND PR IMAGE TAG FOR K8S-ONLY CHANGES
@@ -235,7 +235,7 @@ jobs:
           image-tag: ${{ steps.find-tag.outputs.image_tag }}
           registry: ${{ env.ACR_NAME }}
           repository: ${{ env.API_IMAGE_NAME }}
-          fail-if-missing: 'true'
+          fail-if-missing: "true"
 
   # ===========================================================================
   # PHASE 2D: TERRAFORM (INFRASTRUCTURE CHANGES ONLY)
@@ -250,7 +250,7 @@ jobs:
        (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.infra_changed == 'true'))
     with:
       environment: preview
-      terraform-version: ${{ vars.TERRAFORM_VERSION || '1.5.7' }}
+      terraform-version: ${{ vars.TERRAFORM_VERSION || '1.9' }}
       working-directory: infra/terraform/environments/prod
       run-plan: true
       run-apply: ${{ github.event_name == 'workflow_dispatch' && inputs.apply_terraform == true }}
@@ -379,7 +379,7 @@ jobs:
         with:
           mode: all
           namespace: ${{ env.NAMESPACE_ARGOCD }}
-          verbose: 'true'
+          verbose: "true"
 
   # ===========================================================================
   # PHASE 5: UPDATE KUBERNETES OVERLAY (Reusable Workflow)
@@ -396,7 +396,15 @@ jobs:
       needs.get-ingress.result == 'success' &&
       (needs.terraform.result != 'failure') &&
       needs.sync-argocd-manifests.result == 'success'
-    needs: [check-concurrency, wait-for-ci, get-ingress, detect-changes, terraform, sync-argocd-manifests]
+    needs:
+      [
+        check-concurrency,
+        wait-for-ci,
+        get-ingress,
+        detect-changes,
+        terraform,
+        sync-argocd-manifests,
+      ]
     with:
       environment: preview
       # PR-specific overlay path - each PR gets its own directory
@@ -437,7 +445,7 @@ jobs:
       api-url: ${{ needs.get-ingress.outputs.preview_url }}
       host: ${{ needs.get-ingress.outputs.preview_host }}
       pr-number: ${{ needs.detect-changes.outputs.pr_number }}
-      max-wait-seconds: '300'
+      max-wait-seconds: "300"
       auto-recovery: true
       run-preview-health-check: true
     secrets:
@@ -556,7 +564,7 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '22'
+          node-version: "22"
           working-directory: apps/web
 
       - name: Wait for API to be ready
