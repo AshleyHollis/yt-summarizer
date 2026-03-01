@@ -2,6 +2,7 @@
 # Argo CD Infrastructure Applications
 # =============================================================================
 # These applications manage cluster-level infrastructure components.
+# Shared infrastructure manifests now live in shared-infra repo.
 # Apply AFTER bootstrapping Argo CD with: ./scripts/bootstrap-argocd.ps1
 #
 # Usage:
@@ -177,7 +178,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    repoURL: https://github.com/AshleyHollis/shared-infra
     targetRevision: main
     path: k8s/argocd/cert-manager
   destination:
@@ -243,7 +244,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    repoURL: https://github.com/AshleyHollis/shared-infra
     targetRevision: main
     path: k8s/cluster-resources
   destination:
@@ -273,7 +274,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    repoURL: https://github.com/AshleyHollis/shared-infra
     targetRevision: main
     path: k8s/argocd/gateway-api
   destination:
@@ -304,7 +305,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    repoURL: https://github.com/AshleyHollis/shared-infra
     targetRevision: main
     path: k8s/argocd/external-dns
   destination:
@@ -319,8 +320,8 @@ spec:
 
 ---
 # -----------------------------------------------------------------------------
-# Wildcard Certificates
-# Let's Encrypt wildcard certificate for *.yt-summarizer.apps.ashleyhollis.com
+# Wildcard Certificates (shared-infra)
+# Let's Encrypt wildcard certificates for all applications
 # -----------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -334,7 +335,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/AshleyHollis/yt-summarizer
+    repoURL: https://github.com/AshleyHollis/shared-infra
     targetRevision: main
     path: k8s/argocd/certificates
   destination:
