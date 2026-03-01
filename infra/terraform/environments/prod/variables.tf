@@ -32,9 +32,38 @@ variable "github_repo" {
 }
 
 variable "openai_api_key" {
-  description = "OpenAI API key for summarization"
+  description = "OpenAI API key for summarization (fallback when Azure OpenAI not configured)"
   type        = string
   sensitive   = true
+}
+
+# -----------------------------------------------------------------------------
+# Azure OpenAI
+# -----------------------------------------------------------------------------
+
+variable "azure_openai_api_key" {
+  description = "Azure OpenAI API key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "azure_openai_endpoint" {
+  description = "Azure OpenAI endpoint URL (e.g., https://myresource.openai.azure.com)"
+  type        = string
+  default     = ""
+}
+
+variable "azure_openai_deployment" {
+  description = "Azure OpenAI chat deployment name (e.g., gpt-4o-mini)"
+  type        = string
+  default     = ""
+}
+
+variable "azure_openai_embedding_deployment" {
+  description = "Azure OpenAI embedding deployment name (e.g., text-embedding-3-small)"
+  type        = string
+  default     = ""
 }
 
 variable "cloudflare_api_token" {

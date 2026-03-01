@@ -530,7 +530,7 @@ jobs:
           commit-sha: ${{ needs.detect-changes.outputs.pr_head_sha }}
 
   # ===========================================================================
-  # PHASE 9: E2E TESTS (OPTIONAL)
+  # PHASE 9: E2E TESTS
   # ===========================================================================
   e2e-tests:
     name: E2E Tests
@@ -545,9 +545,7 @@ jobs:
       - check-concurrency
     if: >-
       always() && !cancelled() &&
-      github.event_name == 'workflow_dispatch' &&
-      inputs.run_preview == true &&
-      inputs.run_e2e == true &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_e2e == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.post-preview-comment.result == 'success' &&
@@ -595,6 +593,13 @@ jobs:
           BASE_URL: ${{ steps.base-url.outputs.base_url }}
           NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url }}
           API_URL: ${{ needs.get-ingress.outputs.preview_url }}
+          AUTH0_ISSUER_BASE_URL: https://${{ secrets.AUTH0_DOMAIN }}
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+          AUTH0_ADMIN_TEST_EMAIL: ${{ secrets.AUTH0_ADMIN_TEST_EMAIL }}
+          AUTH0_ADMIN_TEST_PASSWORD: ${{ secrets.AUTH0_ADMIN_TEST_PASSWORD }}
+          AUTH0_USER_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
+          AUTH0_USER_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
