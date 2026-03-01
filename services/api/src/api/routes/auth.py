@@ -243,7 +243,12 @@ async def _fetch_user_info(access_token: str, auth_domain: str) -> dict[str, Any
 
 
 @router.get("/login", status_code=status.HTTP_302_FOUND)
-async def login(request: Request, returnTo: str | None = None) -> RedirectResponse:
+async def login(
+    request: Request,
+    returnTo: str | None = None,
+    connection: str | None = None,
+    login_hint: str | None = None,
+) -> RedirectResponse:
     settings = get_settings()
     auth = _ensure_auth_settings(settings)
     correlation_id = get_correlation_id(request)
@@ -263,6 +268,10 @@ async def login(request: Request, returnTo: str | None = None) -> RedirectRespon
     }
     if auth.audience:
         params["audience"] = auth.audience
+    if connection:
+        params["connection"] = connection
+    if login_hint:
+        params["login_hint"] = login_hint
 
     authorize_url = f"https://{auth.domain}/authorize?{urlencode(params)}"
     logger.info(
