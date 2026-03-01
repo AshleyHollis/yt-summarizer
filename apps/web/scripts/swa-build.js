@@ -53,6 +53,18 @@ if (fs.existsSync(monoServer)) {
   // Flat layout (outputFileTracingRoot = apps/web/): standard Next.js standalone structure
   cpR('.next/static', '.next/standalone/.next/static');
   cpR('public', '.next/standalone/public');
+
+  // Azure SWA hybrid mode (Azure Functions custom handler) sets FUNCTIONS_CUSTOMHANDLER_PORT
+  // but Next.js standalone server.js only reads PORT. Bridge the gap by prepending a one-liner.
+  const serverJsPath = '.next/standalone/server.js';
+  if (fs.existsSync(serverJsPath)) {
+    const serverContent = fs.readFileSync(serverJsPath, 'utf8');
+    const portPatch = `if (process.env.FUNCTIONS_CUSTOMHANDLER_PORT) { process.env.PORT = process.env.FUNCTIONS_CUSTOMHANDLER_PORT; }\n`;
+    if (!serverContent.includes('FUNCTIONS_CUSTOMHANDLER_PORT')) {
+      fs.writeFileSync(serverJsPath, portPatch + serverContent);
+      console.log('[swa-build] Patched server.js: FUNCTIONS_CUSTOMHANDLER_PORT → PORT');
+    }
+  }
 }
 
 // Copy SWA config files
