@@ -93,9 +93,7 @@ async def submit_video(
 
         # Record usage if dispatched
         if quota_status == "released":
-            await record_usage(
-                session, db_user.user_id, "video_submit", str(result.video_id)
-            )
+            await record_usage(session, db_user.user_id, "video_submit", str(result.video_id))
             await session.commit()
 
         return result
