@@ -11,6 +11,7 @@
 'use client';
 
 import React from 'react';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 /**
  * LogoutButton Props
@@ -51,8 +52,8 @@ interface LogoutButtonProps {
  */
 export function LogoutButton({ className = '', variant = 'primary' }: LogoutButtonProps) {
   const handleLogout = () => {
-    // Redirect to Auth0 logout endpoint
-    window.location.href = '/api/auth/logout';
+    const apiUrl = getClientApiUrl();
+    window.location.href = `${apiUrl}/api/auth/logout`;
   };
 
   // Variant styles
