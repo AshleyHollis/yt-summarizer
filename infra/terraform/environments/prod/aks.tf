@@ -23,3 +23,11 @@ module "aks" {
 
   tags = local.common_tags
 }
+
+removed {
+  from = module.aks.azurerm_kubernetes_cluster.aks
+
+  lifecycle {
+    destroy = false
+  }
+}
