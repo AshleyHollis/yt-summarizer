@@ -16,6 +16,7 @@ except ImportError:
         raise NotImplementedError("Database session not available")
 
 
+from ..dependencies.auth import AuthenticatedUser, require_auth
 from ..middleware.correlation import get_correlation_id
 from ..models.batch import (
     BatchDetailResponse,
@@ -25,7 +26,6 @@ from ..models.batch import (
     CreateBatchRequest,
 )
 from ..services.batch_service import BatchService
-from ..dependencies.auth import AuthenticatedUser, require_auth
 
 router = APIRouter(prefix="/api/v1/batches", tags=["Batches"])
 

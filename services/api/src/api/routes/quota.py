@@ -272,10 +272,9 @@ async def get_expedite_status(
 
 
 def _expedite_status_message(req_status: str, video_count: int) -> str:
-    if req_status == "pending":
-        return f"Expedite request pending admin review for {video_count} videos"
-    elif req_status == "approved":
-        return f"Expedite approved! {video_count} videos are being processed"
-    elif req_status == "denied":
-        return "Expedite request denied. Videos will continue processing at normal rate"
-    return f"Expedite request status: {req_status}"
+    status_messages = {
+        "pending": f"Expedite request pending admin review for {video_count} videos",
+        "approved": f"Expedite approved! {video_count} videos are being processed",
+        "denied": "Expedite request denied. Videos will continue processing at normal rate",
+    }
+    return status_messages.get(req_status, f"Expedite request status: {req_status}")

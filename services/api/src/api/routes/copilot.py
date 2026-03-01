@@ -26,6 +26,8 @@ except ImportError:
         return logging.getLogger(name)
 
 
+from ..dependencies.auth import AuthenticatedUser, require_auth
+from ..dependencies.quota import check_copilot_quota
 from ..middleware.correlation import get_correlation_id
 from ..models.copilot import (
     CopilotQueryRequest,
@@ -47,8 +49,6 @@ from ..services.copilot_service import CopilotService
 from ..services.llm_service import get_llm_service
 from ..services.search_service import SearchService
 from ..services.synthesis_service import SynthesisService
-from ..dependencies.auth import AuthenticatedUser, require_auth
-from ..dependencies.quota import check_copilot_quota
 
 router = APIRouter(prefix="/api/v1/copilot", tags=["Copilot"])
 logger = get_logger(__name__)

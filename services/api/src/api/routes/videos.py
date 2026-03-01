@@ -34,6 +34,8 @@ except ImportError:
     SUMMARIES_CONTAINER = "summaries"
 
 
+from ..dependencies.auth import AuthenticatedUser, require_auth
+from ..dependencies.quota import check_video_quota, get_or_create_user, record_usage
 from ..middleware.correlation import get_correlation_id
 from ..models.video import (
     ReprocessVideoRequest,
@@ -42,8 +44,6 @@ from ..models.video import (
     VideoResponse,
 )
 from ..services.video_service import VideoNotFoundError, VideoService
-from ..dependencies.auth import AuthenticatedUser, require_auth
-from ..dependencies.quota import check_video_quota, get_or_create_user, record_usage
 
 router = APIRouter(prefix="/api/v1/videos", tags=["Videos"])
 

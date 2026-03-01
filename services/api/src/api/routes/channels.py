@@ -11,12 +11,12 @@ except ImportError:
         raise NotImplementedError("Database session not available")
 
 
+from ..dependencies.auth import AuthenticatedUser, require_auth
 from ..models.channel import (
     ChannelVideosResponse,
     FetchChannelRequest,
 )
 from ..services.channel_service import ChannelService
-from ..dependencies.auth import AuthenticatedUser, require_auth
 
 router = APIRouter(prefix="/api/v1/channels", tags=["Channels"])
 
