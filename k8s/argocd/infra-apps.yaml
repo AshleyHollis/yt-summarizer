@@ -320,7 +320,8 @@ spec:
 ---
 # -----------------------------------------------------------------------------
 # Wildcard Certificates
-# Let's Encrypt wildcard certificate for *.yt-summarizer.apps.ashleyhollis.com
+# Let's Encrypt wildcard certificates for *.yt-summarizer.apps.ashleyhollis.com
+# and *.meal-planner.apps.ashleyhollis.com
 # -----------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: Application

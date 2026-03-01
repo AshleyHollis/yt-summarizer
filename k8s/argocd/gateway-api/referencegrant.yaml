@@ -8,9 +8,12 @@ metadata:
     app.kubernetes.io/component: gateway
 spec:
   from:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    namespace: yt-summarizer
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: yt-summarizer
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: meal-planner
   to:
-  - group: gateway.networking.k8s.io
-    kind: Gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway

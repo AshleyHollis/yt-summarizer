@@ -1,0 +1,21 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: meal-planner-wildcard
+  namespace: gateway-system
+  labels:
+    app.kubernetes.io/name: meal-planner
+    app.kubernetes.io/component: tls
+spec:
+  secretName: meal-planner-wildcard-tls
+  duration: 2160h # 90 days
+  renewBefore: 720h # 30 days before expiry
+  issuerRef:
+    name: letsencrypt-cloudflare
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.meal-planner.apps.ashleyhollis.com"
+    - "meal-planner.apps.ashleyhollis.com"
+  privateKey:
+    algorithm: RSA
+    size: 2048

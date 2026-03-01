@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: yt-summarizer
     app.kubernetes.io/component: gateway
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: "*.yt-summarizer.apps.ashleyhollis.com"
+    external-dns.alpha.kubernetes.io/hostname: "*.yt-summarizer.apps.ashleyhollis.com,*.meal-planner.apps.ashleyhollis.com"
 spec:
   gatewayClassName: nginx
   listeners:
@@ -27,6 +27,25 @@ spec:
       port: 80
       protocol: HTTP
       hostname: "*.yt-summarizer.apps.ashleyhollis.com"
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-meal-planner
+      port: 443
+      protocol: HTTPS
+      hostname: "*.meal-planner.apps.ashleyhollis.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: meal-planner-wildcard-tls
+            kind: Secret
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: http-meal-planner
+      port: 80
+      protocol: HTTP
+      hostname: "*.meal-planner.apps.ashleyhollis.com"
       allowedRoutes:
         namespaces:
           from: All

@@ -3,3 +3,4 @@ kind: Kustomization
 
 resources:
   - yt-summarizer-wildcard.yaml
+  - meal-planner-wildcard.yaml
