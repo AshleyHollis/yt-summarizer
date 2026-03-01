@@ -202,6 +202,8 @@ variable "auth0_preview_allowed_callback_urls" {
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
     "https://*.azurestaticapps.net/api/auth/callback",
+    # SWA regional hostnames have multi-level subdomains (*.azurestaticapps.net only matches 1 level)
+    "https://*.eastasia.6.azurestaticapps.net/api/auth/callback",
   ]
 }
 
@@ -210,6 +212,7 @@ variable "auth0_preview_allowed_logout_urls" {
   type        = list(string)
   default = [
     "https://*.azurestaticapps.net",
+    "https://*.eastasia.6.azurestaticapps.net",
   ]
 }
 
@@ -218,6 +221,7 @@ variable "auth0_preview_allowed_web_origins" {
   type        = list(string)
   default = [
     "https://*.azurestaticapps.net",
+    "https://*.eastasia.6.azurestaticapps.net",
   ]
 }
 
