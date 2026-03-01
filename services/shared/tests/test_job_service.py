@@ -142,7 +142,10 @@ class TestBatchItemStatusTransitions:
         video_result.scalar_one_or_none.return_value = video
 
         # Return different results for different queries
-        mock_session.execute = AsyncMock(side_effect=[job_result, batch_item_result, batch_result])
+        # Order: job → video (status sync) → batch_item → batch
+        mock_session.execute = AsyncMock(
+            side_effect=[job_result, video_result, batch_item_result, batch_result]
+        )
 
         mock_db = MagicMock()
         mock_db.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
@@ -194,7 +197,7 @@ class TestBatchItemStatusTransitions:
         batch_result.scalar_one_or_none.return_value = batch
 
         mock_session.execute = AsyncMock(
-            side_effect=[job_result, batch_item_result, video_result, batch_result]
+            side_effect=[job_result, video_result, batch_item_result, video_result, batch_result]
         )
 
         mock_db = MagicMock()
@@ -256,7 +259,7 @@ class TestBatchItemStatusTransitions:
         batch_result.scalar_one_or_none.return_value = batch
 
         mock_session.execute = AsyncMock(
-            side_effect=[job_result, batch_item_result, video_result, batch_result]
+            side_effect=[job_result, video_result, batch_item_result, video_result, batch_result]
         )
 
         mock_db = MagicMock()
@@ -364,7 +367,7 @@ class TestBatchCountUpdates:
         batch_result.scalar_one_or_none.return_value = batch
 
         mock_session.execute = AsyncMock(
-            side_effect=[job_result, batch_item_result, video_result, batch_result]
+            side_effect=[job_result, video_result, batch_item_result, video_result, batch_result]
         )
 
         mock_db = MagicMock()
@@ -418,7 +421,7 @@ class TestBatchCountUpdates:
         batch_result.scalar_one_or_none.return_value = batch
 
         mock_session.execute = AsyncMock(
-            side_effect=[job_result, batch_item_result, video_result, batch_result]
+            side_effect=[job_result, video_result, batch_item_result, video_result, batch_result]
         )
 
         mock_db = MagicMock()
@@ -447,13 +450,18 @@ class TestJobWithoutBatch:
             job_type="transcribe",
             status="pending",
         )
+        video = create_mock_video(sample_video_id)
 
         mock_session = AsyncMock()
 
         job_result = MagicMock()
         job_result.scalar_one_or_none.return_value = job
 
-        mock_session.execute = AsyncMock(return_value=job_result)
+        video_result = MagicMock()
+        video_result.scalar_one_or_none.return_value = video
+
+        # Order: job → video (status sync for pending→running)
+        mock_session.execute = AsyncMock(side_effect=[job_result, video_result])
 
         mock_db = MagicMock()
         mock_db.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
@@ -467,8 +475,8 @@ class TestJobWithoutBatch:
         # Verify job was updated
         assert job.status == "running"
 
-        # Verify only one execute call (for the job query, no batch queries)
-        assert mock_session.execute.call_count == 1
+        # Verify two execute calls (job query + video status sync, no batch queries)
+        assert mock_session.execute.call_count == 2
 
 
 class TestHelperFunctions:
@@ -595,7 +603,7 @@ class TestVideoProcessingStatusSync:
         batch_result.scalar_one_or_none.return_value = batch
 
         mock_session.execute = AsyncMock(
-            side_effect=[job_result, batch_item_result, video_result, batch_result]
+            side_effect=[job_result, video_result, batch_item_result, video_result, batch_result]
         )
 
         mock_db = MagicMock()
@@ -646,7 +654,7 @@ class TestVideoProcessingStatusSync:
         batch_result.scalar_one_or_none.return_value = batch
 
         mock_session.execute = AsyncMock(
-            side_effect=[job_result, batch_item_result, video_result, batch_result]
+            side_effect=[job_result, video_result, batch_item_result, video_result, batch_result]
         )
 
         mock_db = MagicMock()
