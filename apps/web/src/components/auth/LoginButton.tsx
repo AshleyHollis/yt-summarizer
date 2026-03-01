@@ -45,7 +45,8 @@ export function LoginButton() {
    */
   const handleLogin = (provider: Provider) => {
     const apiUrl = getClientApiUrl();
-    window.location.href = `${apiUrl}/api/auth/login?connection=${provider}`;
+    const returnTo = encodeURIComponent(window.location.origin);
+    window.location.href = `${apiUrl}/api/auth/login?connection=${provider}&returnTo=${returnTo}`;
   };
 
   return (

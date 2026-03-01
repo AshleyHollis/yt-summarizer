@@ -51,9 +51,18 @@ interface LogoutButtonProps {
  * ```
  */
 export function LogoutButton({ className = '', variant = 'primary' }: LogoutButtonProps) {
-  const handleLogout = () => {
-    const apiUrl = getClientApiUrl();
-    window.location.href = `${apiUrl}/api/auth/logout`;
+  const handleLogout = async () => {
+    try {
+      const apiUrl = getClientApiUrl();
+      await fetch(`${apiUrl}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Ignore errors — session may already be cleared
+    }
+    // Redirect to home page after logout
+    window.location.href = '/';
   };
 
   // Variant styles

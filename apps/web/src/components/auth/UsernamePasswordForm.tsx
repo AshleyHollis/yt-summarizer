@@ -66,7 +66,8 @@ export function UsernamePasswordForm() {
 
     try {
       const apiUrl = getClientApiUrl();
-      window.location.href = `${apiUrl}/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}`;
+      const returnTo = encodeURIComponent(window.location.origin);
+      window.location.href = `${apiUrl}/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}&returnTo=${returnTo}`;
     } catch (err) {
       setError('Login failed. Please check your credentials.');
       setLoading(false);
