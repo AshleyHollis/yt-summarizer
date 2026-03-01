@@ -47,7 +47,7 @@ removed {
 }
 
 removed {
-  from = module.key_vault.azurerm_role_assignment.secrets_officer[0]
+  from = module.key_vault.azurerm_role_assignment.secrets_officer
 
   lifecycle {
     destroy = false
