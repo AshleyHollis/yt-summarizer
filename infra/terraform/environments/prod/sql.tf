@@ -7,8 +7,8 @@ module "sql" {
 
   server_name         = "sql-${local.name_prefix}"
   database_name       = "ytsummarizer"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  resource_group_name = module.shared.resource_group_name
+  location            = module.shared.resource_group_location
   admin_username      = var.sql_admin_username
   admin_password      = var.sql_admin_password
 

@@ -6,8 +6,8 @@ module "swa" {
   source = "../../modules/static-web-app"
 
   name                = "swa-${local.name_prefix}"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  resource_group_name = module.shared.resource_group_name
+  location            = module.shared.resource_group_location
   sku_tier            = "Standard"
   sku_size            = "Standard"
 

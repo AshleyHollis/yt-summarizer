@@ -7,12 +7,6 @@ variable "subscription_id" {
   type        = string
 }
 
-variable "location" {
-  description = "Azure region for resources"
-  type        = string
-  default     = "eastasia"
-}
-
 variable "sql_admin_username" {
   description = "SQL Server admin username"
   type        = string
@@ -24,19 +18,6 @@ variable "sql_admin_password" {
   type        = string
   sensitive   = true
 }
-
-variable "key_vault_secrets_officer_principal_id" {
-  description = "Principal ID with Key Vault Secrets Officer access"
-  type        = string
-  default     = "eac9556a-cd81-431f-a1ec-d6940b2d92d3"
-}
-
-variable "domain" {
-  description = "Base domain for the application"
-  type        = string
-  default     = "yt-summarizer.example.com"
-}
-
 
 variable "github_org" {
   description = "GitHub organization/owner name"
