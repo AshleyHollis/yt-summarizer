@@ -64,6 +64,12 @@ variable "enable_database_connection" {
   default     = false
 }
 
+variable "additional_database_client_ids" {
+  description = "Additional Auth0 client IDs to enable on the database connection (e.g., preview client)"
+  type        = list(string)
+  default     = []
+}
+
 variable "terraform_client_id" {
   description = "Terraform service account client ID (needed to enable connection for user management)"
   type        = string
@@ -164,11 +170,12 @@ resource "auth0_connection_clients" "database_clients" {
   count = var.enable_database_connection ? 1 : 0
 
   connection_id = auth0_connection.database[0].id
-  # Enable for BFF client (end-user auth) and Terraform client (user management)
-  enabled_clients = compact([
+  # Enable for BFF client (end-user auth), Terraform client (user management),
+  # and any additional clients (e.g., preview environment)
+  enabled_clients = compact(concat([
     auth0_client.bff.id,
-    var.terraform_client_id
-  ])
+    var.terraform_client_id,
+  ], var.additional_database_client_ids))
 }
 
 # T009: Google OAuth connection
@@ -345,4 +352,14 @@ output "application_name" {
 output "api_identifier" {
   description = "Auth0 API identifier (audience)"
   value       = var.api_identifier != "" ? auth0_resource_server.api[0].identifier : null
+}
+
+output "database_connection_id" {
+  description = "Auth0 database connection ID (null if not created)"
+  value       = var.enable_database_connection ? auth0_connection.database[0].id : null
+}
+
+output "bff_client_id_raw" {
+  description = "Auth0 BFF client ID (raw resource ID, not the client_id field)"
+  value       = auth0_client.bff.id
 }

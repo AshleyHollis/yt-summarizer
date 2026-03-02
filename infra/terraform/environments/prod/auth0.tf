@@ -56,12 +56,14 @@ module "auth0" {
   # T012: Connection configuration
   enable_database_connection = var.enable_auth0_database_connection
   terraform_client_id        = var.auth0_terraform_client_id
-  enable_google_connection   = var.enable_auth0_google_connection
-  google_client_id           = var.auth0_google_client_id
-  google_client_secret       = var.auth0_google_client_secret
-  enable_github_connection   = var.enable_auth0_github_connection
-  github_client_id           = var.auth0_github_client_id
-  github_client_secret       = var.auth0_github_client_secret
+  # Enable database connection for preview client too (E2E test authentication)
+  additional_database_client_ids = var.enable_auth0 ? [module.auth0_preview[0].bff_client_id_raw] : []
+  enable_google_connection       = var.enable_auth0_google_connection
+  google_client_id               = var.auth0_google_client_id
+  google_client_secret           = var.auth0_google_client_secret
+  enable_github_connection       = var.enable_auth0_github_connection
+  github_client_id               = var.auth0_github_client_id
+  github_client_secret           = var.auth0_github_client_secret
 
   # T012: User and role configuration (T044-T045: Use generated passwords)
   test_users = {
