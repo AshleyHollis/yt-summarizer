@@ -40,7 +40,7 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         <span className="ml-3 text-lg text-gray-900 dark:text-white">
           Loading admin dashboard...
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0f0f0f] dark:from-transparent dark:via-transparent dark:to-transparent">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -159,7 +159,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <div className="mt-8 bg-white dark:bg-gray-800/50 rounded-lg shadow-md dark:shadow-none border border-transparent dark:border-gray-700/50 p-6">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
           <div className="flex flex-wrap gap-3">
             <QuickActionButton
@@ -230,7 +230,7 @@ interface AdminSectionProps {
 
 function AdminSection({ title, description, icon, actions }: AdminSectionProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+    <div className="bg-white dark:bg-gray-800/50 rounded-lg shadow-md dark:shadow-none border border-transparent dark:border-gray-700/50 p-6">
       <div className="flex items-center mb-3">
         <span className="text-3xl mr-3">{icon}</span>
         <div>
@@ -313,7 +313,7 @@ function ExpediteRequestsPanel() {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div className="bg-white dark:bg-gray-800/50 rounded-lg shadow-md dark:shadow-none border border-transparent dark:border-gray-700/50 p-6">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
           ⚡ Expedite Requests
         </h2>
@@ -323,7 +323,7 @@ function ExpediteRequestsPanel() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+    <div className="bg-white dark:bg-gray-800/50 rounded-lg shadow-md dark:shadow-none border border-transparent dark:border-gray-700/50 p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">⚡ Expedite Requests</h2>
         {requests.length > 0 && (

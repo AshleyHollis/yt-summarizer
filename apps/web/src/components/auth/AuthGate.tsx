@@ -13,6 +13,7 @@
 import React from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { LoginButton } from './LoginButton';
+import { UsernamePasswordForm } from './UsernamePasswordForm';
 
 interface AuthGateProps {
   /** What action requires login (shown in the prompt) */
@@ -23,6 +24,8 @@ interface AuthGateProps {
 
 /**
  * Shows children if authenticated, otherwise shows a login prompt.
+ * Includes social login (OAuth) and email/password form for consistency
+ * with the /sign-in page.
  *
  * @example
  * ```tsx
@@ -59,16 +62,28 @@ export function AuthGate({ action = 'use this feature', children }: AuthGateProp
               d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
             />
           </svg>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Sign in required
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sign in required</h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm">
-            You need to sign in to {action}. Your data is secure and we only use your
-            account for quota tracking.
+            You need to sign in to {action}. Your data is secure and we only use your account for
+            quota tracking.
           </p>
         </div>
-        <div className="w-full max-w-xs">
+        <div className="w-full max-w-sm">
           <LoginButton />
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-gray-100 dark:bg-[#0f0f0f] text-gray-500 dark:text-gray-400">
+                Or continue with email
+              </span>
+            </div>
+          </div>
+
+          <UsernamePasswordForm />
         </div>
       </div>
     );
