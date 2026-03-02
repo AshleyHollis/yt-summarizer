@@ -640,16 +640,14 @@ jobs:
             echo "✅ Preview client already enabled for Username-Password-Authentication"
           else
             echo "⚠️ Enabling preview client for Username-Password-Authentication..."
-            ENABLED=$(echo "$CONN_BODY" | jq -c '.[0].enabled_clients')
-            NEW_CLIENTS=$(echo "$ENABLED" | jq -c ". + [\"$PREVIEW_ID\"]")
-            PATCH_RESP=$(curl -s -w "\n%{http_code}" -X PATCH "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}" \
+            # Use the connection-clients endpoint (PATCH doesn't accept enabled_clients)
+            ASSOC_RESP=$(curl -s -w "\n%{http_code}" -X POST "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}/clients/${PREVIEW_ID}" \
               -H "Authorization: Bearer $TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{\"enabled_clients\": $NEW_CLIENTS}")
-            HTTP_CODE=$(echo "$PATCH_RESP" | tail -1)
-            if [[ "$HTTP_CODE" != "200" ]]; then
-              PATCH_BODY=$(echo "$PATCH_RESP" | sed '$d')
-              echo "::error::Failed to enable preview client (HTTP $HTTP_CODE): $PATCH_BODY"
+              -H "Content-Type: application/json")
+            HTTP_CODE=$(echo "$ASSOC_RESP" | tail -1)
+            if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
+              ASSOC_BODY=$(echo "$ASSOC_RESP" | sed '$d')
+              echo "::error::Failed to enable preview client (HTTP $HTTP_CODE): $ASSOC_BODY"
               exit 1
             fi
             echo "✅ Preview client enabled successfully"
