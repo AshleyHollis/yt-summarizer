@@ -46,27 +46,8 @@ export function AuthGate({ action = 'use this feature', children }: AuthGateProp
 
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 space-y-6">
-        <div className="text-center space-y-2">
-          <svg
-            className="w-12 h-12 mx-auto text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-            />
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sign in required</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm">
-            You need to sign in to {action}. Your data is secure and we only use your account for
-            quota tracking.
-          </p>
-        </div>
+      <div className="flex flex-col items-center justify-center p-8">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Sign in to {action}</p>
         <div className="max-w-md w-full">
           <LoginCard />
         </div>
