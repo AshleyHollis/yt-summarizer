@@ -29,10 +29,7 @@ test.describe('Core User Flows @smoke', () => {
       // Should redirect to /add — server-side redirect via Next.js.
       // Use waitForFunction instead of toHaveURL to avoid CopilotKit URL
       // oscillation (?thread= parameter) interfering with URL matching.
-      await page.waitForFunction(
-        () => window.location.pathname === '/add',
-        { timeout: 60_000 },
-      );
+      await page.waitForFunction(() => window.location.pathname === '/add', { timeout: 60_000 });
     });
 
     test('add page has correct title @smoke', async ({ page }) => {
@@ -175,6 +172,11 @@ test.describe('Video Submission (Requires Backend)', () => {
   test.skip(
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
+  );
+
+  test.fixme(
+    !!process.env.CI,
+    'Video submission pipeline not fully configured in preview (missing Azure OpenAI secrets)'
   );
 
   // Use a seeded video with verified auto-captions. dQw4w9WgXcQ (Rick Astley) has NO
