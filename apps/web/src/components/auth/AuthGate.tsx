@@ -12,8 +12,7 @@
 
 import React from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { LoginButton } from './LoginButton';
-import { UsernamePasswordForm } from './UsernamePasswordForm';
+import { LoginCard } from './LoginCard';
 
 interface AuthGateProps {
   /** What action requires login (shown in the prompt) */
@@ -68,22 +67,8 @@ export function AuthGate({ action = 'use this feature', children }: AuthGateProp
             quota tracking.
           </p>
         </div>
-        <div className="w-full max-w-sm">
-          <LoginButton />
-
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-gray-100 dark:bg-[#0f0f0f] text-gray-500 dark:text-gray-400">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
-          <UsernamePasswordForm />
+        <div className="max-w-md w-full">
+          <LoginCard />
         </div>
       </div>
     );
