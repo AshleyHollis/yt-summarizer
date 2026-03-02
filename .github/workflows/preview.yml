@@ -635,19 +635,32 @@ jobs:
           CONN_ID=$(echo "$CONN_BODY" | jq -r '.[0].id')
           echo "Connection ID: $CONN_ID"
 
+          # Get current enabled clients for this connection (new dedicated endpoint)
+          CLIENTS_LIST_RESP=$(curl -s -w "\n%{http_code}" "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}/clients" \
+            -H "Authorization: Bearer $TOKEN")
+          HTTP_CODE=$(echo "$CLIENTS_LIST_RESP" | tail -1)
+          CLIENTS_LIST_BODY=$(echo "$CLIENTS_LIST_RESP" | sed '$d')
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "::error::Failed to get connection clients (HTTP $HTTP_CODE): $CLIENTS_LIST_BODY"
+            exit 1
+          fi
+
           # Check if preview client already enabled
-          if echo "$CONN_BODY" | jq -e ".[0].enabled_clients | index(\"$PREVIEW_ID\")" > /dev/null 2>&1; then
+          if echo "$CLIENTS_LIST_BODY" | jq -e ".[] | select(.client_id == \"$PREVIEW_ID\")" > /dev/null 2>&1; then
             echo "✅ Preview client already enabled for Username-Password-Authentication"
           else
             echo "⚠️ Enabling preview client for Username-Password-Authentication..."
-            # Use the connection-clients endpoint (PATCH doesn't accept enabled_clients)
-            ASSOC_RESP=$(curl -s -w "\n%{http_code}" -X POST "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}/clients/${PREVIEW_ID}" \
+            # Build new enabled_clients list from current + preview
+            CURRENT_IDS=$(echo "$CLIENTS_LIST_BODY" | jq -c '[.[].client_id]')
+            NEW_CLIENTS=$(echo "$CURRENT_IDS" | jq -c ". + [\"$PREVIEW_ID\"]")
+            PATCH_RESP=$(curl -s -w "\n%{http_code}" -X PATCH "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}/clients" \
               -H "Authorization: Bearer $TOKEN" \
-              -H "Content-Type: application/json")
-            HTTP_CODE=$(echo "$ASSOC_RESP" | tail -1)
-            if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
-              ASSOC_BODY=$(echo "$ASSOC_RESP" | sed '$d')
-              echo "::error::Failed to enable preview client (HTTP $HTTP_CODE): $ASSOC_BODY"
+              -H "Content-Type: application/json" \
+              -d "{\"enabled_clients\": $NEW_CLIENTS}")
+            HTTP_CODE=$(echo "$PATCH_RESP" | tail -1)
+            if [[ "$HTTP_CODE" != "200" ]]; then
+              PATCH_BODY=$(echo "$PATCH_RESP" | sed '$d')
+              echo "::error::Failed to enable preview client (HTTP $HTTP_CODE): $PATCH_BODY"
               exit 1
             fi
             echo "✅ Preview client enabled successfully"
