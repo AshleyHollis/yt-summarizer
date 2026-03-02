@@ -657,7 +657,7 @@ jobs:
             PATCH_RESP=$(curl -s -w "\n%{http_code}" -X PATCH "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}/clients" \
               -H "Authorization: Bearer $TOKEN" \
               -H "Content-Type: application/json" \
-              -d "{\"enabled_clients\": $NEW_CLIENTS}")
+              -d "$NEW_CLIENTS")
             HTTP_CODE=$(echo "$PATCH_RESP" | tail -1)
             if [[ "$HTTP_CODE" != "200" ]]; then
               PATCH_BODY=$(echo "$PATCH_RESP" | sed '$d')
