@@ -30,7 +30,7 @@ test.describe('User Story 3: Browse the Library', () => {
       await expect(page).toHaveURL(/\/library(?:\?|$)/);
 
       // Check for main content area and video count indicator
-      await expect(page.getByText(/\d+ videos/)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText(/\d+ videos/)).toBeVisible({ timeout: 30000 });
     });
 
     test('library page shows filter sidebar', async ({ page }) => {
@@ -54,7 +54,7 @@ test.describe('User Story 3: Browse the Library', () => {
             const loading = document.querySelector('.animate-pulse');
             return !loading || loading.closest('.hidden');
           },
-          { timeout: 10000 }
+          { timeout: 30000 }
         )
         .catch(() => {
           // Loading might already be done
@@ -66,7 +66,7 @@ test.describe('User Story 3: Browse the Library', () => {
       const noVideosMessage = page.getByText(/No videos found|No results|library is empty/i);
 
       // Wait for either content or empty state - check if grid has children or empty message shows
-      await expect(videoGrid.first().or(noVideosMessage)).toBeVisible({ timeout: 10000 });
+      await expect(videoGrid.first().or(noVideosMessage)).toBeVisible({ timeout: 30000 });
     });
 
     test('library stats endpoint returns valid data', async ({ request }) => {

@@ -149,6 +149,9 @@ test.describe('Copilot Behavior: Response Quality', () => {
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
+  // Copilot endpoints require auth; cross-domain cookies prevent auth in SWA preview
+  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
+
   test('copilot handles empty library gracefully', async ({ page }, testInfo) => {
     test.slow(); // LLM call: triple timeout to 540s
 
@@ -241,6 +244,9 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
+
+  // Copilot endpoints require auth; cross-domain cookies prevent auth in SWA preview
+  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
 
   // Fetch a pre-seeded video ID once for all tests in this block.
   // Global-setup has already seeded and processed 15+ videos.
