@@ -1,7 +1,7 @@
 {
   "apps/web/**/*.{ts,tsx,js,jsx}": [
     "npx prettier --write",
-    "npx eslint --config apps/web/eslint.config.mjs --fix"
+    "npx --prefix apps/web eslint --config apps/web/eslint.config.mjs --fix"
   ],
   "apps/web/**/*.{json,css,md,yml,yaml}": ["npx prettier --write"],
   "**/*.{yml,yaml}": ["npx prettier --write"],
