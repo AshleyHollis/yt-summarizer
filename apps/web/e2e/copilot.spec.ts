@@ -24,6 +24,8 @@ import {
  */
 
 test.describe('Copilot Feature', () => {
+  // Copilot/coverage endpoints require auth; cross-domain cookies prevent auth in SWA preview
+  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
   test.describe('Sidebar Visibility', () => {
     test('copilot sidebar is visible on library page', async ({ page }) => {
       await page.goto('/library');
