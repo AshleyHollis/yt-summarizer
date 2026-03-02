@@ -646,20 +646,12 @@ jobs:
           fi
           echo "Connection clients response: $(echo "$CLIENTS_LIST_BODY" | jq -c '.' 2>/dev/null || echo "$CLIENTS_LIST_BODY")"
 
-          # Check if preview client already enabled (handle both string[] and object[] formats)
-          ALREADY_ENABLED=false
-          if echo "$CLIENTS_LIST_BODY" | jq -e "index(\"$PREVIEW_ID\")" > /dev/null 2>&1; then
-            ALREADY_ENABLED=true
-          elif echo "$CLIENTS_LIST_BODY" | jq -e ".[] | select(.client_id == \"$PREVIEW_ID\")" > /dev/null 2>&1; then
-            ALREADY_ENABLED=true
-          fi
-
-          if [[ "$ALREADY_ENABLED" == "true" ]]; then
+          # Response format: {"clients":[{"client_id":"..."},...]}}
+          if echo "$CLIENTS_LIST_BODY" | jq -e ".clients[] | select(.client_id == \"$PREVIEW_ID\")" > /dev/null 2>&1; then
             echo "✅ Preview client already enabled for Username-Password-Authentication"
           else
             echo "⚠️ Enabling preview client for Username-Password-Authentication..."
-            # Build new enabled_clients list — try extracting client_ids from objects, fall back to treating as strings
-            CURRENT_IDS=$(echo "$CLIENTS_LIST_BODY" | jq -c '[.[].client_id]' 2>/dev/null || echo "$CLIENTS_LIST_BODY" | jq -c '.')
+            CURRENT_IDS=$(echo "$CLIENTS_LIST_BODY" | jq -c '[.clients[].client_id]')
             NEW_CLIENTS=$(echo "$CURRENT_IDS" | jq -c ". + [\"$PREVIEW_ID\"]")
             echo "Patching with enabled_clients: $NEW_CLIENTS"
             PATCH_RESP=$(curl -s -w "\n%{http_code}" -X PATCH "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}/clients" \
