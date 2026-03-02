@@ -21,6 +21,13 @@ test.describe('Processing History', () => {
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
+  // Library page is public; don't use auth storageState (cross-domain cookies don't work in CI)
+  test.use({ storageState: undefined });
+  test.fixme(
+    !!process.env.CI,
+    'Cross-domain cookie issue: SWA ↔ AKS API on different origins prevents auth in preview'
+  );
+
   test('History tab displays processing stages and timing', async ({ page }) => {
     // Navigate to library - global-setup.ts seeds videos before tests run
     await page.goto('/library?status=completed');
@@ -117,7 +124,9 @@ test.describe('Processing History', () => {
 
     // This may or may not be visible depending on if delays are tracked
     // Just verify the summary stats cards are present (Total Elapsed, Processing, etc.)
-    const summarySection = page.locator('[class*="grid"]').filter({ hasText: /Total Elapsed|Processing/ });
+    const summarySection = page
+      .locator('[class*="grid"]')
+      .filter({ hasText: /Total Elapsed|Processing/ });
     await expect(summarySection.first()).toBeVisible();
   });
 

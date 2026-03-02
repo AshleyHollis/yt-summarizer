@@ -68,6 +68,13 @@ test.describe('Queue Progress UI Updates', () => {
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
+  // Library page is public; don't use auth storageState (cross-domain cookies don't work in CI)
+  test.use({ storageState: undefined });
+  test.fixme(
+    !!process.env.CI,
+    'Cross-domain cookie issue: SWA ↔ AKS API on different origins prevents auth in preview'
+  );
+
   test('progress UI shows queue position and ETA updates during batch processing', async ({
     page,
   }) => {
@@ -228,7 +235,9 @@ test.describe('Queue Progress UI Updates', () => {
       `  Queue position displayed: ${sawQueuePosition ? '✓' : '(not visible - may have been first in queue)'}`
     );
     console.log(`  ETA displayed: ${sawEta ? '✓' : '(not visible)'}`);
-    console.log(`  Stage transitions: ${sawStageTransition ? '✓' : '(not visible - may have started mid-stage)'}`);
+    console.log(
+      `  Stage transitions: ${sawStageTransition ? '✓' : '(not visible - may have started mid-stage)'}`
+    );
     console.log(`  Completed: ${completionSeen ? '✓' : processingFailed ? '(failed)' : '✗'}`);
 
     // Processing should either complete or fail (not hang forever)
@@ -243,7 +252,9 @@ test.describe('Queue Progress UI Updates', () => {
       await historyTab.click();
 
       // Verify processing stages are shown (using actual stage labels from API)
-      await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({
+        timeout: 10000,
+      });
       console.log('  ✓ History tab shows processing stages');
     }
   });
@@ -308,13 +319,12 @@ test.describe('Queue Progress UI Updates', () => {
 
       // Wait for loading skeleton to disappear (animate-pulse div)
       // The page shows a skeleton loader first, then actual content
-      await page.waitForFunction(
-        () => !document.querySelector('.animate-pulse'),
-        { timeout: 15_000 }
-      ).catch(() => {
-        // If skeleton doesn't disappear, the API may be very slow
-        console.log('  Loading skeleton still present after 15s');
-      });
+      await page
+        .waitForFunction(() => !document.querySelector('.animate-pulse'), { timeout: 15_000 })
+        .catch(() => {
+          // If skeleton doesn't disappear, the API may be very slow
+          console.log('  Loading skeleton still present after 15s');
+        });
 
       // Check if video is still processing, already completed, or errored
       // If the API returned an error, we'll see "Failed to load" text
@@ -323,12 +333,26 @@ test.describe('Queue Progress UI Updates', () => {
       const errorSection = page.locator('text=/Failed to load|error|not found/i');
       const loadingSection = page.locator('.animate-pulse');
 
-      const hasProgress = await progressSection.first().isVisible({ timeout: 5000 }).catch(() => false);
-      const hasCompleted = await completedSection.first().isVisible({ timeout: 5000 }).catch(() => false);
-      const hasError = await errorSection.first().isVisible({ timeout: 5000 }).catch(() => false);
-      const isLoading = await loadingSection.first().isVisible().catch(() => false);
+      const hasProgress = await progressSection
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      const hasCompleted = await completedSection
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      const hasError = await errorSection
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      const isLoading = await loadingSection
+        .first()
+        .isVisible()
+        .catch(() => false);
 
-      console.log(`  Video progress: ${hasProgress}, completed: ${hasCompleted}, error: ${hasError}, loading: ${isLoading}`);
+      console.log(
+        `  Video progress: ${hasProgress}, completed: ${hasCompleted}, error: ${hasError}, loading: ${isLoading}`
+      );
 
       // Either progress, completed content, error state, or still loading should be visible
       // (all are valid outcomes — the page rendered, it didn't crash)
