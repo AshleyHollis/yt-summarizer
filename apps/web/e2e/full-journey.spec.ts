@@ -44,6 +44,9 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
+  // Video submission and copilot query require auth; cross-domain cookies prevent auth in SWA preview
+  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
+
   test('complete journey: ingest video and query copilot', async ({ page }, testInfo) => {
     // This test covers: SWA cold start + form submission + API processing + LLM query.
     // Each step can take 30-120s under SWA cold starts. 540s (test.slow) is not enough
