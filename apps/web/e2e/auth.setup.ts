@@ -53,7 +53,8 @@ async function authenticateViaAuth0(
   const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
   const loginUrl = `${apiUrl}/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}&returnTo=${encodeURIComponent(baseUrl)}`;
   console.log(`[auth-setup] Navigating to Auth0 login for ${label} via ${apiUrl}...`);
-  await page.goto(loginUrl);
+  const response = await page.goto(loginUrl);
+  console.log(`[auth-setup] After goto — URL: ${page.url()}, status: ${response?.status()}`);
 
   // Wait for redirect to Auth0's login page
   await page.waitForURL((url) => url.hostname.includes('auth0.com'), { timeout: 20000 });
@@ -104,6 +105,8 @@ setup('authenticate as admin', async ({ page }) => {
     console.log(`[auth-setup] ✓ Saved admin auth state to ${adminAuthFile}`);
   } catch (error) {
     console.error('[auth-setup] ✗ Admin authentication failed:', error);
+    console.error(`[auth-setup] Current URL at failure: ${page.url()}`);
+    await page.screenshot({ path: 'playwright/.auth/admin-failure.png' }).catch(() => {});
     console.error('[auth-setup] Tests requiring admin authentication will be skipped.');
   }
 });
@@ -124,6 +127,8 @@ setup('authenticate as normal user', async ({ page }) => {
     console.log(`[auth-setup] ✓ Saved user auth state to ${userAuthFile}`);
   } catch (error) {
     console.error('[auth-setup] ✗ User authentication failed:', error);
+    console.error(`[auth-setup] Current URL at failure: ${page.url()}`);
+    await page.screenshot({ path: 'playwright/.auth/user-failure.png' }).catch(() => {});
     console.error('[auth-setup] Tests requiring user authentication will be skipped.');
   }
 });
