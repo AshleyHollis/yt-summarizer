@@ -651,9 +651,10 @@ jobs:
             echo "✅ Preview client already enabled for Username-Password-Authentication"
           else
             echo "⚠️ Enabling preview client for Username-Password-Authentication..."
-            CURRENT_IDS=$(echo "$CLIENTS_LIST_BODY" | jq -c '[.clients[].client_id]')
-            NEW_CLIENTS=$(echo "$CURRENT_IDS" | jq -c ". + [\"$PREVIEW_ID\"]")
-            echo "Patching with enabled_clients: $NEW_CLIENTS"
+            # Build array of {client_id: ...} objects for the PATCH body
+            CURRENT_IDS=$(echo "$CLIENTS_LIST_BODY" | jq -c '.clients')
+            NEW_CLIENTS=$(echo "$CURRENT_IDS" | jq -c ". + [{\"client_id\": \"$PREVIEW_ID\"}]")
+            echo "Patching with clients: $NEW_CLIENTS"
             PATCH_RESP=$(curl -s -w "\n%{http_code}" -X PATCH "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}/clients" \
               -H "Authorization: Bearer $TOKEN" \
               -H "Content-Type: application/json" \
