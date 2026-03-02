@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
 import { hasRole } from '@/lib/auth-utils';
-import { UserProfile } from '@/components/auth/UserProfile';
+import { LogoutButton } from '@/components/auth/LogoutButton';
 
 /**
  * Main navigation bar component
@@ -13,12 +13,12 @@ import { UserProfile } from '@/components/auth/UserProfile';
  * Features:
  * - Shows different navigation items based on user authentication
  * - Displays admin link only for users with admin role
- * - Shows user profile and logout button when authenticated
- * - Shows login button when not authenticated
+ * - Shows user avatar and logout button when authenticated
+ * - Shows sign-in link when not authenticated
  */
 export function Navbar() {
   const pathname = usePathname();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
   const isAdmin = user && hasRole(user, 'admin');
@@ -83,8 +83,39 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right Side: Theme Toggle */}
+          {/* Right Side: Auth + Theme Toggle */}
           <div className="flex items-center space-x-3">
+            {isLoading ? (
+              <div className="animate-pulse w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
+            ) : isAuthenticated && user ? (
+              <div className="flex items-center gap-2">
+                {user.picture ? (
+                  <img
+                    src={user.picture}
+                    alt={user.name || user.email}
+                    className="w-7 h-7 rounded-full border border-gray-200 dark:border-gray-700"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
+                    {(user.name || user.email).charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:inline">
+                  {user.name || user.email.split('@')[0]}
+                </span>
+                <LogoutButton
+                  variant="text"
+                  className="text-xs px-2 py-1 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                />
+              </div>
+            ) : (
+              <Link
+                href="/sign-in"
+                className="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
             <ThemeToggle />
           </div>
         </div>

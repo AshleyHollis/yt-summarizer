@@ -40,10 +40,10 @@ export function UserProfile() {
   if (isLoading) {
     return (
       <div className="animate-pulse flex items-center gap-3">
-        <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+        <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
         <div className="space-y-2">
-          <div className="h-4 bg-gray-200 rounded w-24"></div>
-          <div className="h-3 bg-gray-200 rounded w-32"></div>
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
         </div>
       </div>
     );
@@ -52,7 +52,7 @@ export function UserProfile() {
   // Not authenticated
   if (!isAuthenticated || !user) {
     return (
-      <div data-testid="not-authenticated" className="text-gray-600">
+      <div data-testid="not-authenticated" className="text-gray-600 dark:text-gray-400">
         Please log in
       </div>
     );
@@ -71,7 +71,7 @@ export function UserProfile() {
           src={user.picture}
           alt={`${displayName}'s profile`}
           data-testid="profile-picture"
-          className="w-10 h-10 rounded-full border-2 border-gray-200"
+          className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
         />
       ) : (
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold">
@@ -81,17 +81,22 @@ export function UserProfile() {
 
       {/* User Info */}
       <div className="flex flex-col">
-        <span data-testid="user-name" className="text-sm font-semibold text-gray-900">
+        <span
+          data-testid="user-name"
+          className="text-sm font-semibold text-gray-900 dark:text-white"
+        >
           {displayName}
         </span>
         <div className="flex items-center gap-2">
-          <span data-testid="user-email" className="text-xs text-gray-600">
+          <span data-testid="user-email" className="text-xs text-gray-600 dark:text-gray-400">
             {user.email}
           </span>
           <span
             data-testid="user-role"
             className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+              role === 'admin'
+                ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+                : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
             }`}
           >
             {roleDisplay}
