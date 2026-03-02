@@ -56,6 +56,13 @@ async function authenticateViaAuth0(
   const response = await page.goto(loginUrl);
   console.log(`[auth-setup] After goto — URL: ${page.url()}, status: ${response?.status()}`);
 
+  // Check for Auth0 error redirect (e.g., connection not enabled)
+  const currentUrl = page.url();
+  if (currentUrl.includes('error=') && currentUrl.includes('error_description=')) {
+    const errorDesc = decodeURIComponent(new URL(currentUrl).searchParams.get('error_description') || 'unknown');
+    throw new Error(`Auth0 returned error before login page: ${errorDesc}`);
+  }
+
   // Wait for redirect to Auth0's login page
   await page.waitForURL((url) => url.hostname.includes('auth0.com'), { timeout: 20000 });
   console.log(`[auth-setup] Reached Auth0 login page for ${label}`);

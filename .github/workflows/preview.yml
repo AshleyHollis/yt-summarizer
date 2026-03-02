@@ -586,6 +586,44 @@ jobs:
           fi
           echo "base_url=$base_url" >> "$GITHUB_OUTPUT"
 
+      - name: Enable Auth0 DB connection for preview client
+        shell: bash
+        env:
+          AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+          AUTH0_M2M_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_M2M_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+        run: |
+          # Get Management API token
+          TOKEN=$(curl -sf -X POST "https://${AUTH0_DOMAIN}/oauth/token" \
+            -H "Content-Type: application/json" \
+            -d "{\"client_id\":\"${AUTH0_M2M_CLIENT_ID}\",\"client_secret\":\"${AUTH0_M2M_CLIENT_SECRET}\",\"audience\":\"https://${AUTH0_DOMAIN}/api/v2/\",\"grant_type\":\"client_credentials\"}" \
+            | jq -r '.access_token')
+
+          # Find the preview BFF client
+          PREVIEW_ID=$(curl -sf "https://${AUTH0_DOMAIN}/api/v2/clients?fields=client_id,name&include_fields=true&per_page=50" \
+            -H "Authorization: Bearer $TOKEN" \
+            | jq -r '.[] | select(.name == "yt-summarizer-api-bff-preview") | .client_id')
+          echo "Preview client ID: $PREVIEW_ID"
+
+          # Get database connection
+          CONN_JSON=$(curl -sf "https://${AUTH0_DOMAIN}/api/v2/connections?name=Username-Password-Authentication&fields=id,enabled_clients" \
+            -H "Authorization: Bearer $TOKEN")
+          CONN_ID=$(echo "$CONN_JSON" | jq -r '.[0].id')
+          echo "Connection ID: $CONN_ID"
+
+          # Check if preview client already enabled
+          if echo "$CONN_JSON" | jq -e ".[0].enabled_clients | index(\"$PREVIEW_ID\")" > /dev/null 2>&1; then
+            echo "✅ Preview client already enabled for Username-Password-Authentication"
+          else
+            echo "⚠️ Enabling preview client for Username-Password-Authentication..."
+            NEW_CLIENTS=$(echo "$CONN_JSON" | jq ".[0].enabled_clients + [\"$PREVIEW_ID\"]")
+            curl -sf -X PATCH "https://${AUTH0_DOMAIN}/api/v2/connections/${CONN_ID}" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"enabled_clients\": $NEW_CLIENTS}" > /dev/null
+            echo "✅ Preview client enabled successfully"
+          fi
+
       - name: Run E2E tests
         id: run-tests
         uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
