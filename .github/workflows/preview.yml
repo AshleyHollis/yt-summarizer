@@ -660,7 +660,7 @@ jobs:
               -H "Content-Type: application/json" \
               -d "$NEW_CLIENTS")
             HTTP_CODE=$(echo "$PATCH_RESP" | tail -1)
-            if [[ "$HTTP_CODE" != "200" ]]; then
+            if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "204" ]]; then
               PATCH_BODY=$(echo "$PATCH_RESP" | sed '$d')
               echo "::error::Failed to enable preview client (HTTP $HTTP_CODE): $PATCH_BODY"
               exit 1
