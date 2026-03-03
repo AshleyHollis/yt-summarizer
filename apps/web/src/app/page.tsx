@@ -1,9 +1,11 @@
 /**
  * Landing Page
  *
- * Public landing page introducing the app. Auth-aware:
- * - Authenticated users see a CTA to add content
- * - Unauthenticated users see a CTA to sign in
+ * Public landing page introducing the app. Auth-aware CTAs:
+ * - Unauthenticated: "Browse Library" (primary) + "Add Content" (secondary, hits AuthGate)
+ * - Authenticated: "Add Content" (primary) + "Browse Library" (secondary)
+ *
+ * Library is public — let users see value before requiring sign-in.
  */
 
 'use client';
@@ -27,19 +29,35 @@ export default function Home() {
         </p>
 
         {isAuthenticated ? (
-          <Link
-            href="/add"
-            className="inline-flex items-center gap-2 px-8 py-3 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Add Content →
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/add"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Add Content →
+            </Link>
+            <Link
+              href="/library"
+              className="inline-flex items-center gap-2 px-8 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-lg font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              Browse Library
+            </Link>
+          </div>
         ) : (
-          <Link
-            href="/sign-in"
-            className="inline-flex items-center gap-2 px-8 py-3 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Get Started →
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/library"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Browse Library →
+            </Link>
+            <Link
+              href="/add"
+              className="inline-flex items-center gap-2 px-8 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-lg font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              Add Content
+            </Link>
+          </div>
         )}
       </section>
 
