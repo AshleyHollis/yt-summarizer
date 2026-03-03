@@ -19,21 +19,34 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Core User Flows @smoke', () => {
   test.describe('Navigation', () => {
-    test('home page redirects to add page @smoke', async ({ page }) => {
-      // Triple timeout to 540s: SWA cold starts can consume 60-120s on first
-      // page.goto, leaving insufficient time for the redirect check.
-      test.slow();
-      test.fixme(
-        !!process.env.CI,
-        'SWA cold starts cause intermittent redirect timeouts in preview'
-      );
-
+    test('landing page renders hero and CTAs @smoke', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
 
-      // Should redirect to /add — server-side redirect via Next.js.
-      // Use waitForFunction instead of toHaveURL to avoid CopilotKit URL
-      // oscillation (?thread= parameter) interfering with URL matching.
-      await page.waitForFunction(() => window.location.pathname === '/add', { timeout: 60_000 });
+      // Hero heading
+      await expect(page.getByRole('heading', { name: /YT Summarizer/i })).toBeVisible();
+
+      // Two CTAs: Browse Library (public) and Add Content (auth-gated)
+      await expect(page.getByRole('link', { name: /Browse Library/i })).toBeVisible();
+      await expect(page.getByRole('link', { name: /Add Content/i })).toBeVisible();
+    });
+
+    test('Browse Library CTA navigates to library @smoke', async ({ page }) => {
+      await page.goto('/', { timeout: 60_000 });
+      await page.getByRole('link', { name: /Browse Library/i }).click();
+      await page.waitForURL('**/library');
+    });
+
+    test('Add Content CTA navigates to add page @smoke', async ({ page }) => {
+      await page.goto('/', { timeout: 60_000 });
+      await page.getByRole('link', { name: /Add Content/i }).click();
+      await page.waitForURL('**/add');
+    });
+
+    test('landing page renders feature cards @smoke', async ({ page }) => {
+      await page.goto('/', { timeout: 60_000 });
+      await expect(page.getByRole('heading', { name: /Video Summaries/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Channel Import/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Video Library/i })).toBeVisible();
     });
 
     test('add page has correct title @smoke', async ({ page }) => {
@@ -84,15 +97,8 @@ test.describe('Core User Flows @smoke', () => {
       await expect(submitButton).toBeVisible();
     });
 
-    test('renders feature cards', async ({ page }) => {
-      test.fixme(
-        !!process.env.CI,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
-      // The add page should have feature cards explaining capabilities
-      // Check that at least one feature heading exists
-      const singleVideoHeading = page.getByRole('heading', { name: /Single Video/i });
-      await expect(singleVideoHeading).toBeVisible();
+    test('renders add content heading', async ({ page }) => {
+      await expect(page.getByRole('heading', { name: /Add Content/i })).toBeVisible();
     });
   });
 
