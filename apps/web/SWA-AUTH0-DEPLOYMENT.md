@@ -83,7 +83,7 @@ AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name yt-summarizer-kv --na
 # Set in SWA (replace resource group and SWA name if different)
 az staticwebapp appsettings set \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --setting-names \
     AUTH0_SECRET="$AUTH0_SECRET" \
     AUTH0_BASE_URL="https://red-grass-06d413100-64.eastasia.6.azurestaticapps.net" \
@@ -285,7 +285,7 @@ npm run build
 # Deploy to SWA
 az staticwebapp deploy \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --source .
 ```
 
@@ -342,7 +342,7 @@ User clicks "Sign out"
 
 If Auth0 login still fails after following this guide:
 
-1. Check Azure SWA logs: `az staticwebapp logs show --name swa-ytsumm-prd --resource-group rg-ytsumm-prd`
+1. Check Azure SWA logs: `az staticwebapp logs show --name swa-ytsumm-prd --resource-group rg-ytsumm-prd-ci`
 2. Check Auth0 logs: https://manage.auth0.com → Monitoring → Logs
 3. Verify all 5 environment variables are set in Azure Portal
 4. Verify Auth0 callback URLs match production SWA domain exactly

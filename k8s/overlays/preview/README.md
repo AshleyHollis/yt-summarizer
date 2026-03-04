@@ -24,7 +24,7 @@ The template supports these placeholders (substituted by `scripts/ci/generate_pr
 
 - `__PR_NUMBER__` - Pull request number (e.g., `6`)
 - `__IMAGE_TAG__` - Docker image tag (e.g., `pr-6-abc1234` or `latest`)
-- `__ACR_SERVER__` - Azure Container Registry URL (e.g., `acrytsummprd.azurecr.io`)
+- `__ACR_SERVER__` - Azure Container Registry URL (e.g., `acrytsummprdci.azurecr.io`)
 - `__PREVIEW_HOST__` - Preview hostname (e.g., `api-pr-6.yt-summarizer.apps.ashleyhollis.com`)
 - `__TLS_SECRET__` - TLS certificate secret name (e.g., `wildcard-yt-summarizer-apps-tls`)
 

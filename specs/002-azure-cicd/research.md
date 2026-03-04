@@ -310,7 +310,7 @@ terraform {
 terraform apply
 
 # 2. Get AKS credentials
-az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
+az aks get-credentials --resource-group rg-ytsumm-prd-ci --name aks-ytsumm-prd-ci
 
 # 3. Bootstrap Argo CD (one-time)
 ./scripts/bootstrap-argocd.ps1

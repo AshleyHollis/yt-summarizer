@@ -214,7 +214,7 @@ jobs:
           operation: update-preview
           pr-number: ${{ inputs.pr-number }}
           image-tag: ${{ inputs.image-tag }}
-          acr-server: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          acr-server: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
           preview-host: ${{ inputs.preview-host }}
           tls-secret: ${{ inputs.tls-secret }}
           preview-url: ${{ inputs.preview-url }}
@@ -239,8 +239,8 @@ jobs:
         if: inputs.run-k8s-pull-test
         uses: azure/aks-set-context@v4
         with:
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
       - name: Verify cluster can pull image
         if: inputs.run-k8s-pull-test

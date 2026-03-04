@@ -69,8 +69,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
-  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+  ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprdci' }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
   PREVIEW_NAMESPACE_PREFIX: "preview-pr-"
   APPS_BASE_DOMAIN: "yt-summarizer.apps.ashleyhollis.com"
   ARGOCD_SYNC_TIMEOUT: "180"
@@ -371,8 +371,8 @@ jobs:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
       - name: Sync ArgoCD manifests
         uses: AshleyHollis/shared-infra/.github/actions/sync-argocd-manifests@v1
@@ -673,7 +673,7 @@ jobs:
         id: run-tests
         uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
         with:
-          playwright-args: '--reporter=html --max-failures=5'
+          playwright-args: "--reporter=html --max-failures=5"
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ steps.base-url.outputs.base_url }}

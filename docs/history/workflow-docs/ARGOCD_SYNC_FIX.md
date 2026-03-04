@@ -217,7 +217,7 @@ This is why the image tag hasn't updated.
 
    # Deployment image immediately updated:
    kubectl get deployment api -n preview-pr-9 -o jsonpath='{.spec.template.spec.containers[0].image}'
-   # Output: acrytsummprd.azurecr.io/yt-summarizer-api:sha-9116ea1 ✅
+   # Output: acrytsummprdci.azurecr.io/yt-summarizer-api:sha-9116ea1 ✅
    ```
 
 4. **Re-applied ApplicationSet to cluster**:

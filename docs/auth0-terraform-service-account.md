@@ -78,7 +78,7 @@ gh secret set AUTH0_CLIENT_SECRET --body "<secret>"
 
 ### Azure Key Vault (for local development and reference)
 
-The service account credentials are also stored in Azure Key Vault `kv-ytsumm-prd` for local Terraform runs:
+The service account credentials are also stored in Azure Key Vault `kv-ytsumm-prd-ci` for local Terraform runs:
 
 ```
 auth0-terraform-domain         # dev-gvli0bfdrue0h8po.us.auth0.com
@@ -88,9 +88,9 @@ auth0-terraform-client-secret  # (redacted)
 
 **Set via:**
 ```bash
-az keyvault secret set --vault-name kv-ytsumm-prd --name auth0-terraform-domain --value "dev-gvli0bfdrue0h8po.us.auth0.com"
-az keyvault secret set --vault-name kv-ytsumm-prd --name auth0-terraform-client-id --value "Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6"
-az keyvault secret set --vault-name kv-ytsumm-prd --name auth0-terraform-client-secret --value "<secret>"
+az keyvault secret set --vault-name kv-ytsumm-prd-ci --name auth0-terraform-domain --value "dev-gvli0bfdrue0h8po.us.auth0.com"
+az keyvault secret set --vault-name kv-ytsumm-prd-ci --name auth0-terraform-client-id --value "Fmh7q7q2OrqUvmSXTgBxr3E7v5KdAbt6"
+az keyvault secret set --vault-name kv-ytsumm-prd-ci --name auth0-terraform-client-secret --value "<secret>"
 ```
 
 ## Usage in GitHub Actions
@@ -154,9 +154,9 @@ To run Terraform locally with the service account:
 cd infra/terraform/environments/prod
 
 # Load Auth0 credentials from Azure Key Vault
-export AUTH0_DOMAIN=$(az keyvault secret show --vault-name kv-ytsumm-prd --name auth0-terraform-domain --query value -o tsv)
-export AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name kv-ytsumm-prd --name auth0-terraform-client-id --query value -o tsv)
-export AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name kv-ytsumm-prd --name auth0-terraform-client-secret --query value -o tsv)
+export AUTH0_DOMAIN=$(az keyvault secret show --vault-name kv-ytsumm-prd-ci --name auth0-terraform-domain --query value -o tsv)
+export AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name kv-ytsumm-prd-ci --name auth0-terraform-client-id --query value -o tsv)
+export AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name kv-ytsumm-prd-ci --name auth0-terraform-client-secret --query value -o tsv)
 
 # Or set them manually
 export AUTH0_DOMAIN="dev-gvli0bfdrue0h8po.us.auth0.com"
@@ -219,7 +219,7 @@ After Terraform successfully creates the `yt-summarizer-api-bff` application:
 
 ```bash
 # List all Auth0 secrets
-az keyvault secret list --vault-name kv-ytsumm-prd --query "[?starts_with(name, 'auth0-')].name"
+az keyvault secret list --vault-name kv-ytsumm-prd-ci --query "[?starts_with(name, 'auth0-')].name"
 
 # Expected output:
 # Service Account (for Terraform):
@@ -341,7 +341,7 @@ Error: 403 Insufficient scope
 **Solution:**
 1. Verify secrets exist in Azure Key Vault:
    ```bash
-   az keyvault secret list --vault-name kv-ytsumm-prd --query "[?starts_with(name, 'auth0')].name"
+   az keyvault secret list --vault-name kv-ytsumm-prd-ci --query "[?starts_with(name, 'auth0')].name"
    ```
 
 2. Check ExternalSecret status:
@@ -375,7 +375,7 @@ gh secret set AUTH0_CLIENT_SECRET --body "<new-secret>"
 ### 3. Update Azure Key Vault
 
 ```bash
-az keyvault secret set --vault-name kv-ytsumm-prd --name auth0-terraform-client-secret --value "<new-secret>"
+az keyvault secret set --vault-name kv-ytsumm-prd-ci --name auth0-terraform-client-secret --value "<new-secret>"
 ```
 
 ### 4. Test Locally

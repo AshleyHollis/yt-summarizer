@@ -16,10 +16,10 @@ resources:
 # Using digest pinning for immutable deployments
 images:
   - name: yt-summarizer-api
-    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newName: acrytsummprdci.azurecr.io/yt-summarizer-api
     newTag: ${IMAGE_TAG}
   - name: yt-summarizer-workers
-    newName: acrytsummprd.azurecr.io/yt-summarizer-workers
+    newName: acrytsummprdci.azurecr.io/yt-summarizer-workers
     newTag: ${IMAGE_TAG}
 
 # Production-specific patches (all inline for consistency)

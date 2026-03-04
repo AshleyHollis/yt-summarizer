@@ -137,7 +137,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           swa-name: ${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           dry-run: "false"
           min-age-hours: "1"
@@ -221,7 +221,7 @@ jobs:
             echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
           else
             SWA_NAME="${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}"
-            RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}"
+            RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}"
             PR_NUM="${{ inputs.pr-number }}"
             if [[ "${{ inputs.environment }}" == "prod" ]]; then
               HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv 2>/dev/null || echo "")

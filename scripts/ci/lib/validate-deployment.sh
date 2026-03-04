@@ -10,7 +10,7 @@
 #   ./validate-deployment.sh <kustomize_dir> <namespace> [acr_server]
 #
 # Example:
-#   ./validate-deployment.sh k8s/overlays/preview preview-pr-110 acrytsummprd.azurecr.io
+#   ./validate-deployment.sh k8s/overlays/preview preview-pr-110 acrytsummprdci.azurecr.io
 ################################################################################
 
 set -euo pipefail
@@ -212,7 +212,7 @@ validate_quota() {
 ################################################################################
 validate_images() {
     local manifests_file="$1"
-    local acr_server="${2:-acrytsummprd.azurecr.io}"
+    local acr_server="${2:-acrytsummprdci.azurecr.io}"
 
     log_info "⏳ Validating container images exist in registry..."
 
@@ -340,7 +340,7 @@ validate_dependencies() {
 validate_deployment() {
     local kustomize_dir="$1"
     local namespace="$2"
-    local acr_server="${3:-acrytsummprd.azurecr.io}"
+    local acr_server="${3:-acrytsummprdci.azurecr.io}"
 
     echo "╔══════════════════════════════════════════════════════════════════════════════╗"
     echo "║  Pre-Deployment Validation                                                   ║"
@@ -418,7 +418,7 @@ validate_deployment() {
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     if [ $# -lt 2 ]; then
         echo "Usage: $0 <kustomize_dir> <namespace> [acr_server]"
-        echo "Example: $0 k8s/overlays/preview preview-pr-110 acrytsummprd.azurecr.io"
+        echo "Example: $0 k8s/overlays/preview preview-pr-110 acrytsummprdci.azurecr.io"
         exit 1
     fi
 

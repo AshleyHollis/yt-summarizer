@@ -355,7 +355,7 @@ If none of the above works, escalate to Azure:
 
 **Information to provide**:
 
-1. SWA resource: `swa-ytsumm-prd` in `rg-ytsumm-prd`
+1. SWA resource: `swa-ytsumm-prd` in `rg-ytsumm-prd-ci`
 2. Failed deployment IDs from workflow logs
 3. Last successful deployment (production)
 4. GitHub Actions workflow run links

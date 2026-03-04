@@ -174,14 +174,14 @@ terraform plan -no-color -input=false -out=tfplan \
 **OpenAI API Key:**
 ```bash
 terraform import 'module.key_vault.azurerm_key_vault_secret.secrets["openai-api-key"]' \
-  "https://kv-ytsumm-prd.vault.azure.net/secrets/openai-api-key/c8f65984fa984088a5424015734c42e2"
+  "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/openai-api-key/c8f65984fa984088a5424015734c42e2"
 ```
 **Status:** ✅ Imported successfully
 
 **Cloudflare API Token:**
 ```bash
 terraform import 'module.key_vault.azurerm_key_vault_secret.secrets["cloudflare-api-token"]' \
-  "https://kv-ytsumm-prd.vault.azure.net/secrets/cloudflare-api-token/2ff1b7546e82248f542601d29c05d9d"
+  "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/cloudflare-api-token/2ff1b7546e82248f542601d29c05d9d"
 ```
 **Status:** ✅ Imported successfully
 
@@ -243,8 +243,8 @@ Add the following repository secrets:
 
 **How to get values:**
 ```bash
-az keyvault secret show --vault-name kv-ytsumm-prd --name openai-api-key --query "value" -o tsv
-az keyvault secret show --vault-name kv-ytsumm-prd --name cloudflare-api-token --query "value" -o tsv
+az keyvault secret show --vault-name kv-ytsumm-prd-ci --name openai-api-key --query "value" -o tsv
+az keyvault secret show --vault-name kv-ytsumm-prd-ci --name cloudflare-api-token --query "value" -o tsv
 ```
 
 ---

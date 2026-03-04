@@ -100,7 +100,7 @@ images:
 3. **Variables substituted** by `scripts/ci/generate_preview_kustomization.py`:
    - `__PR_NUMBER__` → `6`
    - `__IMAGE_TAG__` → `pr-6-abc1234` or `latest`
-   - `__ACR_SERVER__` → `acrytsummprd.azurecr.io`
+   - `__ACR_SERVER__` → `acrytsummprdci.azurecr.io`
    - `__PREVIEW_HOST__` → `api-pr-6.yt-summarizer.apps.ashleyhollis.com`
    - `__TLS_SECRET__` → `wildcard-yt-summarizer-apps-tls`
 4. **Generated overlay** written to `k8s/overlays/preview/kustomization.yaml`

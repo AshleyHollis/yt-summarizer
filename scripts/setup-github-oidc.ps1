@@ -22,7 +22,7 @@
     GitHub repository name
 
 .EXAMPLE
-    .\setup-github-oidc.ps1 -SubscriptionId "xxx" -ResourceGroupName "rg-ytsumm-prd" -GitHubOrg "AshleyHollis" -GitHubRepo "yt-summarizer"
+    .\setup-github-oidc.ps1 -SubscriptionId "xxx" -ResourceGroupName "rg-ytsumm-prd-ci" -GitHubOrg "AshleyHollis" -GitHubRepo "yt-summarizer"
 #>
 
 param(

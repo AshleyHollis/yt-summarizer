@@ -245,7 +245,7 @@ The project uses a unified validation action (`.github/actions/validate`) that c
 
 ### Required Variables
 
-- `ACR_NAME`: Container registry name (e.g., `acrytsummprd`)
+- `ACR_NAME`: Container registry name (e.g., `acrytsummprdci`)
 - `ACR_LOGIN_SERVER`: Registry login server
 - `AKS_CLUSTER_NAME`: Kubernetes cluster name
 - `AKS_RESOURCE_GROUP`: Resource group for AKS

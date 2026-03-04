@@ -63,7 +63,7 @@ terraform import module.github_oidc.azurerm_role_assignment.contributor[0] <CONT
 
 # 7. Import AcrPush role assignment
 # Use this command to find the role assignment ID:
-# az role assignment list --assignee 0a8480bd-2b41-449f-b16e-badd5616ae15 --scope "/subscriptions/28aefbe7-e2af-4b4a-9ce1-92d6672c31bd/resourceGroups/rg-ytsumm-prd/providers/Microsoft.ContainerRegistry/registries/acrytsummprd" --query "[?roleDefinitionName=='AcrPush'].{name: roleDefinitionName, id: id}"
+# az role assignment list --assignee 0a8480bd-2b41-449f-b16e-badd5616ae15 --scope "/subscriptions/28aefbe7-e2af-4b4a-9ce1-92d6672c31bd/resourceGroups/rg-ytsumm-prd-ci/providers/Microsoft.ContainerRegistry/registries/acrytsummprdci" --query "[?roleDefinitionName=='AcrPush'].{name: roleDefinitionName, id: id}"
 
 terraform import module.github_oidc.azurerm_role_assignment.acr_push[0] <ACR_PUSH_ROLE_ID>
 ```

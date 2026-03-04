@@ -290,7 +290,7 @@ Added new workflow step in `.github/workflows/preview.yml`:
     ENVIRONMENT_NAME="${{ needs.detect-changes.outputs.pr_number }}"
     az staticwebapp appsettings set \
       --name "swa-ytsumm-prd" \
-      --resource-group "rg-ytsumm-prd" \
+      --resource-group "rg-ytsumm-prd-ci" \
       --environment-name "$ENVIRONMENT_NAME" \
       --setting-names \
         "AUTH0_SECRET=${{ steps.fetch-auth0.outputs.auth0-session-secret }}" \
@@ -591,13 +591,13 @@ export async function GET() {
 # But if we could see them, this is how:
 az staticwebapp show \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --output json
 
 # Check if preview environment exists
 az staticwebapp hostname list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd
+  --resource-group rg-ytsumm-prd-ci
 ```
 
 ### Check Current App Settings
@@ -606,12 +606,12 @@ az staticwebapp hostname list \
 # Production (default environment)
 az staticwebapp appsettings list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd
+  --resource-group rg-ytsumm-prd-ci
 
 # Preview environment
 az staticwebapp appsettings list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --environment-name 64
 ```
 

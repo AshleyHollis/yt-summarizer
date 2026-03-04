@@ -40,10 +40,10 @@ When an AKS cluster is stopped:
 
 ```bash
 # Start the AKS cluster
-az aks start --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
+az aks start --resource-group rg-ytsumm-prd-ci --name aks-ytsumm-prd-ci
 
 # Verify cluster is running
-az aks show --resource-group rg-ytsumm-prd --name aks-ytsumm-prd \
+az aks show --resource-group rg-ytsumm-prd-ci --name aks-ytsumm-prd-ci \
   --query "{PowerState:powerState.code, ProvisioningState:provisioningState}"
 
 # Test connectivity
@@ -88,13 +88,13 @@ If cluster stop/start is desired, add a workflow step to ensure cluster is runni
 ```yaml
 - name: Ensure AKS cluster is running
   run: |
-    STATE=$(az aks show -g rg-ytsumm-prd -n aks-ytsumm-prd --query "powerState.code" -o tsv)
+    STATE=$(az aks show -g rg-ytsumm-prd-ci -n aks-ytsumm-prd-ci --query "powerState.code" -o tsv)
     if [ "$STATE" = "Stopped" ]; then
       echo "Cluster is stopped. Starting..."
-      az aks start -g rg-ytsumm-prd -n aks-ytsumm-prd --no-wait
+      az aks start -g rg-ytsumm-prd-ci -n aks-ytsumm-prd-ci --no-wait
       # Wait for cluster to be accessible
       for i in {1..30}; do
-        if az aks show -g rg-ytsumm-prd -n aks-ytsumm-prd --query "provisioningState" -o tsv | grep -q "Succeeded"; then
+        if az aks show -g rg-ytsumm-prd-ci -n aks-ytsumm-prd-ci --query "provisioningState" -o tsv | grep -q "Succeeded"; then
           break
         fi
         sleep 10

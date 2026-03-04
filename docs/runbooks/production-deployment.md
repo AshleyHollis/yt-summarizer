@@ -7,12 +7,12 @@
 
 | Resource | Name | Region |
 |----------|------|--------|
-| Resource Group | `rg-ytsumm-prd` | East Asia |
-| Container Registry | `acrytsummprd.azurecr.io` | East Asia |
-| AKS Cluster | `aks-ytsumm-prd` | East Asia |
+| Resource Group | `rg-ytsumm-prd-ci` | East Asia |
+| Container Registry | `acrytsummprdci.azurecr.io` | East Asia |
+| AKS Cluster | `aks-ytsumm-prd-ci` | East Asia |
 | SQL Server | `sql-ytsumm-prd.database.windows.net` | East Asia |
 | SQL Database | `ytsummarizer` | East Asia |
-| Key Vault | `kv-ytsumm-prd.vault.azure.net` | East Asia |
+| Key Vault | `kv-ytsumm-prd-ci.vault.azure.net` | East Asia |
 | Storage Account | `stytsummprd.blob.core.windows.net` | East Asia |
 | Static Web App | `swa-ytsumm-prd` | Global |
 
@@ -28,7 +28,7 @@
 
 ```powershell
 # Get AKS credentials
-az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
+az aks get-credentials --resource-group rg-ytsumm-prd-ci --name aks-ytsumm-prd-ci
 
 # Verify connection
 kubectl get nodes
@@ -53,7 +53,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
     ForEach-Object { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
 
 # Option 2: From Azure Key Vault
-az keyvault secret show --vault-name kv-ytsumm-prd --name argocd-admin-password --query value -o tsv
+az keyvault secret show --vault-name kv-ytsumm-prd-ci --name argocd-admin-password --query value -o tsv
 ```
 
 ## Argo CD Applications
@@ -84,10 +84,10 @@ kubectl patch application <app-name> -n argocd --type merge -p '{"operation":{"s
 
 ```powershell
 # List all secrets
-az keyvault secret list --vault-name kv-ytsumm-prd --query "[].name" -o tsv
+az keyvault secret list --vault-name kv-ytsumm-prd-ci --query "[].name" -o tsv
 
 # Get a secret value
-az keyvault secret show --vault-name kv-ytsumm-prd --name <secret-name> --query value -o tsv
+az keyvault secret show --vault-name kv-ytsumm-prd-ci --name <secret-name> --query value -o tsv
 ```
 
 ## DNS Configuration (TODO)
