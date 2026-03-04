@@ -87,7 +87,7 @@ az ad app federated-credential delete --id f005883d-5861-47b7-9d7a-177625da6811 
 ### 3. Key Vault Secrets ⚠️ NOT MANAGED BY TERRAFORM
 
 **Status:** Not in Terraform - Should be added  
-**Location:** Key Vault `kv-ytsumm-prd`
+**Location:** Key Vault `kv-ytsumm-prd-ci`
 
 **Secrets in Key Vault:**
 | Secret Name | Source | Managed by Terraform |
@@ -203,9 +203,9 @@ variable "cloudflare_api_token" {
    ```bash
    cd infra/terraform/environments/prod
    terraform import azurerm_key_vault_secret.secrets["openai-api-key"] \
-     "https://kv-ytsumm-prd.vault.azure.net/secrets/openai-api-key"
+     "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/openai-api-key"
    terraform import azurerm_key_vault_secret.secrets["cloudflare-api-token"] \
-     "https://kv-ytsumm-prd.vault.azure.net/secrets/cloudflare-api-token"
+     "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/cloudflare-api-token"
    ```
 
 ### Phase 3: Validation (Medium Priority)
@@ -238,7 +238,7 @@ az ad app federated-credential list --id <app-id> --query "[].{name:name, subjec
 az role assignment list --assignee <app-id> --query "[].{role:roleDefinitionName, scope:scope}" --output table
 
 # List secrets in Key Vault
-az keyvault secret list --vault-name kv-ytsumm-prd --query "[].name" --output table
+az keyvault secret list --vault-name kv-ytsumm-prd-ci --query "[].name" --output table
 
 # Check Terraform state for resources
 terraform state list | grep azuread

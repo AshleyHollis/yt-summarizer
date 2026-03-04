@@ -190,3 +190,5 @@ uv.lock
 *.tfstate.backup
 tfplan
 *.tfplan
+nul
+apps/web/nul

@@ -170,7 +170,7 @@ Changes to any of:
 # Commit e43f28a changes services/api/main.py
 #
 # 1. CI workflow:
-#    - Builds acrytsummprd.azurecr.io/yt-summarizer-api:sha-e43f28a
+#    - Builds acrytsummprdci.azurecr.io/yt-summarizer-api:sha-e43f28a
 #    - Pushes to ACR
 #
 # 2. Production workflow:
@@ -180,7 +180,7 @@ Changes to any of:
 
 images:
   - name: yt-summarizer-api
-    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newName: acrytsummprdci.azurecr.io/yt-summarizer-api
     newTag: sha-e43f28a  # ← CI-BUILT IMAGE (not rebuilt)
 ```
 
@@ -209,7 +209,7 @@ Changes to:
 
 images:
   - name: yt-summarizer-api
-    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newName: acrytsummprdci.azurecr.io/yt-summarizer-api
     newTag: sha-e43f28a  # ← SAME TAG, new config applied
 ```
 
@@ -256,7 +256,7 @@ Both production and preview workflows **reuse CI-built images** instead of rebui
 │  2. CI WORKFLOW BUILDS IMAGE (push to main event)           │
 │     Tag: sha-e43f28a                                        │
 │     Also tagged: latest                                     │
-│     Pushed to: acrytsummprd.azurecr.io                      │
+│     Pushed to: acrytsummprdci.azurecr.io                      │
 │     Duration: ~5-10 minutes                                 │
 └─────────────────────────────────────────────────────────────┘
                           ↓
@@ -278,7 +278,7 @@ Both production and preview workflows **reuse CI-built images** instead of rebui
 ┌─────────────────────────────────────────────────────────────┐
 │  5. ARGOCD AUTO-SYNC                                        │
 │     Detects: kustomization.yaml change                      │
-│     Pulls: acrytsummprd.azurecr.io/.../sha-e43f28a         │
+│     Pulls: acrytsummprdci.azurecr.io/.../sha-e43f28a         │
 │     Deploys: To namespace yt-summarizer                     │
 └─────────────────────────────────────────────────────────────┘
                           ↓
@@ -359,7 +359,7 @@ git push origin main
 ### To Specific Commit
 ```bash
 # 1. Check ACR for available tags
-az acr repository show-tags --name acrytsummprd --repository yt-summarizer-api
+az acr repository show-tags --name acrytsummprdci --repository yt-summarizer-api
 
 # 2. Update kustomization with desired SHA
 newTag: sha-abc1234

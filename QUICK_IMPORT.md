@@ -28,7 +28,7 @@ Replace `<CONTRIBUTOR_ROLE_ID>` and `<ACR_PUSH_ROLE_ID>` with actual IDs from:
 ```powershell
 az role assignment list --assignee 0a8480bd-2b41-449f-b16e-badd5616ae15 --scope "/subscriptions/28aefbe7-e2af-4b4a-9ce1-92d6672c31bd" --query "[?roleDefinitionName=='Contributor'].{name: roleDefinitionName, id: id}"
 
-az role assignment list --assignee 0a8480bd-2b41-449f-b16e-badd5616ae15 --scope "/subscriptions/28aefbe7-e2af-4b4a-9ce1-92d6672c31bd/resourceGroups/rg-ytsumm-prd/providers/Microsoft.ContainerRegistry/registries/acrytsummprd" --query "[?roleDefinitionName=='AcrPush'].{name: roleDefinitionName, id: id}"
+az role assignment list --assignee 0a8480bd-2b41-449f-b16e-badd5616ae15 --scope "/subscriptions/28aefbe7-e2af-4b4a-9ce1-92d6672c31bd/resourceGroups/rg-ytsumm-prd-ci/providers/Microsoft.ContainerRegistry/registries/acrytsummprdci" --query "[?roleDefinitionName=='AcrPush'].{name: roleDefinitionName, id: id}"
 ```
 
 After imports, verify with:

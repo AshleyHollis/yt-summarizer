@@ -28,6 +28,7 @@ PR #64 (`004-auth0-ui-integration`) consistently times out during SWA preview de
 **Purpose**: Confirm preview infrastructure works with current Next.js 16 setup
 
 **Test Command**:
+
 ```bash
 # Build
 cd apps/web
@@ -39,19 +40,21 @@ $TOKEN = (gh secret list | Select-String "AZURE_STATIC_WEB_APPS_API_TOKEN")
 # Deploy to SWA preview environment using AzCLI
 az staticwebapp deployment create \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --environment-name "baseline-test" \
   --source ./apps/web/.next/standalone \
   --output-location .next/static
 ```
 
 **Success Criteria**:
+
 - [ ] Deployment completes in < 2 minutes
 - [ ] App loads successfully
 - [ ] Health check responds
 - [ ] No Auth0 features (expected)
 
 **If FAILS**:
+
 - Issue is NOT Auth0-related
 - Check Next.js 16 compatibility with SWA
 - Check if preview environments have platform issues
@@ -75,11 +78,13 @@ npm run build
 **Purpose**: Test if SDK package itself causes issues
 
 **Success Criteria**:
+
 - [ ] Deployment completes in < 2 minutes
 - [ ] App works same as baseline
 - [ ] No Auth0 code executed
 
 **If FAILS**:
+
 - The Auth0 SDK package itself has incompatibility
 - Check SDK version compatibility with Next.js 16
 - Try downgrading SDK version
@@ -102,10 +107,12 @@ npm run build
 **Purpose**: Test if Auth0 client initialization code causes issues
 
 **Success Criteria**:
+
 - [ ] Deployment completes in < 2 minutes
 - [ ] App works (auth0.ts not used)
 
 **If FAILS**:
+
 - Module-level code in auth0.ts crashes during build/runtime
 - Check for require() or import statements at module level
 - Check for immediate initialization code
@@ -132,11 +139,13 @@ npm run build
 **Purpose**: Test if middleware with Auth0 imports causes warmup timeout
 
 **Success Criteria**:
+
 - [ ] Deployment completes in < 2 minutes
 - [ ] Middleware runs on requests
 - [ ] Auth0 gracefully disabled (no env vars)
 
 **If FAILS** 🔴:
+
 - **ROOT CAUSE IDENTIFIED**: Middleware with Auth0 imports breaks SWA warmup
 - Possible causes:
   - Middleware executed during warmup, crashes server
@@ -289,13 +298,13 @@ Result: TIMEOUT (no error message, just hung)
 
 ### Comparison
 
-| Environment | Code | Auth0 | Result | Time |
-|-------------|------|-------|--------|------|
-| Production (main) | Clean | ❌ No | ✅ Works | ~46s |
-| Production (main) via SWA Action | Clean | ❌ No | ✅ Works | ~46s |
-| Preview PR #64 | + Auth0 | ✅ Yes | ❌ Timeout | ~590s |
-| Preview PR #66 (baseline) | Clean | ❌ No | ❌ Timeout | ~600s |
-| SWA CLI PR #66 | Clean | ❌ No | ❌ Timeout | ~600s |
+| Environment                      | Code    | Auth0  | Result     | Time  |
+| -------------------------------- | ------- | ------ | ---------- | ----- |
+| Production (main)                | Clean   | ❌ No  | ✅ Works   | ~46s  |
+| Production (main) via SWA Action | Clean   | ❌ No  | ✅ Works   | ~46s  |
+| Preview PR #64                   | + Auth0 | ✅ Yes | ❌ Timeout | ~590s |
+| Preview PR #66 (baseline)        | Clean   | ❌ No  | ❌ Timeout | ~600s |
+| SWA CLI PR #66                   | Clean   | ❌ No  | ❌ Timeout | ~600s |
 
 ### Root Cause Analysis
 
@@ -352,11 +361,11 @@ swa deploy \
 
 ## Test Results Tracker (UPDATED)
 
-| Phase | Change | Deploy Method | Time | Result | Notes |
-|-------|--------|---------------|------|--------|-------|
-| 0 | Baseline (no Auth0) | SWA CLI (env 66) | 600s | ❌ Timeout | **AUTH0 NOT THE CAUSE** |
-| 0b | Baseline (no Auth0) | SWA CLI (default) | TBD | ⏳ Pending | Test production env |
-| 1-6 | N/A | N/A | N/A | ⏭️ Skipped | Auth0 phases no longer needed |
+| Phase | Change              | Deploy Method     | Time | Result     | Notes                         |
+| ----- | ------------------- | ----------------- | ---- | ---------- | ----------------------------- |
+| 0     | Baseline (no Auth0) | SWA CLI (env 66)  | 600s | ❌ Timeout | **AUTH0 NOT THE CAUSE**       |
+| 0b    | Baseline (no Auth0) | SWA CLI (default) | TBD  | ⏳ Pending | Test production env           |
+| 1-6   | N/A                 | N/A               | N/A  | ⏭️ Skipped | Auth0 phases no longer needed |
 
 ---
 
@@ -365,15 +374,17 @@ swa deploy \
 ### Option A: Escalate to Azure Support (Recommended)
 
 **Evidence to Provide**:
+
 - Baseline code (no Auth0) times out in preview environments
 - Same code works in production (default environment)
 - Consistent 10-minute timeout across:
   - GitHub Actions deployments
   - Manual SWA CLI deployments
 - Next.js 16.1.3 standalone mode
-- Resource: `swa-ytsumm-prd` in `rg-ytsumm-prd`
+- Resource: `swa-ytsumm-prd` in `rg-ytsumm-prd-ci`
 
 **Request**:
+
 - Access to SWA warmup logs for environment `66`
 - Confirmation of preview environment limits or issues
 - Next.js 16 compatibility status
@@ -382,6 +393,7 @@ swa deploy \
 ### Option B: Workaround - Use Production for Testing
 
 **Temporary Solution**:
+
 - Deploy Auth0 changes directly to production
 - Skip preview deployments temporarily
 - Add feature flags to disable Auth0 in production if needed
@@ -390,6 +402,7 @@ swa deploy \
 ### Option C: Downgrade Next.js
 
 **Test Hypothesis**:
+
 ```bash
 # Check when Next.js 16 was introduced
 git log --all --oneline -- apps/web/package.json | grep -i next
@@ -409,17 +422,18 @@ swa deploy --app-location . --output-location .next/standalone --deployment-toke
 
 ## Test Results Tracker
 
-| Phase | Change | Deploy Method | Time | Result | Notes |
-|-------|--------|---------------|------|--------|-------|
-| 0 | Baseline (no Auth0) | AzCLI | TBD | ⏳ Pending | Clean main branch |
-| 1 | +Auth0 SDK package | AzCLI | TBD | ⏳ Pending | Just npm install |
-| 2 | +auth0.ts module | AzCLI | TBD | ⏳ Pending | Not imported yet |
-| 3 | +proxy middleware | AzCLI | TBD | ⏳ Pending | **Expected to fail** |
-| 4 | +error page | AzCLI | TBD | ⏳ Pending | If Phase 3 passed |
-| 5 | +admin routes | AzCLI | TBD | ⏳ Pending | If Phase 4 passed |
-| 6 | +API routes | AzCLI | TBD | ⏳ Pending | If Phase 5 passed |
+| Phase | Change              | Deploy Method | Time | Result     | Notes                |
+| ----- | ------------------- | ------------- | ---- | ---------- | -------------------- |
+| 0     | Baseline (no Auth0) | AzCLI         | TBD  | ⏳ Pending | Clean main branch    |
+| 1     | +Auth0 SDK package  | AzCLI         | TBD  | ⏳ Pending | Just npm install     |
+| 2     | +auth0.ts module    | AzCLI         | TBD  | ⏳ Pending | Not imported yet     |
+| 3     | +proxy middleware   | AzCLI         | TBD  | ⏳ Pending | **Expected to fail** |
+| 4     | +error page         | AzCLI         | TBD  | ⏳ Pending | If Phase 3 passed    |
+| 5     | +admin routes       | AzCLI         | TBD  | ⏳ Pending | If Phase 4 passed    |
+| 6     | +API routes         | AzCLI         | TBD  | ⏳ Pending | If Phase 5 passed    |
 
 **Legend**:
+
 - ⏳ Pending
 - ✅ Success (< 2 min)
 - ❌ Failed (timeout or error)
@@ -432,6 +446,7 @@ swa deploy --app-location . --output-location .next/standalone --deployment-toke
 **Most Likely Scenario**: Phase 3 (proxy middleware) breaks deployment
 
 **Why**:
+
 - Middleware runs on every request, including SWA health checks
 - Auth0 SDK might crash/hang during initialization when env vars missing
 - Next.js standalone mode might handle middleware differently than dev mode
@@ -482,23 +497,23 @@ du -sh apps/web/.next/standalone
 # Deploy to Azure (requires az login)
 az staticwebapp deployment create \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --environment-name "baseline-test"
 
 # Check deployment status
 az staticwebapp show \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd
+  --resource-group rg-ytsumm-prd-ci
 
 # View SWA environments
 az staticwebapp environment list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd
+  --resource-group rg-ytsumm-prd-ci
 
 # Delete test environment when done
 az staticwebapp environment delete \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --environment-name "baseline-test"
 ```
 

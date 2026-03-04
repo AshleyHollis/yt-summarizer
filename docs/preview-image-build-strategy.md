@@ -98,7 +98,7 @@ Changes to any of:
 2. **CI workflow** (separate) triggers in parallel:
    - Runs tests
    - Builds images tagged as `pr-{number}-{sha}`
-   - Pushes to ACR: `acrytsummprd.azurecr.io/yt-summarizer-api:pr-42-abc1234`
+   - Pushes to ACR: `acrytsummprdci.azurecr.io/yt-summarizer-api:pr-42-abc1234`
 3. **wait-for-ci** job in preview workflow:
    - Finds CI workflow run for same commit
    - Waits up to 30 minutes for completion
@@ -121,7 +121,7 @@ Changes to any of:
 
 images:
   - name: yt-summarizer-api
-    newName: acrytsummprd.azurecr.io/yt-summarizer-api
+    newName: acrytsummprdci.azurecr.io/yt-summarizer-api
     newTag: pr-42-abc1234  # ← PR-scoped tag from CI
 ```
 
@@ -225,7 +225,7 @@ Changes to:
 ┌─────────────────────────────────────────────────────────────┐
 │  5. ARGOCD AUTO-SYNC                                        │
 │     Watches: PR #42 branch                                  │
-│     Pulls: acrytsummprd.azurecr.io/.../pr-42-abc1234       │
+│     Pulls: acrytsummprdci.azurecr.io/.../pr-42-abc1234       │
 │     Deploys: To namespace preview-pr-42                     │
 └─────────────────────────────────────────────────────────────┘
                           ↓

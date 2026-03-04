@@ -71,8 +71,8 @@ env:
   # Only environment-specific overrides and GitHub variables are set here
 
   # GitHub Variables (can override shared.env defaults)
-  ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprd' }}
-  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+  ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprdci' }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
 
   # Production-specific values
   ARGOCD_APP_NAME_PROD: "yt-summarizer-prod"
@@ -163,8 +163,8 @@ jobs:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
       - name: Sync Argo CD manifests
         uses: AshleyHollis/shared-infra/.github/actions/sync-argocd-manifests@v1

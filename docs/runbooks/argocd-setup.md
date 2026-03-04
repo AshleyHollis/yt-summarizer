@@ -42,7 +42,7 @@ terraform init
 terraform apply
 
 # 2. Get AKS credentials
-az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
+az aks get-credentials --resource-group rg-ytsumm-prd-ci --name aks-ytsumm-prd-ci
 
 # 3. Bootstrap Argo CD (installs Argo CD + infrastructure apps)
 .\scripts\bootstrap-argocd.ps1
@@ -188,7 +188,7 @@ If you must use a GitHub PAT, store it in Azure Key Vault for automatic rotation
 ```powershell
 # 1. Store token in Azure Key Vault
 az keyvault secret set \
-  --vault-name kv-ytsumm-prd \
+  --vault-name kv-ytsumm-prd-ci \
   --name github-argocd-token \
   --value "<YOUR_GITHUB_PAT>"
 

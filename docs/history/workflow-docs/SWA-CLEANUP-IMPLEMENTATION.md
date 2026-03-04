@@ -113,7 +113,7 @@ This implementation adds comprehensive cleanup for Azure Static Web Apps staging
 
 ```yaml
 SWA_NAME: swa-ytsumm-prd  # Default value
-SWA_RESOURCE_GROUP: rg-ytsumm-prd  # Default value
+SWA_RESOURCE_GROUP: rg-ytsumm-prd-ci  # Default value
 ```
 
 If your SWA has different names, set these in GitHub repository variables.
@@ -197,20 +197,20 @@ If you have stale environments now:
 # 1. Check current environment count
 az staticwebapp environment list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --query "length([?name!='default'])" \
   -o tsv
 
 # 2. List all environments
 az staticwebapp environment list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --output table
 
 # 3. Delete specific environment
 az staticwebapp environment delete \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --environment-name <env-name>
 ```
 

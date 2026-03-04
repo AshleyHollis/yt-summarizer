@@ -45,7 +45,7 @@ if (!(Get-Command kubectl -ErrorAction SilentlyContinue)) {
 # Verify kubectl context
 $context = kubectl config current-context 2>$null
 if (!$context) {
-    Write-Error "kubectl not configured. Run: az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd"
+    Write-Error "kubectl not configured. Run: az aks get-credentials --resource-group rg-ytsumm-prd-ci --name aks-ytsumm-prd-ci"
 }
 Write-Host "  [OK] kubectl context: $context" -ForegroundColor Green
 

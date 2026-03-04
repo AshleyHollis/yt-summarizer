@@ -157,5 +157,5 @@ jobs:
       - name: Delete PR images from ACR
         uses: AshleyHollis/shared-infra/.github/actions/cleanup-acr-images@v1
         with:
-          acr-name: ${{ vars.ACR_NAME || 'acrytsummprd' }}
+          acr-name: ${{ vars.ACR_NAME || 'acrytsummprdci' }}
           pr-number: ${{ github.event.pull_request.number }}

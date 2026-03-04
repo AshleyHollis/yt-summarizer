@@ -34,7 +34,7 @@ az account set --subscription <YOUR_SUBSCRIPTION_ID>
 # Run the setup script
 .\scripts\setup-github-oidc.ps1 `
   -SubscriptionId '<YOUR_SUBSCRIPTION_ID>' `
-  -ResourceGroupName 'rg-ytsumm-prd' `
+  -ResourceGroupName 'rg-ytsumm-prd-ci' `
   -GitHubOrg 'AshleyHollis' `
   -GitHubRepo 'yt-summarizer'
 ```

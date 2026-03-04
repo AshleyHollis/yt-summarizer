@@ -158,7 +158,7 @@ apps/web/
 ```bash
 az staticwebapp show \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --query '{name: name, hostname: defaultHostname, sku: sku.name}'
 ```
 
@@ -174,7 +174,7 @@ Output:
 ### Key Vault (Auth0 Secrets)
 ```bash
 az keyvault show \
-  --name kv-ytsumm-prd \
+  --name kv-ytsumm-prd-ci \
   --query '{name: name, location: location}'
 ```
 

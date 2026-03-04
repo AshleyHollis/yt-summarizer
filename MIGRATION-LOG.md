@@ -383,7 +383,7 @@ curl -I https://white-meadow-0b8e2e000-migrationphase6a.eastasia.6.azurestaticap
   - Created `apps/web/test-auth-flow.mjs` Playwright E2E test
   - Verified complete auth flow from login to authenticated session
 - **INFRASTRUCTURE**
-  - Built and deployed Docker image: `acrytsummprd.azurecr.io/yt-summarizer-api:sha-bda74d4`
+  - Built and deployed Docker image: `acrytsummprdci.azurecr.io/yt-summarizer-api:sha-bda74d4`
   - Gateway API already configured and routing traffic
   - ExternalSecrets syncing Auth0 credentials to K8s
 
@@ -412,7 +412,7 @@ POST /api/v2/clients/{clientId}/rotate-secret
 → New 64-character secret generated
 
 # Stored in 3 locations
-1. Azure Key Vault: kv-ytsumm-prd/auth0-client-secret
+1. Azure Key Vault: kv-ytsumm-prd-ci/auth0-client-secret
 2. GitHub Secrets: AUTH0_CLIENT_SECRET  
 3. Local dev: apps/web/.env.local
 ```

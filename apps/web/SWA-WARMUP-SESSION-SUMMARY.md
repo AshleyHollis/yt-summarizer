@@ -329,13 +329,13 @@ When we fix this, we should see:
 
 ```bash
 # Check SWA configuration
-az staticwebapp show --name swa-ytsumm-prd --resource-group rg-ytsumm-prd
+az staticwebapp show --name swa-ytsumm-prd --resource-group rg-ytsumm-prd-ci
 
 # List app settings (production)
-az staticwebapp appsettings list --name swa-ytsumm-prd --resource-group rg-ytsumm-prd
+az staticwebapp appsettings list --name swa-ytsumm-prd --resource-group rg-ytsumm-prd-ci
 
 # List app settings (preview PR #64)
-az staticwebapp appsettings list --name swa-ytsumm-prd --resource-group rg-ytsumm-prd --environment-name 64
+az staticwebapp appsettings list --name swa-ytsumm-prd --resource-group rg-ytsumm-prd-ci --environment-name 64
 
 # View workflow run logs
 gh run view 21154450578 --log | less

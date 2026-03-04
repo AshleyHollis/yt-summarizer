@@ -8,7 +8,7 @@
 # - Argo CD → scripts/bootstrap-argocd.ps1
 #
 # After terraform apply, run:
-#   1. az aks get-credentials --resource-group rg-ytsumm-prd --name aks-ytsumm-prd
+#   1. az aks get-credentials --resource-group rg-ytsumm-prd-ci --name aks-ytsumm-prd-ci
 #   2. ./scripts/bootstrap-argocd.ps1
 #   3. kubectl apply -f k8s/argocd/infra-apps.yaml
 # =============================================================================

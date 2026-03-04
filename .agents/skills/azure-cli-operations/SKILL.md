@@ -28,7 +28,7 @@ Common Azure CLI operations for managing YT Summarizer infrastructure resources 
 **List image tags**
 ```bash
 az acr repository show-tags \
-  --name acrytsummprd \
+  --name acrytsummprdci \
   --repository yt-summarizer-api \
   --orderby time_desc \
   --top 10
@@ -37,13 +37,13 @@ az acr repository show-tags \
 **Show repository manifests**
 ```bash
 az acr repository show-manifests \
-  --name acrytsummprd \
+  --name acrytsummprdci \
   --repository yt-summarizer-api
 ```
 
 **Check repository list**
 ```bash
-az acr repository list --name acrytsummprd
+az acr repository list --name acrytsummprdci
 ```
 
 ### Azure Kubernetes Service (AKS)
@@ -137,7 +137,7 @@ az group show \
 **Check if image exists before deployment**
 ```bash
 if az acr repository show-tags \
-  --name acrytsummprd \
+  --name acrytsummprdci \
   --repository yt-summarizer-api \
   --query "contains(@, 'pr-110')" \
   --output tsv; then

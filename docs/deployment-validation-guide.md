@@ -222,7 +222,7 @@ kubectl get secretstore -n yt-summarizer
 ```
 ❌ IMAGE PULL ERRORS DETECTED:
   Pod 'api-5d6f7c8b9e' cannot pull image
-  Image: acrytsummprd.azurecr.io/yt-summarizer-api:sha-12345678
+  Image: acrytsummprdci.azurecr.io/yt-summarizer-api:sha-12345678
   Error: imagepullbackoff
 ```
 
@@ -234,7 +234,7 @@ kubectl get secretstore -n yt-summarizer
 **Fix:**
 ```bash
 # Verify image exists in ACR
-az acr repository show --name acrytsummprd \
+az acr repository show --name acrytsummprdci \
   --repository yt-summarizer-api \
   --query "tags.sha-12345678"
 
@@ -245,7 +245,7 @@ az role assignment list --assignee-type serviceprincipal \
 # Grant AcrPull permission if needed
 az role assignment create --assignee-principal-id <kubelet-identity-oid> \
   --role AcrPull \
-  --scope /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ContainerRegistry/registries/acrytsummprd
+  --scope /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ContainerRegistry/registries/acrytsummprdci
 ```
 
 ### Scenario 4: Hook Job Failure (Database Migration)

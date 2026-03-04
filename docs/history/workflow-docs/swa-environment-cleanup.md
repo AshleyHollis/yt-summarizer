@@ -213,7 +213,7 @@ The cleanup workflows require the following secrets/variables:
 
 **Variables (optional):**
 - `SWA_NAME`: Static Web App name (default: `swa-ytsumm-prd`)
-- `AZURE_RESOURCE_GROUP`: Resource group name (default: `rg-ytsumm-prd`)
+- `AZURE_RESOURCE_GROUP`: Resource group name (default: `rg-ytsumm-prd-ci`)
 
 ### Monitoring and Troubleshooting
 
@@ -249,7 +249,7 @@ If you need to manually clean up an environment:
 # Using Azure CLI
 az staticwebapp environment list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --query "length([?name!='default'])" \
   -o tsv
 ```

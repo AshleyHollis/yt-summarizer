@@ -121,8 +121,8 @@ jobs:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
-          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
       - name: Setup Kustomize
         uses: AshleyHollis/shared-infra/.github/actions/setup-kustomize@v1
@@ -150,7 +150,7 @@ jobs:
           namespace: ${{ inputs.namespace }}
           deployments: api,transcribe-worker,summarize-worker
           expected-tag: ${{ inputs.expected-image-tag }}
-          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprd.azurecr.io' }}
+          registry: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
           image-name: yt-summarizer
           wait-for-ready: "true"
           timeout-seconds: "300"

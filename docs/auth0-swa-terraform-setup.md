@@ -78,7 +78,7 @@ resource "azapi_update_resource" "swa_app_settings" {
 ┌─────────────────┐
 │  Azure Key      │
 │  Vault          │──────────┐
-│  kv-ytsumm-prd  │          │
+│  kv-ytsumm-prd-ci  │          │
 └─────────────────┘          │
         │                    │
         │ Terraform creates  │ Terraform reads
@@ -121,7 +121,7 @@ resource "azapi_update_resource" "swa_app_settings" {
 
    **Retrieve from Key Vault**:
    ```bash
-   az keyvault secret show --vault-name kv-ytsumm-prd --name auth0-terraform-client-secret --query value -o tsv
+   az keyvault secret show --vault-name kv-ytsumm-prd-ci --name auth0-terraform-client-secret --query value -o tsv
    ```
 
 2. **Azure authentication**:
@@ -215,7 +215,7 @@ terraform output -json | jq '.auth0_application_client_id.value'
 ```bash
 az staticwebapp appsettings list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --query "properties" -o json
 ```
 
@@ -251,7 +251,7 @@ Expected output:
    - Email: `admin@test.yt-summarizer.internal`
    - Password: (Retrieve from Key Vault)
      ```bash
-     az keyvault secret show --vault-name kv-ytsumm-prd --name auth0-admin-test-password --query value -o tsv
+     az keyvault secret show --vault-name kv-ytsumm-prd-ci --name auth0-admin-test-password --query value -o tsv
      ```
 
 4. **Expected behavior**:
@@ -309,12 +309,12 @@ If you prefer to verify SWA environment variables were set correctly using Azure
 # List all app settings
 az staticwebapp appsettings list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd
+  --resource-group rg-ytsumm-prd-ci
 
 # Check specific setting (non-sensitive)
 az staticwebapp appsettings list \
   --name swa-ytsumm-prd \
-  --resource-group rg-ytsumm-prd \
+  --resource-group rg-ytsumm-prd-ci \
   --query "properties.AUTH0_BASE_URL" -o tsv
 ```
 

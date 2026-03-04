@@ -24,7 +24,7 @@ curl -I https://white-meadow-0b8e2e000.6.azurestaticapps.net
 gh run view --repo AshleyHollis/yt-summarizer --branch fix/swa-working-baseline
 
 # Check SWA instance
-az staticwebapp show --name swa-ytsumm-prd --resource-group rg-ytsumm-prd
+az staticwebapp show --name swa-ytsumm-prd --resource-group rg-ytsumm-prd-ci
 ```
 
 ---

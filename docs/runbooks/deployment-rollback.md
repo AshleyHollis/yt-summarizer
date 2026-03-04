@@ -117,7 +117,7 @@ cd k8s/overlays/prod
 # Edit kustomization.yaml to restore previous image:
 # images:
 # - name: api
-#   newName: acrytsummprd.azurecr.io/yt-summarizer-api
+#   newName: acrytsummprdci.azurecr.io/yt-summarizer-api
 #   newTag: sha-<previous-good-sha>
 
 # 2. Commit and push

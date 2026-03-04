@@ -47,7 +47,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           swa-name: ${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}
-          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           dry-run: ${{ github.event.inputs.dry-run || 'false' }}
           min-age-hours: "168" # 7 days

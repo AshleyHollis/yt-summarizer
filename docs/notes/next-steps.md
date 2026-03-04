@@ -8,7 +8,7 @@
 ## What Was Done (2026-02-22)
 
 ### Root Cause
-The AKS cluster (`aks-ytsumm-prd`) was in a `Stopped` state (cost-saving). The API server hostname
+The AKS cluster (`aks-ytsumm-prd-ci`) was in a `Stopped` state (cost-saving). The API server hostname
 was not resolving, causing every `deploy-prod.yml` run to fail at "Sync Argo CD Manifests" since
 2026-02-01. ArgoCD was intact on the cluster — it just wasn't reachable.
 

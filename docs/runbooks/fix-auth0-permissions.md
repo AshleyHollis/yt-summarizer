@@ -173,7 +173,7 @@ After Terraform succeeds:
 
 2. **Check Azure Key Vault**:
    ```bash
-   az keyvault secret list --vault-name kv-ytsumm-prd --query "[?starts_with(name, 'auth0-')].name"
+   az keyvault secret list --vault-name kv-ytsumm-prd-ci --query "[?starts_with(name, 'auth0-')].name"
 
    # Should show:
    # - auth0-terraform-domain (service account)

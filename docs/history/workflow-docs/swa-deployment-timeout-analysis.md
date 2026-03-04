@@ -202,7 +202,7 @@ deploy-frontend-preview:
    ```bash
    az staticwebapp environment delete \
      --name swa-ytsumm-prd \
-     --resource-group rg-ytsumm-prd \
+     --resource-group rg-ytsumm-prd-ci \
      --environment-name pr-<PR_NUMBER> \
      --yes
    ```

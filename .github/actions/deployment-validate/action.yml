@@ -17,14 +17,14 @@
 #     with:
 #       overlay-path: k8s/overlays/preview
 #       target-namespace: preview-pr-110
-#       acr-login-server: acrytsummprd.azurecr.io
+#       acr-login-server: acrytsummprdci.azurecr.io
 #
 # Optional - Query AKS for actual quota:
 #   - uses: ./.github/actions/deployment-validate
 #     with:
 #       overlay-path: k8s/overlays/preview
 #       target-namespace: preview-pr-110
-#       acr-login-server: acrytsummprd.azurecr.io
+#       acr-login-server: acrytsummprdci.azurecr.io
 #       query-aks: 'true'
 #       aks-resource-group: rg-yt-summarizer-prod
 #       aks-cluster-name: aks-yt-summarizer-prod
@@ -43,9 +43,9 @@ inputs:
     required: true
 
   acr-login-server:
-    description: "Azure Container Registry login server (e.g., acrytsummprd.azurecr.io)"
+    description: "Azure Container Registry login server (e.g., acrytsummprdci.azurecr.io)"
     required: false
-    default: "acrytsummprd.azurecr.io"
+    default: "acrytsummprdci.azurecr.io"
 
   query-aks:
     description: "Query AKS cluster for actual resource quotas (requires Azure login)"

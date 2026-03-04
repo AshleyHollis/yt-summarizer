@@ -65,7 +65,7 @@
 ### Problem:
 ```
 ✅ api deployment exists
-Current image: acrytsummprd.azurecr.io/yt-summarizer-api:latest
+Current image: acrytsummprdci.azurecr.io/yt-summarizer-api:latest
 ⚠️ Image tag mismatch - Argo CD may still be syncing
 ```
 
