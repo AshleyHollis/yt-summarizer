@@ -149,25 +149,68 @@ jobs:
           echo "✅ Cleaned up ${{ steps.cleanup-stale.outputs.deleted-count }} stale SWA environment(s)"
           echo "💡 Deleted environments for PRs: ${{ steps.cleanup-stale.outputs.stale-prs }}"
 
-      # Downloads CI artifact, applies it, writes runtime config, then deploys with retry:
-      #   Attempts 1-2: 300s fail-fast timeout
-      #   Attempt 3:    1200s extended timeout
-      # SWA warm-up may time out on cold start (continue-on-error: true); deployment still succeeds.
-      - name: Deploy frontend with CI artifact
+      # Download pre-built artifact from CI, apply to workspace, then deploy
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: /tmp/frontend-build
+          run-id: ${{ inputs.ci-run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply CI build artifact
+        shell: bash
+        run: |
+          source_dir="/tmp/frontend-build"
+          app_dir="apps/web"
+          if [[ ! -d "$source_dir" ]]; then
+            echo "::error::CI build artifact not found at $source_dir"
+            exit 1
+          fi
+          rm -rf "$app_dir/.next" "$app_dir/public"
+          cp -R "$source_dir/.next" "$app_dir/.next"
+          cp -R "$source_dir/public" "$app_dir/public"
+          for f in staticwebapp.config.json backend-config.json; do
+            [[ -f "$source_dir/$f" ]] && cp "$source_dir/$f" "$app_dir/$f"
+          done
+          echo "=== apps/web/.next structure ==="
+          ls -la "$app_dir/.next/" || echo "No .next directory"
+
+      - name: Write runtime config
+        shell: bash
+        run: |
+          bash scripts/workflows/write-runtime-config.sh \
+            "apps/web/public/runtime-config.js" \
+            "${{ inputs.api-url }}"
+          # Also copy into standalone/public for hybrid mode
+          if [[ -d "apps/web/.next/standalone/public" ]]; then
+            cp "apps/web/public/runtime-config.js" "apps/web/.next/standalone/public/runtime-config.js"
+          fi
+
+      # Deploy using official Azure action with skip_app_build to prevent
+      # SWA from rebuilding the pre-built artifact (which would fail without node_modules)
+      - name: Deploy to Static Web Apps
         id: deploy-swa
         continue-on-error: true
-        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v3
+        uses: Azure/static-web-apps-deploy@v1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ci-run-id: ${{ inputs.ci-run-id }}
-          api-url: ${{ inputs.api-url }}
-          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          app-location: apps/web
-          runtime-config-path: apps/web/public/runtime-config.js
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: apps/web
           output_location: ""
-          production-branch: main
-          deployment-environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
-          verbose: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
+          skip_app_build: true
+          production_branch: main
+          deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
+
+      # Azure login for URL resolution (needed for production when deploy output URL is empty)
+      - name: Azure Login for URL resolution
+        if: steps.deploy-swa.outputs.static_web_app_url == ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Resolve deployment URL
         id: resolve-url
@@ -177,7 +220,6 @@ jobs:
           if [[ -n "$DEPLOY_URL" ]]; then
             echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
           else
-            # Warmup/cold-start timeout - deployment may still succeed; resolve URL from Azure
             SWA_NAME="${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}"
             RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}"
             PR_NUM="${{ inputs.pr-number }}"
@@ -190,7 +232,6 @@ jobs:
                 exit 1
               fi
             else
-              # For preview: construct URL from environment name (Azure uses PR number as env name)
               HOSTNAME=$(az staticwebapp environment show --name "$SWA_NAME" --resource-group "$RG" \
                 --environment-name "$PR_NUM" --query hostname -o tsv 2>/dev/null || echo "")
               if [[ -n "$HOSTNAME" ]]; then
