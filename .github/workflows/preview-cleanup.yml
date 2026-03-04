@@ -29,7 +29,7 @@ jobs:
 
       - name: Close SWA staging environment
         id: swa-cleanup
-        uses: ./.github/actions/close-swa-environment
+        uses: AshleyHollis/shared-infra/.github/actions/close-swa-environment@v1
         with:
           pr-number: ${{ github.event.pull_request.number }}
           swa-deployment-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
@@ -129,7 +129,7 @@ jobs:
           ref: ${{ github.sha }}
 
       - name: Create cleanup summary
-        uses: ./.github/actions/create-pipeline-summary
+        uses: AshleyHollis/shared-infra/.github/actions/create-pipeline-summary@v1
         with:
           summary-type: cleanup
           pr-number: ${{ github.event.pull_request.number }}
@@ -155,7 +155,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Delete PR images from ACR
-        uses: ./.github/actions/cleanup-acr-images
+        uses: AshleyHollis/shared-infra/.github/actions/cleanup-acr-images@v1
         with:
           acr-name: ${{ vars.ACR_NAME || 'acrytsummprd' }}
           pr-number: ${{ github.event.pull_request.number }}

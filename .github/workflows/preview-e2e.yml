@@ -83,13 +83,13 @@ jobs:
             echo "AUTH0_USER_TEST_PASSWORD=$AUTH0_USER_PASSWORD" >> $GITHUB_ENV
 
       - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+        uses: AshleyHollis/shared-infra/.github/actions/setup-node@v1
         with:
           node-version: ${{ env.NODE_VERSION }}
           working-directory: apps/web
 
       - name: Wait for Frontend to be ready
-        uses: ./.github/actions/health-check
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
         with:
           url: ${{ inputs.environment_url }}
           max-attempts: "30"
@@ -99,7 +99,7 @@ jobs:
           service-name: "Preview Frontend"
 
       - name: Wait for API to be ready
-        uses: ./.github/actions/health-check
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
         with:
           url: ${{ inputs.api_url }}/health/live
           max-attempts: "30"
@@ -109,7 +109,7 @@ jobs:
           service-name: "Preview API"
 
       - name: Run E2E tests
-        uses: ./.github/actions/run-playwright-tests
+        uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ inputs.environment_url }}

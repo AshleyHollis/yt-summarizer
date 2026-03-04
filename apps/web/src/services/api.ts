@@ -252,13 +252,32 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
 
   // Handle error responses
   if (!response.ok) {
+    // 401 Unauthorized — redirect to login
+    if (response.status === 401 && typeof window !== 'undefined') {
+      const apiUrl = getClientApiUrl();
+      const returnTo = encodeURIComponent(window.location.href);
+      window.location.href = `${apiUrl}/api/auth/login?returnTo=${returnTo}`;
+      // Throw anyway so caller doesn't continue
+      throw new ApiClientError('Authentication required', 401, responseCorrelationId);
+    }
+
     let errorMessage = `Request failed with status ${response.status}`;
     let details: ApiError['error']['details'] | undefined;
 
     try {
-      const errorData: ApiError = await response.json();
-      errorMessage = errorData.error.message;
-      details = errorData.error.details;
+      const errorData = await response.json();
+      // Handle FastAPI HTTPException format (detail field)
+      if (errorData.detail) {
+        if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        } else if (errorData.detail.message) {
+          errorMessage = errorData.detail.message;
+          details = errorData.detail;
+        }
+      } else if (errorData.error?.message) {
+        errorMessage = errorData.error.message;
+        details = errorData.error.details;
+      }
     } catch {
       // Ignore JSON parsing errors for error response
     }
@@ -1162,6 +1181,77 @@ export const batchApi = {
    */
   retryItem: (batchId: string, videoId: string): Promise<BatchRetryResponse> =>
     api.post(`/api/v1/batches/${batchId}/items/${videoId}/retry`),
+};
+
+// ============================================================================
+// Quota API
+// ============================================================================
+
+/**
+ * Quota status response from GET /api/v1/quota
+ */
+export interface QuotaStatus {
+  tier: string;
+  videos: {
+    processed_today: number;
+    limit: number | null;
+    remaining: number | null;
+    queued: number;
+    estimated_days: number | null;
+  };
+  copilot: {
+    used_this_hour: number;
+    limit: number | null;
+    remaining: number | null;
+    resets_in_seconds: number;
+  };
+}
+
+/**
+ * Expedite request
+ */
+export interface ExpediteRequest {
+  request_id: string;
+  user_id: string;
+  reason: string | null;
+  video_count: number;
+  status: 'pending' | 'approved' | 'denied';
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+/**
+ * Quota API client
+ */
+export const quotaApi = {
+  /** Get current quota status */
+  getStatus: (): Promise<QuotaStatus> =>
+    api.get('/api/v1/quota'),
+
+  /** Submit an expedite request */
+  requestExpedite: (reason?: string): Promise<ExpediteRequest> =>
+    api.post('/api/v1/quota/expedite', { body: { reason } }),
+
+  /** Get user's expedite requests */
+  getExpediteRequests: (): Promise<{ requests: ExpediteRequest[] }> =>
+    api.get('/api/v1/quota/expedite'),
+};
+
+/**
+ * Admin expedite API
+ */
+export const adminQuotaApi = {
+  /** List all pending expedite requests */
+  listRequests: (status?: string): Promise<{ requests: ExpediteRequest[]; total: number }> =>
+    api.get('/api/v1/admin/expedite-requests', { params: status ? { status } : undefined }),
+
+  /** Approve an expedite request */
+  approve: (requestId: string): Promise<{ request_id: string; status: string; jobs_released: number; message: string }> =>
+    api.post(`/api/v1/admin/expedite-requests/${requestId}/approve`),
+
+  /** Deny an expedite request */
+  deny: (requestId: string): Promise<{ request_id: string; status: string; jobs_released: number; message: string }> =>
+    api.post(`/api/v1/admin/expedite-requests/${requestId}/deny`),
 };
 
 export default api;

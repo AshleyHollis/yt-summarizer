@@ -7,18 +7,6 @@ variable "subscription_id" {
   type        = string
 }
 
-variable "location" {
-  description = "Azure region for resources"
-  type        = string
-  default     = "eastasia"
-}
-
-variable "acr_sku" {
-  description = "SKU for Azure Container Registry"
-  type        = string
-  default     = "Basic"
-}
-
 variable "sql_admin_username" {
   description = "SQL Server admin username"
   type        = string
@@ -30,37 +18,6 @@ variable "sql_admin_password" {
   type        = string
   sensitive   = true
 }
-
-variable "kubernetes_version" {
-  description = "Kubernetes version for AKS"
-  type        = string
-  default     = "1.33"
-}
-
-variable "aks_node_size" {
-  description = "VM size for AKS nodes"
-  type        = string
-  default     = "Standard_B4als_v2" # 4 vCPUs, 8GB RAM, 100 max pods
-}
-
-variable "aks_os_disk_size_gb" {
-  description = "OS disk size for AKS nodes in GB"
-  type        = number
-  default     = 128
-}
-
-variable "key_vault_secrets_officer_principal_id" {
-  description = "Principal ID with Key Vault Secrets Officer access"
-  type        = string
-  default     = "eac9556a-cd81-431f-a1ec-d6940b2d92d3"
-}
-
-variable "domain" {
-  description = "Base domain for the application"
-  type        = string
-  default     = "yt-summarizer.example.com"
-}
-
 
 variable "github_org" {
   description = "GitHub organization/owner name"
@@ -75,9 +32,38 @@ variable "github_repo" {
 }
 
 variable "openai_api_key" {
-  description = "OpenAI API key for summarization"
+  description = "OpenAI API key for summarization (fallback when Azure OpenAI not configured)"
   type        = string
   sensitive   = true
+}
+
+# -----------------------------------------------------------------------------
+# Azure OpenAI
+# -----------------------------------------------------------------------------
+
+variable "azure_openai_api_key" {
+  description = "Azure OpenAI API key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "azure_openai_endpoint" {
+  description = "Azure OpenAI endpoint URL (e.g., https://myresource.openai.azure.com)"
+  type        = string
+  default     = ""
+}
+
+variable "azure_openai_deployment" {
+  description = "Azure OpenAI chat deployment name (e.g., gpt-4o-mini)"
+  type        = string
+  default     = ""
+}
+
+variable "azure_openai_embedding_deployment" {
+  description = "Azure OpenAI embedding deployment name (e.g., text-embedding-3-small)"
+  type        = string
+  default     = ""
 }
 
 variable "cloudflare_api_token" {

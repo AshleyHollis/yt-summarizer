@@ -6,8 +6,8 @@ module "storage" {
   source = "../../modules/storage"
 
   name                = replace("st${local.name_prefix}", "-", "")
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  resource_group_name = module.shared.resource_group_name
+  location            = module.shared.resource_group_location
 
   # Use GRS for production data protection
   account_replication_type = "GRS"

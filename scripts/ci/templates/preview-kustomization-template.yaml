@@ -93,6 +93,8 @@ patches:
               - name: API__CORS_ORIGINS
                 # JSON array string - keep no spaces after commas
                 value: '["${SWA_URL}","http://localhost:3000"]'
+              - name: AUTH0_DEFAULT_RETURN_TO
+                value: "${SWA_URL}"
     target:
       kind: Deployment
       name: api

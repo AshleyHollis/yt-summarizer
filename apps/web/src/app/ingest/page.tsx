@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChannelForm } from '@/components/ChannelForm';
 import { ChannelVideoList } from '@/components/ChannelVideoList';
+import { AuthGate } from '@/components/auth/AuthGate';
 import { formatDateShort } from '@/utils/formatDate';
 import {
   ChannelVideosResponse,
@@ -118,9 +119,11 @@ export default function IngestPage() {
           </p>
         </div>
 
-        {/* Channel URL form */}
+        {/* Channel URL form - auth-gated */}
         <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-5 md:p-6 mb-8">
-          <ChannelForm onChannelLoaded={handleChannelLoaded} />
+          <AuthGate action="import videos from a channel">
+            <ChannelForm onChannelLoaded={handleChannelLoaded} />
+          </AuthGate>
         </section>
 
         {/* Channel videos */}

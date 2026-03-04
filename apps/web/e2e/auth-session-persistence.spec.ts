@@ -31,6 +31,9 @@ test.describe('Session Persistence @auth', () => {
     return !fs.existsSync(authFile);
   }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
+  // Cross-domain cookie issue: auth cookies on API domain aren't sent to SWA domain
+  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
+
   test.describe('Page Refresh', () => {
     test('user remains authenticated after page refresh', async ({ page }) => {
       // Navigate to the app

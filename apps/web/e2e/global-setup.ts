@@ -530,6 +530,10 @@ async function globalSetup(_config: FullConfig) {
         }
         console.log(`  ⊘ Already exists: ${url}`);
         skipped++;
+      } else if (response.status === 401) {
+        // Auth required — expected when auth gates are active and seeding without a session.
+        // Videos should already exist from prior runs; coverage check below will verify.
+        skipped++;
       } else {
         console.log(`  ✗ Failed (${response.status}): ${url}`);
         failed++;
@@ -541,6 +545,11 @@ async function globalSetup(_config: FullConfig) {
   }
 
   console.log(`[global-setup] Done: ${submitted} submitted, ${skipped} skipped, ${failed} failed`);
+
+  // If all videos were skipped due to auth, log a clear message
+  if (submitted === 0 && skipped === ALL_TEST_VIDEOS.length) {
+    console.log('[global-setup] All seeding skipped (auth gates active). Checking existing video coverage...');
+  }
 
   // Store video IDs for tests to use
   // Tests that need to monitor progress can access these

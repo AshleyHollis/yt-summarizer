@@ -101,18 +101,16 @@ class VideoService:
         self,
         url: str,
         correlation_id: str,
+        user_id: str | None = None,
+        quota_status: str = "released",
     ) -> SubmitVideoResponse:
         """Submit a video for processing.
 
         Args:
             url: YouTube video URL.
             correlation_id: Request correlation ID.
-
-        Returns:
-            SubmitVideoResponse with video and job IDs.
-
-        Raises:
-            ValueError: If URL is invalid or video already exists.
+            user_id: Optional user ID for quota tracking.
+            quota_status: "released" to dispatch now, "quota_queued" to hold.
         """
         # Extract video ID from URL
         youtube_video_id = extract_youtube_video_id(url)
@@ -208,37 +206,47 @@ class VideoService:
             status=JobStatus.PENDING.value,
             correlation_id=correlation_id,
             estimated_wait_seconds=estimated_wait,
+            user_id=user_id,
+            quota_status=quota_status,
         )
         self.session.add(job)
         await self.session.flush()  # Get job_id
 
-        # Queue the job
-        try:
-            queue_client = get_queue_client()
-            # Inject trace context for distributed tracing
-            message = inject_trace_context(
-                {
-                    "job_id": str(job.job_id),
-                    "video_id": str(video.video_id),
-                    "youtube_video_id": youtube_video_id,
-                    "channel_name": channel.name,
-                    "correlation_id": correlation_id,
-                }
-            )
-            queue_client.send_message(
-                TRANSCRIBE_QUEUE,
-                message,
-            )
+        # Only dispatch to queue if released (not quota_queued)
+        if quota_status == "released":
+            try:
+                queue_client = get_queue_client()
+                # Inject trace context for distributed tracing
+                message = inject_trace_context(
+                    {
+                        "job_id": str(job.job_id),
+                        "video_id": str(video.video_id),
+                        "youtube_video_id": youtube_video_id,
+                        "channel_name": channel.name,
+                        "correlation_id": correlation_id,
+                    }
+                )
+                queue_client.send_message(
+                    TRANSCRIBE_QUEUE,
+                    message,
+                )
+                logger.info(
+                    "Queued transcribe job",
+                    job_id=str(job.job_id),
+                    video_id=str(video.video_id),
+                    channel_name=channel.name,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to queue job (queue may not be available)",
+                    error=str(e),
+                )
+        else:
             logger.info(
-                "Queued transcribe job",
+                "Video quota-queued (not dispatched)",
                 job_id=str(job.job_id),
                 video_id=str(video.video_id),
-                channel_name=channel.name,
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to queue job (queue may not be available)",
-                error=str(e),
+                quota_status=quota_status,
             )
 
         await self.session.commit()

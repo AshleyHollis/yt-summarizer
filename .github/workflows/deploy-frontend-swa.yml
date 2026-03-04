@@ -29,7 +29,7 @@
 #       environment: preview
 #       ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
 #       api-url: https://pr-42.yt-summarizer.apps.ashleyhollis.com
-#       deployment-environment: pr-42
+#       deployment-environment: '42'
 #       pr-number: '42'
 #       pr-head-sha: abc1234567890
 #       cleanup-stale-environments: 'true'
@@ -53,7 +53,7 @@ on:
         required: true
         type: string
       deployment-environment:
-        description: "SWA deployment environment (default for prod, pr-N for preview)"
+        description: "SWA deployment environment (default for prod, PR number for preview)"
         required: true
         type: string
       # Preview-specific inputs
@@ -104,17 +104,17 @@ jobs:
       # Fail-fast if PR has been closed to avoid false failures and wasted resources
       - name: Check if PR is still open
         if: inputs.environment == 'preview' && inputs.pr-number != ''
-        uses: ./.github/actions/check-pr-open
+        uses: AshleyHollis/shared-infra/.github/actions/check-pr-open@v1
         with:
           pr-number: ${{ inputs.pr-number }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: false
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Verify SWA token is configured
-        uses: ./.github/actions/verify-secret
+        uses: AshleyHollis/shared-infra/.github/actions/verify-secret@v1
         with:
           secret-name: "SWA_DEPLOYMENT_TOKEN"
           secret-value: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
@@ -133,7 +133,7 @@ jobs:
         if: inputs.cleanup-stale-environments
         id: cleanup-stale
         continue-on-error: true
-        uses: ./.github/actions/cleanup-stale-swa-environments
+        uses: AshleyHollis/shared-infra/.github/actions/cleanup-stale-swa-environments@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           swa-name: ${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}
@@ -149,98 +149,25 @@ jobs:
           echo "✅ Cleaned up ${{ steps.cleanup-stale.outputs.deleted-count }} stale SWA environment(s)"
           echo "💡 Deleted environments for PRs: ${{ steps.cleanup-stale.outputs.stale-prs }}"
 
-      # Production and Preview: Azure login to configure SWA app settings before deploy
-      # Auth0 env vars must be present BEFORE warmup (server reads them on startup)
-      - name: Azure Login (SWA app settings)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Configure SWA app settings from Key Vault
-        shell: bash
-        run: |
-          KV_NAME="${{ vars.KEY_VAULT_NAME || 'kv-ytsumm-prd' }}"
-          SWA_NAME="${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}"
-          RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}"
-          ENV="${{ inputs.pr-number }}"  # empty for prod (default env), pr-N for preview
-
-          if [[ "${{ inputs.environment }}" == "prod" ]]; then
-            AUTH0_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-session-secret" --query value -o tsv)
-            AUTH0_DOMAIN=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-domain" --query value -o tsv)
-            AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-client-id" --query value -o tsv)
-            AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-client-secret" --query value -o tsv)
-            ENV_FLAG=""
-          else
-            AUTH0_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-session-secret" --query value -o tsv)
-            AUTH0_DOMAIN=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-domain" --query value -o tsv)
-            AUTH0_CLIENT_ID=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-client-id" --query value -o tsv)
-            AUTH0_CLIENT_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name "auth0-preview-client-secret" --query value -o tsv)
-            ENV_FLAG="--environment-name ${ENV}"
-          fi
-
-          SWA_HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv)
-
-          az staticwebapp appsettings set \
-            --name "$SWA_NAME" \
-            --resource-group "$RG" \
-            $ENV_FLAG \
-            --setting-names \
-              "AUTH0_SECRET=${AUTH0_SECRET}" \
-              "AUTH0_BASE_URL=https://${SWA_HOSTNAME}" \
-              "AUTH0_ISSUER_BASE_URL=https://${AUTH0_DOMAIN}" \
-              "AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}" \
-              "AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}"
-
-          echo "✅ SWA app settings configured for ${{ inputs.environment }} environment"
-
-      - name: Download frontend build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-build
-          path: /tmp/frontend-build
-          run-id: ${{ inputs.ci-run-id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Apply CI build artifact
-        run: |
-          source_dir="/tmp/frontend-build"
-          app_dir="apps/web"
-          if [[ ! -d "$source_dir" ]]; then
-            echo "::error::Expected CI build directory not found at $source_dir"
-            exit 1
-          fi
-          rm -rf "$app_dir/.next" "$app_dir/public"
-          cp -R "$source_dir/.next" "$app_dir/.next"
-          cp -R "$source_dir/public" "$app_dir/public"
-          if [[ -f "$source_dir/staticwebapp.config.json" ]]; then
-            cp "$source_dir/staticwebapp.config.json" "$app_dir/staticwebapp.config.json"
-          fi
-          echo "=== ${app_dir} structure ===" && ls -la "$app_dir/"
-          echo "=== ${app_dir}/.next structure ===" && ls -la "$app_dir/.next/" || echo "No .next directory"
-
-      - name: Write runtime config
-        run: |
-          bash scripts/workflows/write-runtime-config.sh \
-            "apps/web/public/runtime-config.js" \
-            "${{ inputs.api-url }}"
-
-      - name: Deploy to Azure Static Web Apps
+      # Downloads CI artifact, applies it, writes runtime config, then deploys with retry:
+      #   Attempts 1-2: 300s fail-fast timeout
+      #   Attempt 3:    1200s extended timeout
+      # SWA warm-up may time out on cold start (continue-on-error: true); deployment still succeeds.
+      - name: Deploy frontend with CI artifact
         id: deploy-swa
-        continue-on-error: true # SWA warmup can timeout on cold start; deployment still succeeds
-        uses: Azure/static-web-apps-deploy@v1
+        continue-on-error: true
+        uses: AshleyHollis/shared-infra/.github/actions/deploy-frontend-swa@v3
         with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          app_location: "apps/web"
-          api_location: ""
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ci-run-id: ${{ inputs.ci-run-id }}
+          api-url: ${{ inputs.api-url }}
+          swa-token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          app-location: apps/web
+          runtime-config-path: apps/web/public/runtime-config.js
           output_location: ""
-          skip_app_build: true
-          skip_api_build: true
-          deployment_environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
-          production_branch: "main"
+          production-branch: main
+          deployment-environment: ${{ inputs.deployment-environment != 'default' && inputs.deployment-environment || '' }}
+          verbose: ${{ inputs.environment == 'preview' && 'true' || 'false' }}
 
       - name: Resolve deployment URL
         id: resolve-url
@@ -249,25 +176,35 @@ jobs:
           DEPLOY_URL="${{ steps.deploy-swa.outputs.static_web_app_url }}"
           if [[ -n "$DEPLOY_URL" ]]; then
             echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ inputs.environment }}" == "prod" ]]; then
-            # Warmup timeout on cold start - deployment still succeeds; fetch URL from Azure
+          else
+            # Warmup/cold-start timeout - deployment may still succeed; resolve URL from Azure
             SWA_NAME="${{ vars.SWA_NAME || 'swa-ytsumm-prd' }}"
             RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd' }}"
-            HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv 2>/dev/null || echo "")
-            if [[ -n "$HOSTNAME" ]]; then
-              echo "url=https://$HOSTNAME" >> "$GITHUB_OUTPUT"
+            PR_NUM="${{ inputs.pr-number }}"
+            if [[ "${{ inputs.environment }}" == "prod" ]]; then
+              HOSTNAME=$(az staticwebapp show --name "$SWA_NAME" --resource-group "$RG" --query defaultHostname -o tsv 2>/dev/null || echo "")
+              if [[ -n "$HOSTNAME" ]]; then
+                echo "url=https://$HOSTNAME" >> "$GITHUB_OUTPUT"
+              else
+                echo "::error::Could not resolve production deployment URL"
+                exit 1
+              fi
             else
-              echo "::error::Could not resolve production deployment URL"
-              exit 1
+              # For preview: construct URL from environment name (Azure uses PR number as env name)
+              HOSTNAME=$(az staticwebapp environment show --name "$SWA_NAME" --resource-group "$RG" \
+                --environment-name "$PR_NUM" --query hostname -o tsv 2>/dev/null || echo "")
+              if [[ -n "$HOSTNAME" ]]; then
+                echo "url=https://$HOSTNAME" >> "$GITHUB_OUTPUT"
+              else
+                echo "::error::Preview deployment failed - no URL available (environment '$PR_NUM' not found)"
+                exit 1
+              fi
             fi
-          else
-            echo "::error::Preview deployment failed - no URL available"
-            exit 1
           fi
 
       - name: Verify frontend deployment
         if: steps.resolve-url.outputs.url != ''
-        uses: ./.github/actions/health-check
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
         with:
           url: ${{ steps.resolve-url.outputs.url }}
           max-attempts: ${{ env.HEALTH_CHECK_MAX_ATTEMPTS }}

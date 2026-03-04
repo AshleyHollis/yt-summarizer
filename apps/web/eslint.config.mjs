@@ -19,6 +19,8 @@ const eslintConfig = defineConfig([
     // Build artifacts
     'playwright-report/**',
     'test-results/**',
+    // Node.js build scripts (CommonJS, not subject to Next.js ESLint rules)
+    'scripts/**',
   ]),
   // Custom rule overrides for existing codebase patterns
   {

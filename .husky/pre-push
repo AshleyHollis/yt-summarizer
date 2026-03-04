@@ -1,11 +1,16 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
-# Frontend checks (if web app changed)
 echo "🔍 Running pre-push checks..."
 
+# Check if Python files changed
+PYTHON_CHANGED=$(git diff --name-only @{push}..HEAD 2>/dev/null | grep -c '\.py$' || true)
+
+if [ "$PYTHON_CHANGED" -gt 0 ]; then
+  echo "🐍 Python changes detected - running ruff..."
+  python -m ruff check services/ || { echo "  ❌ Ruff lint failed!"; exit 1; }
+  echo "  ✅ Ruff passed"
+fi
+
 # Check if frontend files changed
-FRONTEND_CHANGED=$(git diff --name-only @{push}..HEAD | grep -c '^apps/web/' || true)
+FRONTEND_CHANGED=$(git diff --name-only @{push}..HEAD 2>/dev/null | grep -c '^apps/web/' || true)
 
 if [ "$FRONTEND_CHANGED" -gt 0 ]; then
   echo "📦 Frontend changes detected - running comprehensive checks..."

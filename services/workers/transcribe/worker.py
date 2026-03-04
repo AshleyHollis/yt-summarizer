@@ -21,7 +21,7 @@ from shared.db.job_service import (
     mark_job_rate_limited,
     mark_job_running,
 )
-from shared.db.models import Artifact, Job
+from shared.db.models import Artifact, Job, Video
 from shared.logging.config import get_logger
 from shared.proxy import ProxyService
 from shared.queue.client import SUMMARIZE_QUEUE, TRANSCRIBE_QUEUE, get_queue_client
@@ -114,6 +114,36 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             retry_count=raw_message.get("retry_count", 0),
         )
 
+    async def _has_permanent_no_captions(self, video_id: str) -> bool:
+        """Check if a prior job already determined this video has no captions.
+
+        Queries the video's error_message and any previous failed transcribe jobs
+        for the sentinel "No transcript available" string.
+        """
+        from uuid import UUID
+
+        from sqlalchemy import select
+
+        db = get_db()
+        async with db.session() as session:
+            # Check video error_message from a prior failed attempt
+            result = await session.execute(select(Video).where(Video.video_id == UUID(video_id)))
+            video = result.scalar_one_or_none()
+            if video and video.error_message and "No transcript available" in video.error_message:
+                return True
+
+            # Check historical failed transcribe jobs for the same video
+            result = await session.execute(
+                select(Job).where(
+                    Job.video_id == UUID(video_id),
+                    Job.job_type == "transcribe",
+                    Job.status == "failed",
+                    Job.error_message.ilike("%No transcript available%"),
+                )
+            )
+            prior_failure = result.scalars().first()
+            return prior_failure is not None
+
     async def process_message(
         self,
         message: TranscribeMessage,
@@ -140,6 +170,25 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         try:
             # Mark job as running
             await mark_job_running(message.job_id, "transcribing")
+
+            # Short-circuit: if a prior job already determined this video has no captions,
+            # fail immediately instead of hitting YouTube (which may rate-limit us again).
+            if await self._has_permanent_no_captions(message.video_id):
+                error_msg = (
+                    "No transcript available for this video. "
+                    "This video does not have captions or auto-generated subtitles on YouTube. "
+                    "(Detected from prior job failure — skipped YouTube API call.)"
+                )
+                logger.info(
+                    "Skipping YouTube fetch — prior job confirmed no captions",
+                    job_id=message.job_id,
+                    video_id=message.video_id,
+                )
+                await mark_job_failed(message.job_id, error_msg)
+                return WorkerResult.failed(
+                    Exception("No transcript available (permanent)"),
+                    error_msg,
+                )
 
             # Check if transcript already exists in blob storage
             existing_transcript = await self._check_existing_transcript(

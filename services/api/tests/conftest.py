@@ -115,6 +115,28 @@ def app(mock_session):
         yield mock_session
 
     application.dependency_overrides[get_session] = mock_get_session
+
+    # Override auth dependencies so tests pass without real sessions
+    from api.dependencies.auth import AuthenticatedUser, require_auth
+    from api.dependencies.quota import check_copilot_quota
+
+    mock_user = AuthenticatedUser(
+        sub="auth0|test-user-123",
+        email="test@example.com",
+        name="Test User",
+        picture=None,
+        raw={"sub": "auth0|test-user-123", "email": "test@example.com"},
+    )
+
+    async def mock_require_auth():
+        return mock_user
+
+    async def mock_check_copilot_quota():
+        return mock_user
+
+    application.dependency_overrides[require_auth] = mock_require_auth
+    application.dependency_overrides[check_copilot_quota] = mock_check_copilot_quota
+
     return application
 
 

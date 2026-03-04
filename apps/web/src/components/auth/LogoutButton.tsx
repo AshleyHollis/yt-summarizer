@@ -11,6 +11,7 @@
 'use client';
 
 import React from 'react';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 /**
  * LogoutButton Props
@@ -50,16 +51,26 @@ interface LogoutButtonProps {
  * ```
  */
 export function LogoutButton({ className = '', variant = 'primary' }: LogoutButtonProps) {
-  const handleLogout = () => {
-    // Redirect to Auth0 logout endpoint
-    window.location.href = '/api/auth/logout';
+  const handleLogout = async () => {
+    try {
+      const apiUrl = getClientApiUrl();
+      await fetch(`${apiUrl}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Ignore errors — session may already be cleared
+    }
+    // Redirect to home page after logout
+    window.location.href = '/';
   };
 
   // Variant styles
   const variantStyles = {
     primary: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-    secondary: 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500',
-    text: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+    secondary:
+      'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500',
+    text: 'bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:ring-gray-500',
   };
 
   return (

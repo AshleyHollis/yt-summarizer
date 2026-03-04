@@ -1,9 +1,5 @@
-import { test, expect, Page } from "@playwright/test";
-import {
-  waitForCopilotReady,
-  submitQuery,
-  waitForAssistantResponse,
-} from "./helpers";
+import { test, expect, Page } from '@playwright/test';
+import { waitForCopilotReady, submitQuery, waitForAssistantResponse } from './helpers';
 
 /**
  * E2E tests for Single Response Verification
@@ -20,20 +16,25 @@ function countAssistantMessageBlocks(page: Page) {
   return page.locator('text="Limited Information"').count();
 }
 
-test.describe("Single Response Per Message", () => {
+test.describe('Single Response Per Message', () => {
   // All tests navigate with ?chat=open for reliable chat panel activation.
   // openChatViaButton (button click) is flaky — the click sometimes doesn't
   // register or the panel fails to open within the timeout.
 
-  test("simple greeting produces exactly one response", async ({ page }) => {
+  test.fixme(
+    !!process.env.CI,
+    'CopilotKit requires Azure OpenAI credentials not available in preview'
+  );
+
+  test('simple greeting produces exactly one response', async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library?chat=open", { waitUntil: "commit" });
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
 
     // Send a simple greeting that doesn't trigger tools
-    await submitQuery(page, "Hello, how are you?");
+    await submitQuery(page, 'Hello, how are you?');
 
     // Wait for response
     await page.waitForTimeout(3000);
@@ -50,15 +51,15 @@ test.describe("Single Response Per Message", () => {
     expect(responseMatches).toBeLessThanOrEqual(2); // Allow for greeting + response context
   });
 
-  test("library query produces exactly one tool response card", async ({ page }) => {
+  test('library query produces exactly one tool response card', async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library?chat=open", { waitUntil: "commit" });
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
 
     // Send a query that triggers the queryLibrary tool
-    await submitQuery(page, "What videos do I have about exercise?");
+    await submitQuery(page, 'What videos do I have about exercise?');
 
     // Wait for response to complete
     await waitForAssistantResponse(page);
@@ -75,19 +76,19 @@ test.describe("Single Response Per Message", () => {
     expect(recommendedCount).toBeLessThanOrEqual(1);
   });
 
-  test("second query produces only one additional response", async ({ page }) => {
+  test('second query produces only one additional response', async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library?chat=open", { waitUntil: "commit" });
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
 
     // First message
-    await submitQuery(page, "Hello!");
+    await submitQuery(page, 'Hello!');
     await page.waitForTimeout(2000);
 
     // Second message - triggers tool
-    await submitQuery(page, "What videos do I have?");
+    await submitQuery(page, 'What videos do I have?');
     await waitForAssistantResponse(page);
 
     // Count tool response indicators
@@ -102,15 +103,15 @@ test.describe("Single Response Per Message", () => {
     expect(spinnerCount).toBe(0);
   });
 
-  test("tool result renders exactly once with all components", async ({ page }) => {
+  test('tool result renders exactly once with all components', async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/library?chat=open", { waitUntil: "commit" });
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
 
     // Send query
-    await submitQuery(page, "Tell me about the videos in my library");
+    await submitQuery(page, 'Tell me about the videos in my library');
     await waitForAssistantResponse(page);
 
     // Verify the structure appears once:

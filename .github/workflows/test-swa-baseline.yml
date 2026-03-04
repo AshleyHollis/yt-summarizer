@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number for deployment'
+        description: "PR number for deployment"
         required: false
         type: string
   pull_request:
@@ -28,9 +28,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+        uses: AshleyHollis/shared-infra/.github/actions/setup-node@v1
         with:
-          node-version: '20'
+          node-version: "20"
           working-directory: apps/web
 
       - name: Get PR number
@@ -61,9 +61,9 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: 'upload'
-          app_location: 'apps/web'
-          output_location: '.next/standalone'
+          action: "upload"
+          app_location: "apps/web"
+          output_location: ".next/standalone"
           skip_app_build: true
           deployment_environment: ${{ steps.pr.outputs.number }}
 

@@ -11,6 +11,7 @@
 'use client';
 
 import React, { useState, FormEvent } from 'react';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 /**
  * UsernamePasswordForm Component
@@ -64,8 +65,9 @@ export function UsernamePasswordForm() {
     setError('');
 
     try {
-      // Redirect to Auth0 login endpoint with Username-Password-Authentication connection
-      window.location.href = `/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}`;
+      const apiUrl = getClientApiUrl();
+      const returnTo = encodeURIComponent(window.location.origin);
+      window.location.href = `${apiUrl}/api/auth/login?connection=Username-Password-Authentication&login_hint=${encodeURIComponent(email)}&returnTo=${returnTo}`;
     } catch (err) {
       setError('Login failed. Please check your credentials.');
       setLoading(false);
@@ -76,7 +78,10 @@ export function UsernamePasswordForm() {
     <form onSubmit={handleSubmit} data-testid="username-password-form" className="space-y-4">
       {/* Email Input */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          htmlFor="email"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+        >
           Email
         </label>
         <input
@@ -89,10 +94,10 @@ export function UsernamePasswordForm() {
           aria-required="true"
           aria-invalid={emailValid === false ? 'true' : 'false'}
           data-testid="email-input"
-          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
             emailValid === false
               ? 'border-red-500 focus:ring-red-500'
-              : 'border-gray-300 focus:ring-blue-500'
+              : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
           }`}
           placeholder="you@example.com"
         />
@@ -105,7 +110,10 @@ export function UsernamePasswordForm() {
 
       {/* Password Input */}
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          htmlFor="password"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+        >
           Password
         </label>
         <div className="relative">
@@ -118,7 +126,7 @@ export function UsernamePasswordForm() {
             aria-label="Password"
             aria-required="true"
             data-testid="password-input"
-            className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             placeholder="Enter your password"
           />
           <button
@@ -126,7 +134,7 @@ export function UsernamePasswordForm() {
             onClick={() => setShowPassword(!showPassword)}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             data-testid="toggle-password"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
           >
             {showPassword ? (
               <svg
@@ -186,9 +194,9 @@ export function UsernamePasswordForm() {
         disabled={!isFormValid || loading}
         aria-busy={loading}
         data-testid="submit-button"
-        className={`w-full px-4 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+        className={`w-full px-4 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
           !isFormValid || loading
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
             : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
         }`}
       >

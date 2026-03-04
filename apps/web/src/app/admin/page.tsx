@@ -18,9 +18,10 @@
 
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
+import { adminQuotaApi, type ExpediteRequest } from '@/services/api';
 
 export default function AdminDashboard() {
   const { user, isLoading, isAuthenticated, hasRole } = useAuth();
@@ -39,9 +40,11 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-lg">Loading admin dashboard...</span>
+        <span className="ml-3 text-lg text-gray-900 dark:text-white">
+          Loading admin dashboard...
+        </span>
       </div>
     );
   }
@@ -52,12 +55,14 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0f0f0f] dark:from-transparent dark:via-transparent dark:to-transparent">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">Welcome, {user?.email || 'Administrator'}</p>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Welcome, {user?.email || 'Administrator'}
+          </p>
           {user?.['https://yt-summarizer.com/role'] && (
             <span className="inline-block mt-2 px-3 py-1 text-sm font-semibold text-white bg-purple-600 rounded-full">
               {user['https://yt-summarizer.com/role'].toUpperCase()}
@@ -99,6 +104,11 @@ export default function AdminDashboard() {
 
         {/* Admin Sections */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Expedite Requests - Quota Management */}
+          <div className="lg:col-span-2">
+            <ExpediteRequestsPanel />
+          </div>
+
           {/* User Management */}
           <AdminSection
             title="User Management"
@@ -149,8 +159,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+        <div className="mt-8 bg-white dark:bg-gray-800/50 rounded-lg shadow-md dark:shadow-none border border-transparent dark:border-gray-700/50 p-6">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
           <div className="flex flex-wrap gap-3">
             <QuickActionButton
               label="Refresh Data"
@@ -172,7 +182,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Footer Note */}
-        <div className="mt-8 text-center text-sm text-gray-500">
+        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
           <p>Admin dashboard is only accessible to users with administrator privileges.</p>
           <p className="mt-1">This page is protected by role-based access control.</p>
         </div>
@@ -220,12 +230,12 @@ interface AdminSectionProps {
 
 function AdminSection({ title, description, icon, actions }: AdminSectionProps) {
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white dark:bg-gray-800/50 rounded-lg shadow-md dark:shadow-none border border-transparent dark:border-gray-700/50 p-6">
       <div className="flex items-center mb-3">
         <span className="text-3xl mr-3">{icon}</span>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-          <p className="text-sm text-gray-600">{description}</p>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
         </div>
       </div>
       <div className="mt-4 space-y-2">
@@ -233,7 +243,7 @@ function AdminSection({ title, description, icon, actions }: AdminSectionProps) 
           <a
             key={index}
             href={action.href}
-            className="block w-full text-left px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+            className="block w-full text-left px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
           >
             {action.label} →
           </a>
@@ -247,9 +257,126 @@ function QuickActionButton({ label, onClick }: { label: string; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm dark:shadow-none"
     >
       {label}
     </button>
+  );
+}
+
+/**
+ * Expedite Requests Panel for admin quota management
+ */
+function ExpediteRequestsPanel() {
+  const [requests, setRequests] = useState<ExpediteRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+
+  const loadRequests = async () => {
+    try {
+      const data = await adminQuotaApi.listRequests('pending');
+      setRequests(data.requests);
+    } catch {
+      // Silently fail — endpoint may not be deployed yet
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRequests();
+  }, []);
+
+  const handleApprove = async (requestId: string) => {
+    setActionInProgress(requestId);
+    try {
+      await adminQuotaApi.approve(requestId);
+      await loadRequests();
+    } catch (err) {
+      alert(`Failed to approve: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleDeny = async (requestId: string) => {
+    setActionInProgress(requestId);
+    try {
+      await adminQuotaApi.deny(requestId);
+      await loadRequests();
+    } catch (err) {
+      alert(`Failed to deny: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-800/50 rounded-lg shadow-md dark:shadow-none border border-transparent dark:border-gray-700/50 p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+          ⚡ Expedite Requests
+        </h2>
+        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800/50 rounded-lg shadow-md dark:shadow-none border border-transparent dark:border-gray-700/50 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">⚡ Expedite Requests</h2>
+        {requests.length > 0 && (
+          <span className="px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 rounded-full">
+            {requests.length} pending
+          </span>
+        )}
+      </div>
+
+      {requests.length === 0 ? (
+        <p className="text-gray-500 dark:text-gray-400 text-sm">No pending expedite requests.</p>
+      ) : (
+        <div className="space-y-3">
+          {requests.map((req) => (
+            <div
+              key={req.request_id}
+              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
+            >
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {req.video_count} videos queued
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {new Date(req.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                {req.reason && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    &quot;{req.reason}&quot;
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 ml-4">
+                <button
+                  onClick={() => handleApprove(req.request_id)}
+                  disabled={actionInProgress === req.request_id}
+                  className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => handleDeny(req.request_id)}
+                  disabled={actionInProgress === req.request_id}
+                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  Deny
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

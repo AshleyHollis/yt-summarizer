@@ -226,6 +226,7 @@ class TestWorkerResultOnInvalidContent:
             patch.object(
                 worker, "_fetch_transcript_with_timestamps_and_text", new_callable=AsyncMock
             ) as mock_fetch,
+            patch.object(worker, "_has_permanent_no_captions", return_value=False),
         ):
             # Simulate no transcript available
             mock_fetch.return_value = (None, None)
@@ -274,6 +275,7 @@ class TestRateLimitHandling:
             patch.object(
                 worker, "_check_existing_transcript", new_callable=AsyncMock
             ) as mock_check,
+            patch.object(worker, "_has_permanent_no_captions", return_value=False),
         ):
             # No existing transcript in blob storage
             mock_check.return_value = None
@@ -303,6 +305,7 @@ class TestRateLimitHandling:
             patch.object(
                 worker, "_check_existing_transcript", new_callable=AsyncMock
             ) as mock_check,
+            patch.object(worker, "_has_permanent_no_captions", return_value=False),
         ):
             # No existing transcript in blob storage
             mock_check.return_value = None

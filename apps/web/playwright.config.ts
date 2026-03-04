@@ -26,6 +26,9 @@ export default defineConfig({
   // CI: 1 retry for fast failure signal, Local: 1 retry for quick feedback
   retries: 1,
 
+  // Stop early if too many tests fail - prevents 60min+ runs when auth or infra is broken
+  maxFailures: process.env.CI ? 5 : undefined,
+
   // Run tests in parallel - 4 workers on CI keeps total run time under
   // the 60-minute GitHub Actions limit. The submitQuery() fix (waiting for
   // networkidle before typing + input.toHaveValue("") confirmation) prevents

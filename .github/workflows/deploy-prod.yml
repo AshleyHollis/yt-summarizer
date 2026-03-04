@@ -101,7 +101,7 @@ jobs:
 
       - name: Wait for CI workflow to complete
         id: wait
-        uses: ./.github/actions/wait-for-ci
+        uses: AshleyHollis/shared-infra/.github/actions/wait-for-ci@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           commit-sha: ${{ github.sha }}
@@ -132,7 +132,7 @@ jobs:
        (github.event_name != 'workflow_dispatch'))
     with:
       environment: production
-      terraform-version: ${{ vars.TERRAFORM_VERSION || '1.5.7' }}
+      terraform-version: ${{ vars.TERRAFORM_VERSION || '1.9' }}
       working-directory: infra/terraform/environments/prod
       run-plan: true
       run-apply: true
@@ -155,10 +155,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Setup Azure and AKS
-        uses: ./.github/actions/setup-azure-aks
+        uses: AshleyHollis/shared-infra/.github/actions/setup-azure-aks@v1
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -167,7 +167,7 @@ jobs:
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd' }}
 
       - name: Sync Argo CD manifests
-        uses: ./.github/actions/sync-argocd-manifests
+        uses: AshleyHollis/shared-infra/.github/actions/sync-argocd-manifests@v1
         with:
           mode: all
           namespace: ${{ env.NAMESPACE_ARGOCD }}
@@ -195,7 +195,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Extract image tag from CI
         id: extract
@@ -235,7 +235,7 @@ jobs:
           fi
 
       - name: Azure Login and ACR authentication
-        uses: ./.github/actions/azure-acr-login
+        uses: AshleyHollis/shared-infra/.github/actions/azure-acr-login@v1
         with:
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -243,7 +243,7 @@ jobs:
           acr-name: ${{ env.ACR_NAME }}
 
       - name: Validate CI image exists in ACR
-        uses: ./.github/actions/validate-docker-image
+        uses: AshleyHollis/shared-infra/.github/actions/validate-docker-image@v1
         with:
           validation-type: acr-exists
           image-tag: ${{ steps.normalize-tag.outputs.image_tag }}
@@ -347,7 +347,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load shared environment
-        uses: ./.github/actions/load-shared-env
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
 
       - name: Write execution rationale
         run: |
@@ -370,7 +370,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate summary
-        uses: ./.github/actions/create-pipeline-summary
+        uses: AshleyHollis/shared-infra/.github/actions/create-pipeline-summary@v1
         with:
           summary-type: prod
           image-tag: ${{ needs.get-image-tag.outputs.image_tag }}

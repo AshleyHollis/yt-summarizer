@@ -80,15 +80,17 @@ class BatchService:
         self,
         request: CreateBatchRequest,
         correlation_id: str,
+        user_id: str | None = None,
+        quota_slots: int | None = None,
     ) -> BatchResponse:
         """Create a batch for video ingestion.
 
         Args:
             request: Batch creation request.
             correlation_id: Request correlation ID.
-
-        Returns:
-            BatchResponse with batch info.
+            user_id: Optional user ID for quota tracking.
+            quota_slots: Number of videos to dispatch immediately (rest queued).
+                         None means all dispatch immediately (no quota enforcement).
         """
         logger.info(
             "Creating batch",
@@ -140,15 +142,26 @@ class BatchService:
         self.session.add(batch)
         await self.session.flush()
 
-        # Process each video
+        # Process each video (quota-aware dispatching)
+        dispatched_count = 0
         for youtube_video_id in video_ids_to_ingest:
+            # Determine quota status for this job
+            if quota_slots is not None and dispatched_count >= quota_slots:
+                job_quota_status = "quota_queued"
+            else:
+                job_quota_status = "released"
+
             try:
                 await self._create_batch_item(
                     batch=batch,
                     youtube_video_id=youtube_video_id,
                     correlation_id=correlation_id,
                     channel=channel,
+                    user_id=user_id,
+                    quota_status=job_quota_status,
                 )
+                if job_quota_status == "released":
+                    dispatched_count += 1
             except Exception as e:
                 logger.warning(
                     "Failed to create batch item",
@@ -185,6 +198,8 @@ class BatchService:
         youtube_video_id: str,
         correlation_id: str,
         channel: Channel | None,
+        user_id: str | None = None,
+        quota_status: str = "released",
     ) -> None:
         """Create a batch item for a single video.
 
@@ -193,6 +208,8 @@ class BatchService:
             youtube_video_id: YouTube video ID.
             correlation_id: Request correlation ID.
             channel: Optional channel for the video.
+            user_id: Optional user ID for quota tracking.
+            quota_status: "released" to dispatch now, "quota_queued" to hold.
         """
         # Check if video already exists
         result = await self.session.execute(
@@ -255,32 +272,35 @@ class BatchService:
             stage=JobStage.QUEUED.value,
             status=JobStatus.PENDING.value,
             correlation_id=correlation_id,
+            user_id=user_id,
+            quota_status=quota_status,
         )
         self.session.add(job)
         await self.session.flush()
 
-        # Queue the job
-        try:
-            queue_client = get_queue_client()
-            queue_client.send_message(
-                TRANSCRIBE_QUEUE,
-                inject_trace_context(
-                    {
-                        "job_id": str(job.job_id),
-                        "video_id": str(video.video_id),
-                        "youtube_video_id": youtube_video_id,
-                        "channel_name": channel.name,
-                        "batch_id": str(batch.batch_id),
-                        "correlation_id": correlation_id,
-                    }
-                ),
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to queue job",
-                job_id=str(job.job_id),
-                error=str(e),
-            )
+        # Only dispatch to queue if released (not quota_queued)
+        if quota_status == "released":
+            try:
+                queue_client = get_queue_client()
+                queue_client.send_message(
+                    TRANSCRIBE_QUEUE,
+                    inject_trace_context(
+                        {
+                            "job_id": str(job.job_id),
+                            "video_id": str(video.video_id),
+                            "youtube_video_id": youtube_video_id,
+                            "channel_name": channel.name,
+                            "batch_id": str(batch.batch_id),
+                            "correlation_id": correlation_id,
+                        }
+                    ),
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to queue job",
+                    job_id=str(job.job_id),
+                    error=str(e),
+                )
 
     async def _fetch_video_metadata(self, youtube_video_id: str) -> dict:
         """Fetch video metadata from YouTube using yt-dlp.

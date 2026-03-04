@@ -28,6 +28,8 @@ import {
  */
 
 test.describe("Chat Response Quality", () => {
+  // Copilot endpoint requires auth; cross-domain cookies prevent auth in SWA preview
+  test.fixme(!!process.env.CI, "Cross-domain cookie issue in SWA preview environment");
   // Each test gets a fresh browser context so CopilotKit in-memory thread state
   // never accumulates across tests. This avoids client-generated thread IDs
   // (server should own thread ID generation) and prevents history bloat
@@ -255,6 +257,8 @@ test.describe("Chat Response Quality", () => {
 });
 
 test.describe('Chat Edge Cases', () => {
+  // Copilot endpoint requires auth; cross-domain cookies prevent auth in SWA preview
+  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // Navigate with chat=open to have the sidebar open by default

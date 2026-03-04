@@ -5,11 +5,11 @@ inputs:
   start-time:
     description: Test start time (epoch seconds). If not provided, records current time as start.
     required: false
-    default: ''
+    default: ""
   test-name:
     description: Name of the test suite for logging
     required: false
-    default: 'Tests'
+    default: "Tests"
 
 outputs:
   started_at:

@@ -26,6 +26,8 @@ except ImportError:
         return logging.getLogger(name)
 
 
+from ..dependencies.auth import AuthenticatedUser, require_auth
+from ..dependencies.quota import check_copilot_quota
 from ..middleware.correlation import get_correlation_id
 from ..models.copilot import (
     CopilotQueryRequest,
@@ -84,6 +86,7 @@ def get_copilot_service(session: AsyncSession = Depends(get_session)) -> Copilot
 async def query(
     request_: Request,
     body: CopilotQueryRequest,
+    user: AuthenticatedUser = Depends(check_copilot_quota),
     service: CopilotService = Depends(get_copilot_service),
 ) -> CopilotQueryResponse:
     """Execute a copilot query.
@@ -135,6 +138,7 @@ async def query(
 async def search_segments(
     request_: Request,
     body: SegmentSearchRequest,
+    user: AuthenticatedUser = Depends(require_auth),
     service: SearchService = Depends(get_search_service),
 ) -> SegmentSearchResponse:
     """Search for segments using vector similarity."""
@@ -412,6 +416,7 @@ def get_synthesis_service(session: AsyncSession = Depends(get_session)) -> Synth
 async def synthesize(
     request_: Request,
     body: SynthesizeRequest,
+    user: AuthenticatedUser = Depends(check_copilot_quota),
     session: AsyncSession = Depends(get_session),
 ) -> SynthesizeResponse:
     """Synthesize a structured output from library content.

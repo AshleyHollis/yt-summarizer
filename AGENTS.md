@@ -13,6 +13,7 @@ Essential rules for AI coding assistants. Discover implementation details by rea
 4. **Aspire orchestration**: Start Aspire (`aspire run`) before E2E tests if not running
 5. **Secret management**: ALL secrets MUST be in Azure Key Vault via Terraform (never manual)
 6. **Documentation**: Prefer https://aspire.dev and https://learn.microsoft.com/dotnet/aspire
+7. **Never bypass git hooks**: NEVER use `--no-verify` on `git commit` or `git push`. Hooks run ruff (Python) and ESLint (TypeScript) to catch lint errors before CI. If hooks fail, fix the issues — do not skip them.
 </critical_rules>
 
 ## Architecture Overview

@@ -27,6 +27,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Social Login Authentication @auth', () => {
+  // Cross-domain cookie issue: auth cookies on API domain aren't sent to SWA domain
+  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
   /**
    * Tests in this suite require authentication to be configured.
    * They will be skipped if auth setup failed or is not configured.

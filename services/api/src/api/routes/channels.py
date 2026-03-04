@@ -11,6 +11,7 @@ except ImportError:
         raise NotImplementedError("Database session not available")
 
 
+from ..dependencies.auth import AuthenticatedUser, require_auth
 from ..models.channel import (
     ChannelVideosResponse,
     FetchChannelRequest,
@@ -37,6 +38,7 @@ def get_channel_service(
 async def fetch_channel_videos(
     request: Request,
     body: FetchChannelRequest,
+    user: AuthenticatedUser = Depends(require_auth),
     service: ChannelService = Depends(get_channel_service),
 ) -> ChannelVideosResponse:
     """Fetch videos from a YouTube channel.

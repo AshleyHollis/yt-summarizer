@@ -10,6 +10,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 // ============================================================================
 // Type Definitions
@@ -189,7 +190,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Fetch user session from Auth0 API route
+  // Fetch user session from backend API
   useEffect(() => {
     let mounted = true;
 
@@ -198,29 +199,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setIsLoading(true);
         setError(null);
 
-        // Call the Auth0 session endpoint to get the current user
-        // Add timeout to prevent hanging during SWA warmup
+        // Call the backend API session endpoint directly
+        // Uses runtime config to get the correct backend URL
+        const apiUrl = getClientApiUrl();
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const response = await fetch('/api/auth/me', {
+        const response = await fetch(`${apiUrl}/api/auth/session`, {
           signal: controller.signal,
+          credentials: 'include',
+          headers: { 'Accept': 'application/json' },
         });
 
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          // User is not authenticated (401/403) - this is expected
-          if (response.status === 401 || response.status === 403) {
-            if (mounted) {
-              setUser(null);
-              setIsLoading(false);
-            }
-            return;
+          // Any non-200 response means not authenticated
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
           }
-
-          // Other errors (500, etc.) should be treated as errors
-          throw new Error(`Failed to fetch user session: ${response.statusText}`);
+          return;
         }
 
         const data = await response.json();

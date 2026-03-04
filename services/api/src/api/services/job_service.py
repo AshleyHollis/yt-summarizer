@@ -200,15 +200,18 @@ class JobService:
             overall_progress = 0
             overall_status = "pending"
         else:
-            succeeded = sum(1 for j in items if j.status == JobStatus.SUCCEEDED)
-            failed = sum(1 for j in items if j.status == JobStatus.FAILED)
+            succeeded_types = {j.job_type for j in items if j.status == JobStatus.SUCCEEDED}
+            succeeded = len(succeeded_types)
+            failed_types = {
+                j.job_type for j in items if j.status == JobStatus.FAILED
+            } - succeeded_types
             running = sum(1 for j in items if j.status == JobStatus.RUNNING)
 
             # Expected 4 stages for complete processing
             expected_stages = 4
-            overall_progress = int((succeeded / expected_stages) * 100)
+            overall_progress = min(int((succeeded / expected_stages) * 100), 100)
 
-            if failed > 0:
+            if failed_types:
                 overall_status = "failed"
             elif running > 0:
                 overall_status = "processing"

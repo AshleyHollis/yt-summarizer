@@ -163,6 +163,7 @@ class TestTranscribeWorkerProcessing:
         with (
             patch("transcribe.worker.mark_job_running", new_callable=AsyncMock) as mock_running,
             patch("transcribe.worker.mark_job_failed", new_callable=AsyncMock) as mock_failed,
+            patch.object(worker, "_has_permanent_no_captions", return_value=False),
         ):
             # Process the message - should fail due to no transcript
             result = await worker.process_message(message, sample_correlation_id)
@@ -220,6 +221,7 @@ class TestTranscribeWorkerProcessing:
             ) as mock_store_ts,
             patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact,
             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue,
+            patch.object(worker, "_has_permanent_no_captions", return_value=False),
         ):
             # Configure mocks - method returns (transcript, segments) tuple
             mock_fetch.return_value = (
