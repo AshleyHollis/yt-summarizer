@@ -28,7 +28,7 @@ spec:
             type: LoadBalancer
             annotations:
               service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /health
-              service.beta.kubernetes.io/azure-load-balancer-ipv4: "20.255.113.149"
+              service.beta.kubernetes.io/azure-load-balancer-ipv4: "135.235.188.138"
         nginx:
           image:
             repository: ghcr.io/nginxinc/nginx-gateway-fabric/nginx
