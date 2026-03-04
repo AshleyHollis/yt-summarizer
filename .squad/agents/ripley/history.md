@@ -16,6 +16,25 @@
 ## Learnings
 <!-- Append learnings below -->
 
+### 2026-03-05 — CORS Preflight Fix & Security Headers
+
+**Root cause of CORS 400**: Middleware ordering. `CorrelationIdMiddleware` (a `BaseHTTPMiddleware` subclass) was added after `CORSMiddleware`, making it the outermost wrapper. `BaseHTTPMiddleware` intercepted OPTIONS preflight requests before `CORSMiddleware` could handle them, causing 400 responses. Fix: CORSMiddleware must be added **last** via `add_middleware()` so it's outermost.
+
+**Key rule**: In FastAPI/Starlette, `add_middleware()` inserts at position 0 of an internal list and the stack is built in reverse. The **last** call to `add_middleware` creates the **outermost** middleware. CORS must always be outermost.
+
+**Changes made:**
+- Reordered middleware: CorrelationId (first/inner) → SecurityHeaders → CORS (last/outer)
+- Added SWA URL `https://white-meadow-0b8e2e000.6.azurestaticapps.net` to explicit `cors_origins` (belt-and-suspenders with regex `^https://.*\.azurestaticapps\.net$`)
+- Enumerated allowed methods/headers instead of wildcard `*`
+- Created `SecurityHeadersMiddleware` in `services/api/src/api/middleware/security.py`: HSTS, X-Content-Type-Options, X-Frame-Options, CSP (`default-src 'self'`), Referrer-Policy
+
+**Auth config verified:**
+- Callback URL: dynamically built from `X-Forwarded-Proto` + `Host` headers — no hardcoded URLs
+- Cookie: `samesite="none"`, `secure=True`, no explicit `domain` — correct for cross-origin BFF pattern
+- `default_return_to` configurable via `AUTH0_DEFAULT_RETURN_TO` env var — should be set in K8s deployment to SWA URL
+
+**Note:** `AUTH0_DEFAULT_RETURN_TO` env var in K8s deployment should point to `https://white-meadow-0b8e2e000.6.azurestaticapps.net` (or the custom domain once re-pointed).
+
 ### 2026-03-04 — Production API Health Check
 
 **Observations from `https://api.yt-summarizer.apps.ashleyhollis.com`:**
