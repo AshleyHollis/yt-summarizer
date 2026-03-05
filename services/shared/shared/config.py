@@ -461,7 +461,7 @@ class Settings(BaseSettings):
         description="Service name for logging",
     )
     service_version: str = Field(
-        default="0.1.0",
+        default="0.2.0",
         description="Service version",
     )
     environment: Literal["development", "staging", "production"] = Field(
