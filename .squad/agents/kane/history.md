@@ -15,3 +15,22 @@
 
 ## Learnings
 <!-- Append learnings below -->
+
+### 2026-03-04 — Production Smoke Test
+
+**Frontend (Azure Static Web App)**
+- `https://white-meadow-0b8e2e000.6.azurestaticapps.net` returns Azure SWA native 404 — the app bundle is NOT deployed to this slot.
+- Console error: `Failed to load resource: 404` on the root path — not an app error, Azure itself is serving the 404 page.
+- The SWA resource exists but has no deployed content. **Users cannot access the application.**
+
+**API (AKS Backend)**
+- `/health/ready` → ✅ all checks pass: `api`, `database_init`, `database_connection`, `database_connection_cached` all `true`.
+- `/docs` (Swagger UI) → ❌ 404 with structured error JSON `{"error":{"code":404,"message":"Not Found",...}}`. Swagger docs are disabled in production (likely intentional for security).
+- `/api/auth/session` → ✅ responds correctly with `{"user":null,"isAuthenticated":false}`. No console errors. Auth endpoint is live and responding.
+
+**Summary**: API backend is fully healthy. Frontend is broken — either the deployment pipeline has not pushed the frontend build to the SWA, or the SWA URL has changed.
+
+**Cross-agent findings:**
+- transcribe-worker in CrashLoopBackOff (Parker) — transcription jobs blocked.
+- Deploy pipeline broken, line 127 (Parker) — production deployments failing.
+- CORS broken, security headers missing (Ripley) — browser-side API calls will fail.

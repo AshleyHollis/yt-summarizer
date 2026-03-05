@@ -15,3 +15,51 @@
 
 ## Learnings
 <!-- Append learnings below -->
+
+### 2026-03-04 — Production Deployment Verification
+- **transcribe-worker crash root cause**: `proxy-credentials` K8s secret has empty `username` and `password` values. The ExternalSecret reports `SecretSynced: True`, meaning Key Vault secrets exist but contain empty strings. Fix: populate Webshare proxy credentials in Azure Key Vault (`proxy-username`, `proxy-password`).
+- **Pod labels follow `app.kubernetes.io/name=<name>` pattern** — `kubectl -l app=<name>` won't match; use `app.kubernetes.io/name=<name>` selector.
+- **Gateway lives in `gateway-system` namespace** (not `yt-summarizer`). Gateway IP: `135.235.188.138`. HTTPRoute lives in `yt-summarizer` namespace.
+- **TLS wildcard cert** `yt-summarizer-wildcard` is issued and `True` in `gateway-system`.
+- **Azure SWA `swa-ytsumm-prd`** not found in `rg-ytsumm-prd-ci` — either not yet provisioned via Terraform or deployed under a different resource group.
+- **ArgoCD `yt-summarizer-prod`** is `Synced` but `Progressing` — held back by transcribe-worker crash loop.
+- **Latest "Deploy to Production" run (#252) failed**: Terraform workflow YAML error — `Unexpected value ''` at `terraform-deploy.yml` line 127 (empty expression in `continue-on-error`). Likely a recently introduced template bug.
+- **`/health/ready` returns HTTP 200** — API is externally reachable and healthy.
+- **DNS resolves correctly**: `api.yt-summarizer.apps.ashleyhollis.com` → `135.235.188.138` ✅
+
+**Cross-agent findings:**
+- Frontend SWA (`https://white-meadow-0b8e2e000.6.azurestaticapps.net`) has no deployed content (Kane finding) — users cannot access app.
+- API CORS broken, security headers missing (Ripley findings) — browser-side calls will fail, security posture degraded.
+
+### 2026-03-04 — Infrastructure Fixes Post-Rebuild
+
+**Pipeline Fix (PR #169):**
+- **Root cause of `Unexpected value ''`**: GitHub Actions converts boolean `false` to empty string `''` when used in `${{ }}` expressions outside `if:` conditionals. `continue-on-error: ${{ inputs.post-to-pr }}` when `post-to-pr` is `false` → `continue-on-error: ''` → YAML parse error.
+- **Fix**: Changed to ternary string pattern `${{ inputs.post-to-pr && 'true' || 'false' }}` which always produces a valid boolean string.
+
+**Key Vault RBAC Fix (Azure CLI):**
+- The `github-actions-yt-summarizer` SP (OID: `0a8480bd-2b41-449f-b16e-badd5616ae15`) had NO Key Vault role assignment after the cluster rebuild. Terraform plan failed with 403 ForbiddenByRbac on ALL Key Vault secret reads.
+- **Fix**: Granted `Key Vault Secrets Officer` role on `kv-ytsumm-prd-ci` via `az role assignment create`. This is a bootstrap dependency — Terraform needs KV access to run, so it can't self-provision this role.
+
+**Infrastructure Audit — All Configs Aligned to New Region (centralindia):**
+- Cluster: `aks-ytsumm-prd-ci` in `centralindia` ✓
+- ACR: `acrytsummprdci` in `centralindia` ✓
+- Key Vault: `kv-ytsumm-prd-ci` in `centralindia` ✓
+- DNS: `api.yt-summarizer.apps.ashleyhollis.com` → `135.235.188.138` ✓
+- Gateway IP: `135.235.188.138` ✓
+- All workflow files use parameterized `${{ vars.X || 'default' }}` pattern with correct defaults ✓
+- SecretStore/ClusterSecretStore reference correct Key Vault URL ✓
+- Workload Identity client ID matches across K8s manifests and deployed SA ✓
+- No hardcoded old-region references found in active configs (only in `INFRASTRUCTURE_ISSUES.md` doc)
+
+**SWA Situation:**
+- `swa-ytsumm-prd` does NOT exist in Azure — resource destroyed during rebuild, not yet recreated.
+- SWA is defined in Terraform (`swa.tf`). Once the fixed pipeline runs Terraform, it will create the new SWA.
+- After creation, `SWA_DEPLOYMENT_TOKEN` GitHub secret needs updating with the new SWA API key (from Terraform output `swa_api_key`).
+- Stale SWA callback URL in `variables.tf` (`red-grass-06d413100-64.eastasia.6.azurestaticapps.net`) — harmless, will be replaced when new SWA is created.
+
+**ExternalSecret Configs — Correct, Data Issue Only:**
+- All SecretStore/ClusterSecretStore configs reference `kv-ytsumm-prd-ci` correctly.
+- All ExternalSecrets report `SecretSynced: True` / `Ready`.
+- Proxy credentials (`webshare-proxy-username`, `webshare-proxy-password`) are empty strings in Key Vault — manual population required by Ashley via Azure Portal/CLI.
+- transcribe-worker is in Error state (was CrashLoopBackOff) due to empty proxy credentials.

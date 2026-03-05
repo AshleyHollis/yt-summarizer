@@ -124,7 +124,7 @@ jobs:
           sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        continue-on-error: ${{ inputs.post-to-pr }}
+        continue-on-error: ${{ inputs.post-to-pr && 'true' || 'false' }}
 
       - name: Post Plan to PR and Summary
         if: inputs.post-to-pr && github.event_name == 'pull_request'

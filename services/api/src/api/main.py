@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .middleware import CorrelationIdMiddleware
+from .middleware import CorrelationIdMiddleware, SecurityHeadersMiddleware
 from .routes import (
     admin,
     admin_quota,
@@ -43,6 +43,7 @@ except ImportError:
                     "http://localhost:3001",
                     "https://web.yt-summarizer.apps.ashleyhollis.com",
                     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
+                    "https://white-meadow-0b8e2e000.6.azurestaticapps.net",
                 ]
                 cors_origin_regex = r"^https://.*\.azurestaticapps\.net$"
                 debug = True
@@ -211,21 +212,25 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Add middleware (order matters - first added = last executed)
+    # Add middleware (order matters - last added = outermost = first to execute)
+    # Stack (outside→in): CORS → SecurityHeaders → CorrelationId → App
 
-    # CORS middleware
+    # Correlation ID middleware (innermost — closest to route handlers)
+    app.add_middleware(CorrelationIdMiddleware)
+
+    # Security headers middleware
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    # CORS middleware (outermost — must intercept OPTIONS preflight first)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.api.cors_origins,
         allow_origin_regex=settings.api.cors_origin_regex,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        allow_headers=["Content-Type", "Authorization", "Cookie", "X-Correlation-ID"],
         expose_headers=["X-Correlation-ID"],
     )
-
-    # Correlation ID middleware
-    app.add_middleware(CorrelationIdMiddleware)
 
     # Register exception handlers
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
