@@ -12,6 +12,7 @@ try:
     from shared.db.models import Batch, BatchItem, Channel, Job, Video
     from shared.logging.config import get_logger
     from shared.proxy import ProxyService
+    from shared.proxy.models import ProxyConfigurationError
     from shared.queue.client import TRANSCRIBE_QUEUE, get_queue_client
     from shared.telemetry.config import inject_trace_context
 except ImportError:
@@ -74,7 +75,11 @@ class BatchService:
         self.channel_service = ChannelService(session)
         self.youtube_service = get_youtube_service()
         settings = get_settings()
-        self._proxy_service = ProxyService(settings.proxy) if ProxyService is not None else None
+        try:
+            self._proxy_service = ProxyService(settings.proxy) if ProxyService is not None else None
+        except ProxyConfigurationError:
+            logger.warning("proxy_service.unavailable", reason="credentials not configured")
+            self._proxy_service = None
 
     async def create_batch(
         self,
