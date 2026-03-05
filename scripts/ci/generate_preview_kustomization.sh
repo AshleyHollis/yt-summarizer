@@ -62,7 +62,7 @@ done
 
 # Auto-generate SWA URL if not provided (matches Python logic)
 if [ -z "${SWA_URL:-}" ]; then
-  export SWA_URL="https://red-grass-06d413100-${PR_NUMBER}.eastasia.6.azurestaticapps.net"
+  export SWA_URL="https://proud-hill-0940e7300-${PR_NUMBER}.eastasia.6.azurestaticapps.net"
 fi
 
 # Generate metadata header
