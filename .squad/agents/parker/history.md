@@ -16,6 +16,31 @@
 ## Learnings
 <!-- Append learnings below -->
 
+### 2026-03-05 — Preview PR-177 Infrastructure Audit
+
+**Secrets (all synced via ExternalSecret → azure-keyvault-cluster ClusterSecretStore):**
+- `auth0-credentials` — keys: `client-id`, `client-secret`, `domain`, `session-secret` ✅
+- `db-credentials` — keys: `connection-string` ✅
+- `openai-credentials` — keys: `api-key`, `azure-api-key`, `azure-deployment`, `azure-embedding-deployment`, `azure-endpoint` ✅
+- `proxy-credentials` — keys: `username`, `password` ✅ (populated; note historically was empty in prod)
+- `storage-credentials` — keys: `connection-string` (single string covers blob + queue) ✅
+
+**Pods — all 5 Running, 0 restarts:**
+- `api`, `transcribe-worker`, `summarize-worker`, `embed-worker`, `relationships-worker` all `1/1 Running` ✅
+
+**Worker env vars:**
+- `transcribe-worker`: DATABASE_URL, AZURE_STORAGE_CONNECTION_STRING, OPENAI_API_KEY, PROXY_USERNAME, PROXY_PASSWORD ✅
+- `summarize-worker`: DATABASE_URL, AZURE_STORAGE_CONNECTION_STRING, OPENAI_API_KEY, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT ✅
+- `embed-worker`: DATABASE_URL, AZURE_STORAGE_CONNECTION_STRING, OPENAI_API_KEY, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_EMBEDDING_DEPLOYMENT ✅
+- `relationships-worker`: DATABASE_URL, AZURE_STORAGE_CONNECTION_STRING, OPENAI_API_KEY ✅ (no Azure OpenAI keys — consistent with its role using standard OpenAI only)
+
+**Azure Storage queue connectivity (all HTTP 200 from worker logs):**
+- `transcribe-jobs`, `summarize-jobs`, `embed-jobs`, `relationships-jobs` — all polling successfully ✅
+
+**ArgoCD app `preview-pr-177`**: `Synced` + `Healthy` @ revision `b3e7c6e5` ✅
+
+**No issues found.** Preview environment is fully functional.
+
 ### 2026-03-04 — Production Deployment Verification
 - **transcribe-worker crash root cause**: `proxy-credentials` K8s secret has empty `username` and `password` values. The ExternalSecret reports `SecretSynced: True`, meaning Key Vault secrets exist but contain empty strings. Fix: populate Webshare proxy credentials in Azure Key Vault (`proxy-username`, `proxy-password`).
 - **Pod labels follow `app.kubernetes.io/name=<name>` pattern** — `kubectl -l app=<name>` won't match; use `app.kubernetes.io/name=<name>` selector.

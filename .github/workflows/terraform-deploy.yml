@@ -56,6 +56,10 @@ on:
         required: true
       CLOUDFLARE_API_TOKEN:
         required: true
+      WEBSHARE_PROXY_USERNAME:
+        required: false
+      WEBSHARE_PROXY_PASSWORD:
+        required: false
     outputs:
       plan-summary:
         description: Terraform plan summary
@@ -126,7 +130,7 @@ jobs:
           sql-admin-password: ${{ secrets.SQL_ADMIN_PASSWORD }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        continue-on-error: ${{ inputs.post-to-pr && 'true' || 'false' }}
+        continue-on-error: ${{ inputs.post-to-pr == true }}
 
       - name: Post Plan to PR and Summary
         if: inputs.post-to-pr && github.event_name == 'pull_request'

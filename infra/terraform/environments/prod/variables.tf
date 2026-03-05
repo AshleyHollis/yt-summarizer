@@ -141,8 +141,6 @@ variable "auth0_allowed_callback_urls" {
     "https://api-stg.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback",
     "https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/api/auth/callback/auth0",
-    # Azure Static Web Apps (Next.js @auth0/nextjs-auth0)
-    "https://red-grass-06d413100-64.eastasia.6.azurestaticapps.net/api/auth/callback",
     "http://localhost:3000/api/auth/callback",
   ]
 }
