@@ -16,6 +16,26 @@
 ## Learnings
 <!-- Append learnings below -->
 
+### 2026-03-05 — PR #177 Preview API Smoke Test
+
+**Environment:** `https://api-pr-177.yt-summarizer.apps.ashleyhollis.com`
+
+**Healthy:**
+- All three health endpoints return 200: `/health` (all dependency checks pass — DB, blob, queue), `/health/ready`, `/health/live`.
+- Auth flow works: `GET /api/auth/login` redirects (302) to correct Auth0 tenant `dev-gvli0bfdrue0h8po.us.auth0.com`.
+- `POST /api/v1/videos` and `POST /api/v1/batches` correctly return 401 without a session cookie.
+- `GET /api/v1/batches` returns 200 with empty array — correct for fresh env.
+
+**Known/Expected Behaviours:**
+- `GET /api/v1/videos` returns 405 — there is no GET list-videos route; the endpoint only accepts POST. This is consistent with production and is by design.
+- `/openapi.json`, `/docs`, `/redoc` all return 404 — OpenAPI spec is disabled in non-local environments (intentional).
+
+**Issues Found:**
+1. **`GET /api/v1/admin/recovery/status` returns 200 with no auth required.** The route in `services/api/src/api/routes/admin.py` has no `require_auth` dependency. It exposes internal job-queue counts (dead-lettered jobs, stale jobs, active jobs). This is a **security gap** — low-severity info disclosure but should be gated.
+2. `POST /api/v1/admin/recovery/run` and `POST /api/v1/admin/quota/dispatch` also have no `require_auth`. Not verified in this test run but visible in source.
+
+**Auth0 tenant confirmed:** `dev-gvli0bfdrue0h8po.us.auth0.com` — correct dev tenant for preview environments.
+
 ### 2026-03-05 — CORS Preflight Fix & Security Headers
 
 **Root cause of CORS 400**: Middleware ordering. `CorrelationIdMiddleware` (a `BaseHTTPMiddleware` subclass) was added after `CORSMiddleware`, making it the outermost wrapper. `BaseHTTPMiddleware` intercepted OPTIONS preflight requests before `CORSMiddleware` could handle them, causing 400 responses. Fix: CORSMiddleware must be added **last** via `add_middleware()` so it's outermost.
