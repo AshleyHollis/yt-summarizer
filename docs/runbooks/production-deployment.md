@@ -1,28 +1,28 @@
 # Production Deployment Reference
 
-> **Last Updated**: January 9, 2026  
+> **Last Updated**: March 5, 2026  
 > **Deployed By**: Initial bootstrap via Terraform + Argo CD
 
 ## Azure Resources
 
 | Resource | Name | Region |
 |----------|------|--------|
-| Resource Group | `rg-ytsumm-prd-ci` | East Asia |
-| Container Registry | `acrytsummprdci.azurecr.io` | East Asia |
-| AKS Cluster | `aks-ytsumm-prd-ci` | East Asia |
-| SQL Server | `sql-ytsumm-prd.database.windows.net` | East Asia |
-| SQL Database | `ytsummarizer` | East Asia |
-| Key Vault | `kv-ytsumm-prd-ci.vault.azure.net` | East Asia |
-| Storage Account | `stytsummprd.blob.core.windows.net` | East Asia |
-| Static Web App | `swa-ytsumm-prd` | Global |
+| Resource Group | `rg-ytsumm-prd-ci` | Central India |
+| Container Registry | `acrytsummprdci.azurecr.io` | Central India |
+| AKS Cluster | `aks-ytsumm-prd-ci` | Central India |
+| SQL Server | `sql-ytsumm-prd.database.windows.net` | Central India |
+| SQL Database | `ytsummarizer` | Central India |
+| Key Vault | `kv-ytsumm-prd-ci.vault.azure.net` | Central India |
+| Storage Account | `stytsummprd.blob.core.windows.net` | Central India |
+| Static Web App | `swa-ytsumm-prd` | East Asia |
 
 ## Endpoints
 
 | Service | URL |
 |---------|-----|
 | Frontend (SWA) | https://red-grass-06d413100.6.azurestaticapps.net |
-| Ingress Controller IP | `20.255.113.149` |
-| API (after DNS setup) | https://api.ytsummarizer.dev |
+| Gateway IP | `135.235.188.138` |
+| API | https://api.yt-summarizer.apps.ashleyhollis.com |
 
 ## Accessing the Cluster
 
