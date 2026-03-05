@@ -80,7 +80,7 @@ patches:
       metadata:
         name: shared-config
       data:
-        CORS_ORIGINS: "https://red-grass-06d413100-177.eastasia.6.azurestaticapps.net"
+        CORS_ORIGINS: "https://proud-hill-0940e7300-177.eastasia.6.azurestaticapps.net"
     target:
       kind: ConfigMap
       name: shared-config
@@ -99,9 +99,9 @@ patches:
               env:
               - name: API__CORS_ORIGINS
                 # JSON array string - keep no spaces after commas
-                value: '["https://red-grass-06d413100-177.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
+                value: '["https://proud-hill-0940e7300-177.eastasia.6.azurestaticapps.net","http://localhost:3000"]'
               - name: AUTH0_DEFAULT_RETURN_TO
-                value: "https://red-grass-06d413100-177.eastasia.6.azurestaticapps.net"
+                value: "https://proud-hill-0940e7300-177.eastasia.6.azurestaticapps.net"
     target:
       kind: Deployment
       name: api
