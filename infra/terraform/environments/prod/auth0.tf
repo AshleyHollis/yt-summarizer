@@ -7,6 +7,69 @@
 # Configure these scopes in Auth0 Dashboard → (Terraform M2M App) → APIs → Auth0 Management API
 
 # -----------------------------------------------------------------------------
+# Import existing Auth0 KV secrets (state lost during cluster rebuild 2026-03-04)
+# -----------------------------------------------------------------------------
+import {
+  to = azurerm_key_vault_secret.auth0_domain[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-domain/c52950df0ef141f09aa976750bd35c6e"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_client_id[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-client-id/65d2ba965fb94d56b787675f5af292b4"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_client_secret[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-client-secret/5871ecd33f454497868acf01ff9e8db9"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_session_secret[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-session-secret/7e3acaebc4c344a19de3b6f71173f8be"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_preview_domain[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-preview-domain/4310b46fb6ff412093433ad533ed1453"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_preview_client_id[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-preview-client-id/01b496282b924d469e3d038b3197a62d"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_preview_client_secret[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-preview-client-secret/64585f8b4a364051b52042cb09f3dd91"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_preview_session_secret[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-preview-session-secret/93dcfd4c89bd44e6af60665036347492"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_admin_test_email[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-admin-test-email/d15d5b06934841fc8343ac912be2d843"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_admin_test_password[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-admin-test-password/df065f80e972446ba9fb4d891341108c"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_user_test_email[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-user-test-email/5acfdd1526934c9980b70a3fc1dce0b9"
+}
+
+import {
+  to = azurerm_key_vault_secret.auth0_user_test_password[0]
+  id = "https://kv-ytsumm-prd-ci.vault.azure.net/secrets/auth0-user-test-password/102dd63b001745519d4f871d9ea3ce52"
+}
+
+# -----------------------------------------------------------------------------
 # Generate random session secret for Auth0 BFF
 # -----------------------------------------------------------------------------
 resource "random_password" "auth0_session_secret" {
