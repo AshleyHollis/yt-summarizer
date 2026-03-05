@@ -398,7 +398,7 @@ class APISettings(BaseSettings):
             "http://localhost:3001",
             "https://web.yt-summarizer.apps.ashleyhollis.com",
             "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
-            "https://white-meadow-0b8e2e000.6.azurestaticapps.net",
+            "https://proud-hill-0940e7300.6.azurestaticapps.net",
         ],
         description="Allowed CORS origins",
     )
