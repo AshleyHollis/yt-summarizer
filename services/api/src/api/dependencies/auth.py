@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -40,8 +41,34 @@ class AuthenticatedUser:
     raw: dict[str, Any]  # Full user_info dict from Auth0
 
 
+def _check_api_key(request: Request) -> AuthenticatedUser | None:
+    """Check for a valid X-API-Key header. Returns user if valid, None otherwise."""
+    api_key = request.headers.get("X-API-Key")
+    if not api_key:
+        return None
+
+    expected_key = os.environ.get("API_KEY")
+    if not expected_key:
+        return None
+
+    if api_key != expected_key:
+        return None
+
+    return AuthenticatedUser(
+        sub="api-key",
+        email="openclaw@internal",
+        name="OpenClaw",
+        picture=None,
+        raw={"sub": "api-key", "email": "openclaw@internal", "name": "OpenClaw"},
+    )
+
+
 async def require_auth(request: Request) -> AuthenticatedUser:
     """FastAPI dependency that requires a valid authenticated session.
+
+    Supports two authentication methods:
+    1. X-API-Key header (for programmatic access, e.g. MCP servers)
+    2. Session cookie (for browser-based Auth0 sessions)
 
     Usage:
         @router.post("/endpoint")
@@ -51,6 +78,12 @@ async def require_auth(request: Request) -> AuthenticatedUser:
     Raises:
         HTTPException 401 if no valid session exists.
     """
+    # Check API key first (fast path for programmatic access)
+    api_key_user = _check_api_key(request)
+    if api_key_user:
+        return api_key_user
+
+    # Fall back to session cookie auth
     settings = get_settings()
     session_cookie_name = settings.auth.session_cookie_name
 
