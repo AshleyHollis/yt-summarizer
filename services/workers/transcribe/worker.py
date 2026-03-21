@@ -105,9 +105,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                     proxy_url = proxy_service.get_proxy_url()
                     proxy_handler = urllib.request.ProxyHandler({"http": proxy_url})
                     opener = urllib.request.build_opener(proxy_handler)
-                    req = urllib.request.Request(
-                        "http://httpbin.org/ip", method="HEAD"
-                    )
+                    req = urllib.request.Request("http://httpbin.org/ip", method="HEAD")
                     resp = opener.open(req, timeout=10)
                     return resp.status < 400
                 except Exception:
@@ -124,6 +122,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             def _sync_usage_summary() -> dict:
                 """Return proxy usage stats synchronously."""
                 import asyncio
+
                 try:
                     summary = asyncio.run(proxy_service.get_usage_summary())
                     return {
