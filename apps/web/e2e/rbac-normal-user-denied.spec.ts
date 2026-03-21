@@ -250,7 +250,7 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
         await page.goto('http://localhost:3000/forbidden');
 
         // Should suggest signing in
-        const signInText = page.getByText(/sign in/i);
+        page.getByText(/sign in/i);
         // May or may not be visible depending on implementation
         // Just verify the page loads
         const heading = page.getByRole('heading', { name: /access denied/i });

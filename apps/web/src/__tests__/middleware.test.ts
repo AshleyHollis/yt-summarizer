@@ -16,7 +16,7 @@
  * in the actual middleware implementation.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Mock user types for testing
 interface MockUser {
