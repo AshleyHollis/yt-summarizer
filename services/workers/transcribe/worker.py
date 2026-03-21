@@ -93,13 +93,50 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
     def get_additional_connectivity_checks(self) -> dict:
         """Add proxy connectivity to health server checks."""
         if self._proxy_service is not None:
-            return {"proxy": self._proxy_service.check_connectivity}
+            import urllib.request
+
+            proxy_service = self._proxy_service
+
+            def _sync_proxy_check() -> bool:
+                """Test proxy connectivity synchronously via urllib."""
+                if not proxy_service._settings.enabled:
+                    return True
+                try:
+                    proxy_url = proxy_service.get_proxy_url()
+                    proxy_handler = urllib.request.ProxyHandler({"http": proxy_url})
+                    opener = urllib.request.build_opener(proxy_handler)
+                    req = urllib.request.Request(
+                        "http://httpbin.org/ip", method="HEAD"
+                    )
+                    resp = opener.open(req, timeout=10)
+                    return resp.status < 400
+                except Exception:
+                    return False
+
+            return {"proxy": _sync_proxy_check}
         return {}
 
     def get_proxy_summary_fn(self):
         """Return proxy usage summary callable for /debug/proxy."""
         if self._proxy_service is not None:
-            return self._proxy_service.get_usage_summary
+            proxy_service = self._proxy_service
+
+            def _sync_usage_summary() -> dict:
+                """Return proxy usage stats synchronously."""
+                import asyncio
+                try:
+                    summary = asyncio.run(proxy_service.get_usage_summary())
+                    return {
+                        "total_requests": summary.total_requests,
+                        "successful_requests": summary.successful_requests,
+                        "failed_requests": summary.failed_requests,
+                        "total_bytes_used": summary.total_bytes_used,
+                        "total_duration_ms": summary.total_duration_ms,
+                    }
+                except Exception as e:
+                    return {"error": str(e)}
+
+            return _sync_usage_summary
         return None
 
     def parse_message(self, raw_message: dict[str, Any]) -> TranscribeMessage:
