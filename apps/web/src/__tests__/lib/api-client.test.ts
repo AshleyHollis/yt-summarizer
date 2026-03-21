@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Unit tests for API Client (T075)
  *
@@ -27,7 +28,7 @@ import {
 
 function mockFetch(responses: Array<{ status: number; body?: unknown }>) {
   const queue = [...responses];
-  return vi.fn(async () => {
+  return vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => {
     const next = queue.shift() ?? { status: 200, body: {} };
     return {
       ok: next.status >= 200 && next.status < 300,
@@ -116,7 +117,7 @@ describe('clearAccessTokenCache', () => {
 
 describe('apiGet', () => {
   it('attaches Bearer token to Authorization header when authenticated', async () => {
-    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       if (String(url).includes('/api/auth/me')) {
         return { ok: true, status: 200, json: async () => ({ accessToken: 'my-token' }) } as Response;
       }
@@ -136,7 +137,7 @@ describe('apiGet', () => {
   });
 
   it('sends no Authorization header when unauthenticated', async () => {
-    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       if (String(url).includes('/api/auth/me')) {
         return { ok: false, status: 401, json: async () => ({}) } as Response;
       }
@@ -154,7 +155,7 @@ describe('apiGet', () => {
   });
 
   it('throws and triggers re-auth when API returns 401', async () => {
-    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       if (String(url).includes('/api/auth/me')) {
         return { ok: true, status: 200, json: async () => ({ accessToken: 'expired-token' }) } as Response;
       }
@@ -177,7 +178,7 @@ describe('apiGet', () => {
   });
 
   it('throws on non-401 errors from the API', async () => {
-    global.fetch = vi.fn(async (url: RequestInfo | URL) => {
+    global.fetch = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       if (String(url).includes('/api/auth/me')) {
         return { ok: true, status: 200, json: async () => ({ accessToken: 'tok' }) } as Response;
       }
@@ -188,7 +189,7 @@ describe('apiGet', () => {
   });
 
   it('returns parsed JSON on success', async () => {
-    global.fetch = vi.fn(async (url: RequestInfo | URL) => {
+    global.fetch = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       if (String(url).includes('/api/auth/me')) {
         return { ok: true, status: 200, json: async () => ({ accessToken: 'tok' }) } as Response;
       }
@@ -204,7 +205,7 @@ describe('apiGet', () => {
 
 describe('apiPost', () => {
   it('attaches Bearer token and sets Content-Type on authenticated POST', async () => {
-    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       if (String(url).includes('/api/auth/me')) {
         return { ok: true, status: 200, json: async () => ({ accessToken: 'post-token' }) } as Response;
       }
@@ -226,7 +227,7 @@ describe('apiPost', () => {
   });
 
   it('throws and redirects to /sign-in when API returns 401', async () => {
-    global.fetch = vi.fn(async (url: RequestInfo | URL) => {
+    global.fetch = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       if (String(url).includes('/api/auth/me')) {
         return { ok: true, status: 200, json: async () => ({ accessToken: 'tok' }) } as Response;
       }
