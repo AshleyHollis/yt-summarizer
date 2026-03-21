@@ -1,0 +1,45 @@
+name: Start AKS Cluster
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  start-aks:
+    name: Start AKS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start AKS cluster
+        run: |
+          az aks start \
+            --name "${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}" \
+            --no-wait
+
+      - name: Wait for cluster to be running
+        run: |
+          echo "Waiting for AKS cluster to reach Running state..."
+          for i in $(seq 1 30); do
+            state=$(az aks show \
+              --name "${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}" \
+              --query "powerState.code" -o tsv 2>/dev/null)
+            echo "  attempt $i: powerState=$state"
+            if [ "$state" = "Running" ]; then
+              echo "Cluster is Running."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Timed out waiting for cluster to start."
+          exit 1
