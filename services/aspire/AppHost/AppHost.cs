@@ -57,7 +57,7 @@ var api = builder.AddPythonModule("api", "../../api", "uvicorn")
     .WithEnvironment("AUTH0_CLIENT_SECRET", auth0ClientSecret)
     .WithEnvironment("AUTH0_SESSION_SECRET", auth0SessionSecret)
     .WithEnvironment("AUTH0_DEFAULT_RETURN_TO", "http://localhost:3000")
-    .WithEnvironment("PROXY_ENABLED", "false")
+    .WithEnvironment("PROXY_ENABLED", "true")
     .WithEnvironment("PROXY_USERNAME", webshareProxyUsername)
     .WithEnvironment("PROXY_PASSWORD", webshareProxyPassword)
     .WithEnvironment("PROXY_MAX_CONCURRENCY", "5");
@@ -71,18 +71,20 @@ var web = builder.AddNpmApp("web", "../../../apps/web", "dev")
 // Python Workers - each worker has its own directory and virtual environment
 // Using AddExecutable to avoid pip install conflicts - venvs are pre-created
 // Workers use gRPC protocol for OTLP (default) with SSL certs from SSL_CERT_DIR
+// Workers are run with -m <name> from the workers/ parent dir so relative imports work
+var workersBasePath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers"));
 var transcribeWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/transcribe"));
 var transcribeWorker = builder.AddExecutable("transcribe-worker",
-        Path.Combine(transcribeWorkerPath, ".venv/Scripts/python.exe"),
-        transcribeWorkerPath,
-        "__main__.py")
+        Path.Combine(transcribeWorkerPath, ".venv/bin/python"),
+        workersBasePath,
+        "-m", "transcribe")
     .WithReference(blobs)
     .WithReference(queues)
     .WithReference(sql)
     .WithEnvironment("HEALTH_PORT", "8091")
     .WithEnvironment("QUEUE_POLL_INTERVAL", "10.0")
     .WithEnvironment("QUEUE_BATCH_SIZE", "32")
-    .WithEnvironment("PROXY_ENABLED", "false")
+    .WithEnvironment("PROXY_ENABLED", "true")
     .WithEnvironment("PROXY_USERNAME", webshareProxyUsername)
     .WithEnvironment("PROXY_PASSWORD", webshareProxyPassword)
     .WithEnvironment("PROXY_MAX_CONCURRENCY", "5")
@@ -91,9 +93,9 @@ var transcribeWorker = builder.AddExecutable("transcribe-worker",
 
 var summarizeWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/summarize"));
 var summarizeWorker = builder.AddExecutable("summarize-worker",
-        Path.Combine(summarizeWorkerPath, ".venv/Scripts/python.exe"),
-        summarizeWorkerPath,
-        "__main__.py")
+        Path.Combine(summarizeWorkerPath, ".venv/bin/python"),
+        workersBasePath,
+        "-m", "summarize")
     .WithReference(blobs)
     .WithReference(queues)
     .WithReference(sql)
@@ -109,9 +111,9 @@ var summarizeWorker = builder.AddExecutable("summarize-worker",
 
 var embedWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/embed"));
 var embedWorker = builder.AddExecutable("embed-worker",
-        Path.Combine(embedWorkerPath, ".venv/Scripts/python.exe"),
-        embedWorkerPath,
-        "__main__.py")
+        Path.Combine(embedWorkerPath, ".venv/bin/python"),
+        workersBasePath,
+        "-m", "embed")
     .WithReference(blobs)
     .WithReference(queues)
     .WithReference(sql)
@@ -127,9 +129,9 @@ var embedWorker = builder.AddExecutable("embed-worker",
 
 var relationshipsWorkerPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../workers/relationships"));
 var relationshipsWorker = builder.AddExecutable("relationships-worker",
-        Path.Combine(relationshipsWorkerPath, ".venv/Scripts/python.exe"),
-        relationshipsWorkerPath,
-        "__main__.py")
+        Path.Combine(relationshipsWorkerPath, ".venv/bin/python"),
+        workersBasePath,
+        "-m", "relationships")
     .WithReference(blobs)
     .WithReference(queues)
     .WithReference(sql)
