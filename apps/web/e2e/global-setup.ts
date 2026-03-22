@@ -502,11 +502,17 @@ async function globalSetup(_config: FullConfig) {
   // Track video IDs for progress monitoring
   const videoIds = new Map<string, string>(); // id -> url
 
+  const seedHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+  const seedApiKey = process.env.YT_SUMMARIZER_API_KEY;
+  if (seedApiKey) {
+    seedHeaders['X-API-Key'] = seedApiKey;
+  }
+
   for (const url of ALL_TEST_VIDEOS) {
     try {
       const response = await fetch(`${API_URL}/api/v1/videos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: seedHeaders,
         body: JSON.stringify({ url }),
       });
 

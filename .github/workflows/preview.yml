@@ -374,6 +374,28 @@ jobs:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
+      - name: Inject API key secret into preview namespace
+        if: needs.detect-changes.outputs.pr_number != ''
+        env:
+          PR_NUMBER: ${{ needs.detect-changes.outputs.pr_number }}
+          YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREVIEW_NS="${{ env.PREVIEW_NAMESPACE_PREFIX }}${PR_NUMBER}"
+          echo "Ensuring namespace ${PREVIEW_NS} exists..."
+          kubectl create namespace "${PREVIEW_NS}" --dry-run=client -o yaml | kubectl apply -f -
+          if [[ -n "${YT_SUMMARIZER_API_KEY:-}" ]]; then
+            echo "Creating/updating api-key-credentials secret in ${PREVIEW_NS}..."
+            kubectl create secret generic api-key-credentials \
+              --namespace="${PREVIEW_NS}" \
+              --from-literal=api-key="${YT_SUMMARIZER_API_KEY}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            echo "✅ api-key-credentials secret ready in ${PREVIEW_NS}"
+          else
+            echo "::warning::YT_SUMMARIZER_API_KEY is not set — API key auth will be disabled in preview"
+          fi
+
       - name: Sync ArgoCD manifests
         uses: AshleyHollis/shared-infra/.github/actions/sync-argocd-manifests@v1
         with:
@@ -686,6 +708,7 @@ jobs:
           AUTH0_ADMIN_TEST_PASSWORD: ${{ secrets.AUTH0_ADMIN_TEST_PASSWORD }}
           AUTH0_USER_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
           AUTH0_USER_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
+          YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

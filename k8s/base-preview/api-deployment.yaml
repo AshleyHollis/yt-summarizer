@@ -100,6 +100,12 @@ spec:
                 secretKeyRef:
                   name: openai-credentials
                   key: azure-api-key
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: api-key-credentials
+                  key: api-key
+                  optional: true
             - name: AZURE_OPENAI_DEPLOYMENT
               valueFrom:
                 secretKeyRef:
