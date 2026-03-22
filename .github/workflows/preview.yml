@@ -374,11 +374,10 @@ jobs:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
-      - name: Inject secrets into preview namespace
+      - name: Inject api-key-credentials into preview namespace
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PREVIEW_NS_PREFIX: ${{ env.PREVIEW_NAMESPACE_PREFIX }}
         shell: bash
         run: |
@@ -401,32 +400,6 @@ jobs:
             echo "✅ api-key-credentials secret ready in ${PREVIEW_NS}"
           else
             echo "::warning::YT_SUMMARIZER_API_KEY is not set — API key auth will be disabled in preview"
-          fi
-
-          # Patch openai-credentials to override the Key Vault value with the correct standard OpenAI key.
-          # The Key Vault openai-api-key is an Azure-format key that is invalid for the standard API;
-          # GitHub secret OPENAI_API_KEY holds the real sk-... key needed by the summarize/embed workers.
-          # We pause the ExternalSecret so the ESO does not overwrite our patch during the E2E run.
-          if [[ -n "${OPENAI_API_KEY:-}" ]]; then
-            echo "Patching openai-credentials with correct OpenAI API key in ${PREVIEW_NS}..."
-            # Pause ESO reconciliation so our patch survives the E2E run window
-            kubectl annotate externalsecret openai-credentials \
-              --namespace="${PREVIEW_NS}" \
-              reconcile.external-secrets.io/paused=true \
-              --overwrite 2>/dev/null || true
-            # Patch the secret directly
-            ENCODED_KEY=$(echo -n "${OPENAI_API_KEY}" | base64 -w 0)
-            kubectl patch secret openai-credentials \
-              --namespace="${PREVIEW_NS}" \
-              --type=json \
-              -p="[{\"op\":\"replace\",\"path\":\"/data/api-key\",\"value\":\"${ENCODED_KEY}\"}]" 2>/dev/null || \
-            kubectl create secret generic openai-credentials \
-              --namespace="${PREVIEW_NS}" \
-              --from-literal=api-key="${OPENAI_API_KEY}" \
-              --dry-run=client -o yaml | kubectl apply -f -
-            echo "✅ openai-credentials patched with standard OpenAI key in ${PREVIEW_NS}"
-          else
-            echo "::warning::OPENAI_API_KEY is not set — summarize/embed workers may fail in preview"
           fi
 
       - name: Sync ArgoCD manifests
@@ -620,6 +593,68 @@ jobs:
         with:
           node-version: "22"
           working-directory: apps/web
+
+      - name: Setup Azure and AKS (for secret injection)
+        uses: AshleyHollis/shared-infra/.github/actions/setup-azure-aks@v1
+        with:
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
+
+      - name: Patch OpenAI key and restart workers in preview namespace
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PREVIEW_NS_PREFIX: ${{ env.PREVIEW_NAMESPACE_PREFIX }}
+          WORKER_DEPLOYMENTS: ${{ env.WORKER_DEPLOYMENTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${PR_NUMBER:-}" || -z "${OPENAI_API_KEY:-}" ]]; then
+            echo "PR_NUMBER or OPENAI_API_KEY missing — skipping worker key patch"
+            exit 0
+          fi
+          PREVIEW_NS="${PREVIEW_NS_PREFIX}${PR_NUMBER}"
+          echo "Patching openai-credentials in ${PREVIEW_NS} with correct standard OpenAI key..."
+          # Pause the ExternalSecret so ESO does not overwrite our patch
+          kubectl annotate externalsecret openai-credentials \
+            --namespace="${PREVIEW_NS}" \
+            reconcile.external-secrets.io/paused=true \
+            --overwrite 2>/dev/null || true
+          # Force-write the correct key
+          ENCODED_KEY=$(echo -n "${OPENAI_API_KEY}" | base64 -w 0)
+          kubectl patch secret openai-credentials \
+            --namespace="${PREVIEW_NS}" \
+            --type=json \
+            -p="[{\"op\":\"replace\",\"path\":\"/data/api-key\",\"value\":\"${ENCODED_KEY}\"}]" || \
+          kubectl create secret generic openai-credentials \
+            --namespace="${PREVIEW_NS}" \
+            --from-literal=api-key="${OPENAI_API_KEY}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "✅ openai-credentials patched"
+          # Restart all workers so they reload env vars with the correct key
+          echo "Restarting worker pods in ${PREVIEW_NS} to pick up correct OpenAI key..."
+          IFS=',' read -ra WORKERS <<< "${WORKER_DEPLOYMENTS}"
+          for WORKER in "${WORKERS[@]}"; do
+            WORKER="${WORKER// /}"
+            if kubectl get deployment "${WORKER}" --namespace="${PREVIEW_NS}" &>/dev/null; then
+              kubectl rollout restart deployment/"${WORKER}" --namespace="${PREVIEW_NS}"
+              echo "  ↩️  Restarted ${WORKER}"
+            else
+              echo "  ⚠️  Deployment ${WORKER} not found in ${PREVIEW_NS} — skipping"
+            fi
+          done
+          # Wait for workers to be ready
+          for WORKER in "${WORKERS[@]}"; do
+            WORKER="${WORKER// /}"
+            if kubectl get deployment "${WORKER}" --namespace="${PREVIEW_NS}" &>/dev/null; then
+              echo "Waiting for ${WORKER} to be ready..."
+              kubectl rollout status deployment/"${WORKER}" --namespace="${PREVIEW_NS}" --timeout=120s
+            fi
+          done
+          echo "✅ All workers restarted and ready with correct OpenAI key"
 
       - name: Wait for API to be ready
         uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
