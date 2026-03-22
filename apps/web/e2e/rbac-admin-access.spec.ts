@@ -190,7 +190,7 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
       await page.goto('/admin');
 
       // Look for management section links
-      const pageContent = await page.textContent('body');
+      await page.textContent('body');
 
       // Admin dashboard typically has links to various admin functions
       // Verify the page has interactive elements (links/buttons)

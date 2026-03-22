@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
-import { hasRole } from '@/lib/auth-utils';
 import { LogoutButton } from '@/components/auth/LogoutButton';
 
 /**
@@ -21,7 +21,6 @@ export function Navbar() {
   const { user, isLoading, isAuthenticated } = useAuth();
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
-  const isAdmin = user && hasRole(user, 'admin');
 
   return (
     <nav className="sticky top-0 z-40 border-b border-gray-200/80 dark:border-gray-800/80 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md">
@@ -90,10 +89,12 @@ export function Navbar() {
             ) : isAuthenticated && user ? (
               <div className="flex items-center gap-2">
                 {user.picture ? (
-                  <img
+                  <Image
                     src={user.picture}
                     alt={user.name || user.email}
                     className="w-7 h-7 rounded-full border border-gray-200 dark:border-gray-700"
+                    width={28}
+                    height={28}
                   />
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">

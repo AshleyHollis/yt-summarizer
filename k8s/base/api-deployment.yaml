@@ -79,6 +79,12 @@ spec:
                 secretKeyRef:
                   name: auth0-credentials
                   key: session-secret
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: api-key-credentials
+                  key: api-key
+                  optional: true
             - name: PROXY_ENABLED
               value: "true"
             - name: PROXY_USERNAME

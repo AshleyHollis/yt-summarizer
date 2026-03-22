@@ -47,7 +47,7 @@ export default function AccessDenied() {
             </svg>
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-xl text-gray-600">You don't have permission to access this resource</p>
+          <p className="text-xl text-gray-600">You don&apos;t have permission to access this resource</p>
         </div>
 
         {/* Error Details Card */}
@@ -55,8 +55,8 @@ export default function AccessDenied() {
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-3">Why am I seeing this?</h2>
             <p className="text-gray-700 mb-4">
-              The page or feature you're trying to access requires elevated permissions that your
-              account doesn't currently have.
+              The page or feature you&apos;re trying to access requires elevated permissions that your
+              account doesn&apos;t currently have.
             </p>
 
             {isAuthenticated && user && (

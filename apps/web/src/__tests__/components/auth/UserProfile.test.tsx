@@ -4,9 +4,9 @@
  * @module UserProfile.test
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { AuthProvider } from '@/contexts/AuthContext';
+import Image from 'next/image';
 import type { User } from '@/contexts/AuthContext';
 
 // Mock the UserProfile component since we're writing tests before implementation
@@ -18,7 +18,7 @@ const MockUserProfile = ({ user }: { user: User | null }) => {
 
   return (
     <div data-testid="user-profile">
-      <img src={user.picture} alt={`${user.name}'s profile`} data-testid="profile-picture" />
+      <Image src={user.picture || ''} alt={`${user.name}'s profile`} data-testid="profile-picture" width={40} height={40} />
       <div data-testid="user-name">{user.name || user.email}</div>
       <div data-testid="user-email">{user.email}</div>
       <div data-testid="user-role">{user['https://yt-summarizer.com/role']}</div>
@@ -218,7 +218,7 @@ describe('UserProfile Component', () => {
 
   describe('Component Structure', () => {
     it('should have semantic HTML structure', () => {
-      const { container } = render(<UserProfile user={mockAdminUser} />);
+      render(<UserProfile user={mockAdminUser} />);
 
       // Should contain user profile container
       expect(screen.getByTestId('user-profile')).toBeInTheDocument();

@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { JobProgress } from '@/components/JobProgress';
-import { createMockVideoJobsProgress, createMockJobSummary } from '../helpers/mockFactories';
+import { createMockVideoJobsProgress } from '../helpers/mockFactories';
 
 // Mock the API module
 vi.mock('@/services/api', () => ({
@@ -17,20 +17,6 @@ vi.mock('@/services/api', () => ({
 
 import { jobApi } from '@/services/api';
 
-const createMockProgress = (overrides = {}) => ({
-  video_id: '123',
-  overall_status: 'processing',
-  overall_progress: 50,
-  jobs: [
-    { job_id: 'job-1', job_type: 'transcribe' as const, stage: 'completed' as const, status: 'succeeded' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
-    { job_id: 'job-2', job_type: 'summarize' as const, stage: 'running' as const, status: 'running' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
-    { job_id: 'job-3', job_type: 'embed' as const, stage: 'queued' as const, status: 'pending' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
-    { job_id: 'job-4', job_type: 'build_relationships' as const, stage: 'queued' as const, status: 'pending' as const, retry_count: 0, created_at: '2024-01-01T00:00:00Z' },
-  ],
-  eta: null,
-  current_stage_name: null,
-  ...overrides,
-});
 
 describe('JobProgress', () => {
   beforeEach(() => {

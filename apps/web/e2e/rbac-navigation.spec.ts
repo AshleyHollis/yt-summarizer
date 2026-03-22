@@ -241,7 +241,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
         await page.goto('http://localhost:3000/');
 
         // Should see sign in link instead of user profile
-        const signInLink = page.getByRole('link', { name: /sign in/i });
+        page.getByRole('link', { name: /sign in/i });
 
         // May redirect to login, or show sign in button
         // Just verify navigation loads
@@ -333,7 +333,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
       await expect(nav).toBeVisible();
 
       // Navigation should be semantic HTML
-      const navRole = await nav.getAttribute('role');
+      await nav.getAttribute('role');
       // May or may not have explicit role (nav element is implicit)
     });
   });
