@@ -375,14 +375,18 @@ jobs:
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
       - name: Inject API key secret into preview namespace
-        if: needs.detect-changes.outputs.pr_number != ''
         env:
-          PR_NUMBER: ${{ needs.detect-changes.outputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
+          PREVIEW_NS_PREFIX: ${{ env.PREVIEW_NAMESPACE_PREFIX }}
         shell: bash
         run: |
           set -euo pipefail
-          PREVIEW_NS="${{ env.PREVIEW_NAMESPACE_PREFIX }}${PR_NUMBER}"
+          if [[ -z "${PR_NUMBER:-}" ]]; then
+            echo "No PR number available — skipping API key secret injection"
+            exit 0
+          fi
+          PREVIEW_NS="${PREVIEW_NS_PREFIX}${PR_NUMBER}"
           echo "Ensuring namespace ${PREVIEW_NS} exists..."
           kubectl create namespace "${PREVIEW_NS}" --dry-run=client -o yaml | kubectl apply -f -
           if [[ -n "${YT_SUMMARIZER_API_KEY:-}" ]]; then
