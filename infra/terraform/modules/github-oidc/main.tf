@@ -71,6 +71,16 @@ resource "azuread_application_federated_identity_credential" "pull_request" {
   subject        = "repo:${var.github_organization}/${var.github_repository}:pull_request"
 }
 
+# Preview environment credential - for preview environment deployments
+resource "azuread_application_federated_identity_credential" "preview" {
+  application_id = azuread_application.github_actions.id
+  display_name   = "github-env-preview"
+  description    = "Federated credential for GitHub Actions preview environment"
+  audiences      = ["api://AzureADTokenExchange"]
+  issuer         = "https://token.actions.githubusercontent.com"
+  subject        = "repo:${var.github_organization}/${var.github_repository}:environment:preview"
+}
+
 # Production environment credential - for environment deployments
 resource "azuread_application_federated_identity_credential" "production" {
   application_id = azuread_application.github_actions.id
