@@ -374,21 +374,24 @@ jobs:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
-      - name: Inject API key secret into preview namespace
+      - name: Inject secrets into preview namespace
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PREVIEW_NS_PREFIX: ${{ env.PREVIEW_NAMESPACE_PREFIX }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "${PR_NUMBER:-}" ]]; then
-            echo "No PR number available — skipping API key secret injection"
+            echo "No PR number available — skipping secret injection"
             exit 0
           fi
           PREVIEW_NS="${PREVIEW_NS_PREFIX}${PR_NUMBER}"
           echo "Ensuring namespace ${PREVIEW_NS} exists..."
           kubectl create namespace "${PREVIEW_NS}" --dry-run=client -o yaml | kubectl apply -f -
+
+          # Inject API key for programmatic access (MCP server, E2E seeding)
           if [[ -n "${YT_SUMMARIZER_API_KEY:-}" ]]; then
             echo "Creating/updating api-key-credentials secret in ${PREVIEW_NS}..."
             kubectl create secret generic api-key-credentials \
@@ -398,6 +401,32 @@ jobs:
             echo "✅ api-key-credentials secret ready in ${PREVIEW_NS}"
           else
             echo "::warning::YT_SUMMARIZER_API_KEY is not set — API key auth will be disabled in preview"
+          fi
+
+          # Patch openai-credentials to override the Key Vault value with the correct standard OpenAI key.
+          # The Key Vault openai-api-key is an Azure-format key that is invalid for the standard API;
+          # GitHub secret OPENAI_API_KEY holds the real sk-... key needed by the summarize/embed workers.
+          # We pause the ExternalSecret so the ESO does not overwrite our patch during the E2E run.
+          if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+            echo "Patching openai-credentials with correct OpenAI API key in ${PREVIEW_NS}..."
+            # Pause ESO reconciliation so our patch survives the E2E run window
+            kubectl annotate externalsecret openai-credentials \
+              --namespace="${PREVIEW_NS}" \
+              reconcile.external-secrets.io/paused=true \
+              --overwrite 2>/dev/null || true
+            # Patch the secret directly
+            ENCODED_KEY=$(echo -n "${OPENAI_API_KEY}" | base64 -w 0)
+            kubectl patch secret openai-credentials \
+              --namespace="${PREVIEW_NS}" \
+              --type=json \
+              -p="[{\"op\":\"replace\",\"path\":\"/data/api-key\",\"value\":\"${ENCODED_KEY}\"}]" 2>/dev/null || \
+            kubectl create secret generic openai-credentials \
+              --namespace="${PREVIEW_NS}" \
+              --from-literal=api-key="${OPENAI_API_KEY}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            echo "✅ openai-credentials patched with standard OpenAI key in ${PREVIEW_NS}"
+          else
+            echo "::warning::OPENAI_API_KEY is not set — summarize/embed workers may fail in preview"
           fi
 
       - name: Sync ArgoCD manifests
