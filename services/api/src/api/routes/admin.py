@@ -11,6 +11,7 @@ except ImportError:
         raise NotImplementedError("Database session not available")
 
 
+from ..dependencies.auth import AuthenticatedUser, require_auth
 from ..services.quota_dispatcher import DispatchResult, QuotaDispatcher
 from ..services.recovery_service import RecoveryResult, RecoveryService
 
@@ -34,6 +35,7 @@ def get_recovery_service(session: AsyncSession = Depends(get_session)) -> Recove
 )
 async def run_recovery_sweep(
     request: Request,
+    _user: AuthenticatedUser = Depends(require_auth),
     service: RecoveryService = Depends(get_recovery_service),
 ) -> RecoveryResult:
     """Run a complete recovery sweep."""
@@ -47,6 +49,7 @@ async def run_recovery_sweep(
     description="Check for stuck/failed jobs without taking action.",
 )
 async def recovery_status(
+    _user: AuthenticatedUser = Depends(require_auth),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Check current system health without taking recovery actions."""
@@ -114,6 +117,7 @@ def get_quota_dispatcher(session: AsyncSession = Depends(get_session)) -> QuotaD
 )
 async def run_quota_dispatch(
     request: Request,
+    _user: AuthenticatedUser = Depends(require_auth),
     dispatcher: QuotaDispatcher = Depends(get_quota_dispatcher),
 ) -> DispatchResult:
     """Run a quota dispatch sweep to release queued jobs."""
