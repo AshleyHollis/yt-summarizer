@@ -25,17 +25,23 @@ spec:
           labels:
             app.kubernetes.io/name: recovery-sweep
         spec:
-          serviceAccountName: yt-summarizer
+          serviceAccountName: yt-summarizer-sa
           restartPolicy: Never
           containers:
             - name: recovery
               image: curlimages/curl:8.5.0
+              env:
+                - name: API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: api-key-credentials
+                      key: api-key
               command:
                 - /bin/sh
                 - -c
                 - |
                   echo "Running recovery sweep..."
-                  RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://api.yt-summarizer.svc.cluster.local/api/v1/admin/recovery/run)
+                  RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://api/api/v1/admin/recovery/run -H "X-API-Key: ${API_KEY}")
                   HTTP_CODE=$(echo "$RESPONSE" | tail -1)
                   BODY=$(echo "$RESPONSE" | head -n -1)
                   echo "Response ($HTTP_CODE): $BODY"
