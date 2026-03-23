@@ -41,6 +41,7 @@ output "federated_credentials" {
   value = [
     azuread_application_federated_identity_credential.main.subject,
     azuread_application_federated_identity_credential.pull_request.subject,
+    azuread_application_federated_identity_credential.preview.subject,
     azuread_application_federated_identity_credential.production.subject,
     azuread_application_federated_identity_credential.repository-tf.subject,
   ]
