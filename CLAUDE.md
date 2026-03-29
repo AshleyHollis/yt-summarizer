@@ -6,6 +6,82 @@
 > Note: Repo lives at /home/openclaw/dev/ (NOT OneDriveOpenClaw/projects/) because OneDrive's
 > FUSE mount does not support symlinks, which Python venvs require.
 
+## Related Repos
+
+### shared-infra
+- **Location**: `/home/openclaw/dev/shared-infra` — [GitHub](https://github.com/AshleyHollis/shared-infra)
+- **Discord**: `#shared-infra` (channel 1485029874145169583)
+- **What it provides**: AKS, ACR, Key Vault, OIDC, workload identity (Terraform); 53 composite GitHub Actions; reusable workflows
+- **Impact**: Changes here can break yt-summarizer CI/CD — coordinate in `#shared-infra` first.
+
+---
+
+## Session Recovery (MANDATORY — read this first every session)
+
+```bash
+cd /home/openclaw/dev/yt-summarizer
+cat PENDING.md 2>/dev/null          # current task state — always read this first
+git log --oneline -10               # recent commits
+git status                          # uncommitted changes
+```
+
+If PENDING.md has an in-progress task, continue it without asking Peter to re-explain.
+
+### PENDING.md protocol
+
+**Inbound sessions** (handle a Discord message, < 5 min):
+- Understand the request, estimate size, spawn a background agent if large
+- **NEVER write PENDING.md** — put all context in the spawn-agent.sh task description
+- Exit immediately after spawning
+
+**Background agents** (spawned via spawn-agent.sh, no timeout):
+- **Write PENDING.md immediately on start** — task name, current step, files in progress, next action
+- **Update PENDING.md after every significant action** (each commit, each CI fix, each phase transition)
+  — this is how Peter can check what you're doing without waiting for a Discord message
+- **If you see `=== CONTEXT COMPACTION TRIGGERED ===`**: update PENDING.md before anything else
+- **Task complete**: clear PENDING.md, then post result to Discord
+
+### Automatic hooks (configured in .claude/settings.json)
+- **SessionStart**: injects PENDING.md if a task is in progress; records session start time
+- **PreCompact**: reminds you to checkpoint PENDING.md before context is summarized
+- **Stop**: if session ran ≥ 5 min and PENDING.md still has content → posts ⚠️ crash alert to Discord
+
+### How to check agent progress (for Peter)
+```bash
+cd /home/openclaw/dev/yt-summarizer
+cat PENDING.md                                          # current step
+git log origin/<branch> --oneline -10                  # recent commits
+gh pr view <pr> --repo AshleyHollis/yt-summarizer \
+  --json statusCheckRollup \
+  --jq '[.statusCheckRollup[]|select(.status!="COMPLETED")|{name,status,conclusion}]'
+```
+
+---
+
+## Session Limits and When to Spawn
+
+Inbound sessions have a hard 30-minute timeout. Background agents have NO timeout.
+
+| Task size | Action |
+|-----------|--------|
+| < 20 min | Do it in this session |
+| > 20 min | Spawn a background agent |
+
+**Large tasks**: any CI/CD pipeline, multi-file refactors, preview/prod deployments, waiting for external processes.
+
+```bash
+bash /home/openclaw/.openclaw/workspace/scripts/spawn-agent.sh \
+  1484763611896479865 \
+  "Do <task>. cd /home/openclaw/dev/yt-summarizer. Write PENDING.md at start with current step. Update PENDING.md after each action. Post result to this channel when done."
+
+# GH Actions monitoring
+bash /home/openclaw/.openclaw/workspace/scripts/spawn-gh-monitor.sh <run-id> 1484763611896479865
+```
+
+**NEVER say 'monitoring', 'watching', or 'continuing to monitor'** — spawn instead.
+
+---
+
 ## Architecture
 - Frontend: Next.js in apps/web (port 3000)
 - Backend API: FastAPI in services/api (port 8000)
@@ -139,3 +215,10 @@ apps/web/src/                             — Next.js pages and components
 - Never commit .env files, user-secrets, or any credentials
 - Never use git commit --no-verify
 - Azure deployments happen via GitHub Actions on push to main — do not deploy manually
+
+## CI / Merge Rules
+- **Never merge a PR with failing checks** — all checks must be green before merging
+- If a check is failing, fix the root cause. Do not skip, disable, or downgrade tests to pass CI
+- Do not change a failing test to a warning/non-fatal just to unblock a merge — fix the underlying issue
+- If a check failure is genuinely difficult to fix (intermittent infra issue, unclear root cause, requires credentials you don't have), post to Discord explaining the blocker and wait for instruction
+- If multiple fix attempts fail, post to Discord with what you tried and stop — do not merge anyway
