@@ -606,36 +606,51 @@ jobs:
       - name: Patch OpenAI key and restart workers in preview namespace
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+          AZURE_OPENAI_EMBEDDING_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
           PREVIEW_NS_PREFIX: ${{ env.PREVIEW_NAMESPACE_PREFIX }}
           WORKER_DEPLOYMENTS: ${{ env.WORKER_DEPLOYMENTS }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${PR_NUMBER:-}" || -z "${OPENAI_API_KEY:-}" ]]; then
-            echo "PR_NUMBER or OPENAI_API_KEY missing — skipping worker key patch"
+          if [[ -z "${PR_NUMBER:-}" || -z "${AZURE_OPENAI_API_KEY:-}" ]]; then
+            echo "PR_NUMBER or AZURE_OPENAI_API_KEY missing — skipping worker key patch"
             exit 0
           fi
           PREVIEW_NS="${PREVIEW_NS_PREFIX}${PR_NUMBER}"
-          echo "Patching openai-credentials in ${PREVIEW_NS} with correct standard OpenAI key..."
+          echo "Patching openai-credentials in ${PREVIEW_NS} with Azure OpenAI configuration..."
           # Pause the ExternalSecret so ESO does not overwrite our patch
           kubectl annotate externalsecret openai-credentials \
             --namespace="${PREVIEW_NS}" \
             reconcile.external-secrets.io/paused=true \
             --overwrite 2>/dev/null || true
-          # Force-write the correct key
-          ENCODED_KEY=$(echo -n "${OPENAI_API_KEY}" | base64 -w 0)
+          # Base64-encode all values
+          ENC_KEY=$(echo -n "${AZURE_OPENAI_API_KEY}" | base64 -w 0)
+          ENC_ENDPOINT=$(echo -n "${AZURE_OPENAI_ENDPOINT}" | base64 -w 0)
+          ENC_DEPLOYMENT=$(echo -n "${AZURE_OPENAI_DEPLOYMENT}" | base64 -w 0)
+          ENC_EMBED_DEPLOYMENT=$(echo -n "${AZURE_OPENAI_EMBEDDING_DEPLOYMENT}" | base64 -w 0)
+          # Patch all Azure OpenAI slots
           kubectl patch secret openai-credentials \
             --namespace="${PREVIEW_NS}" \
             --type=json \
-            -p="[{\"op\":\"replace\",\"path\":\"/data/api-key\",\"value\":\"${ENCODED_KEY}\"}]" || \
+            -p="[
+              {\"op\":\"replace\",\"path\":\"/data/azure-api-key\",\"value\":\"${ENC_KEY}\"},
+              {\"op\":\"replace\",\"path\":\"/data/azure-endpoint\",\"value\":\"${ENC_ENDPOINT}\"},
+              {\"op\":\"replace\",\"path\":\"/data/azure-deployment\",\"value\":\"${ENC_DEPLOYMENT}\"},
+              {\"op\":\"replace\",\"path\":\"/data/azure-embedding-deployment\",\"value\":\"${ENC_EMBED_DEPLOYMENT}\"}
+            ]" || \
           kubectl create secret generic openai-credentials \
             --namespace="${PREVIEW_NS}" \
-            --from-literal=api-key="${OPENAI_API_KEY}" \
+            --from-literal=azure-api-key="${AZURE_OPENAI_API_KEY}" \
+            --from-literal=azure-endpoint="${AZURE_OPENAI_ENDPOINT}" \
+            --from-literal=azure-deployment="${AZURE_OPENAI_DEPLOYMENT}" \
+            --from-literal=azure-embedding-deployment="${AZURE_OPENAI_EMBEDDING_DEPLOYMENT}" \
             --dry-run=client -o yaml | kubectl apply -f -
-          echo "✅ openai-credentials patched"
-          # Restart all workers so they reload env vars with the correct key
-          echo "Restarting worker pods in ${PREVIEW_NS} to pick up correct OpenAI key..."
+          echo "✅ openai-credentials patched with Azure OpenAI config"
+          # Restart all workers so they reload env vars
+          echo "Restarting worker pods in ${PREVIEW_NS}..."
           IFS=',' read -ra WORKERS <<< "${WORKER_DEPLOYMENTS}"
           for WORKER in "${WORKERS[@]}"; do
             WORKER="${WORKER// /}"
@@ -654,7 +669,7 @@ jobs:
               kubectl rollout status deployment/"${WORKER}" --namespace="${PREVIEW_NS}" --timeout=120s
             fi
           done
-          echo "✅ All workers restarted and ready with correct OpenAI key"
+          echo "✅ All workers restarted and ready with Azure OpenAI configuration"
 
       - name: Wait for API to be ready
         uses: AshleyHollis/shared-infra/.github/actions/health-check@v1

@@ -525,6 +525,28 @@ async function globalSetup(_config: FullConfig) {
     seedHeaders['X-API-Key'] = seedApiKey;
   }
 
+  // Clear any stale test videos from prior runs so re-submissions are fully re-queued.
+  // Videos in failed/dead_lettered/pending state would be re-queued by the API, but
+  // deleting first ensures a clean slate regardless of prior state.
+  if (seedApiKey) {
+    try {
+      const deleteResp = await fetch(`${API_URL}/api/v1/admin/videos/by-urls`, {
+        method: 'DELETE',
+        headers: seedHeaders,
+        body: JSON.stringify({ urls: ALL_TEST_VIDEOS }),
+      });
+      if (deleteResp.ok) {
+        const deleteData = await deleteResp.json();
+        if (deleteData.deleted > 0) {
+          console.log(`[global-setup] Cleared ${deleteData.deleted} stale test video(s) before seeding`);
+        }
+      }
+    } catch {
+      // Non-fatal — seeding will proceed; stale videos will be re-queued via 201 path
+      console.log('[global-setup] Could not pre-clear stale videos (non-fatal), continuing...');
+    }
+  }
+
   for (const url of ALL_TEST_VIDEOS) {
     try {
       const response = await fetch(`${API_URL}/api/v1/videos`, {

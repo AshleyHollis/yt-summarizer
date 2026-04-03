@@ -74,6 +74,16 @@ class NoTranscriptError(Exception):
         )
 
 
+class VideoAlreadyExistsError(Exception):
+    """Raised when a video already exists with an active or completed job."""
+
+    def __init__(self, video_id: "UUID", job_id: "UUID", status: "ProcessingStatus"):
+        self.video_id = video_id
+        self.job_id = job_id
+        self.status = status
+        super().__init__(f"Video already exists with status '{status.value}'")
+
+
 class VideoService:
     """Service for video operations."""
 
@@ -119,27 +129,83 @@ class VideoService:
 
         # Check if video already exists
         existing = await self.session.execute(
-            select(Video).where(Video.youtube_video_id == youtube_video_id)
+            select(Video)
+            .options(selectinload(Video.channel))
+            .where(Video.youtube_video_id == youtube_video_id)
         )
         existing_video = existing.scalar_one_or_none()
 
         if existing_video:
-            # Return existing video info
-            # Get the latest job for this video
-            job_result = await self.session.execute(
-                select(Job)
-                .where(Job.video_id == existing_video.video_id)
-                .order_by(Job.created_at.desc())
-                .limit(1)
+            existing_status = existing_video.processing_status
+
+            if existing_status in ("completed", "processing", "queued"):
+                # Video has an active or completed job — signal 409 to caller
+                job_result = await self.session.execute(
+                    select(Job)
+                    .where(Job.video_id == existing_video.video_id)
+                    .order_by(Job.created_at.desc())
+                    .limit(1)
+                )
+                latest_job = job_result.scalar_one_or_none()
+                raise VideoAlreadyExistsError(
+                    video_id=existing_video.video_id,
+                    job_id=latest_job.job_id if latest_job else existing_video.video_id,
+                    status=ProcessingStatus(existing_status),
+                )
+
+            # status is failed/dead_lettered/pending — re-queue idempotently for CI re-runs
+            channel_name = existing_video.channel.name if existing_video.channel else "unknown-channel"
+            existing_video.processing_status = "pending"
+            existing_video.error_message = None
+
+            from .stats_service import StatsService
+
+            stats_service = StatsService(self.session)
+            estimated_wait = await stats_service.estimate_queue_wait()
+
+            job = Job(
+                video_id=existing_video.video_id,
+                job_type=JobType.TRANSCRIBE.value,
+                stage=JobStage.QUEUED.value,
+                status=JobStatus.PENDING.value,
+                correlation_id=correlation_id,
+                estimated_wait_seconds=estimated_wait,
+                user_id=user_id,
+                quota_status=quota_status,
             )
-            latest_job = job_result.scalar_one_or_none()
+            self.session.add(job)
+            await self.session.flush()
+
+            if quota_status == "released":
+                try:
+                    queue_client = get_queue_client()
+                    message = inject_trace_context(
+                        {
+                            "job_id": str(job.job_id),
+                            "video_id": str(existing_video.video_id),
+                            "youtube_video_id": existing_video.youtube_video_id,
+                            "channel_name": channel_name,
+                            "correlation_id": correlation_id,
+                        }
+                    )
+                    queue_client.send_message(TRANSCRIBE_QUEUE, message)
+                    logger.info(
+                        "Re-queued stale video",
+                        job_id=str(job.job_id),
+                        video_id=str(existing_video.video_id),
+                        previous_status=existing_status,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to queue re-queued job", error=str(e))
+
+            await self.session.commit()
 
             return SubmitVideoResponse(
                 video_id=existing_video.video_id,
                 youtube_video_id=existing_video.youtube_video_id,
-                job_id=latest_job.job_id if latest_job else existing_video.video_id,
-                status=ProcessingStatus(existing_video.processing_status),
-                message="Video already exists in the system",
+                job_id=job.job_id,
+                status=ProcessingStatus.PENDING,
+                message="Video re-queued for processing",
             )
 
         # Fetch video metadata from YouTube
@@ -174,7 +240,8 @@ class VideoService:
             existing_video = existing.scalar_one_or_none()
 
             if existing_video:
-                # Get the latest job for this video
+                # Race condition: another request just created this video.
+                # Raise 409 so the caller treats it as "already submitted".
                 job_result = await self.session.execute(
                     select(Job)
                     .where(Job.video_id == existing_video.video_id)
@@ -182,13 +249,10 @@ class VideoService:
                     .limit(1)
                 )
                 latest_job = job_result.scalar_one_or_none()
-
-                return SubmitVideoResponse(
+                raise VideoAlreadyExistsError(
                     video_id=existing_video.video_id,
-                    youtube_video_id=existing_video.youtube_video_id,
                     job_id=latest_job.job_id if latest_job else existing_video.video_id,
                     status=ProcessingStatus(existing_video.processing_status),
-                    message="Video already exists in the system",
                 )
             raise  # Re-raise if we still can't find it
 

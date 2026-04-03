@@ -43,7 +43,7 @@ from ..models.video import (
     SubmitVideoResponse,
     VideoResponse,
 )
-from ..services.video_service import VideoNotFoundError, VideoService
+from ..services.video_service import VideoAlreadyExistsError, VideoNotFoundError, VideoService
 
 router = APIRouter(prefix="/api/v1/videos", tags=["Videos"])
 
@@ -101,6 +101,11 @@ async def submit_video(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
+        )
+    except VideoAlreadyExistsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Video already exists with status '{e.status.value}': video_id={e.video_id}",
         )
     except VideoNotFoundError as e:
         raise HTTPException(
