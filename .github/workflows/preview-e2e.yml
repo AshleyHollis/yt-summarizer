@@ -126,6 +126,11 @@ jobs:
           AUTH0_ADMIN_TEST_PASSWORD: ${{ env.AUTH0_ADMIN_TEST_PASSWORD }}
           AUTH0_USER_TEST_EMAIL: ${{ env.AUTH0_USER_TEST_EMAIL }}
           AUTH0_USER_TEST_PASSWORD: ${{ env.AUTH0_USER_TEST_PASSWORD }}
+          # ROPC token injection fallback (global-setup.ts injectAuth0Token) uses these
+          # singular env vars; map to user credentials so the fallback works if
+          # auth.setup.ts did not run or did not produce playwright/.auth/user.json.
+          AUTH0_TEST_EMAIL: ${{ env.AUTH0_USER_TEST_EMAIL }}
+          AUTH0_TEST_PASSWORD: ${{ env.AUTH0_USER_TEST_PASSWORD }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
