@@ -6,7 +6,7 @@
 - **User**: Ashley Hollis
 
 ## Key Knowledge
-- Auth0 test users: admin@test.yt-summarizer.internal, user@test.yt-summarizer.internal
+- Auth0 test users: [email scrubbed], [email scrubbed]
 - Passwords stored in Key Vault: auth0-admin-test-password, auth0-user-test-password
 - E2E auth setup navigates to API URL directly (not SWA) due to SWA /api/* interception
 - Cross-domain cookie issue affects all auth-dependent E2E tests in CI

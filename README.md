@@ -24,25 +24,25 @@ AI-powered YouTube video summarizer that extracts transcripts, generates summari
 
 ```
 ├── apps/
-│   └── web/                 # Next.js frontend
+│   └── web/                    # Next.js frontend
 ├── services/
-│   ├── api/                 # FastAPI REST API
-│   ├── workers/             # Background job processors
-│   │   ├── transcribe/      # YouTube transcript extraction
-│   │   ├── summarize/       # OpenAI summarization
-│   │   ├── embed/           # Embedding generation
-│   │   └── relationships/   # Channel/playlist discovery
-│   ├── shared/              # Shared Python code
-│   │   ├── db/              # Database models & connections
-│   │   ├── queue/           # Azure Queue client
-│   │   ├── blob/            # Azure Blob client
-│   │   └── logging/         # Structured logging
-│   └── aspire/              # .NET Aspire orchestration
-│       ├── AppHost/         # Orchestration host
-│       └── ServiceDefaults/ # Shared service config
-├── db/                      # Database documentation
-├── infra/                   # Infrastructure as Code
-└── docs/                    # Project documentation
+│   ├── api/                    # FastAPI REST API
+│   ├── workers/                # Background job processors
+│   ├── shared/                 # Shared Python code
+│   └── aspire/                 # .NET Aspire orchestration
+├── infra/
+│   └── terraform/              # Infrastructure as Code
+├── k8s/                        # Kubernetes manifests (ArgoCD + overlays)
+├── docs/
+│   ├── architecture/           # Architecture & design docs
+│   ├── runbooks/               # Operational runbooks
+│   ├── screenshots/            # Application screenshots
+│   ├── archive/                # Historical docs & migration logs
+│   └── ...                     # Setup guides & references
+├── specs/                      # Feature specifications
+├── scripts/                    # Deployment & maintenance scripts
+├── githooks/                   # Git hooks
+└── tools/                      # Utility scripts
 ```
 
 ## Quick Start
@@ -117,6 +117,19 @@ This will:
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 - **Aspire Dashboard**: https://localhost:17298 (or check terminal output)
+
+### 6. Verify deployment health
+
+```bash
+# Quick smoke test (run while Aspire is up)
+.\scripts\smoke-test.ps1
+
+# Monitor a GitHub Actions run
+gh run view --repo AshleyHollis/yt-summarizer
+
+# Check the production SWA instance
+az staticwebapp show --name swa-ytsumm-prd --resource-group rg-ytsumm-prd-ci
+```
 
 ## Development
 

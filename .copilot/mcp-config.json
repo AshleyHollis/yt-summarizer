@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "discord": {
+      "type": "local",
+      "command": "node",
+      "args": [
+        "C:\\Users\\ashle\\.copilot\\tools\\discordmcp\\build\\index.js"
+      ],
+      "env": {
+        "DISCORD_TOKEN": "${DISCORD_TOKEN}"
+      },
+      "tools": [
+        "*"
+      ]
+    }
+  }
+}
