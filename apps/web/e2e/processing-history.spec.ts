@@ -21,12 +21,7 @@ test.describe('Processing History', () => {
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
-  // Library page is public; don't use auth storageState (cross-domain cookies don't work in CI)
   test.use({ storageState: undefined });
-  test.fixme(
-    !!process.env.CI,
-    'Cross-domain cookie issue: SWA ↔ AKS API on different origins prevents auth in preview'
-  );
 
   test('History tab displays processing stages and timing', async ({ page }) => {
     // Navigate to library - global-setup.ts seeds videos before tests run

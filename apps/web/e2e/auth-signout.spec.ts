@@ -32,9 +32,6 @@ test.describe('Sign Out Flow @auth', () => {
     return !fs.existsSync(authFile);
   }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
-  // Cross-domain cookie issue: auth cookies on API domain aren't sent to SWA domain
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
-
   test.describe('Logout Button Interaction', () => {
     test('logout button is visible for authenticated users', async ({ page }) => {
       await page.goto('/');

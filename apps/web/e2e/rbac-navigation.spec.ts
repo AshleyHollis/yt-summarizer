@@ -30,9 +30,6 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     return !fs.existsSync(authFile);
   }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
-  // Cross-domain cookie issue: auth cookies on API domain aren't sent to SWA domain
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
-
   test.describe('Admin User Navigation', () => {
     /**
      * These tests assume the authenticated user has admin role

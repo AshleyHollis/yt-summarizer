@@ -261,7 +261,7 @@ const ALL_TEST_VIDEOS = [
 // Minimum number of indexed segments required before tests can run
 // 15 videos (6 Python OOP + 4 fitness/kettlebell + 5 JS async) with typical processing yields ~50-70 segments
 // This prevents E2E test timeout while still ensuring content is indexed
-const MIN_SEGMENTS_REQUIRED = 40;
+const MIN_SEGMENTS_REQUIRED = 35;
 // Maximum wait time for video processing (5 minutes)
 const MAX_WAIT_TIME_MS = 5 * 60 * 1000;
 // Polling interval
@@ -384,11 +384,13 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  console.log('[global-setup] └──────────────────────────────────────────────────────────────────┘');
+  console.log(
+    '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+  );
   console.warn(
     `[global-setup] ⚠ Timeout waiting for video processing after ${MAX_WAIT_TIME_MS / 1000}s. ` +
-    `Only ${MIN_SEGMENTS_REQUIRED - 1} or fewer segments indexed. ` +
-    `Continuing — tests that require specific videos will skip gracefully.`
+      `Only ${MIN_SEGMENTS_REQUIRED - 1} or fewer segments indexed. ` +
+      `Continuing — tests that require specific videos will skip gracefully.`
   );
   return false;
 }
@@ -431,8 +433,8 @@ async function waitForVideoProcessing(): Promise<boolean> {
 
   console.warn(
     `[global-setup] ⚠ Timeout waiting for video processing after ${MAX_WAIT_TIME_MS / 1000}s. ` +
-    `Only ${MIN_SEGMENTS_REQUIRED - 1} or fewer segments indexed. ` +
-    `Continuing — tests that require specific videos will skip gracefully.`
+      `Only ${MIN_SEGMENTS_REQUIRED - 1} or fewer segments indexed. ` +
+      `Continuing — tests that require specific videos will skip gracefully.`
   );
   return false;
 }
@@ -465,24 +467,35 @@ async function warmUpSwa(): Promise<void> {
       });
       clearTimeout(timeout);
 
-      if (response.ok || response.status === 308 || response.status === 307 || response.status === 302) {
+      if (
+        response.ok ||
+        response.status === 308 ||
+        response.status === 307 ||
+        response.status === 302
+      ) {
         const elapsed = Math.round((Date.now() - startTime) / 1000);
-        console.log(`[global-setup] ✓ SWA warm-up complete (${elapsed}s, status=${response.status})`);
+        console.log(
+          `[global-setup] ✓ SWA warm-up complete (${elapsed}s, status=${response.status})`
+        );
         return;
       }
       console.log(`[global-setup] SWA attempt ${attempt}/${maxRetries}: status=${response.status}`);
     } catch (error) {
       const elapsed = Math.round((Date.now() - startTime) / 1000);
-      console.log(`[global-setup] SWA attempt ${attempt}/${maxRetries} failed (${elapsed}s): ${error instanceof Error ? error.message : error}`);
+      console.log(
+        `[global-setup] SWA attempt ${attempt}/${maxRetries} failed (${elapsed}s): ${error instanceof Error ? error.message : error}`
+      );
     }
 
     if (attempt < maxRetries) {
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
     }
   }
 
   const elapsed = Math.round((Date.now() - startTime) / 1000);
-  console.log(`[global-setup] ⚠ SWA warm-up did not succeed after ${elapsed}s — tests may experience cold-start delays`);
+  console.log(
+    `[global-setup] ⚠ SWA warm-up did not succeed after ${elapsed}s — tests may experience cold-start delays`
+  );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -558,7 +571,9 @@ async function globalSetup(_config: FullConfig) {
 
   // If all videos were skipped due to auth, log a clear message
   if (submitted === 0 && skipped === ALL_TEST_VIDEOS.length) {
-    console.log('[global-setup] All seeding skipped (auth gates active). Checking existing video coverage...');
+    console.log(
+      '[global-setup] All seeding skipped (auth gates active). Checking existing video coverage...'
+    );
   }
 
   // Store video IDs for tests to use
@@ -600,7 +615,9 @@ async function injectAuth0Token(): Promise<void> {
   const clientId = process.env.AUTH0_CLIENT_ID;
 
   if (!issuerBaseUrl || !clientId) {
-    console.warn('[global-setup] AUTH0_ISSUER_BASE_URL or AUTH0_CLIENT_ID not set — skipping token injection');
+    console.warn(
+      '[global-setup] AUTH0_ISSUER_BASE_URL or AUTH0_CLIENT_ID not set — skipping token injection'
+    );
     return;
   }
 
@@ -629,14 +646,18 @@ async function injectAuth0Token(): Promise<void> {
 
     if (!response.ok) {
       const err = await response.text();
-      console.warn(`[global-setup] Auth0 token request failed (${response.status}): ${err} — auth-protected tests may skip`);
+      console.warn(
+        `[global-setup] Auth0 token request failed (${response.status}): ${err} — auth-protected tests may skip`
+      );
       return;
     }
 
     const tokens = await response.json();
     const accessToken: string | undefined = tokens.access_token;
     if (!accessToken) {
-      console.warn('[global-setup] No access_token in Auth0 response — auth-protected tests may skip');
+      console.warn(
+        '[global-setup] No access_token in Auth0 response — auth-protected tests may skip'
+      );
       return;
     }
 
@@ -658,7 +679,9 @@ async function injectAuth0Token(): Promise<void> {
     // Only write if auth.setup.ts hasn't already created a richer session state
     try {
       await fs.access(userAuthFile);
-      console.log('[global-setup] playwright/.auth/user.json already exists (auth.setup ran) — skipping token injection');
+      console.log(
+        '[global-setup] playwright/.auth/user.json already exists (auth.setup ran) — skipping token injection'
+      );
     } catch {
       await fs.writeFile(userAuthFile, JSON.stringify(storageState, null, 2));
       console.log(`[global-setup] ✓ Auth0 token injected → ${userAuthFile}`);
@@ -704,11 +727,15 @@ async function warmUpCopilotAgent(): Promise<void> {
       console.log(`[global-setup] ✓ Agent warm-up complete (${elapsed}s, ${text.length} bytes)`);
     } else {
       const elapsed = Math.round((Date.now() - startTime) / 1000);
-      console.log(`[global-setup] ⚠ Agent warm-up returned ${response.status} (${elapsed}s) - tests may be slower on first LLM call`);
+      console.log(
+        `[global-setup] ⚠ Agent warm-up returned ${response.status} (${elapsed}s) - tests may be slower on first LLM call`
+      );
     }
   } catch (error) {
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    console.log(`[global-setup] ⚠ Agent warm-up failed (${elapsed}s): ${error} - tests may be slower on first LLM call`);
+    console.log(
+      `[global-setup] ⚠ Agent warm-up failed (${elapsed}s): ${error} - tests may be slower on first LLM call`
+    );
   }
 }
 

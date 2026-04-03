@@ -255,11 +255,6 @@ test.describe('User Story 1: Video Submission Flow', () => {
   });
 
   test.describe('Error Handling', () => {
-    test.fixme(
-      !!process.env.CI,
-      'Route interception unreliable with cross-domain SWA→AKS in preview'
-    );
-
     test('shows error for invalid video ID', async ({ page }) => {
       // Navigate to /library/ directly to avoid server redirect from /videos/ → /library/
       // which adds latency and can interact with CopilotKit's ?thread= param

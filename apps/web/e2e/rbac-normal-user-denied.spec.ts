@@ -30,11 +30,6 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
     return !fs.existsSync(authFile);
   }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
-  test.fixme(
-    !!process.env.CI,
-    'Cross-domain cookie issue: SWA ↔ AKS API on different origins prevents auth in preview'
-  );
-
   /**
    * NOTE: These tests assume the authenticated user does NOT have admin role.
    * In a full implementation, you would have a separate storage state for normal users.

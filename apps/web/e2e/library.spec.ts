@@ -26,12 +26,6 @@ test.describe('User Story 3: Browse the Library', () => {
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
-  // Safety net: page components (e.g. CopilotKit) may still trigger Auth0 redirect in SWA preview
-  test.fixme(
-    !!process.env.CI,
-    'Cross-domain cookie issue — page components trigger Auth0 redirect in SWA preview'
-  );
-
   test.describe('Library Page Loading', () => {
     test('library page loads successfully', async ({ page }) => {
       await page.goto('/library');

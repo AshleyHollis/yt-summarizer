@@ -1,10 +1,10 @@
-import { test, expect, BrowserContext } from "@playwright/test";
+import { test, expect, BrowserContext } from '@playwright/test';
 import {
   submitQuery,
   waitForResponse,
   waitForCopilotReady,
   getCopilotResponseContent,
-} from "./helpers";
+} from './helpers';
 
 /**
  * E2E tests for Chat Response Quality
@@ -27,21 +27,19 @@ import {
  * These tests use multiple assertions per test for efficiency.
  */
 
-test.describe("Chat Response Quality", () => {
-  // Copilot endpoint requires auth; cross-domain cookies prevent auth in SWA preview
-  test.fixme(!!process.env.CI, "Cross-domain cookie issue in SWA preview environment");
+test.describe('Chat Response Quality', () => {
   // Each test gets a fresh browser context so CopilotKit in-memory thread state
   // never accumulates across tests. This avoids client-generated thread IDs
   // (server should own thread ID generation) and prevents history bloat
   // that causes progressive LLM prompt growth and timeout failures.
   let context: BrowserContext;
-  let page: import("@playwright/test").Page;
+  let page: import('@playwright/test').Page;
 
   test.beforeEach(async ({ browser }) => {
     context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     page = await context.newPage();
-    await page.goto("/library?chat=open", { waitUntil: "commit" });
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
   });
 
@@ -49,9 +47,9 @@ test.describe("Chat Response Quality", () => {
     await context.close();
   });
 
-  test("push-up query returns accurate content with proper citations", async ({}, testInfo) => {
+  test('push-up query returns accurate content with proper citations', async ({}, testInfo) => {
     test.slow(); // LLM call required: triple timeout to 360s
-    await submitQuery(page, "How do I do a proper push-up with good form?");
+    await submitQuery(page, 'How do I do a proper push-up with good form?');
     await waitForResponse(page, testInfo);
 
     // 1. Should show video cards (indicated by video links)
@@ -59,7 +57,7 @@ test.describe("Chat Response Quality", () => {
     await expect(videoLinks.first()).toBeVisible({ timeout: 30_000 });
 
     // 2. Should have "Recommended Videos" section
-    await expect(page.getByText("Recommended Videos")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Recommended Videos')).toBeVisible({ timeout: 15_000 });
 
     // 3. Response should mention key push-up concepts (form cues from the videos)
     const pageContent = await page.content();
@@ -82,9 +80,9 @@ test.describe("Chat Response Quality", () => {
     expect(linkCount).toBeGreaterThan(0);
   });
 
-  test("kettlebell query returns content from Pavel Tsatsouline video", async ({}, testInfo) => {
+  test('kettlebell query returns content from Pavel Tsatsouline video', async ({}, testInfo) => {
     test.slow(); // LLM call required: triple timeout to 360s
-    await submitQuery(page, "Tell me about kettlebell training techniques");
+    await submitQuery(page, 'Tell me about kettlebell training techniques');
     await waitForResponse(page, testInfo);
 
     // 1. Should show video cards
@@ -108,9 +106,9 @@ test.describe("Chat Response Quality", () => {
   });
 
   // Heavy clubs video has been added to global-setup.ts TEST_VIDEOS
-  test("heavy clubs query returns Mark Wildman video content", async ({}, testInfo) => {
+  test('heavy clubs query returns Mark Wildman video content', async ({}, testInfo) => {
     test.slow(); // LLM call with vector search: triple timeout
-    await submitQuery(page, "What should beginners know about heavy clubs?");
+    await submitQuery(page, 'What should beginners know about heavy clubs?');
     await waitForResponse(page, testInfo);
 
     // 1. Should show video cards OR uncertainty response
@@ -134,9 +132,9 @@ test.describe("Chat Response Quality", () => {
     }
   });
 
-  test("multi-topic query returns multiple relevant videos", async ({}, testInfo) => {
+  test('multi-topic query returns multiple relevant videos', async ({}, testInfo) => {
     test.slow(); // LLM-heavy: triple timeout to 360s
-    await submitQuery(page, "What exercises can I do for a full body workout?");
+    await submitQuery(page, 'What exercises can I do for a full body workout?');
     await waitForResponse(page, testInfo);
 
     // Response should include citations - check for any of these indicators:
@@ -168,9 +166,9 @@ test.describe("Chat Response Quality", () => {
     expect(hasExerciseContent).toBe(true);
   });
 
-  test("response includes synthesized answer not just raw transcript", async ({}, testInfo) => {
+  test('response includes synthesized answer not just raw transcript', async ({}, testInfo) => {
     test.slow(); // LLM-heavy: triple timeout to 360s
-    await submitQuery(page, "What are the common mistakes when doing push-ups?");
+    await submitQuery(page, 'What are the common mistakes when doing push-ups?');
     await waitForResponse(page, testInfo);
 
     // 1. Should show video cards
@@ -192,9 +190,9 @@ test.describe("Chat Response Quality", () => {
     expect(pageContent.toLowerCase()).toContain('mistake');
   });
 
-  test("irrelevant query shows Limited Information indicator", async ({}, testInfo) => {
+  test('irrelevant query shows Limited Information indicator', async ({}, testInfo) => {
     test.slow(); // LLM call can be slow: triple timeout to 360s
-    await submitQuery(page, "How do I bake a chocolate cake?");
+    await submitQuery(page, 'How do I bake a chocolate cake?');
 
     // Wait for the "Limited Information" response - derive timeout from test budget
     const limitedInfoTimeout = Math.max(testInfo.timeout - 30000, 30000);
@@ -207,7 +205,7 @@ test.describe("Chat Response Quality", () => {
     // 2. The UncertaintyMessage component always renders "Limited Information" heading.
     // The body text is LLM-generated and varies — don't assert on exact wording.
     // Instead verify the uncertainty indicator is visible (already confirmed above).
-    await expect(page.getByText("Limited Information")).toBeVisible();
+    await expect(page.getByText('Limited Information')).toBeVisible();
 
     // 3. Should NOT show "Recommended Videos" section
     await expect(page.getByText('Recommended Videos')).not.toBeVisible();
@@ -217,9 +215,9 @@ test.describe("Chat Response Quality", () => {
     // the uncertainty flow triggered correctly.
   });
 
-  test("video card links navigate to correct video detail page", async ({}, testInfo) => {
+  test('video card links navigate to correct video detail page', async ({}, testInfo) => {
     test.slow(); // LLM call required before link testing: triple timeout to 360s
-    await submitQuery(page, "Show me push-up tutorials");
+    await submitQuery(page, 'Show me push-up tutorials');
     await waitForResponse(page, testInfo);
 
     // Find a video link - could be in /videos/ or /library/ paths
@@ -235,7 +233,7 @@ test.describe("Chat Response Quality", () => {
     await expect(videoLink).toBeVisible({ timeout: 30_000 });
 
     // Get the href before navigating
-    const href = await videoLink.getAttribute("href");
+    const href = await videoLink.getAttribute('href');
     expect(href).toBeDefined();
 
     // Navigate directly to the video detail page — clicking links inside
@@ -246,7 +244,7 @@ test.describe("Chat Response Quality", () => {
     // Video detail page is a client component that fetches data via useEffect.
     // Wait for the <main> element to be visible (rendered in all states:
     // loading skeleton, error, success).
-    await expect(page.locator("main")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('main')).toBeVisible({ timeout: 30_000 });
 
     // Should show video content — the page may still be loading data, but
     // at minimum the <main> wrapper and basic layout should be present.
@@ -257,14 +255,12 @@ test.describe("Chat Response Quality", () => {
 });
 
 test.describe('Chat Edge Cases', () => {
-  // Copilot endpoint requires auth; cross-domain cookies prevent auth in SWA preview
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // Navigate with chat=open to have the sidebar open by default
     // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
-    await page.goto("/library?chat=open", { waitUntil: "commit" });
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/library?chat=open', { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
     await waitForCopilotReady(page);
   });
 
@@ -292,9 +288,9 @@ test.describe('Chat Edge Cases', () => {
     }
   });
 
-  test("handles special characters in query", async ({ page }, testInfo) => {
+  test('handles special characters in query', async ({ page }, testInfo) => {
     test.slow(); // LLM call required: triple timeout to 540s
-    await submitQuery(page, "What about push-ups? (with good form) & proper technique!");
+    await submitQuery(page, 'What about push-ups? (with good form) & proper technique!');
 
     // Should still work and not crash
     await waitForResponse(page, testInfo);
@@ -304,14 +300,14 @@ test.describe('Chat Edge Cases', () => {
     expect(responseContent.length).toBeGreaterThan(0);
   });
 
-  test("handles very long query", async ({ page }, testInfo) => {
+  test('handles very long query', async ({ page }, testInfo) => {
     test.slow(); // LLM call required: triple timeout to 540s
     // Moderately long query — tests that the input isn't truncated or rejected,
     // without being so verbose that it causes LLM processing timeouts.
     const longQuery =
-      "I want to learn about push-ups including proper form, " +
-      "common mistakes beginners make, and how to progress " +
-      "from beginner to advanced variations.";
+      'I want to learn about push-ups including proper form, ' +
+      'common mistakes beginners make, and how to progress ' +
+      'from beginner to advanced variations.';
 
     await submitQuery(page, longQuery);
     await waitForResponse(page, testInfo);
@@ -323,16 +319,16 @@ test.describe('Chat Edge Cases', () => {
     expect(responseContent.length).toBeGreaterThan(0);
   });
 
-  test("subsequent queries work correctly", async ({ page }, testInfo) => {
+  test('subsequent queries work correctly', async ({ page }, testInfo) => {
     test.slow(); // Two sequential LLM calls required: triple timeout to 540s
     // First query
-    await submitQuery(page, "How do push-ups work?");
+    await submitQuery(page, 'How do push-ups work?');
     await waitForResponse(page, testInfo);
     const firstResponse = await getCopilotResponseContent(page);
     expect(firstResponse.length).toBeGreaterThan(0);
 
     // Second query - different topic
-    await submitQuery(page, "What about kettlebells?");
+    await submitQuery(page, 'What about kettlebells?');
     await waitForResponse(page, testInfo);
 
     // Should show new results

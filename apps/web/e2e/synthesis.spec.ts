@@ -24,11 +24,6 @@ test.describe('US6: Synthesis Feature UI', () => {
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
-  test.fixme(
-    !!process.env.CI,
-    'CopilotKit/synthesis requires Azure OpenAI credentials not available in preview'
-  );
-
   test.describe('Chat Interface for Synthesis', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/library');

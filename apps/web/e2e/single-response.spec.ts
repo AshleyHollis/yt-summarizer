@@ -21,11 +21,6 @@ test.describe('Single Response Per Message', () => {
   // openChatViaButton (button click) is flaky — the click sometimes doesn't
   // register or the panel fails to open within the timeout.
 
-  test.fixme(
-    !!process.env.CI,
-    'CopilotKit requires Azure OpenAI credentials not available in preview'
-  );
-
   test('simple greeting produces exactly one response', async ({ page }) => {
     test.slow(); // LLM call - needs extra time
     await page.setViewportSize({ width: 1280, height: 720 });

@@ -76,10 +76,6 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders submit form with URL input', async ({ page }) => {
-      test.fixme(
-        !!process.env.CI,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
       // Check for URL input
       const input = page.getByLabel(/YouTube URL/i);
       await expect(input).toBeVisible();
@@ -89,10 +85,6 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders submit button', async ({ page }) => {
-      test.fixme(
-        !!process.env.CI,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
       const submitButton = page.getByRole('button', { name: /Enter URL/i });
       await expect(submitButton).toBeVisible();
     });
@@ -202,11 +194,6 @@ test.describe('Video Submission (Requires Backend)', () => {
   test.skip(
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
-  );
-
-  test.fixme(
-    !!process.env.CI,
-    'Video submission pipeline not fully configured in preview (missing Azure OpenAI secrets)'
   );
 
   // Use a seeded video with verified auto-captions. dQw4w9WgXcQ (Rick Astley) has NO
@@ -331,10 +318,6 @@ test.describe('Error Handling (Requires Backend)', () => {
   });
 
   test('handles non-existent video ID gracefully', async ({ page }) => {
-    test.fixme(
-      !!process.env.CI,
-      'Cross-domain auth cookies cause inconsistent error responses in preview'
-    );
     // Navigate directly to a non-existent video on /library/ (not /videos/)
     // /videos/ triggers a server-side redirect that can loop with CopilotKit
     await page.goto('/library/non-existent-video-id-12345');
@@ -349,10 +332,6 @@ test.describe('Error Handling (Requires Backend)', () => {
 
 test.describe('Accessibility', () => {
   test('submit form is keyboard accessible', async ({ page }) => {
-    test.fixme(
-      !!process.env.CI,
-      'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-    );
     await page.goto('/add');
     await page.waitForLoadState('domcontentloaded');
 
@@ -369,10 +348,6 @@ test.describe('Accessibility', () => {
   });
 
   test('form input has accessible label', async ({ page }) => {
-    test.fixme(
-      !!process.env.CI,
-      'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-    );
     await page.goto('/add');
 
     // The input should be associated with a label
@@ -381,10 +356,6 @@ test.describe('Accessibility', () => {
   });
 
   test('form shows disabled button for invalid URLs', async ({ page }) => {
-    test.fixme(
-      !!process.env.CI,
-      'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-    );
     await page.goto('/add');
 
     const input = page.getByLabel(/YouTube URL/i);
