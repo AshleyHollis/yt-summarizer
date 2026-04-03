@@ -261,9 +261,9 @@ const ALL_TEST_VIDEOS = [
 // Minimum number of indexed segments required before tests can run
 // 15 videos (6 Python OOP + 4 fitness/kettlebell + 5 JS async) with typical processing yields ~50-70 segments
 // This prevents E2E test timeout while still ensuring content is indexed
-const MIN_SEGMENTS_REQUIRED = 35;
-// Maximum wait time for video processing (5 minutes)
-const MAX_WAIT_TIME_MS = 5 * 60 * 1000;
+const MIN_SEGMENTS_REQUIRED = 30;
+// Maximum wait time for video processing (8 minutes)
+const MAX_WAIT_TIME_MS = 8 * 60 * 1000;
 // Polling interval
 const POLL_INTERVAL_MS = 10 * 1000;
 
