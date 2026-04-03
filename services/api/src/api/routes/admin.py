@@ -1,7 +1,5 @@
 """Admin routes for system management and recovery."""
 
-from typing import List
-
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -129,7 +127,7 @@ async def run_quota_dispatch(
 
 
 class DeleteVideosByUrlsRequest(BaseModel):
-    urls: List[str]
+    urls: list[str]
 
 
 @router.delete(
@@ -166,9 +164,7 @@ async def delete_videos_by_urls(
     # Fetch matching videos
     from sqlalchemy import select
 
-    result = await session.execute(
-        select(Video).where(Video.youtube_video_id.in_(youtube_ids))
-    )
+    result = await session.execute(select(Video).where(Video.youtube_video_id.in_(youtube_ids)))
     videos = result.scalars().all()
 
     deleted = 0
