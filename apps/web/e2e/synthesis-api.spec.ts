@@ -272,6 +272,10 @@ test.describe('US6: Synthesis API Integration', () => {
   });
 
   test.describe('Coverage Verification', () => {
+    test.fixme(
+      !!process.env.CI,
+      'Embed pipeline takes >8min in CI (global-setup 5min + poll 3min exhausted). Run manually against a warmed env.'
+    );
     test('coverage endpoint shows indexed segments', async ({ request }) => {
       // Coverage endpoint requires empty body
       const response = await request.post(`${API_URL}/api/v1/copilot/coverage`, {
