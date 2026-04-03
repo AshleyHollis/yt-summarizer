@@ -59,7 +59,9 @@ async function authenticateViaAuth0(
   // Check for Auth0 error redirect (e.g., connection not enabled)
   const currentUrl = page.url();
   if (currentUrl.includes('error=') && currentUrl.includes('error_description=')) {
-    const errorDesc = decodeURIComponent(new URL(currentUrl).searchParams.get('error_description') || 'unknown');
+    const errorDesc = decodeURIComponent(
+      new URL(currentUrl).searchParams.get('error_description') || 'unknown'
+    );
     throw new Error(`Auth0 returned error before login page: ${errorDesc}`);
   }
 
@@ -69,7 +71,9 @@ async function authenticateViaAuth0(
 
   // Auth0 Universal Login — email may already be pre-filled via login_hint
   // Fill email if the field is visible and empty
-  const emailInput = page.locator('input[name="username"], input[id="username"], input[type="email"]').first();
+  const emailInput = page
+    .locator('input[name="username"], input[id="username"], input[type="email"]')
+    .first();
   try {
     await emailInput.waitFor({ timeout: 5000 });
     const currentEmail = await emailInput.inputValue();
@@ -93,6 +97,11 @@ async function authenticateViaAuth0(
 
   // Wait for redirect back to our app (away from auth0.com)
   await page.waitForURL((url) => !url.hostname.includes('auth0.com'), { timeout: 30000 });
+
+  // Verify login succeeded: confirm we landed on the app (not an Auth0 error page)
+  await page.waitForURL(`${baseUrl}/**`, { timeout: 15000 });
+  // Give auth session cookie a moment to settle before saving state
+  await page.waitForTimeout(2000);
   console.log(`[auth-setup] ✓ ${label} authenticated successfully — redirected to app`);
 }
 
@@ -102,7 +111,9 @@ setup('authenticate as admin', async ({ page }) => {
 
   if (!email || !password) {
     console.warn('[auth-setup] ⚠ Admin test credentials not set. Skipping admin authentication.');
-    console.warn('[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.');
+    console.warn(
+      '[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.'
+    );
     return;
   }
 
@@ -124,7 +135,9 @@ setup('authenticate as normal user', async ({ page }) => {
 
   if (!email || !password) {
     console.warn('[auth-setup] ⚠ User test credentials not set. Skipping user authentication.');
-    console.warn('[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.');
+    console.warn(
+      '[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.'
+    );
     return;
   }
 
