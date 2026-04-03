@@ -1,9 +1,11 @@
 """Recovery service for automatic self-healing of stuck/failed video processing jobs.
 
-Implements three recovery strategies:
+Implements four recovery strategies:
 1. Dead-letter recovery: Retry jobs that exhausted retries (with auto-recovery cap)
 2. Orphan detection: Find videos stuck in "processing" with no active jobs
 3. Stale job cleanup: Mark jobs stuck in "running" for too long as failed
+4. Stale queued job re-queue: Re-send queue messages for pending jobs whose queue
+   message has expired (queued/pending for >30 minutes)
 """
 
 from datetime import datetime, timedelta
@@ -54,6 +56,12 @@ MAX_AUTO_RECOVERIES = 3
 # Jobs stuck in "running" longer than this are considered stale
 STALE_JOB_THRESHOLD_MINUTES = 15
 
+# Jobs in queued/pending for longer than this have likely lost their queue message
+STALE_QUEUE_THRESHOLD_MINUTES = 30
+
+# Don't requeue jobs older than this — they may be truly abandoned
+MAX_REQUEUE_AGE_HOURS = 24
+
 
 class RecoveryAction(BaseModel):
     """A single recovery action taken."""
@@ -71,6 +79,7 @@ class RecoveryResult(BaseModel):
     dead_letter_recoveries: int = Field(default=0, description="Dead-lettered jobs retried")
     orphan_recoveries: int = Field(default=0, description="Orphaned videos re-queued")
     stale_cleanups: int = Field(default=0, description="Stale running jobs failed")
+    queued_job_requeues: int = Field(default=0, description="Stale pending jobs re-queued")
     skipped: int = Field(default=0, description="Jobs skipped (max auto-recoveries reached)")
     errors: int = Field(default=0, description="Errors during recovery")
     actions: list[RecoveryAction] = Field(default_factory=list, description="Actions taken")
@@ -91,12 +100,14 @@ class RecoveryService:
         await self._recover_dead_lettered_jobs(result, correlation_id)
         await self._recover_orphaned_videos(result, correlation_id)
         await self._cleanup_stale_jobs(result, correlation_id)
+        await self._requeue_stale_queued_jobs(result, correlation_id)
 
         logger.info(
             "Recovery sweep complete",
             dead_letter_recoveries=result.dead_letter_recoveries,
             orphan_recoveries=result.orphan_recoveries,
             stale_cleanups=result.stale_cleanups,
+            queued_job_requeues=result.queued_job_requeues,
             skipped=result.skipped,
             errors=result.errors,
             correlation_id=correlation_id,
@@ -296,6 +307,101 @@ class RecoveryService:
                 )
 
         await self.session.commit()
+
+    async def _requeue_stale_queued_jobs(self, result: RecoveryResult, correlation_id: str) -> None:
+        """Find jobs in queued/pending state for >30 min and re-send their queue messages.
+
+        Handles the case where an Azure Storage Queue message expired before a worker
+        could pick it up (e.g., due to a bad API key causing the worker to be down).
+        Jobs older than MAX_REQUEUE_AGE_HOURS are skipped as likely truly abandoned.
+        """
+        now = datetime.utcnow()
+        stale_threshold = now - timedelta(minutes=STALE_QUEUE_THRESHOLD_MINUTES)
+        age_limit = now - timedelta(hours=MAX_REQUEUE_AGE_HOURS)
+
+        stmt = (
+            select(Job)
+            .where(Job.stage == "queued")
+            .where(Job.status == "pending")
+            .where(Job.created_at < stale_threshold)
+            .where(Job.created_at >= age_limit)
+            .order_by(Job.created_at.asc())
+        )
+        jobs_result = await self.session.execute(stmt)
+        stale_queued_jobs = jobs_result.scalars().all()
+
+        requeued = 0
+        for job in stale_queued_jobs:
+            if requeued >= MAX_AUTO_RECOVERIES:
+                result.skipped += 1
+                continue
+
+            try:
+                video = await self._get_video(job.video_id)
+                if not video or video.processing_status == "completed":
+                    continue
+
+                # Skip if a succeeded job of this type already exists
+                if await self._has_succeeded_job(job.video_id, job.job_type):
+                    continue
+
+                # Skip if a running job of this type already exists
+                active_stmt = (
+                    select(func.count())
+                    .select_from(Job)
+                    .where(
+                        and_(
+                            Job.video_id == job.video_id,
+                            Job.job_type == job.job_type,
+                            Job.stage == "running",
+                        )
+                    )
+                )
+                active_result = await self.session.execute(active_stmt)
+                if (active_result.scalar() or 0) > 0:
+                    continue
+
+                self._queue_job(job, video, correlation_id)
+
+                requeued += 1
+                result.queued_job_requeues += 1
+                result.actions.append(
+                    RecoveryAction(
+                        action="stale_queue_requeue",
+                        job_id=job.job_id,
+                        video_id=job.video_id,
+                        job_type=job.job_type,
+                        detail=(
+                            f"Re-queued stale pending job (created {job.created_at}, "
+                            f"queue message had expired)"
+                        ),
+                    )
+                )
+                logger.info(
+                    "Re-queued stale pending job",
+                    job_id=str(job.job_id),
+                    job_type=job.job_type,
+                    video_id=str(job.video_id),
+                    created_at=str(job.created_at),
+                )
+            except Exception as e:
+                result.errors += 1
+                logger.error(
+                    "Failed to re-queue stale pending job",
+                    job_id=str(job.job_id),
+                    error=str(e),
+                )
+
+        # Count jobs beyond the age limit as skipped (truly abandoned)
+        abandoned_stmt = (
+            select(func.count())
+            .select_from(Job)
+            .where(Job.stage == "queued")
+            .where(Job.status == "pending")
+            .where(Job.created_at < age_limit)
+        )
+        abandoned_result = await self.session.execute(abandoned_stmt)
+        result.skipped += abandoned_result.scalar() or 0
 
     # --- Helper methods ---
 
