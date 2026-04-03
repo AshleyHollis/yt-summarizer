@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Squad Project Status",
+  "description": "Project-level status aggregation file. Lives at .squad/project/status.json. Created by the Spec agent when generating the first roadmap. Updated by the Spec agent on phase completion and by the coordinator (via Scribe) on task/feature completion.",
+  "type": "object",
+  "required": ["projectName", "updatedAt", "summary", "milestones", "features"],
+  "properties": {
+    "projectName": {
+      "type": "string",
+      "description": "The project name from the PRD"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update"
+    },
+    "summary": {
+      "type": "object",
+      "description": "Computed counts from the features array",
+      "required": ["totalFeatures", "specComplete", "implementing", "complete", "notStarted"],
+      "properties": {
+        "totalFeatures": { "type": "integer" },
+        "specComplete": { "type": "integer", "description": "Features with phase=tasks (spec done, not yet implementing)" },
+        "implementing": { "type": "integer", "description": "Features with phase=execution" },
+        "complete": { "type": "integer", "description": "Features with phase=complete" },
+        "notStarted": { "type": "integer", "description": "Features with no spec directory or phase=null" }
+      }
+    },
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "status", "features"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^M\\d+$" },
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["not_started", "in_progress", "complete"]
+          },
+          "features": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^F\\d{3}$" }
+          }
+        }
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "milestone", "specDir", "phase", "totalTasks", "completedTasks", "updatedAt"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^F\\d{3}$",
+            "description": "Feature ID from roadmap (F000, F001, ...)"
+          },
+          "name": { "type": "string" },
+          "milestone": { "type": "string", "pattern": "^M\\d+$" },
+          "specDir": {
+            "type": ["string", "null"],
+            "description": "Spec directory name (e.g., '001-inventory-foundation') or null if not started"
+          },
+          "phase": {
+            "type": ["string", "null"],
+            "enum": ["discovery", "research", "requirements", "design", "tasks", "execution", "complete", null]
+          },
+          "totalTasks": { "type": "integer" },
+          "completedTasks": { "type": "integer" },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}
