@@ -24,6 +24,7 @@ export async function apiCall<T>(
   const response = await fetch(`${apiUrl}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...options,
+    credentials: 'include',
   });
 
   if (!response.ok) {

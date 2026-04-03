@@ -176,6 +176,7 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
   const requestOptions: RequestInit = {
     ...fetchOptions,
     headers,
+    credentials: 'include',
   };
 
   // Add body if present
