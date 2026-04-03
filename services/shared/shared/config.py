@@ -403,7 +403,7 @@ class APISettings(BaseSettings):
         description="Allowed CORS origins",
     )
     cors_origin_regex: str | None = Field(
-        default=r"^https://.*\.azurestaticapps\.net$",
+        default=r"^https://.*\.(azurestaticapps\.net|yt-summarizer\.apps\.ashleyhollis\.com)$",
         description="Allowed CORS origin regex patterns",
     )
 

@@ -45,7 +45,9 @@ except ImportError:
                     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
                     "https://white-meadow-0b8e2e000.6.azurestaticapps.net",
                 ]
-                cors_origin_regex = r"^https://.*\.azurestaticapps\.net$"
+                cors_origin_regex = (
+                    r"^https://.*\.(azurestaticapps\.net|yt-summarizer\.apps\.ashleyhollis\.com)$"
+                )
                 debug = True
 
             class logging:
