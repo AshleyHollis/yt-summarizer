@@ -87,7 +87,9 @@ export function Navbar() {
             {isLoading ? (
               <div className="animate-pulse w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
             ) : isAuthenticated && user ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" data-testid="user-profile">
+                {/* sr-only email allows test assertions on user email */}
+                <span className="sr-only">{user.email}</span>
                 {user.picture ? (
                   <Image
                     src={user.picture}

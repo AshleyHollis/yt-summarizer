@@ -198,7 +198,7 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       const addLink = page.getByRole('link', { name: /add/i }).first();
       await expect(addLink).toBeVisible({ timeout: 10000 });
 
-      const libraryLink = page.getByRole('link', { name: /library/i });
+      const libraryLink = page.getByRole('link', { name: 'Library', exact: true });
       await expect(libraryLink).toBeVisible();
     });
 
