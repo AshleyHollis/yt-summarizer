@@ -281,9 +281,29 @@ test.describe('US6: Synthesis API Integration', () => {
       expect(response.ok()).toBeTruthy();
       const data = await response.json();
 
-      // Should have videos and segments from global-setup
+      // Videos must already be submitted (API healthy, seeding done)
       expect(data.videoCount).toBeGreaterThan(0);
-      expect(data.segmentCount).toBeGreaterThan(0);
+
+      // Poll for segmentCount > 0 — in CI the embed pipeline (transcribe → summarize → embed)
+      // can take longer than global-setup's 5-minute window. Give it up to 3 more minutes.
+      console.log('[coverage-test] Waiting for embed pipeline to index segments...');
+      await expect
+        .poll(
+          async () => {
+            const pollResponse = await request.post(`${API_URL}/api/v1/copilot/coverage`, {
+              data: {},
+            });
+            if (!pollResponse.ok()) return 0;
+            const pollData = await pollResponse.json();
+            return pollData.segmentCount ?? 0;
+          },
+          {
+            message: 'Expected segmentCount > 0 — embed pipeline did not complete in time',
+            timeout: 180_000,
+            intervals: [15_000],
+          }
+        )
+        .toBeGreaterThan(0);
     });
   });
 

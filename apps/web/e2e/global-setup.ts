@@ -9,6 +9,8 @@
  */
 
 import { FullConfig } from '@playwright/test';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
@@ -579,10 +581,91 @@ async function globalSetup(_config: FullConfig) {
   }
 
   // Warm up the CopilotKit agent endpoint.
-  // The first LLM call in a CI run can be very slow (Azure OpenAI cold start).
-  // Sending a warm-up request here ensures the backend is primed before tests start,
-  // preventing flaky timeouts in chat-responses, copilot, and full-journey tests.
   await warmUpCopilotAgent();
+
+  // Inject Auth0 token for CI auth-protected tests (no-op if env vars absent)
+  await injectAuth0Token();
+}
+
+async function injectAuth0Token(): Promise<void> {
+  const email = process.env.AUTH0_TEST_EMAIL;
+  const password = process.env.AUTH0_TEST_PASSWORD;
+
+  if (!email || !password) {
+    console.log('[global-setup] AUTH0_TEST_EMAIL/PASSWORD not set — skipping token injection');
+    return;
+  }
+
+  const issuerBaseUrl = process.env.AUTH0_ISSUER_BASE_URL;
+  const clientId = process.env.AUTH0_CLIENT_ID;
+
+  if (!issuerBaseUrl || !clientId) {
+    console.warn('[global-setup] AUTH0_ISSUER_BASE_URL or AUTH0_CLIENT_ID not set — skipping token injection');
+    return;
+  }
+
+  console.log('[global-setup] Fetching Auth0 token via password grant for CI auth injection...');
+  try {
+    const tokenUrl = `${issuerBaseUrl.replace(/\/$/, '')}/oauth/token`;
+    const body: Record<string, string> = {
+      grant_type: 'http://auth0.com/oauth/grant-type/password-realm',
+      realm: 'Username-Password-Authentication',
+      username: email,
+      password,
+      client_id: clientId,
+      scope: 'openid profile email',
+    };
+
+    const clientSecret = process.env.AUTH0_CLIENT_SECRET;
+    if (clientSecret) {
+      body.client_secret = clientSecret;
+    }
+
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.warn(`[global-setup] Auth0 token request failed (${response.status}): ${err} — auth-protected tests may skip`);
+      return;
+    }
+
+    const tokens = await response.json();
+    const accessToken: string | undefined = tokens.access_token;
+    if (!accessToken) {
+      console.warn('[global-setup] No access_token in Auth0 response — auth-protected tests may skip');
+      return;
+    }
+
+    const authDir = path.join(__dirname, '../playwright/.auth');
+    await fs.mkdir(authDir, { recursive: true });
+
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const storageState = {
+      cookies: [],
+      origins: [
+        {
+          origin: baseUrl,
+          localStorage: [{ name: 'access_token', value: accessToken }],
+        },
+      ],
+    };
+
+    const userAuthFile = path.join(authDir, 'user.json');
+    // Only write if auth.setup.ts hasn't already created a richer session state
+    try {
+      await fs.access(userAuthFile);
+      console.log('[global-setup] playwright/.auth/user.json already exists (auth.setup ran) — skipping token injection');
+    } catch {
+      await fs.writeFile(userAuthFile, JSON.stringify(storageState, null, 2));
+      console.log(`[global-setup] ✓ Auth0 token injected → ${userAuthFile}`);
+    }
+  } catch (error) {
+    console.warn(`[global-setup] Token injection failed: ${error} — auth-protected tests may skip`);
+  }
 }
 
 async function warmUpCopilotAgent(): Promise<void> {
