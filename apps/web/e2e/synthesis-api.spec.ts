@@ -29,10 +29,13 @@ test.describe('US6: Synthesis API Integration', () => {
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
-  // Synthesis endpoints require auth; cross-domain cookies prevent auth in SWA preview
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
-
   test.describe('Learning Path Generation', () => {
+    // synthesize endpoint requires auth (check_copilot_quota → require_auth).
+    // The request fixture carries no auth token, so these fail with 401 in CI.
+    test.fixme(
+      !!process.env.CI,
+      'synthesize endpoint requires authentication; request fixture cannot supply auth tokens'
+    );
     test('generates learning path with sufficient videos', async ({ request }) => {
       // Use a broad query to match multiple test videos (Python OOP and fitness)
       const response = await request.post(`${API_URL}/api/v1/copilot/synthesize`, {
@@ -117,6 +120,11 @@ test.describe('US6: Synthesis API Integration', () => {
   });
 
   test.describe('Watch List Generation', () => {
+    test.fixme(
+      !!process.env.CI,
+      'synthesize endpoint requires authentication; request fixture cannot supply auth tokens'
+    );
+
     test('generates watch list with videos', async ({ request }) => {
       const response = await request.post(`${API_URL}/api/v1/copilot/synthesize`, {
         data: {
@@ -171,6 +179,11 @@ test.describe('US6: Synthesis API Integration', () => {
   });
 
   test.describe('Insufficient Content Handling', () => {
+    test.fixme(
+      !!process.env.CI,
+      'synthesize endpoint requires authentication; request fixture cannot supply auth tokens'
+    );
+
     test('handles queries for topics not in library gracefully', async ({ request }) => {
       // Use a topic that is completely unrelated to the test videos (Python OOP, fitness)
       // The system should either:
@@ -204,6 +217,11 @@ test.describe('US6: Synthesis API Integration', () => {
   });
 
   test.describe('Input Validation', () => {
+    test.fixme(
+      !!process.env.CI,
+      'synthesize endpoint requires authentication; request fixture cannot supply auth tokens'
+    );
+
     test('rejects empty query', async ({ request }) => {
       const response = await request.post(`${API_URL}/api/v1/copilot/synthesize`, {
         data: {
@@ -270,6 +288,11 @@ test.describe('US6: Synthesis API Integration', () => {
   });
 
   test.describe('Learning Path Ordering Verification', () => {
+    test.fixme(
+      !!process.env.CI,
+      'synthesize endpoint requires authentication; request fixture cannot supply auth tokens'
+    );
+
     /**
      * These tests verify that the LLM correctly orders videos from beginner → advanced.
      * They use Corey Schafer's Python OOP tutorial series from global-setup.ts which has
@@ -476,6 +499,11 @@ test.describe('US6: Synthesis API Integration', () => {
   });
 
   test.describe('Implicit Ordering Verification (Content-Based Inference)', () => {
+    test.fixme(
+      !!process.env.CI,
+      'synthesize endpoint requires authentication; request fixture cannot supply auth tokens'
+    );
+
     /**
      * These tests verify that the LLM can infer correct pedagogical order from CONTENT ANALYSIS
      * rather than explicit indicators like "Tutorial 1, 2, 3" or "Beginner/Advanced" labels.
