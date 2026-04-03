@@ -154,7 +154,9 @@ class VideoService:
                 )
 
             # status is failed/dead_lettered/pending — re-queue idempotently for CI re-runs
-            channel_name = existing_video.channel.name if existing_video.channel else "unknown-channel"
+            channel_name = (
+                existing_video.channel.name if existing_video.channel else "unknown-channel"
+            )
             existing_video.processing_status = "pending"
             existing_video.error_message = None
 
