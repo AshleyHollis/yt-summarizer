@@ -22,6 +22,11 @@ on:
         description: "PR number for status reporting"
         required: false
         type: string
+      max_failures:
+        description: "Stop after this many failures (0 = run all tests). Default: 5"
+        required: false
+        type: string
+        default: "5"
 
   # Can also be called by other workflows
   workflow_call:
@@ -127,6 +132,8 @@ jobs:
           BASE_URL: ${{ inputs.environment_url }}
           NEXT_PUBLIC_API_URL: ${{ inputs.api_url }}
           API_URL: ${{ inputs.api_url }}
+          # 0 = run all tests (diagnostic mode); default 5 stops early on infra failures
+          MAX_FAILURES: ${{ inputs.max_failures || '5' }}
           # Auth0 configuration (needed for login page and OAuth)
           AUTH0_SECRET: ${{ secrets.AUTH0_SECRET }}
           AUTH0_BASE_URL: ${{ inputs.environment_url }}
