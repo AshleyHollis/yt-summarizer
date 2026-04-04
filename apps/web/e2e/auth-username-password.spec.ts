@@ -37,7 +37,7 @@ test.describe('Username/Password Authentication @auth', () => {
       await expect(passwordInput).toBeVisible();
 
       // Should show submit button
-      const submitButton = page.getByRole('button', { name: /sign in/i });
+      const submitButton = page.getByTestId('submit-button');
       await expect(submitButton).toBeVisible();
     });
 
@@ -100,7 +100,7 @@ test.describe('Username/Password Authentication @auth', () => {
     test('submit button is disabled when form is empty', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
-      const submitButton = page.getByRole('button', { name: /sign in/i }).last();
+      const submitButton = page.getByTestId('submit-button');
 
       // Button should be disabled when form is empty
       await expect(submitButton).toBeDisabled();
@@ -111,7 +111,7 @@ test.describe('Username/Password Authentication @auth', () => {
 
       const emailInput = page.getByLabel(/email/i);
       const passwordInput = page.getByTestId('password-input');
-      const submitButton = page.getByRole('button', { name: /sign in/i }).last();
+      const submitButton = page.getByTestId('submit-button');
 
       // Fill in invalid email
       await emailInput.fill('invalid-email');
@@ -139,7 +139,7 @@ test.describe('Username/Password Authentication @auth', () => {
 
       const emailInput = page.getByLabel(/email/i);
       const passwordInput = page.getByTestId('password-input');
-      const submitButton = page.getByRole('button', { name: /sign in/i }).last();
+      const submitButton = page.getByTestId('submit-button');
 
       // Fill in valid data
       await emailInput.fill('test@example.com');
@@ -205,7 +205,7 @@ test.describe('Username/Password Authentication @auth', () => {
 
         const emailInput = freshPage.getByLabel(/email/i);
         const passwordInput = freshPage.getByTestId('password-input');
-        const submitButton = freshPage.getByRole('button', { name: /sign in/i }).last();
+        const submitButton = freshpage.getByTestId('submit-button');
 
         // Fill in test credentials
         await emailInput.fill(process.env.AUTH0_ADMIN_TEST_EMAIL!);
@@ -235,7 +235,7 @@ test.describe('Username/Password Authentication @auth', () => {
 
         const emailInput = freshPage.getByLabel(/email/i);
         const passwordInput = freshPage.getByTestId('password-input');
-        const submitButton = freshPage.getByRole('button', { name: /sign in/i }).last();
+        const submitButton = freshpage.getByTestId('submit-button');
 
         // Fill in test credentials
         await emailInput.fill(process.env.AUTH0_ADMIN_TEST_EMAIL!);
@@ -318,7 +318,7 @@ test.describe('Username/Password Authentication @auth', () => {
       await expect(passwordInput).toBeVisible();
 
       // Should see submit button
-      const submitButton = page.getByRole('button', { name: /sign in/i }).last();
+      const submitButton = page.getByTestId('submit-button');
       await expect(submitButton).toBeVisible();
     });
 

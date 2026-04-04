@@ -41,7 +41,11 @@ test.describe('Sign Out Flow @auth', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/auth/logout', async (route) => {
       await page.context().clearCookies();
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: '{"success":true}',
+      });
     });
   });
 
@@ -77,10 +81,9 @@ test.describe('Sign Out Flow @auth', () => {
 
       // Should navigate away as part of the logout process
       // (app redirects to '/' after logout; /sign-in only if route is protected)
-      await page.waitForURL(
-        (url) => url.pathname === '/' || url.pathname.includes('/sign-in'),
-        { timeout: 10000 }
-      );
+      await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
+        timeout: 10000,
+      });
     });
   });
 
@@ -212,8 +215,13 @@ test.describe('Sign Out Flow @auth', () => {
       });
       await page.waitForLoadState('networkidle', { timeout: 15000 });
 
-      // Try to access a protected route — app shows AuthGate login card inline (no hard redirect)
-      await page.goto('/add');
+      // Try to access a protected route via client-side navigation (avoids ERR_ABORTED)
+      // /add uses AuthGate which shows login card inline
+      await page.evaluate(() => {
+        window.location.href = '/add';
+      });
+      await page.waitForURL((url) => url.pathname === '/add', { timeout: 15000 });
+      await page.waitForLoadState('networkidle', { timeout: 15000 });
 
       // Protected content is gated — login card should appear instead of the form
       const loginCard = page.getByTestId('google-login');
@@ -261,7 +269,11 @@ test.describe('Sign Out Flow @auth', () => {
         // Mock logout to preserve server session
         await page.route('**/api/auth/logout', async (route) => {
           await context.clearCookies();
-          await route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: '{"success":true}',
+          });
         });
 
         await page.goto(process.env.BASE_URL || 'http://localhost:3000/');
@@ -302,7 +314,11 @@ test.describe('Sign Out Flow @auth', () => {
         // Mock logout to preserve server session for the re-login check below
         await page.route('**/api/auth/logout', async (route) => {
           await context.clearCookies();
-          await route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: '{"success":true}',
+          });
         });
 
         await page.goto(process.env.BASE_URL || 'http://localhost:3000/');
@@ -359,7 +375,11 @@ test.describe('Sign Out Flow @auth', () => {
         // Mock logout on page1: clears cookies for the entire context (both tabs)
         await page1.route('**/api/auth/logout', async (route) => {
           await context.clearCookies();
-          await route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: '{"success":true}',
+          });
         });
 
         // Logout in first tab
