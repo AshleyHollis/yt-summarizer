@@ -58,6 +58,7 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
+    environment: preview
     permissions:
       id-token: write
       contents: read
