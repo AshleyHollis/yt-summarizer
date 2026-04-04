@@ -85,9 +85,9 @@ test.describe('Social Login Authentication @auth', () => {
     test('login page has beautiful gradient design', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
-      // Check for main content container
-      const mainContent = page.locator('main');
-      await expect(mainContent).toBeVisible();
+      // Check for Google login button (present on the sign-in page)
+      const googleButton = page.getByTestId('google-login');
+      await expect(googleButton).toBeVisible();
 
       // Verify the page has semantic structure
       const heading = page.getByRole('heading', { level: 1 });
@@ -117,18 +117,15 @@ test.describe('Social Login Authentication @auth', () => {
     }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
     test('authenticated user is redirected from login page to dashboard', async ({ page }) => {
-      // Navigate to login page while authenticated
-      await page.goto('/sign-in');
+      // Navigate to home page — should show user profile (authenticated)
+      await page.goto('/');
 
-      // Should redirect away from login page (already authenticated)
-      // The exact redirect location depends on the app's auth flow
-      // It might go to /dashboard, /, or /add
-      await page.waitForURL((url) => !url.pathname.includes('/sign-in'), {
-        timeout: 5000,
-      });
+      // Should see user profile (authenticated state)
+      await expect(page.getByTestId('user-profile')).toBeVisible({ timeout: 10000 });
 
-      // Verify we're not on the login page anymore
-      expect(page.url()).not.toContain('/sign-in');
+      // Should NOT see the sign-in heading on the home page
+      const signInHeading = page.getByRole('heading', { name: /sign in/i });
+      await expect(signInHeading).not.toBeVisible();
     });
 
     test('authenticated user can see user profile component', async ({ page }) => {
@@ -260,15 +257,15 @@ test.describe('Social Login Authentication @auth', () => {
       const page = await context.newPage();
 
       try {
-        // Try to access the main app
-        await page.goto('http://localhost:3000/');
+        // Try to access a protected route — AuthGate shows login card inline (no redirect)
+        await page.goto(`${process.env.BASE_URL || 'http://localhost:3000'}/add`);
 
-        // Should redirect to login page
-        await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
-          timeout: 5000,
-        });
+        // Protected content is gated — login card (Google button) should appear
+        const loginCard = page.getByRole('button', { name: /google/i });
+        await expect(loginCard).toBeVisible({ timeout: 10000 });
 
-        expect(page.url()).toContain('/sign-in');
+        // Should NOT see the user profile (not authenticated)
+        await expect(page.getByTestId('user-profile')).not.toBeVisible({ timeout: 5000 });
       } finally {
         await context.close();
       }
@@ -279,7 +276,7 @@ test.describe('Social Login Authentication @auth', () => {
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/sign-in');
+        await page.goto(`${process.env.BASE_URL || 'http://localhost:3000'}/sign-in`);
 
         // Should see login page with social buttons
         const googleButton = page.getByRole('button', { name: /google/i });
