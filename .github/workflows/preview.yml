@@ -673,7 +673,7 @@ jobs:
           # Also restart the API deployment so it picks up the updated LLM credentials.
           # The API hosts the CopilotKit/LangGraph endpoint and uses the same openai-credentials
           # secret; without a restart it continues running with the pre-patch env vars.
-          API_DEPLOYMENT="yt-summarizer-api"
+          API_DEPLOYMENT="api"
           if kubectl get deployment "${API_DEPLOYMENT}" --namespace="${PREVIEW_NS}" &>/dev/null; then
             kubectl rollout restart deployment/"${API_DEPLOYMENT}" --namespace="${PREVIEW_NS}"
             echo "  ↩️  Restarted ${API_DEPLOYMENT}"
