@@ -514,14 +514,14 @@ test.describe('User Story 3: Browse the Library', () => {
     test('header shows Library link', async ({ page }) => {
       await page.goto('/');
 
-      const libraryLink = page.getByRole('link', { name: /Library/i });
+      const libraryLink = page.getByRole('link', { name: 'Library', exact: true });
       await expect(libraryLink).toBeVisible();
     });
 
     test('Library link navigates to library page', async ({ page }) => {
       await page.goto('/submit');
 
-      const libraryLink = page.getByRole('link', { name: /Library/i });
+      const libraryLink = page.getByRole('link', { name: 'Library', exact: true });
       await libraryLink.click();
 
       // Use regex to tolerate CopilotKit ?thread= query param
@@ -533,7 +533,7 @@ test.describe('User Story 3: Browse the Library', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Go to library
-      await page.getByRole('link', { name: /Library/i }).click();
+      await page.getByRole('link', { name: 'Library', exact: true }).click();
       await page.waitForFunction(() => /\/library/.test(window.location.pathname), {
         timeout: 15_000,
       });
