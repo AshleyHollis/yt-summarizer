@@ -77,7 +77,7 @@ Added "Unpause openai-credentials ESO" step in sync-argocd-manifests job (commit
 **Fix**: Parker to force Terraform or decouple secrets update.
 
 ### Failure Group 2: auth-signout.spec.ts — 1 test
-**Error**: 
+**Error**:
 et::ERR_ABORTED at sign-in page
 **Root Cause**: TEST CODE issue — test navigates to /sign-in which may not exist as static page.
 **Fix**: Kane to investigate actual sign-in URL.
