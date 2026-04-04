@@ -16,6 +16,37 @@
 ## Learnings
 <!-- Append learnings below -->
 
+### 2026-04-04 — ESO Pause State Leak in Preview Namespaces
+
+**Root cause of chat-responses failure ("Expected at least 2 assistant messages, found 1")**:
+The old AKS mutation workaround in `preview.yml` (removed in `8766386b`) paused the
+`openai-credentials` ExternalSecret reconciler (`reconcile.external-secrets.io/paused=true`)
+and never unpaused it. Even after Terraform was fixed to write correct Azure OpenAI creds to
+Key Vault (`TF_VAR_azure_openai_*` vars added), ESO won't sync those values in paused namespaces.
+
+**Fix**: Added "Unpause openai-credentials ESO" step in `sync-argocd-manifests` before ArgoCD
+sync. Removes the paused annotation and triggers `force-sync` so the K8s secret is populated
+with real credentials before pods are restarted by ArgoCD on the new image tag.
+
+**Key pattern**: When removing an AKS mutation workaround, always add a remediation step that
+cleans up the state the workaround left behind. Don't assume "removing the code that set it
+will also remove the state it set".
+
+### 2026-04-04 — Auth-Signout ERR_ABORTED Pattern on SWA /sign-in
+
+Two distinct causes, two distinct fixes:
+1. **Custom browser context (`browser.newContext()`)**: Does NOT inherit `baseURL` from
+   playwright.config.ts. Relative paths in `page.goto('/sign-in')` resolve against the last
+   visited URL — which could be Auth0's domain after the logout redirect. Fix: always use
+   absolute URLs (`${process.env.BASE_URL}/sign-in`) in custom context tests.
+2. **SWA redirect to Auth0**: Azure SWA `/sign-in` may immediately redirect to Auth0 (external
+   domain), causing Playwright's `waitUntil: 'domcontentloaded'` to never fire (ERR_ABORTED).
+   Fix: use `waitUntil: 'commit'` (fires on first response headers) + `.catch(() => {})` + early
+   return if `page.url()` is on an external provider domain.
+
+**Pattern**: Wherever E2E tests navigate to `/sign-in` in an SWA context, use `waitUntil: 'commit'`
+and treat Auth0 redirect as a passing condition (the sign-in flow works — just via external IdP).
+
 ### 2026-04-05 — Terraform Plan Comment Showing "No Changes" Bug
 
 - The `post-terraform-plan` action's `save-data` step uses `${{ inputs.formatted-plan }}` which is NOT a declared input of that action. This writes an empty `formatted-plan.json`. `action-main.js` reads `FORMATTED_PLAN_PATH`, tries to `JSON.parse('')`, fails with "Unexpected end of JSON input", and recalculates summary from empty parsed resources — showing `0 changes` even when real changes exist.
