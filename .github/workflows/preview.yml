@@ -404,6 +404,41 @@ jobs:
             echo "::warning::YT_SUMMARIZER_API_KEY is not set — API key auth will be disabled in preview"
           fi
 
+      - name: Unpause openai-credentials ESO (remediate old AKS mutation state leak)
+        continue-on-error: true
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          PREVIEW_NS_PREFIX: ${{ env.PREVIEW_NAMESPACE_PREFIX }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${PR_NUMBER:-}" ]]; then
+            echo "No PR number — skipping ESO unpause"
+            exit 0
+          fi
+          PREVIEW_NS="${PREVIEW_NS_PREFIX}${PR_NUMBER}"
+
+          # Skip if ExternalSecret doesn't exist yet (fresh namespace — ArgoCD will create it)
+          if ! kubectl get externalsecret openai-credentials --namespace="${PREVIEW_NS}" &>/dev/null; then
+            echo "openai-credentials ExternalSecret not found in ${PREVIEW_NS} — ArgoCD will create it"
+            exit 0
+          fi
+
+          # Remove the paused annotation (set by old AKS mutation workaround, prevents ESO from syncing)
+          # The trailing '-' in the annotation key removes it; no-op if not present
+          kubectl annotate externalsecret openai-credentials \
+            --namespace="${PREVIEW_NS}" \
+            "reconcile.external-secrets.io/paused-" \
+            --overwrite 2>/dev/null || true
+          echo "✅ Removed paused annotation from openai-credentials ESO in ${PREVIEW_NS}"
+
+          # Trigger immediate reconciliation so new Key Vault values are synced before pods restart
+          kubectl annotate externalsecret openai-credentials \
+            --namespace="${PREVIEW_NS}" \
+            "force-sync=$(date +%s)" \
+            --overwrite
+          echo "✅ Force-sync triggered for openai-credentials ESO in ${PREVIEW_NS}"
+
       - name: Sync ArgoCD manifests
         uses: AshleyHollis/shared-infra/.github/actions/sync-argocd-manifests@v1
         with:
@@ -610,11 +645,14 @@ jobs:
         id: base-url
         shell: bash
         run: |
-          base_url="${{ needs.deploy-frontend-preview.outputs.static_web_app_url }}"
-          if [[ -z "$base_url" ]]; then
-            base_url="${{ needs.get-ingress.outputs.preview_url }}"
+          frontend_url="${{ needs.deploy-frontend-preview.outputs.static_web_app_url }}"
+          if [[ -z "$frontend_url" ]]; then
+            echo "::warning::SWA URL not available — falling back to API ingress URL for BASE_URL"
+            frontend_url="${{ needs.get-ingress.outputs.preview_url }}"
           fi
-          echo "base_url=$base_url" >> "$GITHUB_OUTPUT"
+          # Export both base_url (used by Playwright baseURL) and frontend_url (SWA-specific)
+          echo "base_url=$frontend_url" >> "$GITHUB_OUTPUT"
+          echo "frontend_url=$frontend_url" >> "$GITHUB_OUTPUT"
 
       - name: Enable Auth0 DB connection for preview client
         continue-on-error: true
@@ -714,6 +752,7 @@ jobs:
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ steps.base-url.outputs.base_url }}
+          FRONTEND_URL: ${{ steps.base-url.outputs.frontend_url }}
           NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url }}
           API_URL: ${{ needs.get-ingress.outputs.preview_url }}
           AUTH0_ISSUER_BASE_URL: https://${{ secrets.AUTH0_DOMAIN }}
