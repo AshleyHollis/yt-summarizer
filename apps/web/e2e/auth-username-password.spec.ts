@@ -33,7 +33,7 @@ test.describe('Username/Password Authentication @auth', () => {
       await expect(emailInput).toBeVisible();
 
       // Should show password input
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       await expect(passwordInput).toBeVisible();
 
       // Should show submit button
@@ -75,7 +75,7 @@ test.describe('Username/Password Authentication @auth', () => {
     test('password input has correct type and attributes', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
 
       // Should be password type (hidden by default)
       await expect(passwordInput).toHaveAttribute('type', 'password');
@@ -110,7 +110,7 @@ test.describe('Username/Password Authentication @auth', () => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       const submitButton = page.getByRole('button', { name: /sign in/i }).last();
 
       // Fill in invalid email
@@ -138,7 +138,7 @@ test.describe('Username/Password Authentication @auth', () => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       const submitButton = page.getByRole('button', { name: /sign in/i }).last();
 
       // Fill in valid data
@@ -154,7 +154,7 @@ test.describe('Username/Password Authentication @auth', () => {
     test('password visibility toggle shows/hides password', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       const toggleButton = page.getByLabel(/show password/i);
 
       // Initially password should be hidden
@@ -204,7 +204,7 @@ test.describe('Username/Password Authentication @auth', () => {
         await freshPage.goto('http://localhost:3000/sign-in', { waitUntil: 'networkidle' });
 
         const emailInput = freshPage.getByLabel(/email/i);
-        const passwordInput = freshPage.getByLabel('Password');
+        const passwordInput = freshPage.getByTestId('password-input');
         const submitButton = freshPage.getByRole('button', { name: /sign in/i }).last();
 
         // Fill in test credentials
@@ -234,7 +234,7 @@ test.describe('Username/Password Authentication @auth', () => {
         await freshPage.goto('http://localhost:3000/sign-in', { waitUntil: 'networkidle' });
 
         const emailInput = freshPage.getByLabel(/email/i);
-        const passwordInput = freshPage.getByLabel('Password');
+        const passwordInput = freshPage.getByTestId('password-input');
         const submitButton = freshPage.getByRole('button', { name: /sign in/i }).last();
 
         // Fill in test credentials
@@ -280,7 +280,7 @@ test.describe('Username/Password Authentication @auth', () => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
 
       // Should have ARIA attributes
       await expect(emailInput).toHaveAttribute('aria-label');
@@ -314,7 +314,7 @@ test.describe('Username/Password Authentication @auth', () => {
       const emailInput = page.getByLabel(/email/i);
       await expect(emailInput).toBeVisible();
 
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       await expect(passwordInput).toBeVisible();
 
       // Should see submit button
@@ -336,7 +336,7 @@ test.describe('Username/Password Authentication @auth', () => {
       const emailInput = page.getByLabel(/email/i);
       await expect(emailInput).toBeVisible();
 
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       await expect(passwordInput).toBeVisible();
     });
   });

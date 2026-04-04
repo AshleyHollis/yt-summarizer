@@ -186,7 +186,7 @@ test.describe('Sign Out Flow @auth', () => {
       await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('networkidle', { timeout: 15000 });
 
       // Navigate to sign-in page to verify social login buttons
       await page.goto('/sign-in');
@@ -210,7 +210,7 @@ test.describe('Sign Out Flow @auth', () => {
       await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('networkidle', { timeout: 15000 });
 
       // Try to access a protected route — app shows AuthGate login card inline (no hard redirect)
       await page.goto('/add');
@@ -277,6 +277,7 @@ test.describe('Sign Out Flow @auth', () => {
         await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
           timeout: 10000,
         });
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
 
         // Navigate to sign-in page to verify login UI is available
         await page.goto('/sign-in');

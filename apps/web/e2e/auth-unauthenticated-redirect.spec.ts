@@ -24,15 +24,13 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
     test('unauthenticated user accessing /admin is redirected to login', async ({ page }) => {
       await page.goto('/admin');
 
-      // Should redirect to login page
-      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
-        timeout: 10000,
-      });
+      // App uses AuthGate — shows login card inline (no URL redirect to /sign-in)
+      // Verify the Google login button is visible (login card present)
+      await expect(page.getByRole('button', { name: /google/i })).toBeVisible({ timeout: 10000 });
 
-      expect(page.url()).toContain('/sign-in');
-
-      // Should show login page
-      await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
+      // Should NOT see admin-only content
+      const adminContent = page.getByText(/admin dashboard/i);
+      await expect(adminContent).not.toBeVisible();
     });
 
     test('unauthenticated user accessing /add is redirected to login', async ({ page }) => {
@@ -100,7 +98,7 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
       await expect(emailInput).toBeVisible();
 
       // Should show password input
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       await expect(passwordInput).toBeVisible();
 
       // Should show submit button
@@ -210,20 +208,14 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
 
   test.describe('Redirect URL Preservation', () => {
     test('login page preserves returnTo URL for protected routes', async ({ page }) => {
-      // Try to access admin page
+      // Navigate to admin page unauthenticated — AuthGate shows login card inline
       await page.goto('/admin');
 
-      // Should redirect to login
-      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
-        timeout: 10000,
-      });
+      // Should show Google login button (login card present)
+      await expect(page.getByRole('button', { name: /google/i })).toBeVisible({ timeout: 10000 });
 
-      const currentUrl = new URL(page.url());
-
-      // May have returnTo parameter (implementation-specific)
-      // This is optional behavior - some apps use returnTo, others use session state
-      // Just verify we're on the login page
-      expect(currentUrl.pathname).toContain('/sign-in');
+      // Verify we're still on /admin (no URL redirect)
+      expect(page.url()).toContain('/admin');
     });
   });
 
@@ -249,7 +241,8 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
 
     test('accessing protected API routes returns 401 without auth', async ({ page }) => {
       // Try to access a protected API endpoint
-      const response = await page.request.get('http://localhost:3000/api/auth/me');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await page.request.get(`${apiUrl}/api/auth/me`);
 
       // Should return 401 Unauthorized or 302 redirect
       expect([401, 302, 307]).toContain(response.status());
@@ -258,20 +251,16 @@ test.describe('Unauthenticated User Redirect to Login @auth', () => {
 
   test.describe('Security Validation', () => {
     test('protected page HTML is not exposed to unauthenticated users', async ({ page }) => {
-      // Try to access admin page
+      // Try to access admin page — AuthGate shows login card inline
       await page.goto('/admin');
 
-      // Wait for redirect
-      await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
-        timeout: 10000,
-      });
+      // Should show login card (AuthGate), not admin content
+      await expect(page.getByRole('button', { name: /google/i })).toBeVisible({ timeout: 10000 });
 
       const htmlContent = await page.content();
 
       // Should not contain admin dashboard content
-      // (we should be on login page, not admin page)
       expect(htmlContent.toLowerCase()).not.toContain('admin dashboard');
-      expect(htmlContent.toLowerCase()).toContain('sign in');
     });
 
     test('authentication state is properly initialized as null', async ({ page }) => {
