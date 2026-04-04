@@ -677,7 +677,7 @@ jobs:
           if kubectl get deployment "${API_DEPLOYMENT}" --namespace="${PREVIEW_NS}" &>/dev/null; then
             kubectl rollout restart deployment/"${API_DEPLOYMENT}" --namespace="${PREVIEW_NS}"
             echo "  ↩️  Restarted ${API_DEPLOYMENT}"
-            kubectl rollout status deployment/"${API_DEPLOYMENT}" --namespace="${PREVIEW_NS}" --timeout=120s
+            kubectl rollout status deployment/"${API_DEPLOYMENT}" --namespace="${PREVIEW_NS}" --timeout=300s
             echo "✅ ${API_DEPLOYMENT} restarted and ready"
           else
             echo "  ⚠️  Deployment ${API_DEPLOYMENT} not found in ${PREVIEW_NS} — skipping"
