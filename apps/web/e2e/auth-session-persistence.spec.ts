@@ -268,8 +268,10 @@ test.describe('Session Persistence @auth', () => {
     });
 
     test('logout in one tab affects other tabs', async ({ browser }) => {
+      // Use admin session so logout doesn't invalidate the shared user.json session
+      // that other parallel tests depend on.
       const context = await browser.newContext({
-        storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        storageState: path.join(__dirname, '../playwright/.auth/admin.json'),
       });
 
       const page1 = await context.newPage();
