@@ -2,7 +2,7 @@
 ===============================================================================
 SYNC IMPACT REPORT
 ===============================================================================
-Version: 1.2.0 (Engineering quality principles: maintainability, testability, extensibility, modularity, onboarding)
+Version change: 1.2.0 → 1.3.0
 
 Core capabilities this constitution supports:
   - Cross-video and cross-channel queries
@@ -10,46 +10,68 @@ Core capabilities this constitution supports:
   - Synthesized outputs (programs, learning paths, watch lists)
   - Citation-grounded answers from ingested library
   - Read-only copilot (no side effects)
+  - Auth0-backed user identity with social login and RBAC
+  - YouTube access resilience via Webshare rotating proxy service
+  - Zero-latency HTTPS previews via per-app Cloudflare wildcard certs
 
 Principles:
-  I.   Product & UX (cross-content queries, citations, graceful degradation)
+  I.   Product & UX (cross-content queries, citations, graceful degradation, scale target)
   II.  AI/Copilot Boundaries (read-only, grounded, library-scoped)
   III. Data & Provenance (SQL as source of truth, relationships, traceability)
-  IV.  Reliability & Operations (automated service mgmt, async processing, observability, GitOps)
-  V.   Security (no secrets, least-privilege)
-  VI.  Engineering Quality (maintainability, testability, extensibility, modularity, testing NON-NEGOTIABLE, migrations)
+  IV.  Reliability & Operations (automated service mgmt, async, YouTube resilience,
+       serverless wake-up, observability, GitOps)
+  V.   Security (no secrets, least-privilege, Auth0 user auth, RBAC, test accounts)
+  VI.  Engineering Quality (maintainability, testability, extensibility, modularity,
+       onboarding, testing NON-NEGOTIABLE, migrations, dev environment)
   VII. Change Management (amendments, compliance, pre-merge checks)
 
-Changes in 1.2.0:
-  - **MAJOR CHANGE**: Added first-class engineering quality principles (VI.1 - VI.5 as NON-NEGOTIABLE)
-  - Added VI.1 Maintaintability: Module isolation, self-documenting code, single responsibility, error handling
-  - Added VI.2 Testability: Pure functions, dependency injection, testable interfaces, no hidden state
-  - Added VI.3 Extensibility: Plugin-like architecture, strategy pattern, configuration-driven, open-closed principle
-  - Added VI.4 Modularity: Clear module boundaries, internal vs public API, layered imports, single entry point
-  - Added VI.5 Onboarding: Module READMEs, usage examples, architecture diagrams, walkthrough comments
-  - Reordered VI to prioritze these quality principles before simplicity
-  - Expanded principles index to reflect new quality-focused governance structure
+Changes in 1.3.0:
+  - Fixed version-line discrepancy: comment showed 1.2.0 but version line showed 1.1.0;
+    all 1.2.0 engineering-quality additions preserved; baseline set to 1.2.0 → 1.3.0
+  - Architecture table: added LLM row (Azure OpenAI), updated Identity to Auth0 + Azure
+    Entra ID (dual purpose), added DNS/TLS row (Cloudflare + cert-manager + ExternalDNS)
+  - I.6 (new): Added explicit hobby-scale target (~1,500 videos, ~15,000 segments)
+  - IV: Fixed duplicate "3." numbering (was 1, 2, 3, 3, 4 → now 1, 2, 3, 4, 5, 6)
+  - IV.3 (new): Added YouTube Access Resilience sub-principle (Webshare proxy service,
+    feature flag per component, metrics tracking, retry/dead-letter integration)
+  - IV.6 (expanded): GitOps now covers PR preview namespace lifecycle, image-digest
+    promotion, Argo CD rollback, and max-3-concurrent-preview resource limit
+  - V: Materially expanded Security with three new sub-rules:
+      V.3 User Authentication (Auth0, social login, BFF pattern, cookie requirements)
+      V.4 Role-Based Access Control (admin/normal roles, IaC-only config)
+      V.5 Authentication Test Accounts (Key Vault, Terraform provisioning, CI retrieval)
+  - VI: Fixed anomalous "4." heading (Development Environment now correctly VI.9)
+  - VI.11–14: Renumbered from previous out-of-sequence items
+  - VII.3: Pre-merge check expanded to include Auth0/infrastructure Terraform requirement
 
-Changes in 1.1.0:
-  - **MAJOR CHANGE**: Redefined VI.5 "Testing" to be NON-NEGOTIABLE with explicit requirements
-  - Added requirement for unit, integration, AND E2E tests (was "SHOULD", now "MUST")
-  - Added test-driven development requirement: tests MUST fail initially before implementation
-  - Added 100% pass rate requirement before ANY task can be marked complete
-  - Prohibited test skipping: `-SkipE2E` or partial test skipping not allowed for task completion
-  - Added IV.1 "Automated service management": Mandatory background process pattern across all agents
-  - Fixed numbering in Reliability & Operations section (was duplicate "2.")
-  - Added requirement: ALL agents MUST verify background processes before running tests
-  - Added to VII.2: ALL dependent agents MUST be checked and updated after amendments
+Modified principles (old title → new title):
+  - V. Security: 2 sub-rules → 5 sub-rules (V.3, V.4, V.5 added)
+  - IV. Reliability & Operations: 4 sub-rules → 6 sub-rules (IV.3 added, IV.6 expanded)
+  - I. Product & UX: 5 items → 6 items (I.6 scale target added)
 
-Changes in 1.0.2:
-  - Aligned Architecture Constraints to AKS + Argo CD GitOps (single-node, cost-optimized)
-  - Added Delivery layer (Argo CD + Kustomize) to architecture table
-  - Clarified VI.4: Aspire is for local/dev orchestration; production uses AKS + Argo CD
-  - Added GitOps deployment guidance to IV. Reliability & Operations
+Added sections:
+  - Architecture table: LLM row, DNS/TLS row, updated Identity row
+  - IV.3: YouTube Access Resilience
+  - V.3: User Authentication (Auth0 / BFF)
+  - V.4: Role-Based Access Control
+  - V.5: Authentication Test Accounts
 
-Changes in 1.0.1:
-  - Clarified VI.4 to explicitly warn against 'aspire run' in addition to 'dotnet run'
-  - Updated PowerShell example to use full project path argument
+Removed sections:
+  - None
+
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md — Constitution Check gate references V.3–V.5
+     Auth0 principles; no structural change required (gates are constitution-derived)
+  ✅ .specify/templates/spec-template.md — No structural changes required
+  ✅ .specify/templates/tasks-template.md — No structural changes required; testing
+     NON-NEGOTIABLE language already present
+  ✅ AGENTS.md — Auth0 BFF pattern and Key Vault credential retrieval consistent
+     with V.3, V.5; aspire startup rule consistent with VI.9
+
+Follow-up TODOs:
+  - TODO(PROXY_COST): Webshare bandwidth budget ($/month) not yet codified as an
+    Architecture Constraint; add when subscription tier is confirmed.
+  - TODO(AUTH0_TIER): Auth0 Free tier assumed (25k MAU); revisit if team grows.
 ===============================================================================
 -->
 
@@ -68,11 +90,13 @@ Changes in 1.0.1:
 | Frontend | Next.js | Deployed to Azure Static Web Apps |
 | Backend | AKS (Kubernetes) | Single-node, cost-optimized cluster |
 | Delivery | Argo CD + Kustomize | GitOps: Argo syncs from `k8s/overlays/*` |
-| Services | Python (API + Workers) | Unified Python backend for code sharing |
-| Database | Azure SQL (serverless) | Entities, relationships, and vector embeddings |
+| Services | Python (API + Workers) | FastAPI + 4 workers: transcribe, summarize, embed, relationships |
+| LLM | Azure OpenAI | GPT-4o for chat/summarization; text-embedding-3-small for embeddings |
+| Database | Azure SQL (serverless) | Entities, relationships, vector embeddings (~1,500 videos / ~15,000 segments) |
 | Storage | Azure Blob Storage | Large artifacts (transcripts, media references) |
 | Queue | Azure Storage Queue | Background job coordination |
-| Identity | Azure Entra ID | Managed Identity in Azure; no secrets in code/config |
+| Identity | Auth0 + Azure Entra ID | Auth0 for user auth (social login, RBAC); Managed Identity for service-to-service |
+| DNS / TLS | Cloudflare + cert-manager | One wildcard cert per app (`*.yt-summarizer.apps.ashleyhollis.com`); ExternalDNS manages preview DNS records |
 
 ---
 
@@ -95,6 +119,10 @@ Changes in 1.0.1:
    - Clearly state what is unavailable.
    - Suggest actionable next steps (e.g., "Add this video to your library").
    - Never hallucinate or fabricate content.
+
+6. **Hobby-appropriate scale**: The system is designed for a single power user with
+   approximately **1,500 videos** and **15,000 segments**. Optimizations for scale beyond
+   these bounds MUST NOT be introduced without measured evidence of need (see VI.6).
 
 **Rationale**: A personal knowledge library is only valuable if the user trusts it. Trust requires transparency about what the system knows and doesn't know.
 
@@ -158,22 +186,47 @@ Changes in 1.0.1:
    - Dead-letter failed jobs after max retries with diagnostic context.
    - Expose clear job status (pending, running, succeeded, failed) via API.
 
-3. **Serverless wake-up resilience**: Azure SQL serverless auto-pause MUST NOT break UX. The API layer MUST:
+3. **YouTube access resilience**: YouTube-facing components MUST support routing through the shared
+   proxy service to protect against IP-based rate limiting:
+   - The proxy client MUST be implemented as a shared service (common library), usable by any
+     component that communicates with YouTube.
+   - Feature flags MUST be independently configurable per component (transcribe worker, API service).
+     When disabled, components MUST fall back to the native IP with no behavioral change.
+   - When proxy is enabled, workers MUST process all available queued jobs concurrently; no
+     artificial concurrency cap applies.
+   - Proxy metrics (total requests, success/failure counts, estimated bandwidth) MUST be tracked
+     in Azure SQL and exposed via the health endpoint.
+   - Retry logic MUST handle proxy failures (gateway timeouts, 429s) with backoff; after max
+     retries, the job follows the existing dead-letter path.
+
+4. **Serverless wake-up resilience**: Azure SQL serverless auto-pause MUST NOT break UX. The API layer MUST:
    - Detect transient connection failures (DB waking up).
    - Retry with appropriate timeouts (up to 60s for cold start).
    - Return user-friendly "warming up" messaging rather than cryptic errors.
 
-3. **Observability**: All components MUST emit:
+5. **Observability**: All components MUST emit:
    - **Structured logs** (JSON, queryable fields).
    - **Distributed traces** with correlation IDs propagated from UI → API → workers.
 
    Metrics (request counts, latencies, queue depth) are recommended but not required initially.
 
-4. **GitOps deployments**:
+6. **GitOps deployments**:
    - Production deployments are driven by commits to `k8s/overlays/*`; Argo CD syncs to the AKS cluster.
-   - Preview/ephemeral environments (namespaces) are allowed for testing but MUST be cleaned up automatically to control cost on the single-node cluster.
+   - PR preview environments are deployed to isolated namespaces (`preview-pr-<N>`); they MUST be
+     cleaned up automatically within 5 minutes of PR close/merge.
+   - The **same Docker image digests** validated in preview MUST be promoted to production (no rebuild).
+     The Kustomize overlay is updated with the pinned digest to trigger Argo CD sync.
+   - Argo CD automatically rolls back to the previous healthy revision when post-deployment health
+     checks fail; developers MAY also trigger rollback by reverting the merge commit.
+   - Max **3 concurrent preview namespaces** enforced via resource quotas to protect production
+     stability on the single-node cluster.
+   - Preview DNS records (`api-pr-<N>.yt-summarizer.apps.ashleyhollis.com`) are created by
+     ExternalDNS when an HTTPRoute is created and removed when the namespace is deleted.
+     All previews use the shared per-app wildcard certificate; no per-PR cert provisioning.
 
-**Rationale**: Async processing across multiple services is painful to debug without end-to-end tracing. Invest in observability early.
+**Rationale**: Async processing across multiple services is painful to debug without end-to-end
+tracing. YouTube access resilience ensures transcript fetching is not blocked by IP-based rate
+limiting. Invest in observability early.
 
 ---
 
@@ -181,12 +234,48 @@ Changes in 1.0.1:
 
 1. **No secrets in repo**: Secrets MUST NOT be committed to source control. Use:
    - Azure Managed Identity for service-to-service auth.
-   - Azure Key Vault for any external API keys (e.g., OpenAI).
+   - Azure Key Vault for any external API keys (e.g., OpenAI, Webshare credentials, Auth0 secrets).
    - Environment variables populated from secure configuration at deploy time.
+   - All Key Vault secret provisioning MUST be managed via Terraform (zero manual Azure Portal steps).
 
-2. **Least-privilege access**: Each service SHOULD have minimal permissions required.
+2. **Least-privilege access**: Each service SHOULD have minimal permissions required for its function.
+
+3. **User authentication (Auth0)**: All user-facing authentication MUST be delegated to Auth0:
+   - **Social login**: Google and GitHub MUST be supported as the primary end-user auth methods.
+     No user passwords are stored in the application database.
+   - **Username/password**: Available exclusively for test accounts and initial admin users
+     (provisioned via Terraform; NOT self-service registration).
+   - **Backend-for-Frontend (BFF) pattern**: The API handles the full Auth0 flow:
+     - `GET /api/auth/login?returnTo=<web-url>` — initiates Auth0 authorization flow.
+     - `GET /api/auth/callback/auth0` — handles callback; sets `HttpOnly; Secure; SameSite=None`
+       session cookie. Cookie MUST NOT set a `Domain` attribute (host-only).
+     - `POST /api/auth/logout` — clears the session cookie (local logout).
+   - **CORS**: The API MUST enforce a strict origin allowlist for credentialed requests.
+     `Access-Control-Allow-Origin: *` combined with credentials is PROHIBITED.
+   - **IaC-only**: All Auth0 tenant/application configuration (connections, callback URLs,
+     roles, users) MUST be provisioned via Terraform (Auth0 provider). Zero manual
+     dashboard operations are permitted.
+
+4. **Role-based access control (RBAC)**: Two roles exist: `admin` and `normal`.
+   - **Admin**: full access to all features including administrative dashboards.
+   - **Normal**: access to standard user features (video submission, library, copilot).
+   - Role information MUST be stored in Auth0 user metadata and validated on the API for
+     every protected request.
+   - RBAC logic MUST be configuration-driven: adding a new role MUST require only
+     configuration changes, not modifications to core auth logic (see VI.3 Extensibility).
+
+5. **Authentication test accounts**:
+   - Test accounts (one admin, one normal) MUST be provisioned via Terraform.
+   - Test credentials MUST be stored in Azure Key Vault with appropriate access policies.
+   - CI/CD pipelines MUST retrieve test credentials from Key Vault automatically—no
+     manual credential configuration is permitted in pipelines.
+   - Credentials MUST be recreatable via `terraform destroy && terraform apply` without
+     data loss or manual steps.
 
 **Rationale**: Good security hygiene is easier to maintain from the start than to retrofit.
+Auth0 delegates credential management and social-login complexity; the BFF pattern keeps
+tokens server-side, preventing token leakage to the browser. IaC provisioning eliminates
+configuration drift and ensures reproducible environments.
 
 ---
 
@@ -227,18 +316,20 @@ Changes in 1.0.1:
    - **Walkthrough comments**: Complex flows MUST have inline walkthrough comments for new devs.
    - **Naming conventions**: Consistent naming across the codebase to learn pattern once and apply everywhere.
 
-6. **Simplicity first**: Optimize for maintainability and clarity. Add complexity (specialized vector indexes, caching layers) ONLY when measured need exists.
+6. **Simplicity first**: Optimize for maintainability and clarity. Add complexity (specialized
+   vector indexes, caching layers) ONLY when measured need exists.
 
 7. **Bounded queries**: All queries MUST have sensible limits:
    - Top-K retrieval with configurable but capped limits.
    - Pagination for list endpoints.
    - Sensible defaults (e.g., 10 results per page, 50 max per request).
 
-8. **Cost-aware defaults**: Prefer serverless tiers with auto-pause, batched processing over real-time where latency tolerance exists, and cached results over recomputation.
+8. **Cost-aware defaults**: Prefer serverless tiers with auto-pause, batched processing over
+   real-time where latency tolerance exists, and cached results over recomputation.
 
-4. **Development environment**:
+9. **Development environment**:
    - **.NET Aspire is for local/dev orchestration only**. It MUST NOT be used for production deployments.
-   - **Production deployments** are performed via AKS + Argo CD GitOps (see IV.1).
+   - **Production deployments** are performed via AKS + Argo CD GitOps (see IV.6).
    - **.NET Aspire MUST run as a detached background process**. Launching Aspire as a blocking foreground process will cause it to exit when next terminal command is entered.
    - **PowerShell pattern for background Aspire**:
      ```powershell
@@ -249,7 +340,7 @@ Changes in 1.0.1:
    - **⚠️ NEVER use `aspire run` or `dotnet run` directly** when you need to execute follow-up commands in the same session—they block the terminal and will be killed when the next command runs.
    - **Background process checks REQUIRED**: All agents MUST verify services are running via background processes and provide startup help ONLY if needed (using Start-Process pattern).
 
-5. **Testing (NON-NEGOTIABLE)**:
+10. **Testing (NON-NEGOTIABLE)**:
    - **Unit tests**: MUST cover business logic, transformation functions, data models, and service methods.
    - **Integration tests**: MUST cover database access, message contracts, and cross-service communication.
    - **E2E tests**: MUST cover all user story acceptance criteria and critical user journeys.
@@ -258,16 +349,18 @@ Changes in 1.0.1:
    - **No skipping allowed**: `-SkipE2E` or any partial test skipping is prohibited for task completion.
    - **Smoke tests**: SHOULD verify deployment succeeded and critical paths work.
 
-6. **Migration-driven schema changes**: Database schema changes MUST be defined as versioned migrations, source-controlled, and idempotent where possible.
+11. **Migration-driven schema changes**: Database schema changes MUST be defined as versioned
+    migrations (Alembic), source-controlled, and idempotent where possible.
 
-7. **Small, reviewable PRs**: Prefer incremental changes. Each PR SHOULD address a single concern and include relevant tests.
+12. **Small, reviewable PRs**: Prefer incremental changes. Each PR SHOULD address a single
+    concern and include relevant tests.
 
-11. **Dependency discipline**: Keep dependencies minimal and versions pinned.
+13. **Dependency discipline**: Keep dependencies minimal and versions pinned.
 
-12. **Documentation separation**:
-   - **Specs** describe WHAT and WHY (user-visible behavior).
-   - **Plans** describe HOW (architecture, stack choices).
-   - **Tasks** are concrete, ordered, and testable.
+14. **Documentation separation**:
+    - **Specs** describe WHAT and WHY (user-visible behavior).
+    - **Plans** describe HOW (architecture, stack choices).
+    - **Tasks** are concrete, ordered, and testable.
 
 **Rationale**: These engineering quality principles ensure the codebase is **maintainable**, **testable**, **extensible**, and **easy to understand**. Clear module boundaries and self-documenting code reduce debugging time. Testable interfaces and dependency injection enable comprehensive test coverage. Extensible architecture allows adding features without breaking existing code. Good onboarding reduces time for new developers to become productive. Measure before optimizing complexity.
 
@@ -285,7 +378,12 @@ Changes in 1.0.1:
    - Include a Constitution Check section in the plan document.
    - Justify any complexity additions or principle deviations.
 
-3. **Pre-merge checks**: Before merging, ask: Do tests pass? Are there secrets in code? Are DB changes in a migration? Does this violate any constitutional principle?
+3. **Pre-merge checks**: Before merging, verify:
+   - Do all automated tests pass (unit, integration, E2E)?
+   - Are there secrets in code or logs?
+   - Are DB schema changes expressed as Alembic migrations?
+   - Are Auth0 and infrastructure changes managed exclusively via Terraform?
+   - Does this change violate any constitutional principle? If so, is the deviation justified?
 
 **Rationale**: Explicit change management prevents drift. Keep checks lightweight for a solo project.
 
@@ -311,4 +409,4 @@ Changes in 1.0.1:
 
 ---
 
-**Version**: 1.1.0 | **Ratified**: 2025-12-13 | **Last Amended**: 2026-01-13
+**Version**: 1.3.0 | **Ratified**: 2025-12-13 | **Last Amended**: 2026-04-04

@@ -1,0 +1,23 @@
+# Session: Environment Verification (Preview + Prod)
+
+## Goal
+Verify preview and prod environments are fully functional with complete feature coverage:
+- Transcripts processing
+- Relationships extraction
+- All core functionality
+
+## Team Composition
+- **Parker** (DevOps): Start AKS cluster, push test/e2e-env-verification branch, create PR, monitor preview pipeline
+- **Kane** (Tester): E2E test coverage audit for preview+prod environment verification
+
+## Session Phases
+1. Infrastructure: AKS startup and branch preparation
+2. Preview: Deploy to preview, run E2E tests
+3. Production: Verification and validation
+4. Results: Report findings and closure
+
+## Requested by
+Ashley Hollis
+
+## Status
+In progress

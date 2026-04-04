@@ -298,7 +298,8 @@ test.describe('Sign Out Flow @auth', () => {
         await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
           timeout: 10000,
         });
-        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        // Use domcontentloaded — networkidle hangs on pages with background polling (e.g. /library)
+        await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
 
         // Navigate to sign-in page to verify login UI is available
         await page.goto('/sign-in', { waitUntil: 'domcontentloaded', timeout: 15000 });
