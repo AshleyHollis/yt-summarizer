@@ -18,7 +18,7 @@ import { LogoutButton } from '@/components/auth/LogoutButton';
  */
 export function Navbar() {
   const pathname = usePathname();
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, hasRole } = useAuth();
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
 
@@ -69,16 +69,19 @@ export function Navbar() {
               >
                 Jobs
               </Link>
-              <Link
-                href="/admin"
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  isActive('/admin')
-                    ? 'bg-purple-600 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-purple-600/10 hover:text-purple-600 dark:hover:text-purple-400'
-                }`}
-              >
-                Admin
-              </Link>
+              {hasRole('admin') && (
+                <Link
+                  href="/admin"
+                  data-testid="admin-nav-link"
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    isActive('/admin')
+                      ? 'bg-purple-600 text-white'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-purple-600/10 hover:text-purple-600 dark:hover:text-purple-400'
+                  }`}
+                >
+                  Admin
+                </Link>
+              )}
             </div>
           </div>
 

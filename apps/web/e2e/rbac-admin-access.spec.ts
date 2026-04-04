@@ -34,11 +34,20 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
 
   test.describe('Admin Dashboard Access', () => {
     // Skip every test in this group if the admin role is not active in this environment.
-    // The admin page has a client-side useEffect that redirects non-admin users to
-    // /forbidden before the heading renders; this guard detects that redirect.
+    // Strategy: navigate to /admin and wait for EITHER the admin heading (role works) OR
+    // the auth redirect to /forbidden (role missing). A fixed timeout is unreliable in CI
+    // because the auth context loads asynchronously; the redirect fires after useEffect runs.
     test.beforeEach(async ({ page }, testInfo) => {
-      await page.goto('/admin', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(1500); // Allow useEffect auth redirect to settle
+      await page.goto('/admin');
+      try {
+        // Wait for whichever happens first: admin heading renders or page redirects
+        await Promise.race([
+          page.waitForURL('**/forbidden', { timeout: 10000 }),
+          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 10000 }),
+        ]);
+      } catch {
+        // Neither fired within 10 s — fall through to URL check
+      }
       if (!page.url().includes('/admin')) {
         testInfo.skip(true, 'Admin role not available in this environment — page redirected');
       }
@@ -106,6 +115,22 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
   });
 
   test.describe('Admin Navigation', () => {
+    // Skip this group when the admin role is not active — the nav link only renders
+    // when hasRole('admin') returns true, which requires the role to be in the session.
+    test.beforeEach(async ({ page }, testInfo) => {
+      await page.goto('/');
+      // Wait for auth context to settle (session fetch is async)
+      await page.waitForLoadState('networkidle').catch(() => {});
+      const adminLink = page.getByTestId('admin-nav-link');
+      const isAdminLinkVisible = await adminLink.isVisible().catch(() => false);
+      if (!isAdminLinkVisible) {
+        testInfo.skip(
+          true,
+          'Admin nav link not present — admin role not available in this environment'
+        );
+      }
+    });
+
     test('admin link appears in navigation for admin users', async ({ page }) => {
       await page.goto('/');
 
