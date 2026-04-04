@@ -115,3 +115,35 @@
 - `api-url` is injected at deploy time via the `deploy-frontend-swa.yml` workflow → `NEXT_PUBLIC_API_URL` / `API_URL` set to `https://api-pr-177.yt-summarizer.apps.ashleyhollis.com` ✅
 
 **Key Learning**: The k8s overlay CORS/returnTo is set from a hardcoded fallback SWA hostname (`red-grass`) because the overlay is committed before SWA deployment runs. A post-SWA-deploy patch step to update CORS/returnTo with the actual SWA URL would fix this. Auth0 wildcard origins cover the Auth0 side, but the API's own CORS header will reject browser requests from `proud-hill`.
+
+### 2026-06-04 — Chat-Responses E2E Test Hardening (branch: test/e2e-env-verification)
+
+**Root Cause of 4 Failing Tests**
+- Error: `Expected at least 2 assistant messages, found 1` at helpers.ts:194
+- The test's Strategy B (waitForResponse lifecycle-complete path) had an incorrect assertion
+- Original assumption: CopilotKit always has 2 assistant messages (greeting + response)
+- Reality: CopilotKit is configured with NO initial greeting (`apps/web/src/app/providers.tsx` has no `makeSystemMessage`)
+- Each test starts with fresh BrowserContext (line 39-45 in chat-responses.spec.ts), so no accumulated thread history
+- First assistant message is the agent's response to the user query, not a greeting
+
+**waitForResponse Function Architecture** (helpers.ts lines 127-200)
+- Two-phase wait strategy:
+  1. Phase 1: Wait for "Searching your video library..." loading indicator to appear/disappear
+  2. Phase 2: Race two strategies to detect response completion
+- **Strategy A** (tool-rendered): Wait for specific content indicators (video cards, "Recommended Videos", "Limited Information", etc.)
+- **Strategy B** (lifecycle-complete): Wait for chat input to re-enable + verify assistant message count
+- Timeout derives from test's actual timeout: `Math.max(testInfo.timeout - 30_000, 60_000)` (line 131)
+- Tests marked `test.slow()` triple timeout: 120s → 360s, so waitForResponse gets 330s (5.5 minutes)
+
+**Changes Made** (commit 0a2f0f40)
+- Fixed Strategy B assertion from `count < 2` to `count < 1` (only need 1 message: the response)
+- Increased post-response render wait from 2s to 5s for cloud preview streaming delays
+- Added clarifying comments about no-greeting architecture
+
+**Environment-Based Skipping**
+- No `test.skip` guards needed for Azure OpenAI unavailability
+- Parker's commit 7ee3255b already fixed the ESO `openai-credentials` secret pause issue
+- Azure OpenAI creds now flow correctly into preview namespace via Terraform → Key Vault → ESO
+- Tests should work without additional skip guards once infrastructure is healthy
+
+**Key Learning**: When asserting on CopilotKit message counts, verify the actual configuration in `apps/web/src/app/providers.tsx`. Don't assume there's a greeting unless `makeSystemMessage` or similar is configured. Always check if tests use fresh vs. accumulated context (look for `BrowserContext` creation in `beforeEach`).
