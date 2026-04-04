@@ -4,16 +4,13 @@ echo "🔍 Running pre-push checks..."
 # Detect files pushed (vs remote); fall back to last commit when no tracking remote yet
 PUSHED=$(git diff --name-only "@{push}..HEAD" 2>/dev/null || git diff --name-only "HEAD~1..HEAD" 2>/dev/null || echo "")
 
-PYTHON_CHANGED=$(echo "$PUSHED" | grep -c '\.py$' 2>/dev/null || echo "0")
-FRONTEND_CHANGED=$(echo "$PUSHED" | grep -c '^apps/web/' 2>/dev/null || echo "0")
-
-if [ "$PYTHON_CHANGED" -gt 0 ]; then
+if echo "$PUSHED" | grep -q '\.py$'; then
   echo "🐍 Python changes detected - running ruff..."
   python -m ruff check services/ || { echo "  ❌ Ruff lint failed!"; exit 1; }
   echo "  ✅ Ruff passed"
 fi
 
-if [ "$FRONTEND_CHANGED" -gt 0 ]; then
+if echo "$PUSHED" | grep -q '^apps/web/'; then
   echo "📦 Frontend changes detected..."
 
   echo "  ├─ Running ESLint..."
