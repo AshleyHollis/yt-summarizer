@@ -302,7 +302,10 @@ test.describe('Sign Out Flow @auth', () => {
         await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
 
         // Navigate to sign-in page to verify login UI is available
-        await page.goto('/sign-in', { waitUntil: 'domcontentloaded', timeout: 15000 });
+        // Use absolute URL: custom browser contexts don't inherit baseURL from playwright.config.ts,
+        // so a relative '/sign-in' would resolve against whatever domain the logout redirect landed on.
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+        await page.goto(`${baseUrl}/sign-in`, { waitUntil: 'domcontentloaded', timeout: 15000 });
         const googleButton = page.getByTestId('google-login');
         await expect(googleButton).toBeVisible();
 
