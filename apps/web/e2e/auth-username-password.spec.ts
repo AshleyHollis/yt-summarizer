@@ -201,7 +201,9 @@ test.describe('Username/Password Authentication @auth', () => {
       const freshPage = await context.newPage();
 
       try {
-        await freshPage.goto('http://localhost:3000/sign-in', { waitUntil: 'networkidle' });
+        await freshPage.goto(`${process.env.BASE_URL || 'http://localhost:3000'}/sign-in`, {
+          waitUntil: 'networkidle',
+        });
 
         const emailInput = freshPage.getByLabel(/email/i);
         const passwordInput = freshPage.getByTestId('password-input');

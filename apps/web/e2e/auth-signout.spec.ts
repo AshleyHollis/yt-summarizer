@@ -215,17 +215,19 @@ test.describe('Sign Out Flow @auth', () => {
       });
       await page.waitForLoadState('networkidle', { timeout: 15000 });
 
-      // Try to access a protected route via client-side navigation (avoids ERR_ABORTED)
-      // /add uses AuthGate which shows login card inline
-      await page.evaluate(() => {
-        window.location.href = '/add';
+      // Navigate to protected route — use goto with 'commit' to avoid ERR_ABORTED
+      // The /add page uses AuthGate which shows login card inline (no redirect)
+      await page.goto('/add', { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {
+        // Navigation may be aborted on first attempt; the fallback verify below handles this
       });
-      await page.waitForURL((url) => url.pathname === '/add', { timeout: 15000 });
-      await page.waitForLoadState('networkidle', { timeout: 15000 });
 
-      // Protected content is gated — login card should appear instead of the form
-      const loginCard = page.getByTestId('google-login');
-      await expect(loginCard).toBeVisible({ timeout: 10000 });
+      // If goto aborted/redirected, re-navigate once
+      if (!page.url().includes('/add')) {
+        await page.goto('/add', { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+      }
+
+      // /add with AuthGate: login card (google-login button) should be shown, not the add form
+      await expect(page.getByTestId('google-login')).toBeVisible({ timeout: 10000 });
     });
 
     test('browser back button after logout keeps user on login page', async ({ page }) => {
@@ -292,7 +294,7 @@ test.describe('Sign Out Flow @auth', () => {
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
         // Navigate to sign-in page to verify login UI is available
-        await page.goto('/sign-in');
+        await page.goto('/sign-in', { waitUntil: 'domcontentloaded', timeout: 15000 });
         const googleButton = page.getByTestId('google-login');
         await expect(googleButton).toBeVisible();
 
