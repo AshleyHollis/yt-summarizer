@@ -16,6 +16,7 @@
 | Deploy, preview, production, pipeline | Parker | DevOps domain |
 | Test strategy, quality, edge cases | Kane | Testing domain |
 
+| Spec, feature spec, requirements, PRD, product planning, user stories, feature planning | Spec | Specification domain |
 | Human notification (blocked, error, done)         | Any      | Use `squad-human-notification` skill via Discord MCP            |
 
 ## Default

@@ -16,6 +16,7 @@
 | Ripley | Backend Dev | Python, FastAPI, workers, SQLAlchemy, yt-dlp | claude-sonnet-4.6 | 🔧 |
 | Parker | DevOps | Terraform, AKS, CI/CD, Azure, GitHub Actions | claude-sonnet-4.6 | ⚙️ |
 | Kane | Tester | E2E tests, Playwright, quality, edge cases | claude-sonnet-4.6 | 🧪 |
+| Spec | Specification Engineer | Requirements, PRD, feature planning, user stories | claude-sonnet-4.6 | 📋 |
 | Scribe | Session Logger | Memory, decisions, session logs | claude-haiku-4.5 | 📋 |
 | Ralph | Work Monitor | — | — | 🔄 Monitor |
 
