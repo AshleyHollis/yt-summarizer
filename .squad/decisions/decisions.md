@@ -1310,6 +1310,3 @@ The preview environment is healthy and most endpoints behave as expected. Two ca
 - **Security headers missing** — No HSTS, X-Content-Type-Options, X-Frame-Options, or CSP. Server header exposes `nginx`. Fix: Add headers at nginx ingress (annotations/ConfigMap) or FastAPI SecurityHeadersMiddleware.
 - **Worker health not exposed** — `/health/ready` only includes api and database checks. Workers (transcribe, summarize, embed, relationships) have no health representation. Recommendation: Surface workers health via Azure Queue depth or DB heartbeat if available.
 - **API core healthy** — `/health/ready` all checks pass, database fully connected (live + cached), TLS cert valid until Feb 2026, response times acceptable.
-
-
-
