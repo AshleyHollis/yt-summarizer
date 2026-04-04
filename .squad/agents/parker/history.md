@@ -16,6 +16,23 @@
 ## Learnings
 <!-- Append learnings below -->
 
+### 2026-04-05 — Terraform Plan Comment Showing "No Changes" Bug
+
+- The `post-terraform-plan` action's `save-data` step uses `${{ inputs.formatted-plan }}` which is NOT a declared input of that action. This writes an empty `formatted-plan.json`. `action-main.js` reads `FORMATTED_PLAN_PATH`, tries to `JSON.parse('')`, fails with "Unexpected end of JSON input", and recalculates summary from empty parsed resources — showing `0 changes` even when real changes exist.
+- **Bypass**: If env var `TERRAFORM_PLAN_DATA_DIR` is set and points to a directory containing `plan-summary.json` and `formatted-plan.json`, the action skips the buggy `save-data` step and uses those pre-written files directly.
+- **Fix pattern**: Add a step before `Post Plan to PR and Summary` that creates `TERRAFORM_PLAN_DATA_DIR` with the correct files from `steps.plan.outputs.plan_summary` and `steps.plan.outputs.plan_json_path`. Use env vars (not inline expressions) in the `run` script to pass GH Actions values to bash safely.
+- The `plan_json_path` output from `terraform-plan@v1` points to the full plan JSON; copy it as `formatted-plan.json` for the post action to read change details from.
+
+### 2026-04-04 — E2E AKS Mutation Root-Cause Analysis
+
+**Root cause**: `terraform-deploy.yml` never passes `TF_VAR_azure_openai_api_key`, `TF_VAR_azure_openai_endpoint`, `TF_VAR_azure_openai_deployment`, or `TF_VAR_azure_openai_embedding_deployment` to Terraform. All four `variables.tf` declarations default to `""`. Every Terraform run overwrites the four `azure-openai-*` Key Vault secrets with empty strings. ESO syncs empty values into the K8s `openai-credentials` secret. Workers/API start with blank Azure OpenAI env vars.
+
+**The E2E patch step** (`preview.yml` lines 606–684) was added as a workaround — pulling values from GitHub Secrets and directly patching the K8s Secret + restarting pods. It also pauses ESO reconciliation (`reconcile.external-secrets.io/paused=true`) and **never unpauses it**, leaving a state leak in every preview namespace.
+
+**Fix**: Add four `TF_VAR_azure_openai_*` env vars to both jobs in `terraform-deploy.yml` (secrets already exist as `AZURE_OPENAI_*` in GitHub). Then remove the two AKS-mutation steps from the E2E job. No changes to `externalsecret-openai.yaml` or `variables.tf` needed — both are already correct.
+
+**Key insight**: For a fresh preview namespace, ESO syncs the ExternalSecret on creation — no restart trigger needed. The existing `verify-deployment` health check is the correct readiness gate before E2E.
+
 ### 2026-04-03 — Auth0 CI Credential Wiring Audit
 
 **Finding**: `preview-e2e.yml` already fetches `auth0-user-test-email/password` from Key Vault and passes `AUTH0_USER_TEST_EMAIL/PASSWORD` to the E2E step. BUT `global-setup.ts:injectAuth0Token()` reads `AUTH0_TEST_EMAIL` / `AUTH0_TEST_PASSWORD` (singular names) — these were NOT being passed. Added mapping in the E2E step env block.
