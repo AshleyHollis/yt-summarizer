@@ -76,6 +76,10 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders submit form with URL input', async ({ page }) => {
+      test.skip(
+        !!process.env.CI || !!process.env.USE_EXTERNAL_SERVER,
+        'Form is behind AuthGate — cross-domain auth prevents access in preview/CI'
+      );
       // Check for URL input
       const input = page.getByLabel(/YouTube URL/i);
       await expect(input).toBeVisible();
@@ -85,6 +89,10 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders submit button', async ({ page }) => {
+      test.skip(
+        !!process.env.CI || !!process.env.USE_EXTERNAL_SERVER,
+        'Button is behind AuthGate — cross-domain auth prevents access in preview/CI'
+      );
       const submitButton = page.getByRole('button', { name: /Enter URL/i });
       await expect(submitButton).toBeVisible();
     });
@@ -97,7 +105,7 @@ test.describe('Core User Flows @smoke', () => {
   test.describe('Form Validation', () => {
     test.beforeEach(async ({ page }) => {
       test.skip(
-        !!process.env.CI,
+        !!process.env.CI || !!process.env.USE_EXTERNAL_SERVER,
         'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
       );
       await page.goto('/add');
@@ -150,7 +158,7 @@ test.describe('Core User Flows @smoke', () => {
   test.describe('Valid URL Input', () => {
     test.beforeEach(async ({ page }) => {
       test.skip(
-        !!process.env.CI,
+        !!process.env.CI || !!process.env.USE_EXTERNAL_SERVER,
         'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
       );
       await page.goto('/add');

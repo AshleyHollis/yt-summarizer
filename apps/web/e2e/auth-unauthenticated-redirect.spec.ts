@@ -16,8 +16,9 @@
 
 import { test, expect } from '@playwright/test';
 
-// Override default auth state for these tests - we want to test unauthenticated users
-test.use({ storageState: undefined });
+// Override default auth state for these tests - we want to test unauthenticated users.
+// Use an explicit empty state to override project-level storageState (undefined is not sufficient).
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Unauthenticated User Redirect to Login @auth', () => {
   test.describe('Protected Route Redirects', () => {
