@@ -27,7 +27,13 @@ export default defineConfig({
   retries: 1,
 
   // Stop early if too many tests fail - prevents 60min+ runs when auth or infra is broken
-  maxFailures: process.env.CI ? 5 : undefined,
+  // Set MAX_FAILURES=0 (via e2e-full-diagnostic.yml) to run all tests without stopping
+  maxFailures:
+    process.env.MAX_FAILURES !== undefined
+      ? parseInt(process.env.MAX_FAILURES)
+      : process.env.CI
+        ? 5
+        : undefined,
 
   // Run tests in parallel - 4 workers on CI keeps total run time under
   // the 60-minute GitHub Actions limit. The submitQuery() fix (waiting for
