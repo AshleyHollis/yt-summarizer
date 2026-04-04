@@ -250,7 +250,7 @@ test.describe('Session Persistence @auth', () => {
       });
 
       const page1 = await context.newPage();
-      await page1.goto('http://localhost:3000/');
+      await page1.goto(process.env.BASE_URL || 'http://localhost:3000/');
 
       // Verify authenticated in first tab
       const userProfile1 = page1.getByTestId('user-profile');
@@ -258,7 +258,7 @@ test.describe('Session Persistence @auth', () => {
 
       // Open second tab in same context
       const page2 = await context.newPage();
-      await page2.goto('http://localhost:3000/');
+      await page2.goto(process.env.BASE_URL || 'http://localhost:3000/');
 
       // Should also be authenticated in second tab
       const userProfile2 = page2.getByTestId('user-profile');
@@ -273,10 +273,10 @@ test.describe('Session Persistence @auth', () => {
       });
 
       const page1 = await context.newPage();
-      await page1.goto('http://localhost:3000/');
+      await page1.goto(process.env.BASE_URL || 'http://localhost:3000/');
 
       const page2 = await context.newPage();
-      await page2.goto('http://localhost:3000/');
+      await page2.goto(process.env.BASE_URL || 'http://localhost:3000/');
 
       // Both tabs should be authenticated
       await expect(page1.getByTestId('user-profile')).toBeVisible({ timeout: 10000 });
@@ -286,18 +286,19 @@ test.describe('Session Persistence @auth', () => {
       const logoutButton = page1.getByRole('button', { name: /log out|sign out/i });
       await logoutButton.click();
 
-      // Wait for logout to complete
-      await page1.waitForURL((url) => url.pathname.includes('/sign-in'), {
+      // Wait for logout to complete (logout redirects to '/', not '/sign-in')
+      await page1.waitForURL((url) => url.pathname === '/', {
         timeout: 10000,
       });
+
+      // After logout the user-profile should disappear (session cleared)
+      await expect(page1.getByTestId('user-profile')).not.toBeVisible({ timeout: 10000 });
 
       // Refresh second tab - should also be logged out
       await page2.reload();
 
-      // Second tab should now show login page or redirect to login
-      await page2.waitForURL((url) => url.pathname.includes('/sign-in'), {
-        timeout: 10000,
-      });
+      // Second tab should show Sign In (not user-profile) since session is gone
+      await expect(page2.getByTestId('user-profile')).not.toBeVisible({ timeout: 10000 });
 
       await context.close();
     });

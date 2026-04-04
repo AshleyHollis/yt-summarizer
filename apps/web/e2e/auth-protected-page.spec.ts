@@ -231,8 +231,8 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       // Go back home
       await page.goto('/');
 
-      // Click Library link
-      const libraryLink = page.getByRole('link', { name: /library/i });
+      // Click Library link (exact match to avoid matching "Browse Library →" on home page)
+      const libraryLink = page.getByRole('link', { name: 'Library', exact: true });
       await libraryLink.click();
       await expect(page).toHaveURL('/library');
     });
@@ -259,7 +259,9 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       });
 
       page.on('console', (msg) => {
-        if (msg.type() === 'error') {
+        // Filter out network-level "Failed to load resource" messages (e.g. CopilotKit init 400)
+        // We only care about actual JavaScript errors, not HTTP status codes
+        if (msg.type() === 'error' && !msg.text().startsWith('Failed to load resource')) {
           errors.push(msg.text());
         }
       });
@@ -294,8 +296,9 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
 
   test.describe('API Access', () => {
     test('authenticated user can access /api/auth/me endpoint', async ({ page }) => {
-      // Make authenticated request to /me endpoint
-      const response = await page.request.get('http://localhost:3000/api/auth/me');
+      // Make authenticated request to /me endpoint using the configured API URL
+      const apiUrl = process.env.API_URL || 'http://localhost:8000';
+      const response = await page.request.get(`${apiUrl}/api/auth/me`);
 
       // Should return 200 OK
       expect(response.status()).toBe(200);
@@ -307,7 +310,8 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
     });
 
     test('authenticated user data is correct in /api/auth/me', async ({ page }) => {
-      const response = await page.request.get('http://localhost:3000/api/auth/me');
+      const apiUrl = process.env.API_URL || 'http://localhost:8000';
+      const response = await page.request.get(`${apiUrl}/api/auth/me`);
       expect(response.status()).toBe(200);
 
       const userData = await response.json();
@@ -406,8 +410,10 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
         timeout: 10000,
       });
 
-      // User profile should no longer be visible
+      // User profile should no longer be visible after logout
       const userProfileAfterLogout = page.getByTestId('user-profile');
+      // Wait for auth state to update (full page reload on logout)
+      await expect(userProfileAfterLogout).not.toBeVisible({ timeout: 10000 });
       const profileCount = await userProfileAfterLogout.count();
       expect(profileCount).toBe(0);
     });

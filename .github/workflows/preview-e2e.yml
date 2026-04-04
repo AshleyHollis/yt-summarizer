@@ -108,6 +108,11 @@ jobs:
           expected-status: "200"
           service-name: "Preview API"
 
+      - name: Wait for CDN propagation
+        run: |
+          echo "Waiting 60s for SWA CDN edge nodes to propagate new deployment..."
+          sleep 60
+
       - name: Run E2E tests
         uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
         env:
