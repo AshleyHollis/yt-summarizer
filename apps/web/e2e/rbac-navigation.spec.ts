@@ -21,6 +21,8 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
 test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
   /**
    * Skip all tests if auth is not configured
@@ -38,12 +40,13 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     test('admin user sees admin link in navigation', async ({ browser }) => {
       const context = await browser.newContext({
         storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        baseURL: BASE_URL,
       });
 
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/');
+        await page.goto('/');
 
         // Look for admin navigation link
         const adminLink = page.getByTestId('admin-nav-link');
@@ -64,12 +67,13 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     test('admin link is styled with purple color scheme', async ({ browser }) => {
       const context = await browser.newContext({
         storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        baseURL: BASE_URL,
       });
 
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/');
+        await page.goto('/');
 
         const adminLink = page.getByTestId('admin-nav-link');
         const adminLinkCount = await adminLink.count();
@@ -92,12 +96,13 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     test('admin link appears between standard links and user profile', async ({ browser }) => {
       const context = await browser.newContext({
         storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        baseURL: BASE_URL,
       });
 
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/');
+        await page.goto('/');
 
         const adminLink = page.getByTestId('admin-nav-link');
         const adminLinkCount = await adminLink.count();
@@ -119,12 +124,13 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     test('admin link highlights when on admin page', async ({ browser }) => {
       const context = await browser.newContext({
         storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        baseURL: BASE_URL,
       });
 
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/admin');
+        await page.goto('/admin');
 
         // Check if we're actually on admin page (user has admin role)
         const currentUrl = page.url();
@@ -231,11 +237,11 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
   test.describe('Unauthenticated Navigation', () => {
     test('unauthenticated users see sign in link', async ({ browser }) => {
-      const context = await browser.newContext({ storageState: undefined });
+      const context = await browser.newContext({ storageState: undefined, baseURL: BASE_URL });
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/');
+        await page.goto('/');
 
         // Should see sign in link instead of user profile
         page.getByRole('link', { name: /sign in/i });
@@ -250,11 +256,11 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     });
 
     test('unauthenticated users do not see admin link', async ({ browser }) => {
-      const context = await browser.newContext({ storageState: undefined });
+      const context = await browser.newContext({ storageState: undefined, baseURL: BASE_URL });
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/');
+        await page.goto('/');
 
         // Admin link should not be visible
         const adminLink = page.getByTestId('admin-nav-link');
@@ -267,11 +273,11 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     });
 
     test('unauthenticated users do not see user profile', async ({ browser }) => {
-      const context = await browser.newContext({ storageState: undefined });
+      const context = await browser.newContext({ storageState: undefined, baseURL: BASE_URL });
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/');
+        await page.goto('/');
 
         // User profile should not be visible
         const userProfile = page.getByTestId('user-profile');
@@ -299,12 +305,13 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     test('admin link is keyboard accessible', async ({ browser }) => {
       const context = await browser.newContext({
         storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        baseURL: BASE_URL,
       });
 
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/');
+        await page.goto('/');
 
         const adminLink = page.getByTestId('admin-nav-link');
         const adminLinkCount = await adminLink.count();
