@@ -19,11 +19,11 @@ deployed to Azure (SWA + ACA + SQL + Storage).
 ```mermaid
 graph TB
     User(["Library Owner"])
-    
+
     subgraph "Frontend (Azure SWA)"
         Web["Next.js Web App\n:3000"]
     end
-    
+
     subgraph "Backend (Azure Container Apps)"
         API["FastAPI API\n:8000"]
         TW["Transcribe Worker\n:8091"]
@@ -31,19 +31,19 @@ graph TB
         EW["Embed Worker\n:8093"]
         RW["Relationships Worker\n:8094"]
     end
-    
+
     subgraph "Storage"
         SQL["Azure SQL Database\n(Serverless)\nOperational + VECTOR\n+ Relationships"]
         BLOB["Azure Blob Storage\nTranscripts, Summaries"]
         QUEUE["Azure Storage Queue\nJob Messages"]
     end
-    
+
     subgraph "External"
         YT["YouTube\n(yt-dlp)"]
         OAI["OpenAI API\nGPT-4o + Embeddings"]
         KV["Azure Key Vault\nAPI Keys"]
     end
-    
+
     User --> Web
     Web --> API
     API --> SQL
