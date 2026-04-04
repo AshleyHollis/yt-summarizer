@@ -60,6 +60,14 @@ on:
         required: false
       WEBSHARE_PROXY_PASSWORD:
         required: false
+      AZURE_OPENAI_API_KEY:
+        required: false
+      AZURE_OPENAI_ENDPOINT:
+        required: false
+      AZURE_OPENAI_DEPLOYMENT:
+        required: false
+      AZURE_OPENAI_EMBEDDING_DEPLOYMENT:
+        required: false
     outputs:
       plan-summary:
         description: Terraform plan summary
@@ -87,6 +95,10 @@ jobs:
       ARM_USE_OIDC: true
       TF_VAR_webshare_proxy_username: ${{ secrets.WEBSHARE_PROXY_USERNAME }}
       TF_VAR_webshare_proxy_password: ${{ secrets.WEBSHARE_PROXY_PASSWORD }}
+      TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      TF_VAR_azure_openai_deployment: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+      TF_VAR_azure_openai_embedding_deployment: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
@@ -178,6 +190,10 @@ jobs:
       ARM_USE_OIDC: true
       TF_VAR_webshare_proxy_username: ${{ secrets.WEBSHARE_PROXY_USERNAME }}
       TF_VAR_webshare_proxy_password: ${{ secrets.WEBSHARE_PROXY_PASSWORD }}
+      TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      TF_VAR_azure_openai_deployment: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+      TF_VAR_azure_openai_embedding_deployment: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
