@@ -255,7 +255,7 @@
 ### Validation Tests (POST-MERGE)
 
 > **Note**: These tasks require the CI/CD infrastructure to be merged to main first.
-> After merging PR #2, create branch `002-azure-cicd-validation` and run `/speckit.implement` to continue.
+> After merging PR #2, create branch `002-azure-cicd-validation` and continue with implementation tasks.
 
 - [X] T089 Validate full CI workflow with intentional test failure
   - ✅ Created a PR with a failing test, CI blocked merge (runs 20850663682, 20850687881)

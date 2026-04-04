@@ -1,0 +1,14 @@
+{
+  "featureName": "Preview DNS / Cloudflare / cert-manager",
+  "featureId": "F003",
+  "phase": "complete",
+  "intent": "GREENFIELD",
+  "workflow": "poc",
+  "milestone": "M2",
+  "taskIndex": 0,
+  "totalTasks": 77,
+  "completedTasks": 77,
+  "currentAgent": null,
+  "awaitingApproval": false,
+  "updatedAt": "2026-04-04T16:05:50Z"
+}

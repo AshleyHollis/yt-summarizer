@@ -1,0 +1,14 @@
+{
+  "featureName": "YT Summarizer Product Foundation",
+  "featureId": "F001",
+  "phase": "execution",
+  "intent": "GREENFIELD",
+  "workflow": "poc",
+  "milestone": "M1",
+  "taskIndex": 220,
+  "totalTasks": 220,
+  "completedTasks": 220,
+  "currentAgent": null,
+  "awaitingApproval": false,
+  "updatedAt": "2026-04-04T06:01:37Z"
+}

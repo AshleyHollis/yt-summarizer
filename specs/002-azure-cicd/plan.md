@@ -389,7 +389,7 @@ The existing `tasks.md` was generated for the old staging/manual-production appr
 - ApplicationSet for preview discovery
 - Updated overlay structure (`prod/` + `previews/pr-*/`)
 
-**Action Required**: Run `/speckit.tasks` to regenerate task list after plan approval.
+**Action Required**: Regenerate task list after plan approval.
 
 ### Artifacts Status
 

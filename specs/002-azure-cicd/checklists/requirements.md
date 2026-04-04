@@ -1,7 +1,8 @@
-# Specification Quality Checklist: Azure CI/CD Pipelines
+# Specification Quality Checklist: GitHub CI/CD with PR Preview Environments
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
 **Created**: 2026-01-08  
+**Updated**: 2026-01-09  
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -32,5 +33,6 @@
 ## Notes
 
 - All checklist items pass validation
-- Assumptions section documents reasonable defaults for hosting service selection
-- Spec is ready for `/speckit.clarify` or `/speckit.plan`
+- **Migration (2026-01-09)**: Removed implementation-specific language from FR requirements (Argo CD, Kustomize, Docker, AKS, K8s namespaces); removed the inline "Preview Hostnames & TLS" implementation block from User Story 2 (moved context to Assumptions); converted Clarifications section to Assumptions; updated Status to reflect ~70% implementation state
+- Implementation details (specific tools, YAML configs, architecture decisions) are captured in `plan.md` and `research.md`
+- Spec is ready for planning to regenerate the task list reflecting current implementation state

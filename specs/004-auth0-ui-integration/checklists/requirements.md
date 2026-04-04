@@ -2,6 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-01-19
+**Last Updated**: 2026-01-19
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -74,4 +75,26 @@
 - Updated Assumptions: Added test suite, framework, and CI/CD pipeline assumptions
 - All checklist items still pass after testing requirements
 
-**Status**: ✅ All quality checks passed (final validation complete)
+**Validation Iteration 5 (Migration)**:
+
+Issues found and resolved during migration:
+
+1. **[FIXED] Implementation details in FR-025–035**: Requirements referenced specific technologies (TypeScript interfaces, JSDoc comments, Auth0 API calls). Rephrased all 11 requirements to describe the capability and quality property without naming implementation technologies.
+   - Before: "Public authentication API MUST be documented with TypeScript interfaces and JSDoc comments"
+   - After: "The public authentication interface MUST be documented with usage examples and clearly defined contracts for each capability"
+
+2. **[FIXED] Implementation details in SC-016–SC-023**: Success criteria used technical jargon (circular dependencies, TypeScript types, mocked). Rephrased to describe verifiable outcomes in plain language.
+   - Before: "Auth module has zero circular dependencies with other modules"
+   - After: "The authentication module has no dependencies on non-authentication application modules — all dependency flow is one-directional"
+   - Before: "All public auth functions have TypeScript types and JSDoc documentation"
+   - After: "All public authentication capabilities are documented with usage examples and clearly defined input/output contracts"
+
+3. **[FIXED] Unanswered edge case questions**: The Edge Cases section contained 9 open questions (lines beginning with "How does...", "What happens when..."). All 9 resolved with concrete, informed answers covering: expired tokens, unavailable credential storage, dual-identity email handling, service unavailability, CI/CD credential failures, pipeline auth failures, rate limit handling, and engineering quality boundary violations.
+
+4. **[FIXED] Status field**: Updated from "Draft" to "In Progress (~50% implemented)" to reflect current implementation reality.
+
+5. **[FIXED] Clarifications formatting**: Converted inline `Q: ... → A: ...` format to structured `**Q**: / **A**:` format for readability.
+
+6. **[VERIFIED] Key Entities**: Stripped inline code blocks and TypeScript interfaces from the Key Entities section in spec.md (implementation detail artefacts belong in data-model.md and contracts/, not the spec). Entities are now described in plain language.
+
+**Status**: ✅ All quality checks passed (migration validation complete)

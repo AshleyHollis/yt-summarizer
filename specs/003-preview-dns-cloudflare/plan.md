@@ -53,7 +53,7 @@ specs/003-preview-dns-cloudflare/
 ├── data-model.md        # Phase 1 output (Kubernetes resources)
 ├── quickstart.md        # Phase 1 output (validation steps)
 ├── contracts/           # Phase 1 output (API auth endpoints)
-└── tasks.md             # Phase 2 output (/speckit.tasks command)
+└── tasks.md             # Phase 2 output (tasks command)
 ```
 
 ### Source Code (repository root)
@@ -432,7 +432,7 @@ app.add_middleware(
 
 ## Next Steps
 
-1. Run `/speckit.tasks` to generate detailed implementation tasks
+1. Generate detailed implementation tasks
 2. Create DNS records in Cloudflare (manual step: wildcard A record for Gateway IP)
 3. Implement infrastructure manifests
 4. Update GitHub Actions
