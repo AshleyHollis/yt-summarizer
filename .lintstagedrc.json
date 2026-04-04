@@ -1,9 +1,4 @@
 {
-  "apps/web/**/*.{ts,tsx,js,jsx}": [
-    "npx prettier --write",
-    "npx --prefix apps/web eslint --config apps/web/eslint.config.mjs --fix"
-  ],
-  "apps/web/**/*.{json,css,md,yml,yaml}": ["npx prettier --write"],
-  "**/*.{yml,yaml}": ["npx prettier --write"],
+  "apps/web/**/*.{ts,tsx,js,jsx,json,css,md}": ["npm --prefix apps/web exec -- prettier --write"],
   "services/**/*.py": ["python -m ruff check --fix", "python -m ruff format"]
 }
