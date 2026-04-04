@@ -226,7 +226,7 @@ test.describe('Sign Out Flow @auth', () => {
       await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
         timeout: 10000,
       });
-      await page.waitForLoadState('networkidle', { timeout: 15000 });
+      await page.waitForLoadState('load', { timeout: 15000 });
 
       // Navigate to protected route — use goto with 'commit' to avoid ERR_ABORTED
       // The /add page uses AuthGate which shows login card inline (no redirect)

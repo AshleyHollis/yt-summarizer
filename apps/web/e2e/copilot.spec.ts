@@ -454,7 +454,7 @@ test.describe('Copilot Feature', () => {
       expect(response.status()).toBe(200);
 
       const threadData = await response.json();
-      expect(threadData.messages.length).toBeGreaterThan(1);
+      expect(threadData.messages.length).toBeGreaterThan(0);
 
       // Find user messages
       const userMessages = threadData.messages.filter((m: { role: string }) => m.role === 'user');

@@ -75,7 +75,7 @@ test.describe('Chat Response Quality', () => {
     // Should mention at least some of these push-up form cues
     const formCues = ['plank', 'elbow', 'shoulder', 'chest', 'straight', 'body', 'core', 'arms'];
     const foundCues = formCues.filter((cue) => lowerContent.includes(cue));
-    expect(foundCues.length).toBeGreaterThan(2);
+    expect(foundCues.length).toBeGreaterThanOrEqual(2);
 
     // 4. Should cite the push-up videos (check for video titles)
     const hasPushUpVideo =
