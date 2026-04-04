@@ -192,7 +192,14 @@ test.describe('Sign Out Flow @auth', () => {
       await page.waitForLoadState('networkidle', { timeout: 15000 });
 
       // Navigate to sign-in page to verify social login buttons
-      await page.goto('/sign-in');
+      await page
+        .goto('/sign-in', { waitUntil: 'domcontentloaded', timeout: 15000 })
+        .catch(() => {});
+      if (!page.url().includes('/sign-in')) {
+        await page
+          .goto('/sign-in', { waitUntil: 'domcontentloaded', timeout: 15000 })
+          .catch(() => {});
+      }
 
       // Should see social login buttons
       const googleButton = page.getByTestId('google-login');

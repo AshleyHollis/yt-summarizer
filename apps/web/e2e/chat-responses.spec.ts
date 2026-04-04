@@ -1,4 +1,5 @@
 import { test, expect, BrowserContext } from '@playwright/test';
+import * as path from 'path';
 import {
   submitQuery,
   waitForResponse,
@@ -36,7 +37,12 @@ test.describe('Chat Response Quality', () => {
   let page: import('@playwright/test').Page;
 
   test.beforeEach(async ({ browser }) => {
-    context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    // Fresh context per test (prevents CopilotKit thread state accumulation),
+    // but must include auth state so the copilot API calls succeed.
+    context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+    });
     page = await context.newPage();
     await page.goto('/library?chat=open', { waitUntil: 'commit' });
     await page.waitForLoadState('domcontentloaded');

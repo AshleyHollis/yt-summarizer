@@ -97,6 +97,9 @@ test.describe('Channel Ingestion Flow', () => {
     // These tests require the backend to be running
     test.beforeEach(async ({ page }) => {
       await page.goto('/ingest');
+      // Wait for AuthGate to finish loading auth state so the channel URL
+      // input is visible before each test body runs.
+      await expect(page.getByLabel(/YouTube Channel URL/i)).toBeVisible({ timeout: 30_000 });
     });
 
     test('fetches videos from channel URL', async ({ page }) => {
