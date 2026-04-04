@@ -409,13 +409,16 @@ async def get_session(request: Request) -> SessionResponse:
     if not session_data:
         return SessionResponse(isAuthenticated=False)
 
-    # Transform user_info to match frontend expectations
+    # Transform user_info to match frontend expectations.
+    # IMPORTANT: custom claims (role) must be forwarded — Auth0 Actions add them
+    # to the userinfo payload using a namespaced key.
     user_info = session_data.user_info
     user = {
         "id": user_info.get("sub", ""),
         "email": user_info.get("email", ""),
         "name": user_info.get("name", ""),
         "picture": user_info.get("picture"),
+        "https://yt-summarizer.com/role": user_info.get("https://yt-summarizer.com/role"),
     }
 
     return SessionResponse(user=user, isAuthenticated=True)
