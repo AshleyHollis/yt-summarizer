@@ -280,6 +280,13 @@ test.describe('Session Persistence @auth', () => {
       const page2 = await context.newPage();
       await page2.goto(process.env.BASE_URL || 'http://localhost:3000/');
 
+      // Mock logout on page1: clears cookies from the shared context (affects both tabs).
+      // Tests cross-tab session clearing behavior via client-side cookie invalidation.
+      await page1.route('**/api/auth/logout', async (route) => {
+        await context.clearCookies();
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+      });
+
       // Both tabs should be authenticated
       await expect(page1.getByTestId('user-profile')).toBeVisible({ timeout: 10000 });
       await expect(page2.getByTestId('user-profile')).toBeVisible({ timeout: 10000 });

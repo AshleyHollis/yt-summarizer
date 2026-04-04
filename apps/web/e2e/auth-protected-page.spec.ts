@@ -393,38 +393,35 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
   });
 
   test.describe('Logout Functionality', () => {
-    // Use admin session so this logout test doesn't invalidate the shared user.json
-    // session that other parallel tests depend on.
-    test('authenticated user can sign out', async ({ browser }) => {
-      const adminAuthFile = path.join(__dirname, '../playwright/.auth/admin.json');
-      const context = await browser.newContext({ storageState: adminAuthFile });
-      const page = await context.newPage();
-      try {
-        await page.goto(process.env.BASE_URL || 'http://localhost:3000/');
+    test('authenticated user can sign out', async ({ page }) => {
+      // Mock logout to preserve the shared user.json session for other parallel tests.
+      await page.route('**/api/auth/logout', async (route) => {
+        await page.context().clearCookies();
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+      });
 
-        // Verify user is authenticated
-        const userProfile = page.getByTestId('user-profile');
-        await expect(userProfile).toBeVisible({ timeout: 10000 });
+      await page.goto('/');
 
-        // Click logout button
-        const logoutButton = page.getByRole('button', { name: /sign out|log out/i });
-        await expect(logoutButton).toBeVisible();
-        await logoutButton.click();
+      // Verify user is authenticated
+      const userProfile = page.getByTestId('user-profile');
+      await expect(userProfile).toBeVisible({ timeout: 10000 });
 
-        // Should redirect to login or home page
-        await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
-          timeout: 10000,
-        });
+      // Click logout button
+      const logoutButton = page.getByRole('button', { name: /sign out|log out/i });
+      await expect(logoutButton).toBeVisible();
+      await logoutButton.click();
 
-        // User profile should no longer be visible after logout
-        const userProfileAfterLogout = page.getByTestId('user-profile');
-        // Wait for auth state to update (full page reload on logout)
-        await expect(userProfileAfterLogout).not.toBeVisible({ timeout: 10000 });
-        const profileCount = await userProfileAfterLogout.count();
-        expect(profileCount).toBe(0);
-      } finally {
-        await context.close();
-      }
+      // Should redirect to login or home page
+      await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/sign-in'), {
+        timeout: 10000,
+      });
+
+      // User profile should no longer be visible after logout
+      const userProfileAfterLogout = page.getByTestId('user-profile');
+      // Wait for auth state to update (full page reload on logout)
+      await expect(userProfileAfterLogout).not.toBeVisible({ timeout: 10000 });
+      const profileCount = await userProfileAfterLogout.count();
+      expect(profileCount).toBe(0);
     });
   });
 });
