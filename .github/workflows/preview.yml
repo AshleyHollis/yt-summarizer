@@ -63,6 +63,11 @@ on:
         required: false
         type: boolean
         default: true
+      max_failures:
+        description: "Stop E2E tests after this many failures (0 = run all). Default: 5"
+        required: false
+        type: string
+        default: "5"
 
 concurrency:
   group: preview-${{ github.event.pull_request.number || github.run_id }}
@@ -748,7 +753,7 @@ jobs:
         id: run-tests
         uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
         with:
-          playwright-args: "--reporter=html --max-failures=5"
+          playwright-args: "--reporter=html --max-failures=${{ inputs.max_failures || '5' }}"
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ steps.base-url.outputs.base_url }}
