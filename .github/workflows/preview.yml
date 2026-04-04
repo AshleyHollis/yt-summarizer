@@ -774,6 +774,13 @@ jobs:
             echo "✅ Preview client enabled successfully"
           fi
 
+      - name: Wait for CDN propagation
+        run: |
+          echo "Waiting 90s for SWA CDN edge nodes to propagate new JS bundle..."
+          echo "This prevents race conditions where early test workers see the old bundle"
+          echo "and fail on data-testid attributes added in the new deployment."
+          sleep 90
+
       - name: Run E2E tests
         id: run-tests
         uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
