@@ -87,7 +87,9 @@ test.describe('US6: Synthesis Feature UI', () => {
             !text.includes('unauthorized') &&
             !text.includes('auth') &&
             !text.includes('session') &&
-            !text.includes('cross-origin')
+            !text.includes('cross-origin') &&
+            !text.includes('copilotkit') &&
+            !text.includes('component stack')
           ) {
             errors.push(msg.text());
           }

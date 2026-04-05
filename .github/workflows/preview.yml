@@ -768,6 +768,7 @@ jobs:
           AUTH0_USER_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
           AUTH0_USER_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
           YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
+          LIVE_PROCESSING: "true"
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

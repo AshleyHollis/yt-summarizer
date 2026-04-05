@@ -43,12 +43,13 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
       await page.goto('/admin');
       try {
         // Wait for whichever happens first: admin heading renders or page redirects
+        // 25s gives the auth context time to cold-start in CI before declaring the role missing
         await Promise.race([
-          page.waitForURL('**/forbidden', { timeout: 10000 }),
-          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 10000 }),
+          page.waitForURL('**/forbidden', { timeout: 25000 }),
+          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 25000 }),
         ]);
       } catch {
-        // Neither fired within 10 s — fall through to URL check
+        // Neither fired within 25 s — fall through to URL check
       }
       if (!page.url().includes('/admin')) {
         testInfo.skip(true, 'Admin role not available in this environment — page redirected');
@@ -175,11 +176,11 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
       await page.goto('/admin');
       try {
         await Promise.race([
-          page.waitForURL('**/forbidden', { timeout: 10000 }),
-          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 10000 }),
+          page.waitForURL('**/forbidden', { timeout: 25000 }),
+          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 25000 }),
         ]);
       } catch {
-        // Neither fired within 10 s — fall through to URL check
+        // Neither fired within 25 s — fall through to URL check
       }
       if (!page.url().includes('/admin')) {
         testInfo.skip(true, 'Admin role not available in this environment — page redirected');
@@ -234,11 +235,11 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
       await page.goto('/admin');
       try {
         await Promise.race([
-          page.waitForURL('**/forbidden', { timeout: 10000 }),
-          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 10000 }),
+          page.waitForURL('**/forbidden', { timeout: 25000 }),
+          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 25000 }),
         ]);
       } catch {
-        // Neither fired within 10 s — fall through to URL check
+        // Neither fired within 25 s — fall through to URL check
       }
       if (!page.url().includes('/admin')) {
         testInfo.skip(true, 'Admin role not available in this environment — page redirected');
@@ -293,11 +294,11 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
       await page.goto('/admin');
       try {
         await Promise.race([
-          page.waitForURL('**/forbidden', { timeout: 10000 }),
-          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 10000 }),
+          page.waitForURL('**/forbidden', { timeout: 25000 }),
+          page.getByRole('heading', { name: /admin/i }).waitFor({ timeout: 25000 }),
         ]);
       } catch {
-        // Neither fired within 10 s — fall through to URL check
+        // Neither fired within 25 s — fall through to URL check
       }
       if (!page.url().includes('/admin')) {
         testInfo.skip(true, 'Admin role not available in this environment — page redirected');

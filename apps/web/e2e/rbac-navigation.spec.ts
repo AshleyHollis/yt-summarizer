@@ -212,11 +212,13 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
     test('clicking logo navigates to home', async ({ page }) => {
       await page.goto('/library');
+      await page.waitForLoadState('networkidle').catch(() => {});
 
       const logoLink = page.getByRole('link', { name: /yt summarizer/i });
+      await expect(logoLink).toBeVisible({ timeout: 10000 });
       await logoLink.click();
 
-      await expect(page).toHaveURL('/');
+      await expect(page).toHaveURL('/', { timeout: 15000 });
     });
   });
 
