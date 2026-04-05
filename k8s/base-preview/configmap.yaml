@@ -14,3 +14,7 @@ data:
   LOG_LEVEL: "INFO"
   API_HOST: "0.0.0.0"
   API_PORT: "8000"
+  # Auth0 API audience — needed for JWT access tokens so /userinfo returns
+  # custom claims (e.g. https://yt-summarizer.com/role from the role Action).
+  # Without this, Auth0 returns an opaque access token and role claims are missing.
+  AUTH0_AUDIENCE: "https://api.yt-summarizer.apps.ashleyhollis.com"

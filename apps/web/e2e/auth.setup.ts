@@ -119,6 +119,29 @@ setup('authenticate as admin', async ({ page }) => {
 
   try {
     await authenticateViaAuth0(page, email, password, 'admin');
+
+    // Verify the admin session has the role claim before saving state.
+    // This catches Auth0 Action misconfigurations early with a clear message.
+    const sessionCheck = await page.evaluate(async (apiUrl) => {
+      try {
+        const r = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include' });
+        return { status: r.status, data: r.ok ? await r.json() : null };
+      } catch (e) {
+        return { status: 0, error: String(e) };
+      }
+    }, process.env.API_URL || 'http://localhost:8000');
+
+    const roleInSession = sessionCheck.data?.user?.['https://yt-summarizer.com/role'];
+    if (roleInSession === 'admin') {
+      console.log(`[auth-setup] ✓ Admin session confirmed — role: ${roleInSession}`);
+    } else {
+      console.warn(
+        `[auth-setup] ⚠ Admin session missing role claim (got: ${roleInSession}).` +
+          ` Admin tests will skip. Check Auth0 Action and AUTH0_AUDIENCE config.` +
+          ` Full session: ${JSON.stringify(sessionCheck)}`
+      );
+    }
+
     await page.context().storageState({ path: adminAuthFile });
     console.log(`[auth-setup] ✓ Saved admin auth state to ${adminAuthFile}`);
   } catch (error) {

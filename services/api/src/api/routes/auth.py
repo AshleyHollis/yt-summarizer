@@ -310,18 +310,37 @@ async def auth0_callback(
 
     user_info = await _fetch_user_info(access_token, auth.domain)
 
-    # Merge custom claims from ID token — Auth0's /userinfo endpoint does NOT
-    # return namespaced claims (e.g. https://yt-summarizer.com/role) because
-    # those are added by an Auth0 Action to the ID token only.
+    # Merge custom claims from ID token — when AUTH0_AUDIENCE is not configured,
+    # Auth0 returns an opaque access token and /userinfo only returns standard OIDC
+    # claims. The ID token (always a JWT) contains the role claim from the Action.
     id_token = token_data.get("id_token")
     if id_token:
         try:
             id_token_payload = json.loads(_b64decode(id_token.split(".")[1]))
+            role_claim = id_token_payload.get("https://yt-summarizer.com/role")
+            logger.info(
+                "ID token decoded at callback",
+                has_role_claim=role_claim is not None,
+                role=role_claim,
+                correlation_id=correlation_id,
+            )
             for key, value in id_token_payload.items():
-                if key not in user_info:
+                # Overwrite missing keys AND null values — /userinfo may return the
+                # key with null when using an opaque access token, which would prevent
+                # the role from being set if we only checked `key not in user_info`.
+                if key not in user_info or user_info[key] is None:
                     user_info[key] = value
-        except Exception:
-            pass  # Don't fail login if ID token decoding fails
+        except Exception as exc:
+            logger.warning(
+                "Failed to decode ID token for custom claims — role may be missing",
+                error=str(exc),
+                correlation_id=correlation_id,
+            )
+    else:
+        logger.warning(
+            "No ID token in token response — custom claims will not be available",
+            correlation_id=correlation_id,
+        )
 
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=auth.session_ttl_seconds)
 
