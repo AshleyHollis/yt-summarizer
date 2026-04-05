@@ -76,25 +76,17 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders submit form with URL input', async ({ page }) => {
-      test.skip(
-        !!process.env.CI || !!process.env.USE_EXTERNAL_SERVER,
-        'Form is behind AuthGate — cross-domain auth prevents access in preview/CI'
-      );
-      // Check for URL input
+      // AuthGate requires auth — wait up to 15s for session fetch to complete
       const input = page.getByLabel(/YouTube URL/i);
-      await expect(input).toBeVisible();
+      await expect(input).toBeVisible({ timeout: 15000 });
 
       // Check placeholder text
       await expect(input).toHaveAttribute('placeholder', /YouTube URL/);
     });
 
     test('renders submit button', async ({ page }) => {
-      test.skip(
-        !!process.env.CI || !!process.env.USE_EXTERNAL_SERVER,
-        'Button is behind AuthGate — cross-domain auth prevents access in preview/CI'
-      );
       const submitButton = page.getByRole('button', { name: /Enter URL/i });
-      await expect(submitButton).toBeVisible();
+      await expect(submitButton).toBeVisible({ timeout: 15000 });
     });
 
     test('renders add content heading', async ({ page }) => {
@@ -104,11 +96,9 @@ test.describe('Core User Flows @smoke', () => {
 
   test.describe('Form Validation', () => {
     test.beforeEach(async ({ page }) => {
-      test.skip(
-        !!process.env.CI || !!process.env.USE_EXTERNAL_SERVER,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
       await page.goto('/add');
+      // Wait for AuthGate to resolve (auth context fetches session cross-origin)
+      await expect(page.getByLabel(/YouTube URL/i)).toBeVisible({ timeout: 15000 });
     });
 
     test('submit button is disabled when URL is empty', async ({ page }) => {
@@ -157,11 +147,9 @@ test.describe('Core User Flows @smoke', () => {
 
   test.describe('Valid URL Input', () => {
     test.beforeEach(async ({ page }) => {
-      test.skip(
-        !!process.env.CI || !!process.env.USE_EXTERNAL_SERVER,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
       await page.goto('/add');
+      // Wait for AuthGate to resolve before interacting with form
+      await expect(page.getByLabel(/YouTube URL/i)).toBeVisible({ timeout: 15000 });
     });
 
     test('accepts standard YouTube watch URL', async ({ page }) => {

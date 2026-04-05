@@ -176,6 +176,8 @@ $env:AUTH0_ADMIN_TEST_EMAIL    = [System.Environment]::GetEnvironmentVariable("A
 $env:AUTH0_ADMIN_TEST_PASSWORD = [System.Environment]::GetEnvironmentVariable("AUTH0_ADMIN_TEST_PASSWORD")
 $env:AUTH0_USER_TEST_EMAIL     = [System.Environment]::GetEnvironmentVariable("AUTH0_USER_TEST_EMAIL")
 $env:AUTH0_USER_TEST_PASSWORD  = [System.Environment]::GetEnvironmentVariable("AUTH0_USER_TEST_PASSWORD")
+# Enable live AI processing tests — workers are running in preview environments
+$env:LIVE_PROCESSING      = "true"
 
 $ytApiKey = [System.Environment]::GetEnvironmentVariable("YT_SUMMARIZER_API_KEY")
 if ($ytApiKey) { $env:YT_SUMMARIZER_API_KEY = $ytApiKey }
