@@ -46,36 +46,12 @@ jobs:
     name: E2E Full Diagnostic (all tests, no failure limit)
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
       pull-requests: write
       issues: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Azure login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Retrieve Auth0 test credentials from Key Vault
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            AUTH0_ADMIN_EMAIL=$(az keyvault secret show --vault-name "kv-ytsumm-prd-ci" --name "auth0-admin-test-email" --query "value" -o tsv)
-            AUTH0_ADMIN_PASSWORD=$(az keyvault secret show --vault-name "kv-ytsumm-prd-ci" --name "auth0-admin-test-password" --query "value" -o tsv)
-            AUTH0_USER_EMAIL=$(az keyvault secret show --vault-name "kv-ytsumm-prd-ci" --name "auth0-user-test-email" --query "value" -o tsv)
-            AUTH0_USER_PASSWORD=$(az keyvault secret show --vault-name "kv-ytsumm-prd-ci" --name "auth0-user-test-password" --query "value" -o tsv)
-
-            echo "AUTH0_ADMIN_TEST_EMAIL=$AUTH0_ADMIN_EMAIL" >> $GITHUB_ENV
-            echo "::add-mask::$AUTH0_ADMIN_PASSWORD"
-            echo "AUTH0_ADMIN_TEST_PASSWORD=$AUTH0_ADMIN_PASSWORD" >> $GITHUB_ENV
-            echo "AUTH0_USER_TEST_EMAIL=$AUTH0_USER_EMAIL" >> $GITHUB_ENV
-            echo "::add-mask::$AUTH0_USER_PASSWORD"
-            echo "AUTH0_USER_TEST_PASSWORD=$AUTH0_USER_PASSWORD" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: AshleyHollis/shared-infra/.github/actions/setup-node@v1
@@ -119,12 +95,14 @@ jobs:
           AUTH0_ISSUER_BASE_URL: ${{ secrets.AUTH0_ISSUER_BASE_URL }}
           AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
           AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-          AUTH0_ADMIN_TEST_EMAIL: ${{ env.AUTH0_ADMIN_TEST_EMAIL }}
-          AUTH0_ADMIN_TEST_PASSWORD: ${{ env.AUTH0_ADMIN_TEST_PASSWORD }}
-          AUTH0_USER_TEST_EMAIL: ${{ env.AUTH0_USER_TEST_EMAIL }}
-          AUTH0_USER_TEST_PASSWORD: ${{ env.AUTH0_USER_TEST_PASSWORD }}
-          AUTH0_TEST_EMAIL: ${{ env.AUTH0_USER_TEST_EMAIL }}
-          AUTH0_TEST_PASSWORD: ${{ env.AUTH0_USER_TEST_PASSWORD }}
+          AUTH0_ADMIN_TEST_EMAIL: ${{ secrets.AUTH0_ADMIN_TEST_EMAIL }}
+          AUTH0_ADMIN_TEST_PASSWORD: ${{ secrets.AUTH0_ADMIN_TEST_PASSWORD }}
+          AUTH0_USER_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
+          AUTH0_USER_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
+          AUTH0_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
+          AUTH0_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
+          YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
+          LIVE_PROCESSING: "true"
         with:
           playwright-args: "--reporter=html,json"
 
