@@ -1,4 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { getSeededVideoId, waitForVideoProcessingViaApi } from './helpers';
 
 /**
  * E2E Tests for User Story 1: Complete Video Submission Flow
@@ -15,9 +16,10 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 // Test configuration
-const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-const PROCESSING_TIMEOUT = 480_000; // 8 minutes — matches global-setup MAX_WAIT_TIME_MS
-const API_URL = process.env.API_URL || 'http://localhost:8000';
+// ZDa-Z5JzLYM = Python OOP tutorial, has YouTube auto-captions (fast caption extraction, not Whisper).
+// dQw4w9WgXcQ (Rick Astley) has NO captions → forces Whisper transcription → 5–10 min processing.
+const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=ZDa-Z5JzLYM';
+const PROCESSING_TIMEOUT = 300_000; // 5 min fallback — only reached if pre-seeded video unavailable
 
 // Check if live processing tests should run (requires real AI services)
 const LIVE_PROCESSING = process.env.LIVE_PROCESSING === 'true';
@@ -104,10 +106,23 @@ test.describe('User Story 1: Video Submission Flow', () => {
     });
 
     test('completed video displays transcript and summary', async ({ page }) => {
-      // Processing can take >7min with DeepSeek-V3.2 — set explicit timeout
-      // 60s (nav) + 480s (processing) + 120s (buffer) = 660s
-      test.setTimeout(660_000);
-      // First submit a video
+      // Use a pre-seeded completed video from global-setup (instant — no processing wait needed).
+      const seededId = await getSeededVideoId();
+      if (seededId) {
+        await page.goto(`/videos/${seededId}`);
+        await expect(page.locator('main')).toBeVisible();
+
+        const transcriptSection = page.locator('section, div').filter({ hasText: /transcript/i });
+        await expect(transcriptSection.first()).toBeVisible({ timeout: 10_000 });
+
+        const summarySection = page.locator('section, div').filter({ hasText: /summary/i });
+        await expect(summarySection.first()).toBeVisible({ timeout: 5_000 });
+        return;
+      }
+
+      // Fallback: submit a video with captions and wait (should not be reached in CI
+      // because global-setup pre-seeds videos before tests run).
+      test.setTimeout(480_000);
       await page.goto('/submit');
       const urlInput = page.getByLabel(/YouTube Video URL/i);
       await urlInput.fill(TEST_VIDEO_URL);
@@ -115,26 +130,21 @@ test.describe('User Story 1: Video Submission Flow', () => {
       const submitButton = page.getByRole('button', { name: /Process Video/i });
       await submitButton.click();
 
-      // Wait for redirect to video page
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
         { timeout: 60_000 }
       );
 
-      // Wait for processing to complete (or check if already completed)
-      // This uses a polling approach to wait for completion
-      await waitForVideoCompletion(page, PROCESSING_TIMEOUT);
+      const videoId = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1];
+      if (videoId) {
+        const ok = await waitForVideoProcessingViaApi(videoId, PROCESSING_TIMEOUT);
+        if (!ok) throw new Error('Video processing did not complete');
+      }
 
-      // Verify transcript section is visible
-      const transcriptSection = page.locator('section, div').filter({
-        hasText: /transcript/i,
-      });
+      const transcriptSection = page.locator('section, div').filter({ hasText: /transcript/i });
       await expect(transcriptSection.first()).toBeVisible({ timeout: 5_000 });
 
-      // Verify summary section is visible
-      const summarySection = page.locator('section, div').filter({
-        hasText: /summary/i,
-      });
+      const summarySection = page.locator('section, div').filter({ hasText: /summary/i });
       await expect(summarySection.first()).toBeVisible({ timeout: 5_000 });
     });
   });
@@ -149,10 +159,13 @@ test.describe('User Story 1: Video Submission Flow', () => {
     let existingVideoId: string | null = null;
 
     test.beforeAll(async ({ browser }) => {
-      // 60s (nav) + 480s (processing) + 120s (buffer) = 660s
-      test.setTimeout(660_000);
+      // Prefer a pre-seeded completed video from global-setup (instant — no processing wait).
+      existingVideoId = await getSeededVideoId();
+      if (existingVideoId) return;
 
-      // Submit a video once and reuse for subsequent tests
+      // Fallback: submit and wait (should not be needed in CI because global-setup
+      // pre-seeds videos with auto-captions before tests run).
+      test.setTimeout(480_000);
       const page = await browser.newPage();
       await page.goto('/submit');
 
@@ -168,8 +181,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
       );
       existingVideoId = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1] ?? null;
 
-      // Wait for processing to complete
-      await waitForVideoCompletion(page, PROCESSING_TIMEOUT);
+      if (existingVideoId) {
+        await waitForVideoProcessingViaApi(existingVideoId, PROCESSING_TIMEOUT);
+      }
       await page.close();
     });
 
@@ -349,10 +363,24 @@ test.describe('Reprocessing Flow', () => {
   test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
 
   test('can reprocess an existing video', async ({ page }) => {
-    // Navigation + waitForVideoCompletion can exceed default 180s — set explicit timeout
-    // 60s (nav) + 480s (processing) + 120s (buffer) = 660s
-    test.setTimeout(660_000);
-    // First submit a video
+    // Use a pre-seeded completed video — no submission or processing wait needed.
+    const seededId = await getSeededVideoId();
+
+    if (seededId) {
+      await page.goto(`/videos/${seededId}`);
+      await expect(page.locator('main')).toBeVisible();
+
+      const reprocessButton = page.getByRole('button', { name: /reprocess|retry|re-run/i });
+      if (await reprocessButton.isVisible()) {
+        await reprocessButton.click();
+        const processingIndicator = page.getByText(/processing|pending|running/i);
+        await expect(processingIndicator.first()).toBeVisible({ timeout: 10_000 });
+      }
+      return;
+    }
+
+    // Fallback: submit, wait for completion, then try reprocess.
+    test.setTimeout(480_000);
     await page.goto('/submit');
     const urlInput = page.getByLabel(/YouTube Video URL/i);
     await urlInput.fill(TEST_VIDEO_URL);
@@ -365,92 +393,16 @@ test.describe('Reprocessing Flow', () => {
       { timeout: 60_000 }
     );
 
-    // Wait for completion
-    await waitForVideoCompletion(page, PROCESSING_TIMEOUT);
+    const videoId = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1];
+    if (videoId) {
+      await waitForVideoProcessingViaApi(videoId, PROCESSING_TIMEOUT);
+    }
 
-    // Look for reprocess button
     const reprocessButton = page.getByRole('button', { name: /reprocess|retry|re-run/i });
-
     if (await reprocessButton.isVisible()) {
       await reprocessButton.click();
-
-      // Should start processing again
       const processingIndicator = page.getByText(/processing|pending|running/i);
       await expect(processingIndicator.first()).toBeVisible({ timeout: 10_000 });
     }
   });
 });
-
-/**
- * Helper: Wait for video processing to complete.
- * Polls the progress API directly (same approach as global-setup) for fast,
- * reliable status checks. Falls back to UI polling if video ID is not in URL.
- */
-async function waitForVideoCompletion(page: Page, timeout: number): Promise<void> {
-  const videoIdMatch = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/);
-
-  if (videoIdMatch) {
-    const videoId = videoIdMatch[1];
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeout) {
-      try {
-        const response = await page.request.get(`${API_URL}/api/v1/jobs/video/${videoId}/progress`);
-        if (response.ok()) {
-          const data = await response.json();
-          const elapsed = Math.round((Date.now() - startTime) / 1000);
-          console.log(
-            `  📡 [${elapsed}s] Video ${videoId}: status=${data.status}, stage=${data.current_stage || '-'}`
-          );
-          if (data.status === 'completed') return;
-          if (['failed', 'dead_lettered'].includes(data.status)) {
-            throw new Error(`Video processing failed with status: ${data.status}`);
-          }
-        }
-      } catch (e) {
-        if (e instanceof Error && e.message.includes('failed with status')) throw e;
-      }
-      await page.waitForTimeout(5000);
-    }
-    throw new Error(`Video processing did not complete within ${timeout / 1000}s`);
-  }
-
-  // Fallback: UI polling when video ID is not available in URL
-  const startTime = Date.now();
-  while (Date.now() - startTime < timeout) {
-    const completedText = page.getByText(/completed/i);
-    const summarySection = page.locator('section, div').filter({ hasText: /summary/i });
-    const transcriptSection = page.locator('section, div').filter({ hasText: /transcript/i });
-
-    const isCompleted = await Promise.race([
-      completedText
-        .first()
-        .isVisible()
-        .catch(() => false),
-      summarySection
-        .first()
-        .isVisible()
-        .catch(() => false),
-      transcriptSection
-        .first()
-        .isVisible()
-        .catch(() => false),
-    ]);
-
-    if (isCompleted) return;
-
-    const errorText = page.getByText(/failed|error/i);
-    if (
-      await errorText
-        .first()
-        .isVisible()
-        .catch(() => false)
-    ) {
-      throw new Error('Video processing failed');
-    }
-
-    await page.waitForTimeout(3000);
-  }
-
-  throw new Error(`Video processing did not complete within ${timeout / 1000}s`);
-}
