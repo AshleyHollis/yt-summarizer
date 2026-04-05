@@ -1,42 +1,12 @@
-[
-  {
-    "persistent_name": "Dallas",
-    "role": "Lead",
-    "universe": "alien",
-    "created_at": "2026-03-02T08:26:00Z",
-    "legacy_named": false,
-    "status": "active"
-  },
-  {
-    "persistent_name": "Lambert",
-    "role": "Frontend Dev",
-    "universe": "alien",
-    "created_at": "2026-03-02T08:26:00Z",
-    "legacy_named": false,
-    "status": "active"
-  },
-  {
-    "persistent_name": "Ripley",
-    "role": "Backend Dev",
-    "universe": "alien",
-    "created_at": "2026-03-02T08:26:00Z",
-    "legacy_named": false,
-    "status": "active"
-  },
-  {
-    "persistent_name": "Parker",
-    "role": "DevOps",
-    "universe": "alien",
-    "created_at": "2026-03-02T08:26:00Z",
-    "legacy_named": false,
-    "status": "active"
-  },
-  {
-    "persistent_name": "Kane",
-    "role": "Tester",
-    "universe": "alien",
-    "created_at": "2026-03-02T08:26:00Z",
-    "legacy_named": false,
-    "status": "active"
+{
+  "agents": {
+    "dallas": { "persistent_name": "Dallas", "role": "Lead", "status": "active", "legacy_named": false },
+    "lambert": { "persistent_name": "Lambert", "role": "Frontend Dev", "status": "active", "legacy_named": false },
+    "ripley": { "persistent_name": "Ripley", "role": "Backend Dev", "status": "active", "legacy_named": false },
+    "parker": { "persistent_name": "Parker", "role": "DevOps", "status": "active", "legacy_named": false },
+    "kane": { "persistent_name": "Kane", "role": "Tester", "status": "active", "legacy_named": false },
+    "spec": { "persistent_name": "Spec", "role": "Specification Engineer", "status": "active", "legacy_named": false },
+    "scribe": { "persistent_name": "Scribe", "role": "Session Logger", "status": "active", "legacy_named": false },
+    "ralph": { "persistent_name": "Ralph", "role": "Work Monitor", "status": "active", "legacy_named": false }
   }
-]
+}
