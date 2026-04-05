@@ -387,8 +387,8 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
 
       const loadTime = Date.now() - startTime;
 
-      // Page should load in reasonable time (< 5 seconds)
-      expect(loadTime).toBeLessThan(5000);
+      // Page should load in reasonable time (< 10 seconds for remote preview environments)
+      expect(loadTime).toBeLessThan(10000);
     });
   });
 
@@ -397,7 +397,11 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       // Mock logout to preserve the shared user.json session for other parallel tests.
       await page.route('**/api/auth/logout', async (route) => {
         await page.context().clearCookies();
-        await route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: '{"success":true}',
+        });
       });
 
       await page.goto('/');

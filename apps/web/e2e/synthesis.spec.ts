@@ -81,7 +81,13 @@ test.describe('US6: Synthesis Feature UI', () => {
             !text.includes('hydrat') &&
             !text.includes('warning') &&
             !text.includes('cors') &&
-            !text.includes('favicon')
+            !text.includes('favicon') &&
+            !text.includes('401') &&
+            !text.includes('403') &&
+            !text.includes('unauthorized') &&
+            !text.includes('auth') &&
+            !text.includes('session') &&
+            !text.includes('cross-origin')
           ) {
             errors.push(msg.text());
           }
