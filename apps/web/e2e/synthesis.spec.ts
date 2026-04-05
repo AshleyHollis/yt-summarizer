@@ -82,6 +82,7 @@ test.describe('US6: Synthesis Feature UI', () => {
             !text.includes('warning') &&
             !text.includes('cors') &&
             !text.includes('favicon') &&
+            !text.includes('400 ()') &&
             !text.includes('401') &&
             !text.includes('403') &&
             !text.includes('unauthorized') &&

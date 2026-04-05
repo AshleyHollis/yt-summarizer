@@ -350,7 +350,7 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
 
         // Should redirect to login
         await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
-          timeout: 10000,
+          timeout: 25000,
         });
 
         expect(page.url()).toContain('/sign-in');

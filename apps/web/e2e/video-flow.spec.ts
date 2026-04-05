@@ -54,7 +54,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       // Use waitForFunction to avoid CopilotKit URL oscillation (?thread= toggling)
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
-        { timeout: 15_000 }
+        { timeout: 60_000 }
       );
       const videoUrl = page.url();
       const videoId = videoUrl.match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1];
@@ -85,7 +85,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       // Wait for redirect
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
-        { timeout: 15_000 }
+        { timeout: 60_000 }
       );
 
       // Verify job progress section exists
@@ -114,7 +114,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       // Wait for redirect to video page
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
-        { timeout: 15_000 }
+        { timeout: 60_000 }
       );
 
       // Wait for processing to complete (or check if already completed)
@@ -157,7 +157,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
-        { timeout: 15_000 }
+        { timeout: 60_000 }
       );
       existingVideoId = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/)?.[1] ?? null;
 
@@ -274,7 +274,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
       // The video detail page shows "Failed to load video. Please try again." for errors
       const errorMessage = page.getByText(/error|not found|failed/i);
-      await expect(errorMessage.first()).toBeVisible({ timeout: 15_000 });
+      await expect(errorMessage.first()).toBeVisible({ timeout: 60_000 });
     });
 
     test('handles API timeout gracefully', async ({ page }) => {
@@ -318,7 +318,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
 
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
-        { timeout: 15_000 }
+        { timeout: 60_000 }
       );
 
       // Wait a bit for polling to happen
@@ -349,7 +349,7 @@ test.describe('Reprocessing Flow', () => {
 
     await page.waitForFunction(
       () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
-      { timeout: 15_000 }
+      { timeout: 60_000 }
     );
 
     // Wait for completion

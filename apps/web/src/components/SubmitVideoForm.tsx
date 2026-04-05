@@ -89,6 +89,16 @@ export function SubmitVideoForm({ onSuccess, className = '' }: SubmitVideoFormPr
     } catch (err) {
       console.error('Video submission error:', err);
       if (err instanceof ApiClientError) {
+        // 409 means the video already exists — navigate to it rather than show an error
+        if (err.status === 409) {
+          const match = err.message?.match(/video_id=([a-f0-9-]{36})/);
+          if (match?.[1]) {
+            setTimeout(() => {
+              router.push(`/videos/${match[1]}`);
+            }, 1500);
+            return;
+          }
+        }
         setError({
           message: err.message,
           field: err.details?.[0]?.field,

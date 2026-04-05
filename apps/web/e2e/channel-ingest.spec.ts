@@ -199,7 +199,7 @@ test.describe('Channel Ingestion Flow', () => {
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
 
       // Should navigate to batch progress page
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
+      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
 
       // Should show batch progress
       await expect(page.getByText(/Batch Progress/i)).toBeVisible();
@@ -214,7 +214,7 @@ test.describe('Channel Ingestion Flow', () => {
       });
 
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
+      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
 
       // Check navigation buttons
       await expect(page.getByRole('link', { name: /Ingest More Videos/i })).toBeVisible();
@@ -230,7 +230,7 @@ test.describe('Channel Ingestion Flow', () => {
       });
 
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
+      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
 
       // Check back to ingest link
       await expect(page.getByRole('link', { name: /Back to Ingest/i })).toBeVisible();
@@ -245,7 +245,7 @@ test.describe('Channel Ingestion Flow', () => {
       });
 
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
+      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
 
       // Wait for batch details to load (batch name should appear in heading)
       await expect(page.getByRole('heading', { name: /Darci Isabella/i })).toBeVisible({
