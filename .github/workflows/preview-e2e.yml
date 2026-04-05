@@ -86,6 +86,7 @@ jobs:
             AUTH0_ADMIN_PASSWORD=$(az keyvault secret show --vault-name "kv-ytsumm-prd-ci" --name "auth0-admin-test-password" --query "value" -o tsv)
             AUTH0_USER_EMAIL=$(az keyvault secret show --vault-name "kv-ytsumm-prd-ci" --name "auth0-user-test-email" --query "value" -o tsv)
             AUTH0_USER_PASSWORD=$(az keyvault secret show --vault-name "kv-ytsumm-prd-ci" --name "auth0-user-test-password" --query "value" -o tsv)
+            API_KEY=$(az keyvault secret show --vault-name "kv-ytsumm-prd-ci" --name "api-key" --query "value" -o tsv)
 
             # Export to GitHub Actions environment
             echo "AUTH0_ADMIN_TEST_EMAIL=$AUTH0_ADMIN_EMAIL" >> $GITHUB_ENV
@@ -94,6 +95,8 @@ jobs:
             echo "AUTH0_USER_TEST_EMAIL=$AUTH0_USER_EMAIL" >> $GITHUB_ENV
             echo "::add-mask::$AUTH0_USER_PASSWORD"
             echo "AUTH0_USER_TEST_PASSWORD=$AUTH0_USER_PASSWORD" >> $GITHUB_ENV
+            echo "::add-mask::$API_KEY"
+            echo "YT_SUMMARIZER_API_KEY=$API_KEY" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: AshleyHollis/shared-infra/.github/actions/setup-node@v1
@@ -151,6 +154,8 @@ jobs:
           # auth.setup.ts did not run or did not produce playwright/.auth/user.json.
           AUTH0_TEST_EMAIL: ${{ env.AUTH0_USER_TEST_EMAIL }}
           AUTH0_TEST_PASSWORD: ${{ env.AUTH0_USER_TEST_PASSWORD }}
+          # API key for synthesis-api tests — allows direct API auth without session cookies
+          YT_SUMMARIZER_API_KEY: ${{ env.YT_SUMMARIZER_API_KEY }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
