@@ -145,6 +145,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
     let existingVideoId: string | null = null;
 
     test.beforeAll(async ({ browser }) => {
+      // Extend timeout: navigation (60s) + waitForVideoCompletion (120s) + overhead
+      test.setTimeout(360_000);
+
       // Submit a video once and reuse for subsequent tests
       const page = await browser.newPage();
       await page.goto('/submit');
@@ -299,6 +302,8 @@ test.describe('User Story 1: Video Submission Flow', () => {
     test.skip(() => !LIVE_PROCESSING, 'Requires live video processing for auto-refresh test');
 
     test('page auto-refreshes during processing', async ({ page }) => {
+      // Navigation + processing can exceed default 180s — triple the timeout
+      test.slow();
       // Set up API call tracking BEFORE any navigation so we capture all
       // requests, including those fired immediately on page load.
       // Note: actual API uses /api/v1/library/videos/ path
@@ -339,6 +344,8 @@ test.describe('Reprocessing Flow', () => {
   test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
 
   test('can reprocess an existing video', async ({ page }) => {
+    // Navigation + waitForVideoCompletion can exceed default 180s — triple the timeout
+    test.slow();
     // First submit a video
     await page.goto('/submit');
     const urlInput = page.getByLabel(/YouTube Video URL/i);
