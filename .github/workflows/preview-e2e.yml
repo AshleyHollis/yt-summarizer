@@ -47,11 +47,11 @@ on:
 env:
   NODE_VERSION: "22"
 
-# Ensure only one E2E run against a given PR at a time.
-# The e2e-full-diagnostic workflow uses the same group key so it queues
-# rather than conflicting with a regular preview-e2e run.
+# Use the same concurrency group as the preview deployment workflow so that
+# manual E2E runs queue behind any in-progress deployment rather than
+# testing a partially-deployed environment.
 concurrency:
-  group: e2e-preview-${{ inputs.pr_number || github.run_id }}
+  group: preview-${{ inputs.pr_number || github.run_id }}
   cancel-in-progress: false
 
 jobs:

@@ -36,9 +36,9 @@ on:
 env:
   NODE_VERSION: "22"
 
-# Same group as preview-e2e.yml — queues instead of conflicting
+# Same group as preview.yml — queues behind any in-progress deployment
 concurrency:
-  group: e2e-preview-${{ inputs.pr_number || github.run_id }}
+  group: preview-${{ inputs.pr_number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
