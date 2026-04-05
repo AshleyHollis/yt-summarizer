@@ -16,7 +16,8 @@ import { test, expect, Page } from '@playwright/test';
 
 // Test configuration
 const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-const PROCESSING_TIMEOUT = 300_000; // 5 minutes — DeepSeek-V3.2 in CI can be slow
+const PROCESSING_TIMEOUT = 480_000; // 8 minutes — matches global-setup MAX_WAIT_TIME_MS
+const API_URL = process.env.API_URL || 'http://localhost:8000';
 
 // Check if live processing tests should run (requires real AI services)
 const LIVE_PROCESSING = process.env.LIVE_PROCESSING === 'true';
@@ -103,8 +104,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
     });
 
     test('completed video displays transcript and summary', async ({ page }) => {
-      // Processing can take >2min with DeepSeek-V3.2 — triple the timeout
-      test.slow();
+      // Processing can take >7min with DeepSeek-V3.2 — set explicit timeout
+      // 60s (nav) + 480s (processing) + 120s (buffer) = 660s
+      test.setTimeout(660_000);
       // First submit a video
       await page.goto('/submit');
       const urlInput = page.getByLabel(/YouTube Video URL/i);
@@ -147,8 +149,8 @@ test.describe('User Story 1: Video Submission Flow', () => {
     let existingVideoId: string | null = null;
 
     test.beforeAll(async ({ browser }) => {
-      // 60s (nav) + 300s (processing) + 60s buffer = 420s
-      test.setTimeout(420_000);
+      // 60s (nav) + 480s (processing) + 120s (buffer) = 660s
+      test.setTimeout(660_000);
 
       // Submit a video once and reuse for subsequent tests
       const page = await browser.newPage();
@@ -347,8 +349,9 @@ test.describe('Reprocessing Flow', () => {
   test.skip(() => !LIVE_PROCESSING, 'Requires live AI processing - run with LIVE_PROCESSING=true');
 
   test('can reprocess an existing video', async ({ page }) => {
-    // Navigation + waitForVideoCompletion can exceed default 180s — triple the timeout
-    test.slow();
+    // Navigation + waitForVideoCompletion can exceed default 180s — set explicit timeout
+    // 60s (nav) + 480s (processing) + 120s (buffer) = 660s
+    test.setTimeout(660_000);
     // First submit a video
     await page.goto('/submit');
     const urlInput = page.getByLabel(/YouTube Video URL/i);
@@ -379,18 +382,46 @@ test.describe('Reprocessing Flow', () => {
 });
 
 /**
- * Helper: Wait for video processing to complete
+ * Helper: Wait for video processing to complete.
+ * Polls the progress API directly (same approach as global-setup) for fast,
+ * reliable status checks. Falls back to UI polling if video ID is not in URL.
  */
 async function waitForVideoCompletion(page: Page, timeout: number): Promise<void> {
-  const startTime = Date.now();
+  const videoIdMatch = page.url().match(/\/(?:videos|library)\/([a-f0-9-]{36})/);
 
+  if (videoIdMatch) {
+    const videoId = videoIdMatch[1];
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const response = await page.request.get(`${API_URL}/api/v1/jobs/video/${videoId}/progress`);
+        if (response.ok()) {
+          const data = await response.json();
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          console.log(
+            `  📡 [${elapsed}s] Video ${videoId}: status=${data.status}, stage=${data.current_stage || '-'}`
+          );
+          if (data.status === 'completed') return;
+          if (['failed', 'dead_lettered'].includes(data.status)) {
+            throw new Error(`Video processing failed with status: ${data.status}`);
+          }
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.includes('failed with status')) throw e;
+      }
+      await page.waitForTimeout(5000);
+    }
+    throw new Error(`Video processing did not complete within ${timeout / 1000}s`);
+  }
+
+  // Fallback: UI polling when video ID is not available in URL
+  const startTime = Date.now();
   while (Date.now() - startTime < timeout) {
-    // Check for completion indicators
     const completedText = page.getByText(/completed/i);
     const summarySection = page.locator('section, div').filter({ hasText: /summary/i });
     const transcriptSection = page.locator('section, div').filter({ hasText: /transcript/i });
 
-    // Check if any completion indicator is visible
     const isCompleted = await Promise.race([
       completedText
         .first()
@@ -406,11 +437,8 @@ async function waitForVideoCompletion(page: Page, timeout: number): Promise<void
         .catch(() => false),
     ]);
 
-    if (isCompleted) {
-      return;
-    }
+    if (isCompleted) return;
 
-    // Check for error state
     const errorText = page.getByText(/failed|error/i);
     if (
       await errorText
@@ -421,7 +449,6 @@ async function waitForVideoCompletion(page: Page, timeout: number): Promise<void
       throw new Error('Video processing failed');
     }
 
-    // Wait before next check (page auto-refreshes, but we poll status)
     await page.waitForTimeout(3000);
   }
 
