@@ -71,6 +71,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     try {
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        undefined,
         { timeout: 30_000 }
       );
       const videoUrl = page.url();

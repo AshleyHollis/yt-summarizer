@@ -251,6 +251,7 @@ test.describe('Video Submission (Requires Backend)', () => {
     // setTimeout in SmartUrlInput fires after the API resolves.
     await page.waitForFunction(
       () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
+      undefined,
       { timeout: 90_000 }
     );
     await expect(page).toHaveURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/);
@@ -274,6 +275,7 @@ test.describe('Video Submission (Requires Backend)', () => {
     // Allow 60s — under load the API can be slow to respond.
     await page.waitForFunction(
       () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
+      undefined,
       { timeout: 60_000 }
     );
 

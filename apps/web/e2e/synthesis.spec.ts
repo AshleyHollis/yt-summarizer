@@ -99,7 +99,7 @@ test.describe('US6: Synthesis Feature UI', () => {
       await page.waitForTimeout(2000);
 
       // Should have no critical console errors
-      expect(errors.length).toBe(0);
+      expect(errors, `Critical console errors on /library:\n${errors.join('\n')}`).toHaveLength(0);
     });
 
     test('chat interface is accessible on library page', async ({ page }) => {

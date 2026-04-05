@@ -39,7 +39,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
     test('admin user sees admin link in navigation', async ({ browser }) => {
       const context = await browser.newContext({
-        storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        storageState: path.join(__dirname, '../playwright/.auth/admin.json'),
         baseURL: BASE_URL,
       });
 
@@ -66,7 +66,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
     test('admin link is styled with purple color scheme', async ({ browser }) => {
       const context = await browser.newContext({
-        storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        storageState: path.join(__dirname, '../playwright/.auth/admin.json'),
         baseURL: BASE_URL,
       });
 
@@ -95,7 +95,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
     test('admin link appears between standard links and user profile', async ({ browser }) => {
       const context = await browser.newContext({
-        storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        storageState: path.join(__dirname, '../playwright/.auth/admin.json'),
         baseURL: BASE_URL,
       });
 
@@ -123,7 +123,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
     test('admin link highlights when on admin page', async ({ browser }) => {
       const context = await browser.newContext({
-        storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+        storageState: path.join(__dirname, '../playwright/.auth/admin.json'),
         baseURL: BASE_URL,
       });
 

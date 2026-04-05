@@ -29,6 +29,13 @@ test.describe('US6: Synthesis API Integration', () => {
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
+  // All requests to the synthesis/coverage endpoints require the API key
+  test.use({
+    extraHTTPHeaders: {
+      'X-API-Key': process.env.YT_SUMMARIZER_API_KEY || '',
+    },
+  });
+
   test.describe('Learning Path Generation', () => {
     test('generates learning path with sufficient videos', async ({ request }) => {
       // Use a broad query to match multiple test videos (Python OOP and fitness)

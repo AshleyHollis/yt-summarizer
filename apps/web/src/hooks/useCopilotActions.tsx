@@ -15,10 +15,10 @@
  * - Copilot Readable: Context provided to the agent (scope, current video)
  */
 
-import { useCopilotReadable } from "@copilotkit/react-core";
-import { useScope, useAISettings } from "@/app/providers";
-import { useCallback } from "react";
-import { getClientApiUrl } from "@/services/runtimeConfig";
+import { useCopilotReadable } from '@copilotkit/react-core';
+import { useScope, useAISettings } from '@/app/providers';
+import { useCallback } from 'react';
+import { getClientApiUrl } from '@/services/runtimeConfig';
 
 // Modular hooks
 import { useFrontendTools } from './useFrontendTools';
@@ -35,7 +35,7 @@ export type {
 } from '@/types/copilot-types';
 
 // Re-export utils
-export { formatTime } from "./copilot-utils";
+export { formatTime } from './copilot-utils';
 
 /**
  * Main hook to register all Copilot actions.
@@ -102,8 +102,9 @@ export function useCoverage() {
 
   const fetchCoverage = useCallback(async () => {
     const response = await fetch(`${apiUrl}/api/v1/copilot/coverage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ scope }),
     });
 

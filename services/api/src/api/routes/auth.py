@@ -309,6 +309,20 @@ async def auth0_callback(
         )
 
     user_info = await _fetch_user_info(access_token, auth.domain)
+
+    # Merge custom claims from ID token — Auth0's /userinfo endpoint does NOT
+    # return namespaced claims (e.g. https://yt-summarizer.com/role) because
+    # those are added by an Auth0 Action to the ID token only.
+    id_token = token_data.get("id_token")
+    if id_token:
+        try:
+            id_token_payload = json.loads(_b64decode(id_token.split(".")[1]))
+            for key, value in id_token_payload.items():
+                if key not in user_info:
+                    user_info[key] = value
+        except Exception:
+            pass  # Don't fail login if ID token decoding fails
+
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=auth.session_ttl_seconds)
 
     session_data = SessionData(

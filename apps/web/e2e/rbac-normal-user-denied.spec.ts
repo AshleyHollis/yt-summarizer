@@ -57,12 +57,8 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
         // Try to access admin page
         await page.goto('/admin');
 
-        // Should redirect to access-denied page
-        // (This will only work if the authenticated user is NOT an admin)
-        await page.waitForURL(
-          (url) => url.pathname.includes('/forbidden') || url.pathname.includes('/admin'),
-          { timeout: 10000 }
-        );
+        // Wait for the redirect to /forbidden — useEffect fires after initial render
+        await page.waitForURL('**/forbidden', { timeout: 15000 }).catch(() => {});
 
         const currentUrl = page.url();
 
@@ -274,13 +270,8 @@ test.describe('Normal User Denied Admin Access @auth @rbac', () => {
         try {
           await page.goto(route);
 
-          await page.waitForURL(
-            (url) =>
-              url.pathname.includes('/forbidden') ||
-              url.pathname.includes('/admin') ||
-              url.pathname.includes('/404'),
-            { timeout: 10000 }
-          );
+          // Wait for redirect to /forbidden — don't accept /admin as a valid result
+          await page.waitForURL('**/forbidden', { timeout: 15000 }).catch(() => {});
 
           const currentUrl = page.url();
 
