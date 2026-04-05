@@ -78,6 +78,11 @@ spec:
                 secretKeyRef:
                   name: auth0-credentials
                   key: session-secret
+            - name: AUTH0_AUDIENCE
+              valueFrom:
+                configMapKeyRef:
+                  name: yt-summarizer-config
+                  key: AUTH0_AUDIENCE
             - name: PROXY_ENABLED
               value: "true"
             - name: PROXY_USERNAME
