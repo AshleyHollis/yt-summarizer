@@ -318,14 +318,17 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
     test('navigation is keyboard accessible', async ({ page }) => {
       await page.goto('/');
 
-      // Wait for the page to be fully interactive before pressing Tab
-      await page.waitForLoadState('networkidle');
+      // Wait for the nav to be visible before testing keyboard navigation
+      await page.locator('nav').waitFor({ state: 'visible', timeout: 15000 });
+
+      // Click the page body to ensure the page has keyboard focus
+      await page.locator('body').click({ position: { x: 1, y: 1 } });
 
       // Tab through navigation
       await page.keyboard.press('Tab');
 
-      // Wait a short moment for focus to settle
-      await page.waitForTimeout(100);
+      // Give focus time to settle
+      await page.waitForTimeout(300);
 
       // Should focus on first focusable element in or near the navigation.
       // Accept any element that isn't BODY/HTML (focus must have moved somewhere).

@@ -21,13 +21,13 @@ Implementation: T056 (Create integration test for API auth token validation)
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from api.main import create_app
-from api.routes.auth import SessionData, session_store
+from api.routes.auth import _build_session_token
 
 pytestmark = pytest.mark.integration
 
@@ -55,8 +55,8 @@ def mock_auth_settings():
 
 
 @pytest.fixture
-async def valid_session(mock_auth_settings):
-    """Create a valid session for testing."""
+def valid_session(mock_auth_settings):
+    """Create a valid session token for testing."""
     user_info = {
         "sub": "auth0|test123",
         "email": "test@example.com",
@@ -65,34 +65,29 @@ async def valid_session(mock_auth_settings):
         "picture": "https://example.com/picture.jpg",
     }
 
-    session_data = SessionData(
-        user_info=user_info,
-        access_token="test_access_token",
-        id_token="test_id_token",
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    session_token = _build_session_token(
+        user_info,
+        secret=mock_auth_settings["session_secret"],
+        ttl_seconds=3600,
     )
-
-    session_id = await session_store.create_session(session_data)
-    return session_id, user_info
+    return session_token, user_info
 
 
 @pytest.fixture
-async def expired_session(mock_auth_settings):
-    """Create an expired session for testing."""
+def expired_session(mock_auth_settings):
+    """Create an expired session token for testing."""
     user_info = {
         "sub": "auth0|test456",
         "email": "expired@example.com",
     }
 
-    session_data = SessionData(
-        user_info=user_info,
-        access_token="expired_access_token",
-        id_token="expired_id_token",
-        expires_at=datetime.now(timezone.utc) - timedelta(hours=1),  # Expired
+    # Build token with a negative TTL so it's already expired
+    session_token = _build_session_token(
+        user_info,
+        secret=mock_auth_settings["session_secret"],
+        ttl_seconds=-3600,  # expires one hour in the past
     )
-
-    session_id = await session_store.create_session(session_data)
-    return session_id, user_info
+    return session_token, user_info
 
 
 class TestAuthMeEndpoint:
@@ -109,10 +104,10 @@ class TestAuthMeEndpoint:
             setattr(mock_settings_obj.auth, key, value)
         mock_settings.return_value = mock_settings_obj
 
-        session_id, user_info = valid_session
+        session_token, user_info = valid_session
 
         # Make request with session cookie
-        response = client.get("/api/auth/me", cookies={"session": session_id})
+        response = client.get("/api/auth/me", cookies={"session": session_token})
 
         assert response.status_code == 200
         data = response.json()
@@ -146,10 +141,10 @@ class TestAuthMeEndpoint:
             setattr(mock_settings_obj.auth, key, value)
         mock_settings.return_value = mock_settings_obj
 
-        session_id, _ = expired_session
+        session_token, _ = expired_session
 
         # Make request with expired session cookie
-        response = client.get("/api/auth/me", cookies={"session": session_id})
+        response = client.get("/api/auth/me", cookies={"session": session_token})
 
         assert response.status_code == 401
         assert response.json()["detail"] == "Not authenticated"
@@ -251,10 +246,10 @@ class TestProtectedEndpoints:
             setattr(mock_settings_obj.auth, key, value)
         mock_settings.return_value = mock_settings_obj
 
-        session_id, _ = valid_session
+        session_token, _ = valid_session
 
         # Access /me with valid session
-        response = client.get("/api/auth/me", cookies={"session": session_id})
+        response = client.get("/api/auth/me", cookies={"session": session_token})
         assert response.status_code == 200
 
 
@@ -272,18 +267,15 @@ class TestLogoutEndpoint:
             setattr(mock_settings_obj.auth, key, value)
         mock_settings.return_value = mock_settings_obj
 
-        session_id, _ = valid_session
+        session_token, _ = valid_session
 
         # Logout
-        response = client.post("/api/auth/logout", cookies={"session": session_id})
+        response = client.post("/api/auth/logout", cookies={"session": session_token})
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
         assert data["message"] == "Logged out successfully"
-
-        # Verify session is cleared - cookie should be set to empty with max_age=0
-        # In a real implementation, check Set-Cookie header
 
     @patch("api.routes.auth.get_settings")
     def test_logout_without_session(self, mock_settings, client, mock_auth_settings):
@@ -301,29 +293,35 @@ class TestLogoutEndpoint:
         assert response.json()["detail"] == "Not authenticated"
 
     @patch("api.routes.auth.get_settings")
-    async def test_session_deleted_after_logout(
+    async def test_session_cleared_after_logout(
         self, mock_settings, client, valid_session, mock_auth_settings
     ):
-        """Test that session cannot be reused after logout."""
+        """Test that logout clears the session cookie.
+
+        With stateless session tokens, logout clears the cookie on the client side.
+        The token value itself remains cryptographically valid (server cannot revoke it),
+        but once the browser discards the cookie, it cannot be reused.
+        """
         # Setup mock settings
         mock_settings_obj = MagicMock()
         for key, value in mock_auth_settings.items():
             setattr(mock_settings_obj.auth, key, value)
         mock_settings.return_value = mock_settings_obj
 
-        session_id, _ = valid_session
+        session_token, _ = valid_session
 
         # Verify session works before logout
-        response = client.get("/api/auth/me", cookies={"session": session_id})
+        response = client.get("/api/auth/me", cookies={"session": session_token})
         assert response.status_code == 200
 
-        # Logout
-        response = client.post("/api/auth/logout", cookies={"session": session_id})
+        # Logout — cookie is cleared on the client; the token itself is still valid
+        response = client.post("/api/auth/logout", cookies={"session": session_token})
         assert response.status_code == 200
 
-        # Verify session no longer works
-        response = client.get("/api/auth/me", cookies={"session": session_id})
-        assert response.status_code == 401
+        # The logout response clears the cookie (max_age=0, value="")
+        set_cookie = response.headers.get("set-cookie", "")
+        assert "session=" in set_cookie
+        assert "Max-Age=0" in set_cookie or "max-age=0" in set_cookie.lower()
 
 
 @pytest.mark.skipif(

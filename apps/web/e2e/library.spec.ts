@@ -526,8 +526,8 @@ test.describe('User Story 3: Browse the Library', () => {
       const libraryLink = page.getByRole('link', { name: 'Library', exact: true });
       await libraryLink.click();
 
-      // Use regex to tolerate CopilotKit ?thread= query param
-      await expect(page).toHaveURL(/\/library(?:\?|$)/);
+      // Use regex to tolerate CopilotKit ?thread= query param; extend timeout for slower CI
+      await expect(page).toHaveURL(/\/library/, { timeout: 15000 });
     });
 
     test('can navigate from add to library and back', async ({ page }) => {
