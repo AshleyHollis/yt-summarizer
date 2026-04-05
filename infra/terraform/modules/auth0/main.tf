@@ -253,6 +253,10 @@ resource "auth0_resource_server" "api" {
   identifier           = var.api_identifier
   signing_alg          = "RS256"
   allow_offline_access = true
+  # Skip OAuth2 consent screen for first-party clients (same Auth0 tenant).
+  # Required when AUTH0_AUDIENCE is set so login flows don't get blocked by
+  # a consent prompt that Playwright (and end users) would not expect.
+  skip_consent_for_verifiable_first_party_clients = true
 }
 
 # T010: Test users
