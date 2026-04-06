@@ -117,8 +117,12 @@ async def check_copilot_quota(
 
     Returns the authenticated user if under quota.
     Raises 429 if over quota.
-    Admin users bypass quota checks.
+    Admin users and API key users bypass quota checks.
     """
+    # API key users (programmatic access, e.g., E2E tests, MCP servers) bypass quota
+    if user.sub == "api-key":
+        return user
+
     db_user = await get_or_create_user(session, user)
     limit = get_quota_limit(db_user.quota_tier, "copilot_query")
 
