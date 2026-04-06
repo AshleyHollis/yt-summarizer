@@ -1,0 +1,15 @@
+# =============================================================================
+# Preview Namespace
+# =============================================================================
+# Placeholder - Argo CD ApplicationSet creates the actual namespace
+# Name pattern: preview-pr-<number>
+apiVersion: v1
+kind: Namespace
+metadata:
+  # This is a placeholder - ApplicationSet overrides with preview-pr-{{number}}
+  name: preview-placeholder
+  labels:
+    environment: preview
+    app.kubernetes.io/part-of: yt-summarizer
+  annotations:
+    preview.yt-summarizer.dev/created-by: argocd-applicationset
