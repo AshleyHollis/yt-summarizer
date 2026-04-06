@@ -300,6 +300,12 @@ test.describe('User Story 3: Browse the Library', () => {
   });
 
   test.describe('Video Detail from Library', () => {
+    // Force user.json for both chromium and chromium-admin — these tests make direct API
+    // calls (request fixture) and browser page calls that behave consistently with user
+    // auth. Admin sessions can return different API responses or have expired role claims
+    // causing failures that don't reproduce on the chromium (user) project.
+    test.use({ storageState: 'playwright/.auth/user.json' });
+
     let videoId: string | null = null;
 
     test.beforeAll(async ({ request }) => {
@@ -553,6 +559,10 @@ test.describe('User Story 3: Browse the Library', () => {
      *
      * This caused 404 errors when fetching summaries from blob storage.
      */
+
+    // Force user.json for both chromium and chromium-admin — same reasoning as
+    // Video Detail from Library above.
+    test.use({ storageState: 'playwright/.auth/user.json' });
 
     test('completed video API returns summary content', async ({ request }) => {
       // Get a completed video from the library

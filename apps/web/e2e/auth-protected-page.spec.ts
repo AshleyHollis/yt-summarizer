@@ -223,10 +223,14 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
     test('navigation links work correctly', async ({ page }) => {
       await page.goto('/');
 
-      // Click Add link
-      const addLink = page.getByRole('link', { name: /add/i }).first();
+      // Use exact match scoped to the navbar to avoid matching hero-section CTA links.
+      // The /add/i regex can also match "Add Content →" on the hero, which sometimes
+      // triggers CopilotKit-aware navigation leading back to '/'.
+      const addLink = page.locator('nav').getByRole('link', { name: 'Add', exact: true });
+      await expect(addLink).toBeVisible({ timeout: 10000 });
       await addLink.click();
-      await expect(page).toHaveURL('/add');
+      // Use waitForURL with regex to tolerate CopilotKit's ?thread= query parameter
+      await page.waitForURL(/\/add/, { timeout: 15000 });
 
       // Go back home
       await page.goto('/');
@@ -234,7 +238,8 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       // Click Library link (exact match to avoid matching "Browse Library →" on home page)
       const libraryLink = page.getByRole('link', { name: 'Library', exact: true });
       await libraryLink.click();
-      await expect(page).toHaveURL('/library');
+      // Tolerate CopilotKit ?thread= param
+      await page.waitForURL(/\/library/, { timeout: 15000 });
     });
   });
 
