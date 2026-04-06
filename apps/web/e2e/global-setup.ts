@@ -262,6 +262,10 @@ const ALL_TEST_VIDEOS = [
 // 15 videos (6 Python OOP + 4 fitness/kettlebell + 5 JS async) with typical processing yields ~50-70 segments
 // This prevents E2E test timeout while still ensuring content is indexed
 const MIN_SEGMENTS_REQUIRED = 30;
+// Minimum number of videos with processing_status='completed' in the DB.
+// The embed worker indexes segments BEFORE the relationships worker sets processing_status='completed'.
+// Without this check, global-setup can declare "ready" while library API still returns 0 completed videos.
+const MIN_COMPLETED_VIDEOS = 1;
 // Maximum wait time for video processing (8 minutes)
 const MAX_WAIT_TIME_MS = 8 * 60 * 1000;
 // Polling interval
@@ -344,7 +348,10 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
       `[global-setup] │ [${elapsed}s] ✓${completed} ⚙${processing} ⏳${pending} ✗${failed} ${queueInfo}`
     );
 
-    // Check completion via coverage endpoint
+    // Check completion via coverage endpoint + DB-backed library API.
+    // Coverage endpoint reads the vector store (segments indexed after Embed step).
+    // Library API reads the DB processing_status (set to 'completed' by the Relationships step).
+    // Both must pass to avoid declaring "ready" before DB status is updated.
     try {
       const coverageResponse = await fetch(`${API_URL}/api/v1/copilot/coverage`, {
         method: 'POST',
@@ -357,24 +364,40 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
         const segments = coverage.segmentCount || 0;
 
         if (segments >= MIN_SEGMENTS_REQUIRED) {
-          console.log(
-            '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+          // Also verify the DB has at least MIN_COMPLETED_VIDEOS with processing_status='completed'.
+          // This guards against the embed→relationships pipeline gap where segments exist
+          // but processing_status hasn't been updated yet.
+          const libraryResponse = await fetch(
+            `${API_URL}/api/v1/library/videos?status=completed&page_size=1`
           );
-          console.log(
-            `[global-setup] ✓ Ready! ${segments} segments indexed, ${completed} videos completed`
-          );
+          const dbCompletedCount = libraryResponse.ok
+            ? ((await libraryResponse.json()).total_count ?? 0)
+            : 0;
 
-          // Log final processing stats
-          console.log('\n[global-setup] Processing Summary:');
-          for (const progress of progressList) {
-            if (progress.status === 'completed') {
-              console.log(
-                `  ✓ ${progress.id.slice(0, 8)}... wait=${formatTime(progress.waitSeconds)} proc=${formatTime(progress.processingSeconds)}`
-              );
+          if (dbCompletedCount >= MIN_COMPLETED_VIDEOS) {
+            console.log(
+              '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+            );
+            console.log(
+              `[global-setup] ✓ Ready! ${segments} segments indexed, ${dbCompletedCount} DB-completed videos`
+            );
+
+            // Log final processing stats
+            console.log('\n[global-setup] Processing Summary:');
+            for (const progress of progressList) {
+              if (progress.status === 'completed') {
+                console.log(
+                  `  ✓ ${progress.id.slice(0, 8)}... wait=${formatTime(progress.waitSeconds)} proc=${formatTime(progress.processingSeconds)}`
+                );
+              }
             }
-          }
 
-          return true;
+            return true;
+          } else {
+            console.log(
+              `[global-setup] Segments ready (${segments}) but DB-completed videos: ${dbCompletedCount}/${MIN_COMPLETED_VIDEOS} — waiting for relationships worker...`
+            );
+          }
         }
       }
     } catch {
@@ -415,13 +438,33 @@ async function waitForVideoProcessing(): Promise<boolean> {
         const segments = coverage.segmentCount || 0;
         const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-        console.log(
-          `[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments (${elapsed}s elapsed)`
-        );
-
         if (segments >= MIN_SEGMENTS_REQUIRED) {
-          console.log(`[global-setup] ✓ Ready! ${segments} segments indexed`);
-          return true;
+          // Also verify the DB has at least MIN_COMPLETED_VIDEOS with processing_status='completed'.
+          const libraryResponse = await fetch(
+            `${API_URL}/api/v1/library/videos?status=completed&page_size=1`
+          );
+          const dbCompletedCount = libraryResponse.ok
+            ? ((await libraryResponse.json()).total_count ?? 0)
+            : 0;
+
+          console.log(
+            `[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments, ${dbCompletedCount} DB-completed (${elapsed}s elapsed)`
+          );
+
+          if (dbCompletedCount >= MIN_COMPLETED_VIDEOS) {
+            console.log(
+              `[global-setup] ✓ Ready! ${segments} segments indexed, ${dbCompletedCount} DB-completed videos`
+            );
+            return true;
+          } else {
+            console.log(
+              `[global-setup] Segments ready but DB-completed videos: ${dbCompletedCount}/${MIN_COMPLETED_VIDEOS} — waiting for relationships worker...`
+            );
+          }
+        } else {
+          console.log(
+            `[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments (${elapsed}s elapsed)`
+          );
         }
       }
     } catch (error) {
@@ -538,7 +581,9 @@ async function globalSetup(_config: FullConfig) {
       if (deleteResp.ok) {
         const deleteData = await deleteResp.json();
         if (deleteData.deleted > 0) {
-          console.log(`[global-setup] Cleared ${deleteData.deleted} stale test video(s) before seeding`);
+          console.log(
+            `[global-setup] Cleared ${deleteData.deleted} stale test video(s) before seeding`
+          );
         }
       }
     } catch {

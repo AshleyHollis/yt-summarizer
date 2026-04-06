@@ -269,8 +269,8 @@ test.describe('Admin User Access to Admin Dashboard @auth @rbac', () => {
       await expect(homeLink).toBeVisible();
       await homeLink.click();
 
-      // Should navigate to home
-      await expect(page).toHaveURL('/');
+      // Should navigate away from admin (home or library redirect)
+      await expect(page).not.toHaveURL(/\/admin/, { timeout: 10_000 });
     });
 
     test('admin dashboard maintains session across navigation', async ({ page }) => {

@@ -275,16 +275,39 @@ export function getApiUrl(): string {
  */
 export async function getSeededVideoId(): Promise<string | null> {
   const API_URL = getApiUrl();
-  try {
-    const response = await fetch(`${API_URL}/api/v1/library/videos?page_size=1`);
-    if (!response.ok) return null;
-    const data = await response.json();
-    const videos = data.videos || data.items || [];
-    if (videos.length === 0) return null;
-    return videos[0].id || videos[0].video_id || null;
-  } catch {
-    return null;
+  const maxAttempts = 5;
+  const backoffMs = [5000, 10000, 20000, 30000];
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(`${API_URL}/api/v1/library/videos?status=completed&page_size=1`);
+      if (!response.ok) {
+        console.warn(`[getSeededVideoId] attempt ${attempt}: HTTP ${response.status}`);
+        if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, backoffMs[attempt - 1]));
+        continue;
+      }
+      const data = await response.json();
+      const videos = data.videos || data.items || [];
+      if (videos.length === 0) {
+        console.warn(`[getSeededVideoId] attempt ${attempt}: empty videos list`);
+        if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, backoffMs[attempt - 1]));
+        continue;
+      }
+      const videoId: string | null = videos[0].video_id || videos[0].id || null;
+      if (!videoId) {
+        console.warn(
+          `[getSeededVideoId] attempt ${attempt}: no video_id in response`,
+          JSON.stringify(videos[0])
+        );
+        if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, backoffMs[attempt - 1]));
+        continue;
+      }
+      return videoId;
+    } catch (err) {
+      console.warn(`[getSeededVideoId] attempt ${attempt}: fetch error`, err);
+      if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, backoffMs[attempt - 1]));
+    }
   }
+  return null;
 }
 
 /**
