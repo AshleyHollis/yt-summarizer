@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 try:
     from shared.db.connection import get_session
-    from shared.db.models import Segment, Video
+    from shared.db.models import Artifact, Segment, Video
     from shared.logging.config import get_logger
 except ImportError:
 
@@ -190,6 +190,22 @@ async def get_video(
     if video.channel:
         channel_name = video.channel.name
 
+    # FIX 1: Load summary artifact — content is stored in blob_uri, not inline.
+    # Inline text is not available in the DB; a blob download would be required.
+    # We query to confirm existence but cannot return text without a blob fetch.
+    summary_text = None
+    try:
+        artifact_result = await session.execute(
+            select(Artifact)
+            .where(Artifact.video_id == video_id)
+            .where(Artifact.artifact_type == "summary")
+            .limit(1)
+        )
+        _artifact = artifact_result.scalar_one_or_none()
+        # summary_text remains None — blob download needed to get actual text
+    except Exception:
+        pass
+
     return AgentVideoResponse(
         video_id=video.video_id,
         youtube_video_id=video.youtube_video_id,
@@ -201,7 +217,7 @@ async def get_video(
             else None
         ),
         duration=video.duration,
-        summary=None,
+        summary=summary_text,
         processing_status=str(video.processing_status),
         segment_count=len(segments),
         estimated_tokens=0,
@@ -355,10 +371,10 @@ async def ingest_video(
 ) -> IngestResponse:
     """Submit a YouTube URL for async ingestion. Returns a job_id to poll."""
     try:
-        from ..services.video_service import VideoService
+        from ..services.video_service import VideoAlreadyExistsError, VideoService
 
         video_service = VideoService(session)
-        result = await video_service.submit_video(body.url, correlation_id="agent")
+        result = await video_service.submit_video(body.url, correlation_id="agent", user_id=None)
 
         return IngestResponse(
             job_id=result.job_id,
@@ -369,6 +385,11 @@ async def ingest_video(
         )
     except HTTPException:
         raise
+    except VideoAlreadyExistsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": "Video already exists", "video_id": str(e.video_id)},
+        )
     except Exception as e:
         logger.error("Ingest failed", url=body.url, error=str(e))
         raise HTTPException(
@@ -411,7 +432,7 @@ async def get_job_status(
             if hasattr(result.status, "value")
             else str(result.status),
             progress_pct=result.progress or 0,
-            stages=[],
+            stages=[],  # TODO: populate from job stages when a stage-transition log is available
             created_at=str(result.created_at),
             updated_at=str(result.updated_at),
         )

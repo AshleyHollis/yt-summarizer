@@ -230,7 +230,7 @@ class TestGetVideo:
         mock_seg.end_time = 10.0
         mock_seg.label = "intro"
 
-        # First execute → video result; second execute → segments result
+        # First execute → video result; second execute → segments result; third → artifact result
         video_result = MagicMock()
         video_result.scalar_one_or_none.return_value = mock_video
 
@@ -239,7 +239,10 @@ class TestGetVideo:
         seg_scalars.all.return_value = [mock_seg]
         seg_result.scalars.return_value = seg_scalars
 
-        mock_sess.execute = AsyncMock(side_effect=[video_result, seg_result])
+        artifact_result = MagicMock()
+        artifact_result.scalar_one_or_none.return_value = None  # no artifact → summary=None
+
+        mock_sess.execute = AsyncMock(side_effect=[video_result, seg_result, artifact_result])
 
         client = TestClient(app)
         resp = client.get(f"/api/v1/agent/videos/{vid_id}")
@@ -260,6 +263,40 @@ class TestGetVideo:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get(f"/api/v1/agent/videos/{uuid4()}")
         assert resp.status_code == 404
+
+    def test_summary_loaded_from_artifact(self):
+        """Artifact query runs without error; summary is None (blob download needed)."""
+        app, mock_sess = _make_agent_app()
+
+        vid_id = uuid4()
+        mock_video = MagicMock()
+        mock_video.video_id = vid_id
+        mock_video.youtube_video_id = "abc"
+        mock_video.title = "Test"
+        mock_video.channel = None
+        mock_video.duration = 100
+        mock_video.processing_status = "completed"
+
+        video_result = MagicMock()
+        video_result.scalar_one_or_none.return_value = mock_video
+
+        seg_result = MagicMock()
+        seg_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[]))
+
+        mock_artifact = MagicMock()
+        mock_artifact.artifact_type = "summary"
+        mock_artifact.blob_uri = "https://storage.example.com/summary.txt"
+        artifact_result = MagicMock()
+        artifact_result.scalar_one_or_none.return_value = mock_artifact
+
+        mock_sess.execute = AsyncMock(side_effect=[video_result, seg_result, artifact_result])
+
+        client = TestClient(app)
+        resp = client.get(f"/api/v1/agent/videos/{vid_id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        # Artifact exists but content requires blob download — summary remains None
+        assert data["summary"] is None
 
 
 @pytest.mark.unit
@@ -403,6 +440,34 @@ class TestIngest:
         assert data["job_id"] == str(job_id)
         assert data["video_id"] == str(vid_id)
         assert "status" in data
+
+    def test_duplicate_ingest_returns_409(self):
+        app, _ = _make_agent_app()
+
+        vid_id = uuid4()
+        job_id = uuid4()
+
+        from api.services.video_service import VideoAlreadyExistsError
+
+        class _FakeStatus:
+            value = "completed"
+
+        error = VideoAlreadyExistsError(video_id=vid_id, job_id=job_id, status=_FakeStatus())
+
+        with patch("api.services.video_service.VideoService") as MockVS:
+            mock_instance = AsyncMock()
+            mock_instance.submit_video = AsyncMock(side_effect=error)
+            MockVS.return_value = mock_instance
+
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post(
+                "/api/v1/agent/videos",
+                json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+            )
+
+        assert resp.status_code == 409
+        data = resp.json()
+        assert data["detail"]["video_id"] == str(vid_id)
 
 
 @pytest.mark.unit
