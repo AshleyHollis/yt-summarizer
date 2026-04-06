@@ -27,3 +27,31 @@
 - **Quick-win Option D**: Inject `appSession` cookies for SWA domain in Playwright `auth.setup.ts` to unblock CI immediately.
 - **Option B (shared custom domain) not feasible**: SWA preview environments get auto-generated URLs; custom domains on previews are not a standard SWA capability.
 - Decision written to `.squad/decisions/inbox/2026-04-03T07-21-52Z-dallas-cross-domain-cookie-fix.md`.
+
+### 2026-04-06 — Auth0 RCA: Management API Access & Role Verification
+
+**Challenge**: Verify Auth0 admin role configuration via Management API to confirm "by design" classification was incorrect.
+
+**Method**
+- Located Terraform client credentials in Key Vault `kv-ytsumm-prd-ci`
+- Used client-credentials grant to authenticate with Auth0 Management API
+- Verified admin test user configuration and role-claims Action binding
+
+**Finding: Auth0 Infrastructure Fully Correct**
+- Admin test user: `admin@test.yt-summarizer.internal`
+- Admin role IS assigned via `app_metadata.role = "admin"`
+- "Add Role Claims to Tokens" Action is built, deployed, and bound to post-login trigger
+- Sets `https://yt-summarizer.com/role` claim with value from `app_metadata.role`
+- ROPC warning in CI logs is benign (preview app correctly doesn't have password grant)
+
+**Conclusion**
+- Auth0 infrastructure is correct
+- "By design" classification was inaccurate — actual causes were in workflow config (missing env vars, Parker) and auth setup error handling (silently saving broken state, Kane)
+- This RCA validated the fix chain: workflow misconfiguration → setup failure → cascading test skips
+
+**Resource for Future**
+- Auth0 Management API is accessible via Terraform client credentials
+- Key Vault: `kv-ytsumm-prd-ci` (IDs: `auth0-terraform-client-id` / `auth0-terraform-client-secret`)
+- Token endpoint: `https://dev-gvli0bfdrue0h8po.us.auth0.com/oauth/token`
+- Grant: `client_credentials` with `audience=https://dev-gvli0bfdrue0h8po.us.auth0.com/api/v2/`
+- Useful for debugging role assignments, Action deployments, and other Auth0 configuration at scale

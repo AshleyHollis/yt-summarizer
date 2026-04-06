@@ -147,3 +147,41 @@
 - Tests should work without additional skip guards once infrastructure is healthy
 
 **Key Learning**: When asserting on CopilotKit message counts, verify the actual configuration in `apps/web/src/app/providers.tsx`. Don't assume there's a greeting unless `makeSystemMessage` or similar is configured. Always check if tests use fresh vs. accumulated context (look for `BrowserContext` creation in `beforeEach`).
+
+### 2026-04-06 — E2E Skip Audit (branch: test/e2e-env-verification, PR #186)
+
+**E2E Test Skip Analysis**
+- All 43 skips on branch `test/e2e-env-verification` are properly categorized with clear rationale:
+  - **By-design** (26): OAuth providers (Google/GitHub), Auth0 session expiry (24h timeout), RBAC/role guards
+  - **Data-conditional** (9): missing fixture data or test-specific prerequisites
+  - **LIVE_PROCESSING guards** (8): tests require the live processing server to be running
+- ✅ No bare stubs or undocumented skips remaining
+- Social login tests (Google/GitHub OAuth): skipped BY DESIGN with TODO comments — not feasible to automate without OAuth provider mocking/interception capability
+- Auth0 session expiry tests: skipped BY DESIGN — 24-hour timeout is not feasible in CI pipeline windows
+
+**Flaky Test Status**
+- `library.spec.ts:717` response time flakiness was already fixed on the branch: threshold raised from 3500ms → 10000ms
+- No action needed from this audit
+
+**Key Learning**: When auditing test skips/fixmes, categorize them by root cause rather than just counting. This reveals whether skips are technical debt to address or by-design trade-offs. In this case, all 43 skips are intentional and properly documented.
+
+### 2026-04-06 — Auth0 RCA: auth.setup.ts Hardening
+
+**Challenge**: Ashley questioned the "by design" classification of LIVE_PROCESSING and RBAC skips. Investigation revealed real bugs, not intended behavior.
+
+**Finding in auth.setup.ts**
+- Original code warned when admin role claim was absent from Auth0 session but still saved `admin.json`
+- Silently saving broken `admin.json` caused all RBAC tests to skip with misleading "no admin.json found" messages
+- This cascaded downstream failures that appeared "by design" but were actually setup failures
+
+**Fix Applied** (commit 3142afe8)
+- `auth.setup.ts` now throws (not warns) when admin role claim is absent
+- `admin.json` is only saved inside the role-confirmation branch
+- `catch` block re-throws instead of swallowing errors
+- Errors now surface immediately instead of silently corrupting state
+
+**Pattern for Future**
+- Guard storageState save inside role-confirmation branches
+- Never silently save partial or broken state — fail fast
+- Use strict validation for auth setup: throw on missing claims, don't warn
+- This prevents cascading failures downstream that look like "by design" skips

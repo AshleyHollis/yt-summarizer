@@ -59,3 +59,29 @@ and treat Auth0 redirect as a passing condition (the sign-in flow works — just
 ---
 
 *Older learnings archived to .squad/archive/agents/parker-history-archive.md*
+
+### 2026-04-06 — Auth0 RCA: Missing Env Vars + MAX_FAILURES Adjustment
+
+**Challenge**: Workflow appearing to skip LIVE_PROCESSING tests "by design" — found infrastructure misconfiguration instead.
+
+**Finding: preview.yml Env Var Drift**
+- `preview.yml` E2E job lacked `AUTH0_SECRET`, `AUTH0_BASE_URL`, `AUTH0_TEST_EMAIL`, `AUTH0_TEST_PASSWORD`
+- These were present in `preview-e2e.yml` but not mirrored to main preview step
+- When auth setup fails early, it generates 5+ quick failures → `maxFailures=5` aborts the run → LIVE_PROCESSING tests never execute
+- Appeared "by design" but was actually incomplete env var coverage
+
+**Fix Applied** (commit 3a09dbf5)
+- Added missing Auth0 env vars to `preview.yml` E2E step
+- LIVE_PROCESSING IS correctly forwarded through shared-infra composite action (confirmed via code trace)
+- Now auth setup succeeds and allows tests to proceed
+
+**MAX_FAILURES Adjustment** (pending commit)
+- Raised from 5 → 10 in preview E2E workflows
+- Rationale: LLM-based test generation causes non-deterministic flakes in setup phase
+- Allows transient errors to resolve naturally instead of aborting prematurely
+- 5 is too aggressive when dealing with generated tests; 10 better balances signal vs. tolerance
+
+**Pattern for Future**
+- Always cross-check both `preview.yml` and `preview-e2e.yml` for env var coverage when debugging E2E failures
+- MAX_FAILURES=5 is baseline too low for LIVE_PROCESSING runs; prefer 10+
+- When a workflow appears to skip tests "by design", check infrastructure setup first before assuming intentional behavior
