@@ -345,7 +345,7 @@ async def _generate_segment_labels(self, video_id: str) -> None:
 ```python
 def estimate_tokens(text: str) -> int:
     """Estimate token count using character heuristic (no tiktoken dependency).
-    
+
     Approximation: ~4 characters per token (cl100k_base average).
     Accuracy target: within ±20% of actual tokeniser count.
     """

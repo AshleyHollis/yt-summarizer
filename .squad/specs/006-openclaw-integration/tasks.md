@@ -38,7 +38,7 @@
 
 - [ ] Do: Add `require_api_key` function to `services/api/src/api/dependencies/auth.py`
   - Call `_check_api_key(request)` — this already reads `API_KEY` env var and checks `X-API-Key` header
-  - If result is `None`, raise `HTTPException(status_code=401, detail={"error": {"code": "UNAUTHORIZED", "message": "Valid X-API-Key header required"}})` 
+  - If result is `None`, raise `HTTPException(status_code=401, detail={"error": {"code": "UNAUTHORIZED", "message": "Valid X-API-Key header required"}})`
   - If result is an `AuthenticatedUser`, return it
   - This is strictly API-key-only — does NOT fall back to session cookie (unlike `require_auth`)
 - [ ] Verify: `cd services/api && uv run pytest tests/test_auth.py -x -q` exits 0
