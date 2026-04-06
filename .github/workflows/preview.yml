@@ -753,7 +753,7 @@ jobs:
         id: run-tests
         uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
         with:
-          playwright-args: "--reporter=html --max-failures=${{ inputs.max_failures || '5' }}"
+          playwright-args: "--reporter=html --max-failures=${{ inputs.max_failures || '10' }}"
         env:
           USE_EXTERNAL_SERVER: "true"
           BASE_URL: ${{ steps.base-url.outputs.base_url }}
