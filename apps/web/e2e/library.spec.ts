@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { getSeededVideoId } from './helpers';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
@@ -308,16 +309,8 @@ test.describe('User Story 3: Browse the Library', () => {
 
     let videoId: string | null = null;
 
-    test.beforeAll(async ({ request }) => {
-      // Get a video ID from the library
-      const response = await request.get(`${API_URL}/api/v1/library/videos?page_size=1`, {
-        headers: { 'X-Correlation-ID': 'e2e-test' },
-      });
-      const data = await response.json();
-
-      if (data.videos && data.videos.length > 0) {
-        videoId = data.videos[0].video_id;
-      }
+    test.beforeAll(async () => {
+      videoId = await getSeededVideoId();
     });
 
     test('video detail page loads from library', async ({ page }) => {
@@ -370,7 +363,7 @@ test.describe('User Story 3: Browse the Library', () => {
       }
     });
 
-    test('transcript tab loads content for completed videos', async ({ page, request }) => {
+    test('transcript tab loads content for completed videos', async ({ page }) => {
       /**
        * REGRESSION TEST: Transcript Tab Blob Path Loading
        *
@@ -384,24 +377,11 @@ test.describe('User Story 3: Browse the Library', () => {
        */
 
       // Get a completed video from the library
-      const listResponse = await request.get(
-        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
-        { headers: { 'X-Correlation-ID': 'e2e-transcript-tab-test' } }
-      );
-
-      if (!listResponse.ok()) {
-        test.skip(true, 'API unavailable — backend not running or unhealthy');
-        return;
-      }
-
-      const listData = await listResponse.json();
-
-      if (!listData.videos || listData.videos.length === 0) {
+      const completedVideoId = await getSeededVideoId();
+      if (!completedVideoId) {
         test.skip(true, 'No completed videos available in library');
         return;
       }
-
-      const completedVideoId = listData.videos[0].video_id;
 
       // Navigate to the video detail page
       await page.goto(`/library/${completedVideoId}`);
@@ -564,23 +544,17 @@ test.describe('User Story 3: Browse the Library', () => {
     // Video Detail from Library above.
     test.use({ storageState: 'playwright/.auth/user.json' });
 
+    let sharedVideoId: string | null = null;
+    test.beforeAll(async () => {
+      sharedVideoId = await getSeededVideoId();
+    });
+
     test('completed video API returns summary content', async ({ request }) => {
-      // Get a completed video from the library
-      const listResponse = await request.get(
-        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
-        { headers: { 'X-Correlation-ID': 'e2e-summary-test' } }
-      );
-
-      expect(listResponse.ok()).toBeTruthy();
-      const listData = await listResponse.json();
-
-      // Skip if no completed videos
-      if (!listData.videos || listData.videos.length === 0) {
+      const videoId = sharedVideoId;
+      if (!videoId) {
         test.skip(true, 'No completed videos available in library');
         return;
       }
-
-      const videoId = listData.videos[0].video_id;
 
       // Fetch video detail - this is where the blob path bug manifested
       const detailResponse = await request.get(`${API_URL}/api/v1/library/videos/${videoId}`, {
@@ -611,22 +585,11 @@ test.describe('User Story 3: Browse the Library', () => {
        * This was the root cause of "Failed to load transcript. Please try again." errors.
        */
 
-      // Get a completed video from the library
-      const listResponse = await request.get(
-        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
-        { headers: { 'X-Correlation-ID': 'e2e-transcript-api-test' } }
-      );
-
-      expect(listResponse.ok()).toBeTruthy();
-      const listData = await listResponse.json();
-
-      // Skip if no completed videos
-      if (!listData.videos || listData.videos.length === 0) {
+      const videoId = sharedVideoId;
+      if (!videoId) {
         test.skip(true, 'No completed videos available in library');
         return;
       }
-
-      const videoId = listData.videos[0].video_id;
 
       // Call the transcript endpoint directly - this is what the TranscriptViewer component uses
       const transcriptResponse = await request.get(
@@ -651,21 +614,12 @@ test.describe('User Story 3: Browse the Library', () => {
       expect(transcriptText.length).toBeGreaterThan(10);
     });
 
-    test('video detail page displays summary for completed videos', async ({ page, request }) => {
-      // Get a completed video
-      const listResponse = await request.get(
-        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
-        { headers: { 'X-Correlation-ID': 'e2e-summary-ui-test' } }
-      );
-
-      const listData = await listResponse.json();
-
-      if (!listData.videos || listData.videos.length === 0) {
+    test('video detail page displays summary for completed videos', async ({ page }) => {
+      const videoId = sharedVideoId;
+      if (!videoId) {
         test.skip(true, 'No completed videos available in library');
         return;
       }
-
-      const videoId = listData.videos[0].video_id;
 
       // Navigate to video detail page
       await page.goto(`/library/${videoId}`);
@@ -685,20 +639,11 @@ test.describe('User Story 3: Browse the Library', () => {
     });
 
     test('API response time for video detail is acceptable', async ({ request }) => {
-      // Get a completed video
-      const listResponse = await request.get(
-        `${API_URL}/api/v1/library/videos?status=completed&page_size=1`,
-        { headers: { 'X-Correlation-ID': 'e2e-perf-test' } }
-      );
-
-      const listData = await listResponse.json();
-
-      if (!listData.videos || listData.videos.length === 0) {
+      const videoId = sharedVideoId;
+      if (!videoId) {
         test.skip(true, 'No completed videos available in library');
         return;
       }
-
-      const videoId = listData.videos[0].video_id;
 
       // Warm-up request to avoid cold-start skewing the timing measurement
       // (First request to a cold pod can take 30+ seconds; subsequent requests are fast)
@@ -726,48 +671,39 @@ test.describe('User Story 3: Browse the Library', () => {
 
     test('summary artifact blob_uri format is valid', async ({ request }) => {
       // This test validates the blob URI format at the database level
-      const listResponse = await request.get(
-        `${API_URL}/api/v1/library/videos?status=completed&page_size=5`,
-        { headers: { 'X-Correlation-ID': 'e2e-blob-uri-test' } }
-      );
-
-      const listData = await listResponse.json();
-
-      if (!listData.videos || listData.videos.length === 0) {
+      const videoId = sharedVideoId;
+      if (!videoId) {
         test.skip(true, 'No completed videos available in library');
         return;
       }
 
-      for (const video of listData.videos) {
-        const detailResponse = await request.get(
-          `${API_URL}/api/v1/library/videos/${video.video_id}`,
-          { headers: { 'X-Correlation-ID': 'e2e-blob-uri-test' } }
-        );
+      const detailResponse = await request.get(`${API_URL}/api/v1/library/videos/${videoId}`, {
+        headers: { 'X-Correlation-ID': 'e2e-blob-uri-test' },
+      });
 
-        const detailData = await detailResponse.json();
+      const detailData = await detailResponse.json();
 
-        // If there's a summary artifact, validate the blob_uri contains video_id folder
-        if (detailData.summary_artifact?.blob_uri) {
-          const blobUri = detailData.summary_artifact.blob_uri;
+      // If there's a summary artifact, validate the blob_uri contains video_id folder
+      if (detailData.summary_artifact?.blob_uri) {
+        const blobUri = detailData.summary_artifact.blob_uri;
 
-          // The blob URI should include the video_id in the path
-          // Format: http://host/account/summaries/{video_id}/{youtube_id}_summary.md
-          expect(blobUri).toContain('/summaries/');
-          expect(blobUri).toContain('_summary.md');
+        // The blob URI should include the video_id in the path
+        // Format: http://host/account/summaries/{video_id}/{youtube_id}_summary.md
+        expect(blobUri).toContain('/summaries/');
+        expect(blobUri).toContain('_summary.md');
 
-          // Extract path after /summaries/
-          const pathMatch = blobUri.match(/\/summaries\/(.+)/);
-          expect(pathMatch).toBeTruthy();
+        // Extract path after /summaries/
+        const pathMatch = blobUri.match(/\/summaries\/(.+)/);
+        expect(pathMatch).toBeTruthy();
 
-          if (pathMatch) {
-            const blobPath = pathMatch[1];
-            // Should have format: {uuid}/{filename}
-            // The UUID should match the video_id
-            expect(blobPath).toContain('/');
-            const [folderPart] = blobPath.split('/');
-            // Folder should be a UUID (video_id)
-            expect(folderPart).toMatch(/^[a-f0-9-]{36}$/);
-          }
+        if (pathMatch) {
+          const blobPath = pathMatch[1];
+          // Should have format: {uuid}/{filename}
+          // The UUID should match the video_id
+          expect(blobPath).toContain('/');
+          const [folderPart] = blobPath.split('/');
+          // Folder should be a UUID (video_id)
+          expect(folderPart).toMatch(/^[a-f0-9-]{36}$/);
         }
       }
     });

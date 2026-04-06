@@ -36,7 +36,7 @@ test.describe('Processing History', () => {
     // Old videos may have been processed before history tracking was added,
     // so we verify the /history endpoint returns stages before picking a video.
     const listResponse = await request.get(
-      `${API_URL}/api/v1/library/videos?status=completed&page_size=10`
+      `${API_URL}/api/v1/library/videos?status=completed&page_size=50`
     );
     if (!listResponse.ok()) return;
 
