@@ -55,3 +55,41 @@
 - Token endpoint: `https://dev-gvli0bfdrue0h8po.us.auth0.com/oauth/token`
 - Grant: `client_credentials` with `audience=https://dev-gvli0bfdrue0h8po.us.auth0.com/api/v2/`
 - Useful for debugging role assignments, Action deployments, and other Auth0 configuration at scale
+
+### 2026-04-06 — E2E Failures RCA Round 2: Pipeline Status Chain & ROPC Dead Code
+
+**Challenge:** Categorize 32 E2E skips and verify database/Auth0 status. Ashley disputed the "by design" classification.
+
+**Method:** Full skip audit + database API verification + Auth0 Management API access
+
+**Key Findings**
+
+1. **Video processing pipeline is sequential with authority at each stage**
+   - Transcribe → Summarize → Embed (writes segments to vector store) → Relationships (sets `processing_status='completed'`)
+   - Coverage endpoint (`/copilot/coverage`) reads segments (Embed output)
+   - Library API (`/library?status=completed`) reads `processing_status` (Relationships output)
+   - Global-setup must check BOTH to guarantee all workers finished
+   - **DB Investigator's fix:** Added library API check alongside coverage check
+
+2. **Skip categorization (all 32 skips are justified)**
+   - ~15 data-conditional (FIXED by global-setup improvement)
+   - ~7 auth-role conditional (users must have roles in CI env)
+   - ~7 by-design (unfeasible without mocking/provider interception)
+
+3. **ROPC is dead code in preview**
+   - Auth0 preview app only has `authorization_code` grant (no password-realm)
+   - `injectAuth0Token()` in global-setup.ts always gets 403
+   - localStorage token written is ignored by Auth0 SDK (uses cookies, not localStorage)
+   - Decision: Flag for cleanup (no functional impact)
+
+4. **"❌ Video processing failed!" is UI monitoring, not fatal**
+   - From queue-progress.spec.ts line ~218 (test console.log when stalled)
+   - Test passes either way
+   - No fix needed
+
+5. **Preview API health: healthy baseline**
+   - Endpoint: `https://api-pr-186.yt-summarizer.apps.ashleyhollis.com`
+   - 18 videos total, 15 completed, 239 segments
+   - All workers running correctly
+
+**Key Learning:** When a worker pipeline has multiple completion signals, trace to the final stage to confirm all predecessors are done. Don't rely on intermediate signals (e.g., segment count from Embed worker) — verify the final worker's output (`processing_status` from Relationships). This prevents race conditions where later stages haven't finished yet.
