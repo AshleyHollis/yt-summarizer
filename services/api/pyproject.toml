@@ -94,3 +94,8 @@ DEP002 = ["azure", "opentelemetry"]  # Multi-package namespaces
 # Security scanner configuration
 exclude_dirs = ["tests", "test_.*", ".venv", "venv"]
 skips = ["B101"]  # Skip assert_used (used in tests)
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.13",
+]

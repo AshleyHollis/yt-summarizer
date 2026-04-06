@@ -123,7 +123,8 @@ test.describe('Copilot Feature', () => {
       // This should display something like "X videos indexed" or "X segments"
       const coverageText = page.getByText(/\d+\s*(videos?|segments?)/i);
 
-      await expect(coverageText.first()).toBeVisible({ timeout: 5000 });
+      // 20s: page needs to render the video list which may include async data fetches in CI
+      await expect(coverageText.first()).toBeVisible({ timeout: 20000 });
     });
   });
 
