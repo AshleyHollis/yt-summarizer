@@ -38,7 +38,9 @@ export default defineConfig({
   // Run tests in parallel - 6 workers on CI for better throughput. Tests are
   // well-isolated (each uses its own browser context; auth state is read-only;
   // creation/processing tests are gated behind LIVE_PROCESSING=true which is
-  // not set in CI). The submitQuery() fix ensures copilot concurrency is safe.
+  // NOT set in ci.yml (unit/build CI) but IS set in the preview E2E workflows
+  // (preview.yml / preview-e2e.yml)). The submitQuery() fix ensures copilot
+  // concurrency is safe.
   // At 6 workers the wall-clock time drops from ~34 min to ~23 min while
   // staying well under the 60-minute GitHub Actions limit.
   workers: process.env.CI ? 6 : undefined,

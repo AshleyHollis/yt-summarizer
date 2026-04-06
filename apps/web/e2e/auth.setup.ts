@@ -134,21 +134,24 @@ setup('authenticate as admin', async ({ page }) => {
     const roleInSession = sessionCheck.data?.user?.['https://yt-summarizer.com/role'];
     if (roleInSession === 'admin') {
       console.log(`[auth-setup] ✓ Admin session confirmed — role: ${roleInSession}`);
+      await page.context().storageState({ path: adminAuthFile });
+      console.log(`[auth-setup] ✓ Saved admin auth state to ${adminAuthFile}`);
     } else {
-      console.warn(
-        `[auth-setup] ⚠ Admin session missing role claim (got: ${roleInSession}).` +
-          ` Admin tests will skip. Check Auth0 Action and AUTH0_AUDIENCE config.` +
-          ` Full session: ${JSON.stringify(sessionCheck)}`
+      // Hard fail — admin role IS expected in preview. A missing role means the Auth0
+      // Action or role assignment is broken, not that this is an optional feature.
+      // Saving admin.json with a broken session produces misleading "role not available"
+      // skips across all RBAC admin tests; failing loudly here surfaces the real issue.
+      throw new Error(
+        `Admin test account does not have admin role in Auth0 (got: ${roleInSession}). ` +
+          `Assign the admin role to ${email} in Auth0 Dashboard before running E2E tests. ` +
+          `Full session: ${JSON.stringify(sessionCheck)}`
       );
     }
-
-    await page.context().storageState({ path: adminAuthFile });
-    console.log(`[auth-setup] ✓ Saved admin auth state to ${adminAuthFile}`);
   } catch (error) {
     console.error('[auth-setup] ✗ Admin authentication failed:', error);
     console.error(`[auth-setup] Current URL at failure: ${page.url()}`);
     await page.screenshot({ path: 'playwright/.auth/admin-failure.png' }).catch(() => {});
-    console.error('[auth-setup] Tests requiring admin authentication will be skipped.');
+    throw error;
   }
 });
 
