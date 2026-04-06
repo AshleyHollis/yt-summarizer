@@ -28,11 +28,12 @@ test.describe('Processing History', () => {
   // clear the project-level config across all Playwright versions and was the root cause
   // of unauthenticated API calls returning empty video lists.
 
-  // Video ID with confirmed processing history (populated by beforeAll)
+  // Video IDs with confirmed processing history (populated by beforeAll)
   let videoIdWithHistory: string | null = null;
+  let secondVideoIdWithHistory: string | null = null;
 
   test.beforeAll(async ({ request }) => {
-    // Find a completed video that actually has processing history records.
+    // Find up to 2 completed videos that actually have processing history records.
     // Old videos may have been processed before history tracking was added,
     // so we verify the /history endpoint returns stages before picking a video.
     const listResponse = await request.get(
@@ -48,9 +49,16 @@ test.describe('Processing History', () => {
       if (!historyResponse.ok()) continue;
       const historyData = await historyResponse.json();
       if (historyData.stages && historyData.stages.length > 0) {
-        videoIdWithHistory = video.video_id;
-        console.log(`[processing-history] Found video with history: ${videoIdWithHistory}`);
-        break;
+        if (!videoIdWithHistory) {
+          videoIdWithHistory = video.video_id;
+          console.log(`[processing-history] Found video 1 with history: ${videoIdWithHistory}`);
+        } else if (!secondVideoIdWithHistory) {
+          secondVideoIdWithHistory = video.video_id;
+          console.log(
+            `[processing-history] Found video 2 with history: ${secondVideoIdWithHistory}`
+          );
+          break;
+        }
       }
     }
     if (!videoIdWithHistory) {
@@ -142,28 +150,16 @@ test.describe('Processing History', () => {
     await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 15000 });
   });
 
-  test('multiple seeded videos have processing history', async ({ page, request }) => {
+  test('multiple seeded videos have processing history', async ({ page }) => {
     test.slow(); // This test navigates between multiple videos
     test.skip(!videoIdWithHistory, 'No completed videos with processing history found');
-
-    // Confirm at least 2 completed videos exist
-    const listResponse = await request.get(
-      `${API_URL}/api/v1/library/videos?status=completed&page_size=2`
+    test.skip(
+      !secondVideoIdWithHistory,
+      'Only 1 video with history found — need at least 2 for this test'
     );
-    if (!listResponse.ok()) {
-      test.skip(true, 'Cannot reach library API');
-      return;
-    }
-    const listData = await listResponse.json();
-    if (!listData.videos || listData.videos.length < 2) {
-      test.skip(true, 'Fewer than 2 completed videos available');
-      return;
-    }
-
-    console.log(`Found ${listData.total_count ?? listData.videos.length} completed videos`);
 
     // Check first video has history
-    await page.goto(`/library/${listData.videos[0].video_id}`);
+    await page.goto(`/library/${videoIdWithHistory}`);
     await page.waitForLoadState('domcontentloaded');
 
     const historyTab = page.getByRole('button', { name: /History/i });
@@ -172,7 +168,7 @@ test.describe('Processing History', () => {
     await expect(page.getByText(/Extracting Transcript/i).first()).toBeVisible({ timeout: 15000 });
 
     // Check second video has history
-    await page.goto(`/library/${listData.videos[1].video_id}`);
+    await page.goto(`/library/${secondVideoIdWithHistory}`);
     await page.waitForLoadState('domcontentloaded');
 
     const historyTab2 = page.getByRole('button', { name: /History/i });
