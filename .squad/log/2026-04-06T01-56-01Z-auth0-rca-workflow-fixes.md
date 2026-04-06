@@ -46,7 +46,7 @@ Four agents contributed to this session:
 ## Files Modified
 
 - `apps/web/e2e/auth.setup.ts`
-- `playwright.config.ts` 
+- `playwright.config.ts`
 - `preview.yml`
 - `.github/workflows/preview-e2e.yml` (pending)
 
