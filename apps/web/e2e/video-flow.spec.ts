@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import * as path from 'path';
 import { getSeededVideoId, waitForVideoProcessingViaApi } from './helpers';
 
 /**
@@ -166,7 +167,9 @@ test.describe('User Story 1: Video Submission Flow', () => {
       // Fallback: submit and wait (should not be needed in CI because global-setup
       // pre-seeds videos with auto-captions before tests run).
       test.setTimeout(480_000);
-      const page = await browser.newPage();
+      const authStatePath = path.join(__dirname, '../playwright/.auth/user.json');
+      const ctx = await browser.newContext({ storageState: authStatePath });
+      const page = await ctx.newPage();
       await page.goto('/submit');
 
       const urlInput = page.getByLabel(/YouTube Video URL/i);
@@ -184,7 +187,7 @@ test.describe('User Story 1: Video Submission Flow', () => {
       if (existingVideoId) {
         await waitForVideoProcessingViaApi(existingVideoId, PROCESSING_TIMEOUT);
       }
-      await page.close();
+      await ctx.close();
     });
 
     test('can navigate back to submit page', async ({ page }) => {

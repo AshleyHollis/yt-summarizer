@@ -66,7 +66,14 @@ test.describe('Authenticated User Accessing Protected Pages @auth', () => {
       expect(currentUrl).not.toContain('/sign-in');
     });
 
-    test('authenticated user without admin role cannot access /admin', async ({ page }) => {
+    test('authenticated user without admin role cannot access /admin', async ({
+      page,
+    }, testInfo) => {
+      test.skip(
+        testInfo.project.name.includes('admin'),
+        'Admin users bypass this test — see rbac-admin-access.spec.ts'
+      );
+
       await page.goto('/admin');
 
       // Should redirect to access-denied (unless user has admin role)

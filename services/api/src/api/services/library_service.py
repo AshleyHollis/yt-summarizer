@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 
 # Import shared modules
 try:
@@ -85,7 +85,7 @@ class LibraryService:
         Returns:
             SQLAlchemy select query.
         """
-        query = select(Video).options(selectinload(Video.channel))
+        query = select(Video).options(selectinload(Video.channel), noload(Video.segments))
 
         # Apply filters
         if filters.channel_id:
