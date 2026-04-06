@@ -12,6 +12,7 @@ from .middleware import CorrelationIdMiddleware, SecurityHeadersMiddleware
 from .routes import (
     admin,
     admin_quota,
+    agent,
     auth,
     batches,
     channels,
@@ -258,6 +259,7 @@ def create_app() -> FastAPI:
     app.include_router(channels.router)
     app.include_router(batches.router)
     app.include_router(copilot.router)
+    app.include_router(agent.router)
     app.include_router(threads.router)
     app.include_router(admin.router)
     app.include_router(quota.router)

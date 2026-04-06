@@ -343,6 +343,78 @@ class YouTubeService:
             )
             raise ValueError(f"Failed to fetch channel: {e!s}") from e
 
+    async def search_videos(self, query: str, limit: int = 10) -> list[dict]:
+        """Search YouTube for videos matching a query.
+
+        Uses yt-dlp's ytsearch prefix — no YouTube Data API key required.
+        Proxy-aware: routes through existing WebShare proxy config if available.
+
+        Returns:
+            List of dicts with keys: youtube_video_id, title, channel,
+            duration_seconds, url, thumbnail_url.
+            Returns empty list on any error.
+        """
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+
+        def _run_search() -> list[dict]:
+            import yt_dlp
+
+            ydl_opts: dict = {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+                "skip_download": True,
+            }
+
+            proxy_url = self._get_proxy_url()
+            if proxy_url:
+                ydl_opts["proxy"] = proxy_url
+
+            results = []
+            search_query = f"ytsearch{limit}:{query}"
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(search_query, download=False)
+                entries = info.get("entries", []) if info else []
+                for entry in entries:
+                    if not entry:
+                        continue
+                    vid_id = entry.get("id") or entry.get("url", "").split("v=")[-1]
+                    results.append(
+                        {
+                            "youtube_video_id": vid_id,
+                            "title": entry.get("title", ""),
+                            "channel": entry.get("uploader") or entry.get("channel", ""),
+                            "duration_seconds": int(entry.get("duration") or 0) or None,
+                            "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else "",
+                            "thumbnail_url": entry.get("thumbnail"),
+                        }
+                    )
+            return results
+
+        try:
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, _run_search),
+                timeout=8.0,
+            )
+        except TimeoutError:
+            logger.warning("YouTube search timed out", query=query)
+            return []
+        except Exception as e:
+            logger.warning("YouTube search failed", query=query, error=str(e))
+            return []
+
+    def _get_proxy_url(self) -> str | None:
+        """Return proxy URL string if proxy is available and enabled."""
+        try:
+            if self._proxy_service and hasattr(self._proxy_service, "get_proxy_url"):
+                return self._proxy_service.get_proxy_url()
+        except Exception:
+            pass
+        return None
+
 
 # Singleton instance
 _youtube_service: YouTubeService | None = None

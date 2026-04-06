@@ -188,6 +188,10 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
                 summary,
             )
 
+            # Generate segment labels (best-effort, does not fail the job)
+            openai_client = await self._get_openai_client()
+            await self._generate_segment_labels(message.video_id, openai_client)
+
             # Mark job as completed
             await mark_job_completed(message.job_id)
 
@@ -501,6 +505,116 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
             queue_client.send_message(EMBED_QUEUE, queue_message)
 
             logger.info("Queued embed job", job_id=str(job.job_id))
+
+    async def _get_openai_client(self):
+        """Create an OpenAI client using the same config as _generate_summary.
+
+        Returns None when no valid OpenAI config is present (mock mode).
+        """
+        settings = get_settings()
+        has_valid_config = settings.openai.is_azure_configured or (
+            settings.openai.api_key and settings.openai.api_key != "not-configured"
+        )
+        if not has_valid_config:
+            return None
+
+        try:
+            if settings.openai.is_azure_configured:
+                base_url = settings.openai.azure_openai_base_url
+                if settings.openai.is_azure_ai_foundry:
+                    from openai import AsyncOpenAI
+
+                    return AsyncOpenAI(
+                        api_key=settings.openai.effective_api_key,
+                        base_url=base_url,
+                        default_headers={
+                            "api-key": settings.openai.effective_api_key,
+                            "api-version": settings.openai.azure_api_version,
+                        },
+                    )
+                else:
+                    from openai import AsyncAzureOpenAI
+
+                    return AsyncAzureOpenAI(
+                        api_key=settings.openai.effective_api_key,
+                        azure_endpoint=base_url,
+                        api_version=settings.openai.azure_api_version,
+                    )
+            else:
+                from openai import AsyncOpenAI
+
+                return AsyncOpenAI(api_key=settings.openai.api_key)
+        except Exception as e:
+            logger.warning("Failed to create OpenAI client for label generation", error=str(e))
+            return None
+
+    async def _generate_segment_labels(
+        self,
+        video_id: str,
+        openai_client,
+    ) -> None:
+        """Generate short AI labels for each transcript segment.
+
+        Labels are 5-10 words summarising what the segment covers.
+        Failure does NOT fail the job — label generation is best-effort.
+        Skipped entirely if openai_client is None (mock mode).
+        """
+        if openai_client is None:
+            return
+
+        try:
+            from uuid import UUID
+
+            from shared.db.connection import get_db
+            from shared.db.models import Segment
+            from sqlalchemy import select
+
+            db = get_db()
+            async with db.session() as session:
+                result = await session.execute(
+                    select(Segment)
+                    .where(Segment.video_id == UUID(video_id))
+                    .order_by(Segment.sequence_number)
+                )
+                segments = result.scalars().all()
+
+                for segment in segments:
+                    try:
+                        response = await openai_client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        f"Summarize this transcript excerpt in 5-10 words: "
+                                        f"{segment.text[:500]}"
+                                    ),
+                                }
+                            ],
+                            max_tokens=20,
+                            temperature=0.3,
+                        )
+                        label = response.choices[0].message.content.strip()
+                        segment.label = label[:200]
+                    except Exception as label_err:
+                        logger.warning(
+                            "Segment label generation failed for segment",
+                            segment_id=str(segment.segment_id),
+                            error=str(label_err),
+                        )
+
+                await session.commit()
+                logger.info(
+                    "Segment labels generated",
+                    video_id=video_id,
+                    count=len(segments),
+                )
+        except Exception as e:
+            logger.warning(
+                "Segment label generation skipped due to error",
+                video_id=video_id,
+                error=str(e),
+            )
 
 
 def main():

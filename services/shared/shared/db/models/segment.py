@@ -31,6 +31,7 @@ class Segment(Base):
     end_time: Mapped[float] = mapped_column(Float, nullable=False)  # seconds
     text: Mapped[str] = mapped_column(Text, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Embedding stored as binary blob - VECTOR(1536) in SQL Server
     # Handled via raw SQL for vector operations
     # embedding column will be added in migration with VECTOR type
