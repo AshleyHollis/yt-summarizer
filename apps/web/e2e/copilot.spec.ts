@@ -81,11 +81,8 @@ test.describe('Copilot Feature', () => {
         .or(page.locator('[placeholder*="ask" i]'))
         .or(page.getByRole('textbox', { name: /ask|message/i }));
 
-      // Give the page time to fully render the chat interface
-      await page.waitForTimeout(2000);
-
       // Assert that a chat input exists and is visible
-      await expect(chatInput).toBeVisible({ timeout: 5000 });
+      await expect(chatInput).toBeVisible({ timeout: 7000 });
     });
 
     test('can type in query input when visible', async ({ page }) => {

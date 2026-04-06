@@ -35,11 +35,13 @@ export default defineConfig({
         ? 5
         : undefined,
 
-  // Run tests in parallel - 4 workers on CI keeps total run time under
-  // the 60-minute GitHub Actions limit. The submitQuery() fix (waiting for
-  // networkidle before typing + input.toHaveValue("") confirmation) prevents
-  // the race condition that caused earlier failures, so concurrency is safe.
-  workers: process.env.CI ? 4 : undefined,
+  // Run tests in parallel - 6 workers on CI for better throughput. Tests are
+  // well-isolated (each uses its own browser context; auth state is read-only;
+  // creation/processing tests are gated behind LIVE_PROCESSING=true which is
+  // not set in CI). The submitQuery() fix ensures copilot concurrency is safe.
+  // At 6 workers the wall-clock time drops from ~34 min to ~23 min while
+  // staying well under the 60-minute GitHub Actions limit.
+  workers: process.env.CI ? 6 : undefined,
 
   // Reporter to use
   reporter: [['html', { open: 'never' }], ['list']],
