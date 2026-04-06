@@ -96,7 +96,7 @@ test.describe('Queue Progress UI Updates', () => {
 
     if (!videoId) {
       console.log('  ⚠ No videos found - global-setup may not have run');
-      test.skip();
+      test.skip(true, 'No videos found — global-setup may not have seeded videos');
       return;
     }
 
@@ -269,7 +269,7 @@ test.describe('Queue Progress UI Updates', () => {
 
     if (!videoId) {
       console.log('  ⚠ No videos found');
-      test.skip();
+      test.skip(true, 'No videos found — global-setup may not have seeded videos');
       return;
     }
 

@@ -218,30 +218,18 @@ test.describe('Social Login Authentication @auth', () => {
      * 5. Verify you're redirected back to the app with an active session
      */
 
-    test.skip('Google OAuth flow redirects to Auth0 login', async ({ page }) => {
-      // This test would require handling OAuth popups/redirects
-      // For now, it's documented as a manual test case
-
-      await page.goto('/sign-in');
-      const googleButton = page.getByRole('button', { name: /google/i });
-      await googleButton.click();
-
-      // Would need to handle Auth0 redirect and Google OAuth consent screen
-      // This is complex to automate and slow (30+ seconds)
-      // Instead, we use programmatic auth in auth.setup.ts
+    // BY DESIGN: OAuth flows require live browser interaction with third-party providers
+    // (Google, GitHub) and cannot be automated in CI. We use programmatic auth (auth.setup.ts)
+    // for authenticated test suites instead.
+    // TODO: If needed, implement with Auth0 test tenants and intercepted OAuth redirects.
+    test.skip('Google OAuth flow redirects to Auth0 login', async () => {
+      // Not automated: requires OAuth provider interaction (Google consent screen).
+      // Covered manually; programmatic auth in auth.setup.ts covers the authenticated path.
     });
 
-    test.skip('GitHub OAuth flow redirects to Auth0 login', async ({ page }) => {
-      // This test would require handling OAuth popups/redirects
-      // For now, it's documented as a manual test case
-
-      await page.goto('/sign-in');
-      const githubButton = page.getByRole('button', { name: /github/i });
-      await githubButton.click();
-
-      // Would need to handle Auth0 redirect and GitHub OAuth consent screen
-      // This is complex to automate and slow (30+ seconds)
-      // Instead, we use programmatic auth in auth.setup.ts
+    test.skip('GitHub OAuth flow redirects to Auth0 login', async () => {
+      // Not automated: requires OAuth provider interaction (GitHub consent screen).
+      // Covered manually; programmatic auth in auth.setup.ts covers the authenticated path.
     });
   });
 

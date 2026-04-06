@@ -284,7 +284,11 @@ test.describe('Session Persistence @auth', () => {
       // Tests cross-tab session clearing behavior via client-side cookie invalidation.
       await page1.route('**/api/auth/logout', async (route) => {
         await context.clearCookies();
-        await route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: '{"success":true}',
+        });
       });
 
       // Both tabs should be authenticated
@@ -324,6 +328,9 @@ test.describe('Session Persistence @auth', () => {
      * 3. Verify session expires and user is redirected to login
      */
 
+    // BY DESIGN: Auth0 session expiry requires waiting 24h or configuring a short timeout
+    // in the Auth0 Dashboard for the test environment. Not feasible for automated CI.
+    // To test manually: configure a short session timeout (e.g., 5 min) in Auth0 Dashboard.
     test.skip('session expires after inactivity timeout', async ({ page }) => {
       // This would require waiting for session expiration
       // Default Auth0 session timeout is 24 hours
@@ -343,6 +350,8 @@ test.describe('Session Persistence @auth', () => {
       // await expect(page).toHaveURL(/\`/sign-in`/);
     });
 
+    // BY DESIGN: Rolling session requires waiting for the session expiry window,
+    // which is not feasible in automated CI. Manual test only.
     test.skip('session is refreshed on activity (rolling session)', async ({ page }) => {
       // Auth0 uses rolling sessions by default
       // Each request extends the session expiration
