@@ -760,6 +760,8 @@ jobs:
           FRONTEND_URL: ${{ steps.base-url.outputs.frontend_url }}
           NEXT_PUBLIC_API_URL: ${{ needs.get-ingress.outputs.preview_url }}
           API_URL: ${{ needs.get-ingress.outputs.preview_url }}
+          AUTH0_SECRET: ${{ secrets.AUTH0_SECRET }}
+          AUTH0_BASE_URL: ${{ steps.base-url.outputs.frontend_url }}
           AUTH0_ISSUER_BASE_URL: https://${{ secrets.AUTH0_DOMAIN }}
           AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
           AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
@@ -767,6 +769,9 @@ jobs:
           AUTH0_ADMIN_TEST_PASSWORD: ${{ secrets.AUTH0_ADMIN_TEST_PASSWORD }}
           AUTH0_USER_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
           AUTH0_USER_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
+          # ROPC token injection fallback maps to user credentials
+          AUTH0_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
+          AUTH0_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
           YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
           LIVE_PROCESSING: "true"
 
