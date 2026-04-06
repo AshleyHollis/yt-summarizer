@@ -1,7 +1,8 @@
-# Specification Quality Checklist: YT Summarizer Product Spec
+# Specification Quality Checklist: YT Summarizer — Personal YouTube Knowledge Library
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning  
-**Created**: 2025-12-13  
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2025-12-13
+**Updated**: 2026-01-07
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,19 +32,21 @@
 
 ## Validation Summary
 
-| Check | Status | Notes |
-|-------|--------|-------|
-| User Stories Complete | ✅ Pass | 6 user stories with acceptance scenarios |
-| Functional Requirements | ✅ Pass | 25 requirements covering all areas |
-| Success Criteria | ✅ Pass | 6 measurable, technology-agnostic criteria |
-| Edge Cases | ✅ Pass | 7 edge cases identified |
-| Scope Boundaries | ✅ Pass | Clear in-scope, non-goals, and out-of-scope |
-| Copilot Read-Only | ✅ Pass | Hard rule explicitly stated in multiple sections |
-| Domain-Agnostic | ✅ Pass | No workout-specific language |
+| Check                     | Status    | Notes                                                                        |
+| ------------------------- | --------- | ---------------------------------------------------------------------------- |
+| User Stories Complete     | ✅ Pass   | 6 user stories (P1–P3) with acceptance scenarios and independent test guides |
+| Functional Requirements   | ✅ Pass   | 28 requirements across 5 categories (ingestion, library, copilot, transparency, observability) |
+| Success Criteria          | ✅ Pass   | 7 measurable, technology-agnostic criteria                                   |
+| Edge Cases                | ✅ Pass   | 7 edge cases identified (duplicate URL, unavailable video, partial transcript, cold start, empty scope, long video, rate limiting) |
+| Scope Boundaries          | ✅ Pass   | Explicit in-scope list, out-of-scope list, and future ideas removed from spec body |
+| Copilot Read-Only         | ✅ Pass   | Hard constraint stated in Scope, in FR-010, and in acceptance scenarios      |
+| Assumptions Separated     | ✅ Pass   | Tech stack constraints moved to dedicated Assumptions section; not mixed into FRs |
+| Spec Format               | ✅ Pass   | Spec follows standard template structure |
 
 ## Notes
 
-- Spec is ready for `/speckit.plan` phase
-- All requirements are testable without implementation knowledge
-- Traceability metadata for debugging covered in FR-019
-- Constraints section acknowledges tech stack without specifying implementation
+- All clarification sessions resolved — no open questions remain
+- Implementation detail (tech stack) retained in Assumptions section only, explicitly flagged as acknowledged constraints not prescriptive requirements
+- FR-028 added during migration: copilot chat history persistence (was only in removed "Copilot UX Requirements" section)
+- SC-007 added during migration: learning path ordering verifiable success criterion (was only in US6 test constraints)
+- Spec is ready for planning phase

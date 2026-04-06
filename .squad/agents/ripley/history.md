@@ -16,6 +16,32 @@
 ## Learnings
 <!-- Append learnings below -->
 
+### 2026-05-xx — CORS custom domain fix for preview environments
+
+**Root cause:** `cors_origin_regex` in `services/shared/shared/config.py` only matched `*.azurestaticapps.net`. E2E tests hit the SWA custom domain (`pr-NNN.yt-summarizer.apps.ashleyhollis.com`) which was rejected by CORS, stripping credentials and making all auth-protected tests fail.
+
+**Fix:** Expanded regex to:
+```python
+r"^https://.*\.(azurestaticapps\.net|yt-summarizer\.apps\.ashleyhollis\.com)$"
+```
+This covers both native SWA URLs and all custom-domain preview/prod environments under `*.yt-summarizer.apps.ashleyhollis.com`.
+
+**Also updated:** the fallback `MockSettings.cors_origin_regex` in `services/api/src/api/main.py` to match, so local dev without the shared package also gets the right regex.
+
+**Canonical source of truth:** `services/shared/shared/config.py` `ApiSettings.cors_origin_regex`. `main.py` reads from `settings.api.cors_origin_regex` — no duplicate hardcoded logic.
+
+### 2026-03-22 — Stale Queued Job Re-queue Strategy
+
+**Problem:** 17 videos stuck with `stage=queued`/`status=pending` from March 22. Azure Storage Queue messages had expired (invalid OpenAI key kept workers down). Recovery sweep didn't detect them because orphan detection only queries `Video.processing_status == "processing"` — these videos were likely still in `processing` status but all their jobs were in `queued`/`pending`, not `running`/`failed`.
+
+**Fix:** Added fourth recovery strategy `_requeue_stale_queued_jobs()` to `RecoveryService`. Detects jobs in `queued`/`pending` state for >30 minutes and re-sends queue messages. Guards: skip if succeeded job exists, skip if running job exists, skip if job >24h old (abandoned), cap at `MAX_AUTO_RECOVERIES` per sweep run.
+
+**Key constants added:**
+- `STALE_QUEUE_THRESHOLD_MINUTES = 30` — queue message expiry window
+- `MAX_REQUEUE_AGE_HOURS = 24` — cutoff for "truly abandoned" jobs
+
+**RecoveryResult** gained `queued_job_requeues: int` field — propagates automatically to `/api/v1/admin/recovery/run` response via Pydantic `response_model=RecoveryResult`.
+
 ### 2026-03-05 — PR #177 Preview API Smoke Test
 
 **Environment:** `https://api-pr-177.yt-summarizer.apps.ashleyhollis.com`

@@ -44,9 +44,6 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
-  // Video submission and copilot query require auth; cross-domain cookies prevent auth in SWA preview
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
-
   test('complete journey: ingest video and query copilot', async ({ page }, testInfo) => {
     // This test covers: SWA cold start + form submission + API processing + LLM query.
     // Each step can take 30-120s under SWA cold starts. 540s (test.slow) is not enough
@@ -74,6 +71,7 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
     try {
       await page.waitForFunction(
         () => /\/(?:videos|library)\/[a-f0-9-]+/.test(window.location.pathname),
+        undefined,
         { timeout: 30_000 }
       );
       const videoUrl = page.url();
@@ -149,9 +147,6 @@ test.describe('Copilot Behavior: Response Quality', () => {
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
-  // Copilot endpoints require auth; cross-domain cookies prevent auth in SWA preview
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
-
   test('copilot handles empty library gracefully', async ({ page }, testInfo) => {
     test.slow(); // LLM call: triple timeout to 540s
 
@@ -182,7 +177,9 @@ test.describe('Copilot Behavior: Response Quality', () => {
     }
   });
 
-  test('copilot searches proactively instead of asking for clarification', async ({ page }, testInfo) => {
+  test('copilot searches proactively instead of asking for clarification', async ({
+    page,
+  }, testInfo) => {
     test.slow(); // LLM call: triple timeout to 540s
 
     await page.goto('/library?chat=open', { waitUntil: 'commit' });
@@ -228,9 +225,7 @@ test.describe('Copilot Behavior: Response Quality', () => {
       '401',
       '404',
     ];
-    const hasBackendError = errorPhrases.some(phrase =>
-      lowerResponse.includes(phrase)
-    );
+    const hasBackendError = errorPhrases.some((phrase) => lowerResponse.includes(phrase));
     expect(hasBackendError).toBe(false);
   });
 });
@@ -245,9 +240,6 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
 
-  // Copilot endpoints require auth; cross-domain cookies prevent auth in SWA preview
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
-
   // Fetch a pre-seeded video ID once for all tests in this block.
   // Global-setup has already seeded and processed 15+ videos.
   let seededVideoId: string | null = null;
@@ -257,7 +249,9 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     console.log(`[citation tests] Using seeded video ID: ${seededVideoId}`);
   });
 
-  test('agent response includes citation elements when video is ingested', async ({ page }, testInfo) => {
+  test('agent response includes citation elements when video is ingested', async ({
+    page,
+  }, testInfo) => {
     test.skip(!seededVideoId, 'No processed videos available from global-setup');
     test.slow(); // LLM call with vector search: triple timeout to 540s
 
@@ -304,7 +298,9 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
     expect(hasCitations + hasVideoCards > 0 || hasTopicReferences).toBe(true);
   });
 
-  test('agent references specific video content when asked about it', async ({ page }, testInfo) => {
+  test('agent references specific video content when asked about it', async ({
+    page,
+  }, testInfo) => {
     test.skip(!seededVideoId, 'No processed videos available from global-setup');
     test.slow(); // LLM call with vector search: triple timeout to 540s
 

@@ -18,7 +18,7 @@ import { LogoutButton } from '@/components/auth/LogoutButton';
  */
 export function Navbar() {
   const pathname = usePathname();
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, hasRole } = useAuth();
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
 
@@ -69,16 +69,19 @@ export function Navbar() {
               >
                 Jobs
               </Link>
-              <Link
-                href="/admin"
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  isActive('/admin')
-                    ? 'bg-purple-600 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-purple-600/10 hover:text-purple-600 dark:hover:text-purple-400'
-                }`}
-              >
-                Admin
-              </Link>
+              {hasRole('admin') && (
+                <Link
+                  href="/admin"
+                  data-testid="admin-nav-link"
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    isActive('/admin')
+                      ? 'bg-purple-600 text-white'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-purple-600/10 hover:text-purple-600 dark:hover:text-purple-400'
+                  }`}
+                >
+                  Admin
+                </Link>
+              )}
             </div>
           </div>
 
@@ -87,7 +90,9 @@ export function Navbar() {
             {isLoading ? (
               <div className="animate-pulse w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
             ) : isAuthenticated && user ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" data-testid="user-profile">
+                {/* sr-only email allows test assertions on user email */}
+                <span className="sr-only">{user.email}</span>
                 {user.picture ? (
                   <Image
                     src={user.picture}

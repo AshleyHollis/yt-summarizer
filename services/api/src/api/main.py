@@ -45,7 +45,9 @@ except ImportError:
                     "https://web-stg.yt-summarizer.apps.ashleyhollis.com",
                     "https://white-meadow-0b8e2e000.6.azurestaticapps.net",
                 ]
-                cors_origin_regex = r"^https://.*\.azurestaticapps\.net$"
+                cors_origin_regex = (
+                    r"^https://.*\.(azurestaticapps\.net|yt-summarizer\.apps\.ashleyhollis\.com)$"
+                )
                 debug = True
 
             class logging:
@@ -228,7 +230,16 @@ def create_app() -> FastAPI:
         allow_origin_regex=settings.api.cors_origin_regex,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        allow_headers=["Content-Type", "Authorization", "Cookie", "X-Correlation-ID"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "Cookie",
+            "X-Correlation-ID",
+            # CopilotKit v1.54+ always sends this version header in every request.
+            # Without it, Starlette returns 400 for the OPTIONS preflight, causing
+            # the browser to log "Failed to load resource: 400" on any page using CopilotKit.
+            "X-CopilotKit-Runtime-Client-GQL-Version",
+        ],
         expose_headers=["X-Correlation-ID"],
     )
 

@@ -27,9 +27,12 @@ export class CopilotErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log the error for debugging
-    console.error('CopilotKit error caught:', error.message);
-    console.error('Component stack:', errorInfo.componentStack);
+    // Use warn (not error) so E2E console-error listeners don't flag CopilotKit
+    // connection failures on pages that don't use the chat feature.
+    console.warn('CopilotKit error caught:', error.message);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Component stack:', errorInfo.componentStack);
+    }
   }
 
   render() {

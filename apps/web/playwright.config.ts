@@ -27,13 +27,23 @@ export default defineConfig({
   retries: 1,
 
   // Stop early if too many tests fail - prevents 60min+ runs when auth or infra is broken
-  maxFailures: process.env.CI ? 5 : undefined,
+  // Set MAX_FAILURES=0 (via e2e-full-diagnostic.yml) to run all tests without stopping
+  maxFailures:
+    process.env.MAX_FAILURES !== undefined
+      ? parseInt(process.env.MAX_FAILURES)
+      : process.env.CI
+        ? 5
+        : undefined,
 
-  // Run tests in parallel - 4 workers on CI keeps total run time under
-  // the 60-minute GitHub Actions limit. The submitQuery() fix (waiting for
-  // networkidle before typing + input.toHaveValue("") confirmation) prevents
-  // the race condition that caused earlier failures, so concurrency is safe.
-  workers: process.env.CI ? 4 : undefined,
+  // Run tests in parallel - 6 workers on CI for better throughput. Tests are
+  // well-isolated (each uses its own browser context; auth state is read-only;
+  // creation/processing tests are gated behind LIVE_PROCESSING=true which is
+  // NOT set in ci.yml (unit/build CI) but IS set in the preview E2E workflows
+  // (preview.yml / preview-e2e.yml)). The submitQuery() fix ensures copilot
+  // concurrency is safe.
+  // At 6 workers the wall-clock time drops from ~34 min to ~23 min while
+  // staying well under the 60-minute GitHub Actions limit.
+  workers: process.env.CI ? 6 : undefined,
 
   // Reporter to use
   reporter: [['html', { open: 'never' }], ['list']],

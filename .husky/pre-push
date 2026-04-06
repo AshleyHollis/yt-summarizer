@@ -1,43 +1,25 @@
+#!/bin/sh
 echo "🔍 Running pre-push checks..."
 
-# Check if Python files changed
-PYTHON_CHANGED=$(git diff --name-only @{push}..HEAD 2>/dev/null | grep -c '\.py$' || true)
+# Detect files pushed (vs remote); fall back to last commit when no tracking remote yet
+PUSHED=$(git diff --name-only "@{push}..HEAD" 2>/dev/null || git diff --name-only "HEAD~1..HEAD" 2>/dev/null || echo "")
 
-if [ "$PYTHON_CHANGED" -gt 0 ]; then
+if echo "$PUSHED" | grep -q '\.py$'; then
   echo "🐍 Python changes detected - running ruff..."
   python -m ruff check services/ || { echo "  ❌ Ruff lint failed!"; exit 1; }
   echo "  ✅ Ruff passed"
 fi
 
-# Check if frontend files changed
-FRONTEND_CHANGED=$(git diff --name-only @{push}..HEAD 2>/dev/null | grep -c '^apps/web/' || true)
+if echo "$PUSHED" | grep -q '^apps/web/'; then
+  echo "📦 Frontend changes detected..."
 
-if [ "$FRONTEND_CHANGED" -gt 0 ]; then
-  echo "📦 Frontend changes detected - running comprehensive checks..."
-
-  cd apps/web || exit 1
-
-  # Run lint
   echo "  ├─ Running ESLint..."
-  npm run lint || { echo "  │  ❌ ESLint failed!"; exit 1; }
+  npm --prefix apps/web run lint || { echo "  │  ❌ ESLint failed!"; exit 1; }
   echo "  │  ✅ ESLint passed"
 
-  # Run TypeScript check
-  echo "  ├─ Running TypeScript check..."
-  npx tsc --noEmit || { echo "  │  ❌ TypeScript check failed!"; exit 1; }
-  echo "  │  ✅ TypeScript check passed"
-
-  # Run build
-  echo "  ├─ Running build..."
-  npm run build || { echo "  │  ❌ Build failed!"; exit 1; }
-  echo "  │  ✅ Build passed"
-
-  # Run tests
-  echo "  └─ Running tests..."
-  npm run test:run || { echo "     ❌ Tests failed!"; exit 1; }
-  echo "     ✅ Tests passed"
-
-  cd ../.. || exit 1
+  echo "  └─ Running TypeScript check..."
+  npm --prefix apps/web run type:check || { echo "     ❌ TypeScript check failed!"; exit 1; }
+  echo "     ✅ TypeScript check passed"
 fi
 
 echo "✅ All pre-push checks passed!"

@@ -29,10 +29,12 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           INSIDER_VERSION="${VERSION}-insider+${SHORT_SHA}"
           INSIDER_TAG="v${INSIDER_VERSION}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "insider_version=$INSIDER_VERSION" >> "$GITHUB_OUTPUT"
-          echo "insider_tag=$INSIDER_TAG" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$VERSION"
+            echo "short_sha=$SHORT_SHA"
+            echo "insider_version=$INSIDER_VERSION"
+            echo "insider_tag=$INSIDER_TAG"
+          } >> "$GITHUB_OUTPUT"
           echo "📦 Base Version: $VERSION (Short SHA: $SHORT_SHA)"
           echo "🏷️ Insider Version: $INSIDER_VERSION"
           echo "🔖 Insider Tag: $INSIDER_TAG"

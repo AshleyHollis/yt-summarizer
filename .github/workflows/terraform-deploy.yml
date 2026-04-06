@@ -60,6 +60,14 @@ on:
         required: false
       WEBSHARE_PROXY_PASSWORD:
         required: false
+      AZURE_OPENAI_API_KEY:
+        required: false
+      AZURE_OPENAI_ENDPOINT:
+        required: false
+      AZURE_OPENAI_DEPLOYMENT:
+        required: false
+      AZURE_OPENAI_EMBEDDING_DEPLOYMENT:
+        required: false
     outputs:
       plan-summary:
         description: Terraform plan summary
@@ -87,6 +95,10 @@ jobs:
       ARM_USE_OIDC: true
       TF_VAR_webshare_proxy_username: ${{ secrets.WEBSHARE_PROXY_USERNAME }}
       TF_VAR_webshare_proxy_password: ${{ secrets.WEBSHARE_PROXY_PASSWORD }}
+      TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      TF_VAR_azure_openai_deployment: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+      TF_VAR_azure_openai_embedding_deployment: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
@@ -131,6 +143,30 @@ jobs:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         continue-on-error: ${{ inputs.post-to-pr == true }}
+
+      - name: Prepare plan data for PR comment
+        if: inputs.post-to-pr && github.event_name == 'pull_request'
+        env:
+          PLAN_SUMMARY: ${{ steps.plan.outputs.plan_summary }}
+          PLAN_JSON_PATH: ${{ steps.plan.outputs.plan_json_path }}
+        run: |
+          PLAN_DATA_DIR="$(mktemp -d)"
+
+          # Write plan summary JSON
+          echo "$PLAN_SUMMARY" > "$PLAN_DATA_DIR/plan-summary.json"
+
+          # Copy full plan JSON as formatted-plan.json (used by action-main.js for change details)
+          if [ -f "$PLAN_JSON_PATH" ]; then
+            cp "$PLAN_JSON_PATH" "$PLAN_DATA_DIR/formatted-plan.json"
+            echo "✅ Copied plan.json ($(wc -c < "$PLAN_DATA_DIR/formatted-plan.json") bytes)"
+          else
+            echo "{}" > "$PLAN_DATA_DIR/formatted-plan.json"
+            echo "⚠️ plan.json not found at: $PLAN_JSON_PATH"
+          fi
+
+          echo "TERRAFORM_PLAN_DATA_DIR=$PLAN_DATA_DIR" >> $GITHUB_ENV
+          echo "✅ Plan data prepared at: $PLAN_DATA_DIR"
+          ls -lh "$PLAN_DATA_DIR"
 
       - name: Post Plan to PR and Summary
         if: inputs.post-to-pr && github.event_name == 'pull_request'
@@ -178,6 +214,10 @@ jobs:
       ARM_USE_OIDC: true
       TF_VAR_webshare_proxy_username: ${{ secrets.WEBSHARE_PROXY_USERNAME }}
       TF_VAR_webshare_proxy_password: ${{ secrets.WEBSHARE_PROXY_PASSWORD }}
+      TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      TF_VAR_azure_openai_deployment: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+      TF_VAR_azure_openai_embedding_deployment: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}

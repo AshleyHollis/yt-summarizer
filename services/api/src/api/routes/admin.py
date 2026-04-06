@@ -1,6 +1,7 @@
 """Admin routes for system management and recovery."""
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
@@ -123,3 +124,54 @@ async def run_quota_dispatch(
     """Run a quota dispatch sweep to release queued jobs."""
     correlation_id = getattr(request.state, "correlation_id", "quota-dispatch-manual")
     return await dispatcher.run_dispatch_sweep(correlation_id)
+
+
+class DeleteVideosByUrlsRequest(BaseModel):
+    urls: list[str]
+
+
+@router.delete(
+    "/videos/by-urls",
+    status_code=status.HTTP_200_OK,
+    summary="Delete Videos by URLs",
+    description=(
+        "Delete videos (and their associated jobs/segments) by YouTube URL. "
+        "Used by CI/E2E test seeding to clear stale data before re-runs."
+    ),
+)
+async def delete_videos_by_urls(
+    body: DeleteVideosByUrlsRequest,
+    _user: AuthenticatedUser = Depends(require_auth),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Delete videos matching the given YouTube URLs."""
+    from sqlalchemy import delete as sql_delete
+
+    try:
+        from shared.db.models import Job, Video
+    except ImportError:
+        return {"error": "shared module not available", "deleted": 0}
+
+    from ..models.video import extract_youtube_video_id
+
+    # Resolve YouTube video IDs from URLs
+    youtube_ids = [extract_youtube_video_id(u) for u in body.urls]
+    youtube_ids = [yid for yid in youtube_ids if yid]
+
+    if not youtube_ids:
+        return {"deleted": 0, "skipped": len(body.urls)}
+
+    # Fetch matching videos
+    from sqlalchemy import select
+
+    result = await session.execute(select(Video).where(Video.youtube_video_id.in_(youtube_ids)))
+    videos = result.scalars().all()
+
+    deleted = 0
+    for video in videos:
+        await session.execute(sql_delete(Job).where(Job.video_id == video.video_id))
+        await session.execute(sql_delete(Video).where(Video.video_id == video.video_id))
+        deleted += 1
+
+    await session.commit()
+    return {"deleted": deleted, "skipped": len(body.urls) - deleted}

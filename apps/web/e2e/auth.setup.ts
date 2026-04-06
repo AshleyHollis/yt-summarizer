@@ -59,7 +59,9 @@ async function authenticateViaAuth0(
   // Check for Auth0 error redirect (e.g., connection not enabled)
   const currentUrl = page.url();
   if (currentUrl.includes('error=') && currentUrl.includes('error_description=')) {
-    const errorDesc = decodeURIComponent(new URL(currentUrl).searchParams.get('error_description') || 'unknown');
+    const errorDesc = decodeURIComponent(
+      new URL(currentUrl).searchParams.get('error_description') || 'unknown'
+    );
     throw new Error(`Auth0 returned error before login page: ${errorDesc}`);
   }
 
@@ -69,7 +71,9 @@ async function authenticateViaAuth0(
 
   // Auth0 Universal Login — email may already be pre-filled via login_hint
   // Fill email if the field is visible and empty
-  const emailInput = page.locator('input[name="username"], input[id="username"], input[type="email"]').first();
+  const emailInput = page
+    .locator('input[name="username"], input[id="username"], input[type="email"]')
+    .first();
   try {
     await emailInput.waitFor({ timeout: 5000 });
     const currentEmail = await emailInput.inputValue();
@@ -93,6 +97,11 @@ async function authenticateViaAuth0(
 
   // Wait for redirect back to our app (away from auth0.com)
   await page.waitForURL((url) => !url.hostname.includes('auth0.com'), { timeout: 30000 });
+
+  // Verify login succeeded: confirm we landed on the app (not an Auth0 error page)
+  await page.waitForURL(`${baseUrl}/**`, { timeout: 15000 });
+  // Give auth session cookie a moment to settle before saving state
+  await page.waitForTimeout(2000);
   console.log(`[auth-setup] ✓ ${label} authenticated successfully — redirected to app`);
 }
 
@@ -102,19 +111,47 @@ setup('authenticate as admin', async ({ page }) => {
 
   if (!email || !password) {
     console.warn('[auth-setup] ⚠ Admin test credentials not set. Skipping admin authentication.');
-    console.warn('[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.');
+    console.warn(
+      '[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.'
+    );
     return;
   }
 
   try {
     await authenticateViaAuth0(page, email, password, 'admin');
-    await page.context().storageState({ path: adminAuthFile });
-    console.log(`[auth-setup] ✓ Saved admin auth state to ${adminAuthFile}`);
+
+    // Verify the admin session has the role claim before saving state.
+    // This catches Auth0 Action misconfigurations early with a clear message.
+    const sessionCheck = await page.evaluate(async (apiUrl) => {
+      try {
+        const r = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include' });
+        return { status: r.status, data: r.ok ? await r.json() : null };
+      } catch (e) {
+        return { status: 0, error: String(e) };
+      }
+    }, process.env.API_URL || 'http://localhost:8000');
+
+    const roleInSession = sessionCheck.data?.user?.['https://yt-summarizer.com/role'];
+    if (roleInSession === 'admin') {
+      console.log(`[auth-setup] ✓ Admin session confirmed — role: ${roleInSession}`);
+      await page.context().storageState({ path: adminAuthFile });
+      console.log(`[auth-setup] ✓ Saved admin auth state to ${adminAuthFile}`);
+    } else {
+      // Hard fail — admin role IS expected in preview. A missing role means the Auth0
+      // Action or role assignment is broken, not that this is an optional feature.
+      // Saving admin.json with a broken session produces misleading "role not available"
+      // skips across all RBAC admin tests; failing loudly here surfaces the real issue.
+      throw new Error(
+        `Admin test account does not have admin role in Auth0 (got: ${roleInSession}). ` +
+          `Assign the admin role to ${email} in Auth0 Dashboard before running E2E tests. ` +
+          `Full session: ${JSON.stringify(sessionCheck)}`
+      );
+    }
   } catch (error) {
     console.error('[auth-setup] ✗ Admin authentication failed:', error);
     console.error(`[auth-setup] Current URL at failure: ${page.url()}`);
     await page.screenshot({ path: 'playwright/.auth/admin-failure.png' }).catch(() => {});
-    console.error('[auth-setup] Tests requiring admin authentication will be skipped.');
+    throw error;
   }
 });
 
@@ -124,7 +161,9 @@ setup('authenticate as normal user', async ({ page }) => {
 
   if (!email || !password) {
     console.warn('[auth-setup] ⚠ User test credentials not set. Skipping user authentication.');
-    console.warn('[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.');
+    console.warn(
+      '[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.'
+    );
     return;
   }
 

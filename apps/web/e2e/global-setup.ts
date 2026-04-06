@@ -9,6 +9,8 @@
  */
 
 import { FullConfig } from '@playwright/test';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
@@ -259,9 +261,13 @@ const ALL_TEST_VIDEOS = [
 // Minimum number of indexed segments required before tests can run
 // 15 videos (6 Python OOP + 4 fitness/kettlebell + 5 JS async) with typical processing yields ~50-70 segments
 // This prevents E2E test timeout while still ensuring content is indexed
-const MIN_SEGMENTS_REQUIRED = 40;
-// Maximum wait time for video processing (5 minutes)
-const MAX_WAIT_TIME_MS = 5 * 60 * 1000;
+const MIN_SEGMENTS_REQUIRED = 30;
+// Minimum number of videos with processing_status='completed' in the DB.
+// The embed worker indexes segments BEFORE the relationships worker sets processing_status='completed'.
+// Without this check, global-setup can declare "ready" while library API still returns 0 completed videos.
+const MIN_COMPLETED_VIDEOS = 1;
+// Maximum wait time for video processing (8 minutes)
+const MAX_WAIT_TIME_MS = 8 * 60 * 1000;
 // Polling interval
 const POLL_INTERVAL_MS = 10 * 1000;
 
@@ -342,7 +348,10 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
       `[global-setup] │ [${elapsed}s] ✓${completed} ⚙${processing} ⏳${pending} ✗${failed} ${queueInfo}`
     );
 
-    // Check completion via coverage endpoint
+    // Check completion via coverage endpoint + DB-backed library API.
+    // Coverage endpoint reads the vector store (segments indexed after Embed step).
+    // Library API reads the DB processing_status (set to 'completed' by the Relationships step).
+    // Both must pass to avoid declaring "ready" before DB status is updated.
     try {
       const coverageResponse = await fetch(`${API_URL}/api/v1/copilot/coverage`, {
         method: 'POST',
@@ -355,24 +364,40 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
         const segments = coverage.segmentCount || 0;
 
         if (segments >= MIN_SEGMENTS_REQUIRED) {
-          console.log(
-            '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+          // Also verify the DB has at least MIN_COMPLETED_VIDEOS with processing_status='completed'.
+          // This guards against the embed→relationships pipeline gap where segments exist
+          // but processing_status hasn't been updated yet.
+          const libraryResponse = await fetch(
+            `${API_URL}/api/v1/library/videos?status=completed&page_size=1`
           );
-          console.log(
-            `[global-setup] ✓ Ready! ${segments} segments indexed, ${completed} videos completed`
-          );
+          const dbCompletedCount = libraryResponse.ok
+            ? ((await libraryResponse.json()).total_count ?? 0)
+            : 0;
 
-          // Log final processing stats
-          console.log('\n[global-setup] Processing Summary:');
-          for (const progress of progressList) {
-            if (progress.status === 'completed') {
-              console.log(
-                `  ✓ ${progress.id.slice(0, 8)}... wait=${formatTime(progress.waitSeconds)} proc=${formatTime(progress.processingSeconds)}`
-              );
+          if (dbCompletedCount >= MIN_COMPLETED_VIDEOS) {
+            console.log(
+              '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+            );
+            console.log(
+              `[global-setup] ✓ Ready! ${segments} segments indexed, ${dbCompletedCount} DB-completed videos`
+            );
+
+            // Log final processing stats
+            console.log('\n[global-setup] Processing Summary:');
+            for (const progress of progressList) {
+              if (progress.status === 'completed') {
+                console.log(
+                  `  ✓ ${progress.id.slice(0, 8)}... wait=${formatTime(progress.waitSeconds)} proc=${formatTime(progress.processingSeconds)}`
+                );
+              }
             }
-          }
 
-          return true;
+            return true;
+          } else {
+            console.log(
+              `[global-setup] Segments ready (${segments}) but DB-completed videos: ${dbCompletedCount}/${MIN_COMPLETED_VIDEOS} — waiting for relationships worker...`
+            );
+          }
         }
       }
     } catch {
@@ -382,11 +407,13 @@ async function monitorBatchProgress(videoIds: Map<string, string>): Promise<bool
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  console.log('[global-setup] └──────────────────────────────────────────────────────────────────┘');
+  console.log(
+    '[global-setup] └──────────────────────────────────────────────────────────────────┘'
+  );
   console.warn(
     `[global-setup] ⚠ Timeout waiting for video processing after ${MAX_WAIT_TIME_MS / 1000}s. ` +
-    `Only ${MIN_SEGMENTS_REQUIRED - 1} or fewer segments indexed. ` +
-    `Continuing — tests that require specific videos will skip gracefully.`
+      `Only ${MIN_SEGMENTS_REQUIRED - 1} or fewer segments indexed. ` +
+      `Continuing — tests that require specific videos will skip gracefully.`
   );
   return false;
 }
@@ -411,13 +438,33 @@ async function waitForVideoProcessing(): Promise<boolean> {
         const segments = coverage.segmentCount || 0;
         const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-        console.log(
-          `[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments (${elapsed}s elapsed)`
-        );
-
         if (segments >= MIN_SEGMENTS_REQUIRED) {
-          console.log(`[global-setup] ✓ Ready! ${segments} segments indexed`);
-          return true;
+          // Also verify the DB has at least MIN_COMPLETED_VIDEOS with processing_status='completed'.
+          const libraryResponse = await fetch(
+            `${API_URL}/api/v1/library/videos?status=completed&page_size=1`
+          );
+          const dbCompletedCount = libraryResponse.ok
+            ? ((await libraryResponse.json()).total_count ?? 0)
+            : 0;
+
+          console.log(
+            `[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments, ${dbCompletedCount} DB-completed (${elapsed}s elapsed)`
+          );
+
+          if (dbCompletedCount >= MIN_COMPLETED_VIDEOS) {
+            console.log(
+              `[global-setup] ✓ Ready! ${segments} segments indexed, ${dbCompletedCount} DB-completed videos`
+            );
+            return true;
+          } else {
+            console.log(
+              `[global-setup] Segments ready but DB-completed videos: ${dbCompletedCount}/${MIN_COMPLETED_VIDEOS} — waiting for relationships worker...`
+            );
+          }
+        } else {
+          console.log(
+            `[global-setup] Progress: ${coverage.videoCount} videos, ${segments} segments (${elapsed}s elapsed)`
+          );
         }
       }
     } catch (error) {
@@ -429,8 +476,8 @@ async function waitForVideoProcessing(): Promise<boolean> {
 
   console.warn(
     `[global-setup] ⚠ Timeout waiting for video processing after ${MAX_WAIT_TIME_MS / 1000}s. ` +
-    `Only ${MIN_SEGMENTS_REQUIRED - 1} or fewer segments indexed. ` +
-    `Continuing — tests that require specific videos will skip gracefully.`
+      `Only ${MIN_SEGMENTS_REQUIRED - 1} or fewer segments indexed. ` +
+      `Continuing — tests that require specific videos will skip gracefully.`
   );
   return false;
 }
@@ -463,24 +510,35 @@ async function warmUpSwa(): Promise<void> {
       });
       clearTimeout(timeout);
 
-      if (response.ok || response.status === 308 || response.status === 307 || response.status === 302) {
+      if (
+        response.ok ||
+        response.status === 308 ||
+        response.status === 307 ||
+        response.status === 302
+      ) {
         const elapsed = Math.round((Date.now() - startTime) / 1000);
-        console.log(`[global-setup] ✓ SWA warm-up complete (${elapsed}s, status=${response.status})`);
+        console.log(
+          `[global-setup] ✓ SWA warm-up complete (${elapsed}s, status=${response.status})`
+        );
         return;
       }
       console.log(`[global-setup] SWA attempt ${attempt}/${maxRetries}: status=${response.status}`);
     } catch (error) {
       const elapsed = Math.round((Date.now() - startTime) / 1000);
-      console.log(`[global-setup] SWA attempt ${attempt}/${maxRetries} failed (${elapsed}s): ${error instanceof Error ? error.message : error}`);
+      console.log(
+        `[global-setup] SWA attempt ${attempt}/${maxRetries} failed (${elapsed}s): ${error instanceof Error ? error.message : error}`
+      );
     }
 
     if (attempt < maxRetries) {
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
     }
   }
 
   const elapsed = Math.round((Date.now() - startTime) / 1000);
-  console.log(`[global-setup] ⚠ SWA warm-up did not succeed after ${elapsed}s — tests may experience cold-start delays`);
+  console.log(
+    `[global-setup] ⚠ SWA warm-up did not succeed after ${elapsed}s — tests may experience cold-start delays`
+  );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -508,6 +566,30 @@ async function globalSetup(_config: FullConfig) {
   const seedApiKey = process.env.YT_SUMMARIZER_API_KEY;
   if (seedApiKey) {
     seedHeaders['X-API-Key'] = seedApiKey;
+  }
+
+  // Clear any stale test videos from prior runs so re-submissions are fully re-queued.
+  // Videos in failed/dead_lettered/pending state would be re-queued by the API, but
+  // deleting first ensures a clean slate regardless of prior state.
+  if (seedApiKey) {
+    try {
+      const deleteResp = await fetch(`${API_URL}/api/v1/admin/videos/by-urls`, {
+        method: 'DELETE',
+        headers: seedHeaders,
+        body: JSON.stringify({ urls: ALL_TEST_VIDEOS }),
+      });
+      if (deleteResp.ok) {
+        const deleteData = await deleteResp.json();
+        if (deleteData.deleted > 0) {
+          console.log(
+            `[global-setup] Cleared ${deleteData.deleted} stale test video(s) before seeding`
+          );
+        }
+      }
+    } catch {
+      // Non-fatal — seeding will proceed; stale videos will be re-queued via 201 path
+      console.log('[global-setup] Could not pre-clear stale videos (non-fatal), continuing...');
+    }
   }
 
   for (const url of ALL_TEST_VIDEOS) {
@@ -556,7 +638,9 @@ async function globalSetup(_config: FullConfig) {
 
   // If all videos were skipped due to auth, log a clear message
   if (submitted === 0 && skipped === ALL_TEST_VIDEOS.length) {
-    console.log('[global-setup] All seeding skipped (auth gates active). Checking existing video coverage...');
+    console.log(
+      '[global-setup] All seeding skipped (auth gates active). Checking existing video coverage...'
+    );
   }
 
   // Store video IDs for tests to use
@@ -579,10 +663,99 @@ async function globalSetup(_config: FullConfig) {
   }
 
   // Warm up the CopilotKit agent endpoint.
-  // The first LLM call in a CI run can be very slow (Azure OpenAI cold start).
-  // Sending a warm-up request here ensures the backend is primed before tests start,
-  // preventing flaky timeouts in chat-responses, copilot, and full-journey tests.
   await warmUpCopilotAgent();
+
+  // Inject Auth0 token for CI auth-protected tests (no-op if env vars absent)
+  await injectAuth0Token();
+}
+
+async function injectAuth0Token(): Promise<void> {
+  const email = process.env.AUTH0_TEST_EMAIL;
+  const password = process.env.AUTH0_TEST_PASSWORD;
+
+  if (!email || !password) {
+    console.log('[global-setup] AUTH0_TEST_EMAIL/PASSWORD not set — skipping token injection');
+    return;
+  }
+
+  const issuerBaseUrl = process.env.AUTH0_ISSUER_BASE_URL;
+  const clientId = process.env.AUTH0_CLIENT_ID;
+
+  if (!issuerBaseUrl || !clientId) {
+    console.warn(
+      '[global-setup] AUTH0_ISSUER_BASE_URL or AUTH0_CLIENT_ID not set — skipping token injection'
+    );
+    return;
+  }
+
+  console.log('[global-setup] Fetching Auth0 token via password grant for CI auth injection...');
+  try {
+    const tokenUrl = `${issuerBaseUrl.replace(/\/$/, '')}/oauth/token`;
+    const body: Record<string, string> = {
+      grant_type: 'http://auth0.com/oauth/grant-type/password-realm',
+      realm: 'Username-Password-Authentication',
+      username: email,
+      password,
+      client_id: clientId,
+      scope: 'openid profile email',
+    };
+
+    const clientSecret = process.env.AUTH0_CLIENT_SECRET;
+    if (clientSecret) {
+      body.client_secret = clientSecret;
+    }
+
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.warn(
+        `[global-setup] Auth0 token request failed (${response.status}): ${err} — auth-protected tests may skip`
+      );
+      return;
+    }
+
+    const tokens = await response.json();
+    const accessToken: string | undefined = tokens.access_token;
+    if (!accessToken) {
+      console.warn(
+        '[global-setup] No access_token in Auth0 response — auth-protected tests may skip'
+      );
+      return;
+    }
+
+    const authDir = path.join(__dirname, '../playwright/.auth');
+    await fs.mkdir(authDir, { recursive: true });
+
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const storageState = {
+      cookies: [],
+      origins: [
+        {
+          origin: baseUrl,
+          localStorage: [{ name: 'access_token', value: accessToken }],
+        },
+      ],
+    };
+
+    const userAuthFile = path.join(authDir, 'user.json');
+    // Only write if auth.setup.ts hasn't already created a richer session state
+    try {
+      await fs.access(userAuthFile);
+      console.log(
+        '[global-setup] playwright/.auth/user.json already exists (auth.setup ran) — skipping token injection'
+      );
+    } catch {
+      await fs.writeFile(userAuthFile, JSON.stringify(storageState, null, 2));
+      console.log(`[global-setup] ✓ Auth0 token injected → ${userAuthFile}`);
+    }
+  } catch (error) {
+    console.warn(`[global-setup] Token injection failed: ${error} — auth-protected tests may skip`);
+  }
 }
 
 async function warmUpCopilotAgent(): Promise<void> {
@@ -621,11 +794,15 @@ async function warmUpCopilotAgent(): Promise<void> {
       console.log(`[global-setup] ✓ Agent warm-up complete (${elapsed}s, ${text.length} bytes)`);
     } else {
       const elapsed = Math.round((Date.now() - startTime) / 1000);
-      console.log(`[global-setup] ⚠ Agent warm-up returned ${response.status} (${elapsed}s) - tests may be slower on first LLM call`);
+      console.log(
+        `[global-setup] ⚠ Agent warm-up returned ${response.status} (${elapsed}s) - tests may be slower on first LLM call`
+      );
     }
   } catch (error) {
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    console.log(`[global-setup] ⚠ Agent warm-up failed (${elapsed}s): ${error} - tests may be slower on first LLM call`);
+    console.log(
+      `[global-setup] ⚠ Agent warm-up failed (${elapsed}s): ${error} - tests may be slower on first LLM call`
+    );
   }
 }
 

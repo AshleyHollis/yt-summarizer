@@ -23,8 +23,6 @@ const TEST_CHANNEL_URL = 'https://www.youtube.com/@darciisabella/videos';
 const LIVE_PROCESSING = process.env.LIVE_PROCESSING === 'true';
 
 test.describe('Channel Ingestion Flow', () => {
-  // Auth gates active but cross-domain cookies prevent auth session in SWA preview
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
   test.describe('Navigation', () => {
     test('submit page has link to channel ingestion', async ({ page }) => {
       await page.goto('/submit');
@@ -99,6 +97,9 @@ test.describe('Channel Ingestion Flow', () => {
     // These tests require the backend to be running
     test.beforeEach(async ({ page }) => {
       await page.goto('/ingest');
+      // Wait for AuthGate to finish loading auth state so the channel URL
+      // input is visible before each test body runs.
+      await expect(page.getByLabel(/YouTube Channel URL/i)).toBeVisible({ timeout: 30_000 });
     });
 
     test('fetches videos from channel URL', async ({ page }) => {
@@ -169,6 +170,13 @@ test.describe('Channel Ingestion Flow', () => {
       'Requires live AI processing - run with LIVE_PROCESSING=true'
     );
 
+    // Run serially to avoid race conditions when multiple tests hit the same channel API
+    test.describe.configure({ mode: 'serial' });
+
+    // Shared batch URL — created once in test 'can ingest all channel videos' and reused
+    // by subsequent tests that verify batch progress page behavior
+    let sharedBatchUrl: string | null = null;
+
     test.beforeEach(async ({ page }) => {
       await page.goto('/ingest');
     });
@@ -198,22 +206,26 @@ test.describe('Channel Ingestion Flow', () => {
       await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
 
       // Should navigate to batch progress page
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
+      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
+      sharedBatchUrl = page.url();
 
       // Should show batch progress
       await expect(page.getByText(/Batch Progress/i)).toBeVisible();
     });
 
     test('batch progress page shows navigation buttons', async ({ page }) => {
-      // Fetch and ingest videos
-      await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
-      await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
-        timeout: 60000,
-      });
-
-      await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
+      if (sharedBatchUrl) {
+        await page.goto(sharedBatchUrl);
+      } else {
+        await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
+        await page.getByRole('button', { name: /Fetch Videos/i }).click();
+        await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+          timeout: 60000,
+        });
+        await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
+        await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
+        sharedBatchUrl = page.url();
+      }
 
       // Check navigation buttons
       await expect(page.getByRole('link', { name: /Ingest More Videos/i })).toBeVisible();
@@ -221,30 +233,36 @@ test.describe('Channel Ingestion Flow', () => {
     });
 
     test('batch progress page shows back to ingest link', async ({ page }) => {
-      // Fetch and ingest videos
-      await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
-      await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
-        timeout: 60000,
-      });
-
-      await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
+      if (sharedBatchUrl) {
+        await page.goto(sharedBatchUrl);
+      } else {
+        await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
+        await page.getByRole('button', { name: /Fetch Videos/i }).click();
+        await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+          timeout: 60000,
+        });
+        await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
+        await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
+        sharedBatchUrl = page.url();
+      }
 
       // Check back to ingest link
       await expect(page.getByRole('link', { name: /Back to Ingest/i })).toBeVisible();
     });
 
     test('batch progress page displays batch details and video list', async ({ page }) => {
-      // Fetch and ingest videos
-      await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
-      await page.getByRole('button', { name: /Fetch Videos/i }).click();
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
-        timeout: 60000,
-      });
-
-      await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/);
+      if (sharedBatchUrl) {
+        await page.goto(sharedBatchUrl);
+      } else {
+        await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
+        await page.getByRole('button', { name: /Fetch Videos/i }).click();
+        await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+          timeout: 60000,
+        });
+        await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
+        await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
+        sharedBatchUrl = page.url();
+      }
 
       // Wait for batch details to load (batch name should appear in heading)
       await expect(page.getByRole('heading', { name: /Darci Isabella/i })).toBeVisible({
@@ -259,22 +277,21 @@ test.describe('Channel Ingestion Flow', () => {
       // This test verifies the fix for the bug where the link used status=ready (invalid)
       // instead of status=completed (valid)
 
-      // Fetch and ingest videos
-      await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
-      await page.getByRole('button', { name: /Fetch Videos/i }).click();
-
-      // Wait for videos to load
-      await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
-        timeout: 60000,
-      });
-
-      await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
-      await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 15000 });
+      if (sharedBatchUrl) {
+        await page.goto(sharedBatchUrl);
+      } else {
+        await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
+        await page.getByRole('button', { name: /Fetch Videos/i }).click();
+        await expect(page.locator('[data-testid="video-item"]').first()).toBeVisible({
+          timeout: 60000,
+        });
+        await page.getByRole('button', { name: /Ingest All Channel Videos/i }).click();
+        await expect(page).toHaveURL(/\/ingest\/[a-f0-9-]+/, { timeout: 30000 });
+        sharedBatchUrl = page.url();
+      }
 
       // Wait for batch to potentially complete or have some succeeded items
       // The "View Ready Videos" link only appears when succeeded_count > 0
-
-      // Wait a bit for potential processing
       await page.waitForTimeout(5000);
 
       // Check if View Ready link exists (it may not if no videos succeeded yet)

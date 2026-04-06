@@ -1,0 +1,14 @@
+{
+  "featureName": "Azure CI/CD Pipelines",
+  "featureId": "F002",
+  "phase": "execution",
+  "intent": "GREENFIELD",
+  "workflow": "poc",
+  "milestone": "M2",
+  "taskIndex": 81,
+  "totalTasks": 81,
+  "completedTasks": 78,
+  "currentAgent": null,
+  "awaitingApproval": false,
+  "updatedAt": "2026-04-04T16:06:41Z"
+}

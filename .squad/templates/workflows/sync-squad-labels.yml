@@ -3,8 +3,8 @@ name: Sync Squad Labels
 on:
   push:
     paths:
-      - ".squad/team.md"
-      - ".ai-team/team.md"
+      - '.squad/team.md'
+      - '.ai-team/team.md'
   workflow_dispatch:
 
 permissions:

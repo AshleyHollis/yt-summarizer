@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import hashlib
 import hmac
 import json
 import re
 import secrets
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlencode, urlparse
@@ -51,14 +49,6 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 
-@dataclass
-class SessionData:
-    user_info: dict[str, Any]
-    access_token: str
-    id_token: str | None
-    expires_at: datetime
-
-
 class UserInfo(BaseModel):
     sub: str
     email: str | None = None
@@ -73,33 +63,45 @@ class LogoutResponse(BaseModel):
     message: str
 
 
-class SessionStore:
-    def __init__(self) -> None:
-        self._sessions: dict[str, SessionData] = {}
-        self._lock = asyncio.Lock()
+def _build_session_token(user_info: dict[str, Any], secret: str, ttl_seconds: int) -> str:
+    """Encode user_info into a signed cookie value.
 
-    async def create_session(self, data: SessionData) -> str:
-        session_id = secrets.token_urlsafe(32)
-        async with self._lock:
-            self._sessions[session_id] = data
-        return session_id
-
-    async def get_session(self, session_id: str) -> SessionData | None:
-        async with self._lock:
-            data = self._sessions.get(session_id)
-            if not data:
-                return None
-            if data.expires_at <= datetime.now(timezone.utc):
-                self._sessions.pop(session_id, None)
-                return None
-            return data
-
-    async def delete_session(self, session_id: str) -> None:
-        async with self._lock:
-            self._sessions.pop(session_id, None)
+    Format: base64url(json(payload)).hmac_sha256_signature
+    The payload contains user_info, iat, and exp — no server-side state required.
+    """
+    payload = {
+        "user": user_info,
+        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "exp": int((datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)).timestamp()),
+    }
+    raw = _b64encode(json.dumps(payload, separators=(",", ":")).encode())
+    signature = _sign_value(raw, secret)
+    return f"{raw}.{signature}"
 
 
-session_store = SessionStore()
+def _parse_session_token(value: str, secret: str) -> dict[str, Any] | None:
+    """Decode and verify a signed session cookie value.
+
+    Returns the payload dict if valid and not expired, None otherwise.
+    """
+    try:
+        raw, signature = value.split(".", 1)
+    except ValueError:
+        return None
+
+    expected_signature = _sign_value(raw, secret)
+    if not hmac.compare_digest(signature, expected_signature):
+        return None
+
+    try:
+        payload = json.loads(_b64decode(raw))
+    except Exception:
+        return None
+
+    if payload.get("exp", 0) < int(datetime.now(timezone.utc).timestamp()):
+        return None
+
+    return payload
 
 
 def _b64encode(payload: bytes) -> str:
@@ -309,20 +311,45 @@ async def auth0_callback(
         )
 
     user_info = await _fetch_user_info(access_token, auth.domain)
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=auth.session_ttl_seconds)
 
-    session_data = SessionData(
-        user_info=user_info,
-        access_token=access_token,
-        id_token=token_data.get("id_token"),
-        expires_at=expires_at,
-    )
-    session_id = await session_store.create_session(session_data)
+    # Merge custom claims from ID token — when AUTH0_AUDIENCE is not configured,
+    # Auth0 returns an opaque access token and /userinfo only returns standard OIDC
+    # claims. The ID token (always a JWT) contains the role claim from the Action.
+    id_token = token_data.get("id_token")
+    if id_token:
+        try:
+            id_token_payload = json.loads(_b64decode(id_token.split(".")[1]))
+            role_claim = id_token_payload.get("https://yt-summarizer.com/role")
+            logger.info(
+                "ID token decoded at callback",
+                has_role_claim=role_claim is not None,
+                role=role_claim,
+                correlation_id=correlation_id,
+            )
+            for key, value in id_token_payload.items():
+                # Overwrite missing keys AND null values — /userinfo may return the
+                # key with null when using an opaque access token, which would prevent
+                # the role from being set if we only checked `key not in user_info`.
+                if key not in user_info or user_info[key] is None:
+                    user_info[key] = value
+        except Exception as exc:
+            logger.warning(
+                "Failed to decode ID token for custom claims — role may be missing",
+                error=str(exc),
+                correlation_id=correlation_id,
+            )
+    else:
+        logger.warning(
+            "No ID token in token response — custom claims will not be available",
+            correlation_id=correlation_id,
+        )
+
+    session_token = _build_session_token(user_info, auth.session_secret, auth.session_ttl_seconds)
 
     response = RedirectResponse(url=return_to, status_code=status.HTTP_302_FOUND)
     response.set_cookie(
         auth.session_cookie_name,
-        session_id,
+        session_token,
         httponly=True,
         secure=True,
         samesite="none",
@@ -337,20 +364,19 @@ async def auth0_callback(
 async def logout(request: Request) -> JSONResponse:
     settings = get_settings()
 
-    # Check for session cookie first before validating settings
+    # Check for session cookie before validating full settings
     session_cookie_name = settings.auth.session_cookie_name
-    session_id = request.cookies.get(session_cookie_name)
-    if not session_id:
+    cookie_value = request.cookies.get(session_cookie_name)
+    if not cookie_value:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    session_data = await session_store.get_session(session_id)
-    if not session_data:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-
-    # Now that we know user is authenticated, validate full auth settings
+    # Now validate full auth settings
     auth = _ensure_auth_settings(settings)
 
-    await session_store.delete_session(session_id)
+    payload = _parse_session_token(cookie_value, auth.session_secret)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
     response = JSONResponse({"success": True, "message": "Logged out successfully"})
     response.set_cookie(
         auth.session_cookie_name,
@@ -370,15 +396,16 @@ async def get_current_user(request: Request) -> UserInfo:
 
     # Check for session cookie first before validating settings
     session_cookie_name = settings.auth.session_cookie_name
-    session_id = request.cookies.get(session_cookie_name)
-    if not session_id:
+    cookie_value = request.cookies.get(session_cookie_name)
+    if not cookie_value:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    session_data = await session_store.get_session(session_id)
-    if not session_data:
+    auth = _ensure_auth_settings(settings)
+    payload = _parse_session_token(cookie_value, auth.session_secret)
+    if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    return UserInfo(**session_data.user_info)
+    return UserInfo(**payload["user"])
 
 
 class SessionResponse(BaseModel):
@@ -401,21 +428,24 @@ async def get_session(request: Request) -> SessionResponse:
     except HTTPException:
         return SessionResponse(isAuthenticated=False)
 
-    session_id = request.cookies.get(auth.session_cookie_name)
-    if not session_id:
+    cookie_value = request.cookies.get(auth.session_cookie_name)
+    if not cookie_value:
         return SessionResponse(isAuthenticated=False)
 
-    session_data = await session_store.get_session(session_id)
-    if not session_data:
+    payload = _parse_session_token(cookie_value, auth.session_secret)
+    if not payload:
         return SessionResponse(isAuthenticated=False)
 
-    # Transform user_info to match frontend expectations
-    user_info = session_data.user_info
+    # Transform user_info to match frontend expectations.
+    # IMPORTANT: custom claims (role) must be forwarded — Auth0 Actions add them
+    # to the userinfo payload using a namespaced key.
+    user_info = payload["user"]
     user = {
         "id": user_info.get("sub", ""),
         "email": user_info.get("email", ""),
         "name": user_info.get("name", ""),
         "picture": user_info.get("picture"),
+        "https://yt-summarizer.com/role": user_info.get("https://yt-summarizer.com/role"),
     }
 
     return SessionResponse(user=user, isAuthenticated=True)

@@ -16,75 +16,72 @@
 ## Learnings
 <!-- Append learnings below -->
 
-### 2026-03-05 — Preview PR-177 Infrastructure Audit
+### 2026-04-04 — ESO Pause State Leak in Preview Namespaces
 
-**Secrets (all synced via ExternalSecret → azure-keyvault-cluster ClusterSecretStore):**
-- `auth0-credentials` — keys: `client-id`, `client-secret`, `domain`, `session-secret` ✅
-- `db-credentials` — keys: `connection-string` ✅
-- `openai-credentials` — keys: `api-key`, `azure-api-key`, `azure-deployment`, `azure-embedding-deployment`, `azure-endpoint` ✅
-- `proxy-credentials` — keys: `username`, `password` ✅ (populated; note historically was empty in prod)
-- `storage-credentials` — keys: `connection-string` (single string covers blob + queue) ✅
+**Root cause of chat-responses failure ("Expected at least 2 assistant messages, found 1")**:
+The old AKS mutation workaround in preview.yml (removed in 8766386b) paused the
+openai-credentials ExternalSecret reconciler (econcile.external-secrets.io/paused=true)
+and never unpaused it. Even after Terraform was fixed to write correct Azure OpenAI creds to
+Key Vault (TF_VAR_azure_openai_* vars added), ESO won't sync those values in paused namespaces.
 
-**Pods — all 5 Running, 0 restarts:**
-- `api`, `transcribe-worker`, `summarize-worker`, `embed-worker`, `relationships-worker` all `1/1 Running` ✅
+**Fix**: Added "Unpause openai-credentials ESO" step in sync-argocd-manifests before ArgoCD
+sync. Removes the paused annotation and triggers orce-sync so the K8s secret is populated
+with real credentials before pods are restarted by ArgoCD on the new image tag.
 
-**Worker env vars:**
-- `transcribe-worker`: DATABASE_URL, AZURE_STORAGE_CONNECTION_STRING, OPENAI_API_KEY, PROXY_USERNAME, PROXY_PASSWORD ✅
-- `summarize-worker`: DATABASE_URL, AZURE_STORAGE_CONNECTION_STRING, OPENAI_API_KEY, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT ✅
-- `embed-worker`: DATABASE_URL, AZURE_STORAGE_CONNECTION_STRING, OPENAI_API_KEY, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_EMBEDDING_DEPLOYMENT ✅
-- `relationships-worker`: DATABASE_URL, AZURE_STORAGE_CONNECTION_STRING, OPENAI_API_KEY ✅ (no Azure OpenAI keys — consistent with its role using standard OpenAI only)
+**Key pattern**: When removing an AKS mutation workaround, always add a remediation step that
+cleans up the state the workaround left behind.
 
-**Azure Storage queue connectivity (all HTTP 200 from worker logs):**
-- `transcribe-jobs`, `summarize-jobs`, `embed-jobs`, `relationships-jobs` — all polling successfully ✅
+### 2026-04-04 — Auth-Signout ERR_ABORTED Pattern on SWA /sign-in
 
-**ArgoCD app `preview-pr-177`**: `Synced` + `Healthy` @ revision `b3e7c6e5` ✅
+Two distinct causes, two distinct fixes:
+1. **Custom browser context (rowser.newContext())**: Does NOT inherit aseURL from
+   playwright.config.ts. Relative paths in page.goto('/sign-in') resolve against the last
+   visited URL — which could be Auth0's domain after the logout redirect. Fix: always use
+   absolute URLs (\/sign-in) in custom context tests.
+2. **SWA redirect to Auth0**: Azure SWA /sign-in may immediately redirect to Auth0 (external
+   domain), causing Playwright's waitUntil: 'domcontentloaded' to never fire (ERR_ABORTED).
+   Fix: use waitUntil: 'commit' (fires on first response headers) + .catch(() => {}) + early
+   return if page.url() is on an external provider domain.
 
-**No issues found.** Preview environment is fully functional.
+**Pattern**: Wherever E2E tests navigate to /sign-in in an SWA context, use waitUntil: 'commit'
+and treat Auth0 redirect as a passing condition (the sign-in flow works — just via external IdP).
 
-### 2026-03-04 — Production Deployment Verification
-- **transcribe-worker crash root cause**: `proxy-credentials` K8s secret has empty `username` and `password` values. The ExternalSecret reports `SecretSynced: True`, meaning Key Vault secrets exist but contain empty strings. Fix: populate Webshare proxy credentials in Azure Key Vault (`proxy-username`, `proxy-password`).
-- **Pod labels follow `app.kubernetes.io/name=<name>` pattern** — `kubectl -l app=<name>` won't match; use `app.kubernetes.io/name=<name>` selector.
-- **Gateway lives in `gateway-system` namespace** (not `yt-summarizer`). Gateway IP: `135.235.188.138`. HTTPRoute lives in `yt-summarizer` namespace.
-- **TLS wildcard cert** `yt-summarizer-wildcard` is issued and `True` in `gateway-system`.
-- **Azure SWA `swa-ytsumm-prd`** not found in `rg-ytsumm-prd-ci` — either not yet provisioned via Terraform or deployed under a different resource group.
-- **ArgoCD `yt-summarizer-prod`** is `Synced` but `Progressing` — held back by transcribe-worker crash loop.
-- **Latest "Deploy to Production" run (#252) failed**: Terraform workflow YAML error — `Unexpected value ''` at `terraform-deploy.yml` line 127 (empty expression in `continue-on-error`). Likely a recently introduced template bug.
-- **`/health/ready` returns HTTP 200** — API is externally reachable and healthy.
-- **DNS resolves correctly**: `api.yt-summarizer.apps.ashleyhollis.com` → `135.235.188.138` ✅
+### 2026-04-04 — E2E AKS Mutation Root-Cause Analysis
 
-**Cross-agent findings:**
-- Frontend SWA (`https://white-meadow-0b8e2e000.6.azurestaticapps.net`) has no deployed content (Kane finding) — users cannot access app.
-- API CORS broken, security headers missing (Ripley findings) — browser-side calls will fail, security posture degraded.
+**Root cause**: 	erraform-deploy.yml never passes TF_VAR_azure_openai_api_key, TF_VAR_azure_openai_endpoint, TF_VAR_azure_openai_deployment, or TF_VAR_azure_openai_embedding_deployment to Terraform. All four ariables.tf declarations default to "". Every Terraform run overwrites the four zure-openai-* Key Vault secrets with empty strings. ESO syncs empty values into the K8s openai-credentials secret. Workers/API start with blank Azure OpenAI env vars.
 
-### 2026-03-04 — Infrastructure Fixes Post-Rebuild
+**The E2E patch step** (preview.yml lines 606–684) was added as a workaround — pulling values from GitHub Secrets and directly patching the K8s Secret + restarting pods. It also pauses ESO reconciliation (econcile.external-secrets.io/paused=true) and **never unpauses it**, leaving a state leak in every preview namespace.
 
-**Pipeline Fix (PR #169):**
-- **Root cause of `Unexpected value ''`**: GitHub Actions converts boolean `false` to empty string `''` when used in `${{ }}` expressions outside `if:` conditionals. `continue-on-error: ${{ inputs.post-to-pr }}` when `post-to-pr` is `false` → `continue-on-error: ''` → YAML parse error.
-- **Fix**: Changed to ternary string pattern `${{ inputs.post-to-pr && 'true' || 'false' }}` which always produces a valid boolean string.
+**Fix**: Add four TF_VAR_azure_openai_* env vars to both jobs in 	erraform-deploy.yml (secrets already exist as AZURE_OPENAI_* in GitHub). Then remove the two AKS-mutation steps from the E2E job. No changes to xternalsecret-openai.yaml or ariables.tf needed — both are already correct.
 
-**Key Vault RBAC Fix (Azure CLI):**
-- The `github-actions-yt-summarizer` SP (OID: `0a8480bd-2b41-449f-b16e-badd5616ae15`) had NO Key Vault role assignment after the cluster rebuild. Terraform plan failed with 403 ForbiddenByRbac on ALL Key Vault secret reads.
-- **Fix**: Granted `Key Vault Secrets Officer` role on `kv-ytsumm-prd-ci` via `az role assignment create`. This is a bootstrap dependency — Terraform needs KV access to run, so it can't self-provision this role.
+**Key insight**: For a fresh preview namespace, ESO syncs the ExternalSecret on creation — no restart trigger needed. The existing erify-deployment health check is the correct readiness gate before E2E.
 
-**Infrastructure Audit — All Configs Aligned to New Region (centralindia):**
-- Cluster: `aks-ytsumm-prd-ci` in `centralindia` ✓
-- ACR: `acrytsummprdci` in `centralindia` ✓
-- Key Vault: `kv-ytsumm-prd-ci` in `centralindia` ✓
-- DNS: `api.yt-summarizer.apps.ashleyhollis.com` → `135.235.188.138` ✓
-- Gateway IP: `135.235.188.138` ✓
-- All workflow files use parameterized `${{ vars.X || 'default' }}` pattern with correct defaults ✓
-- SecretStore/ClusterSecretStore reference correct Key Vault URL ✓
-- Workload Identity client ID matches across K8s manifests and deployed SA ✓
-- No hardcoded old-region references found in active configs (only in `INFRASTRUCTURE_ISSUES.md` doc)
+---
 
-**SWA Situation:**
-- `swa-ytsumm-prd` does NOT exist in Azure — resource destroyed during rebuild, not yet recreated.
-- SWA is defined in Terraform (`swa.tf`). Once the fixed pipeline runs Terraform, it will create the new SWA.
-- After creation, `SWA_DEPLOYMENT_TOKEN` GitHub secret needs updating with the new SWA API key (from Terraform output `swa_api_key`).
-- Stale SWA callback URL in `variables.tf` (`red-grass-06d413100-64.eastasia.6.azurestaticapps.net`) — harmless, will be replaced when new SWA is created.
+*Older learnings archived to .squad/archive/agents/parker-history-archive.md*
 
-**ExternalSecret Configs — Correct, Data Issue Only:**
-- All SecretStore/ClusterSecretStore configs reference `kv-ytsumm-prd-ci` correctly.
-- All ExternalSecrets report `SecretSynced: True` / `Ready`.
-- Proxy credentials (`webshare-proxy-username`, `webshare-proxy-password`) are empty strings in Key Vault — manual population required by Ashley via Azure Portal/CLI.
-- transcribe-worker is in Error state (was CrashLoopBackOff) due to empty proxy credentials.
+### 2026-04-06 — Auth0 RCA: Missing Env Vars + MAX_FAILURES Adjustment
+
+**Challenge**: Workflow appearing to skip LIVE_PROCESSING tests "by design" — found infrastructure misconfiguration instead.
+
+**Finding: preview.yml Env Var Drift**
+- `preview.yml` E2E job lacked `AUTH0_SECRET`, `AUTH0_BASE_URL`, `AUTH0_TEST_EMAIL`, `AUTH0_TEST_PASSWORD`
+- These were present in `preview-e2e.yml` but not mirrored to main preview step
+- When auth setup fails early, it generates 5+ quick failures → `maxFailures=5` aborts the run → LIVE_PROCESSING tests never execute
+- Appeared "by design" but was actually incomplete env var coverage
+
+**Fix Applied** (commit 3a09dbf5)
+- Added missing Auth0 env vars to `preview.yml` E2E step
+- LIVE_PROCESSING IS correctly forwarded through shared-infra composite action (confirmed via code trace)
+- Now auth setup succeeds and allows tests to proceed
+
+**MAX_FAILURES Adjustment** (pending commit)
+- Raised from 5 → 10 in preview E2E workflows
+- Rationale: LLM-based test generation causes non-deterministic flakes in setup phase
+- Allows transient errors to resolve naturally instead of aborting prematurely
+- 5 is too aggressive when dealing with generated tests; 10 better balances signal vs. tolerance
+
+**Pattern for Future**
+- Always cross-check both `preview.yml` and `preview-e2e.yml` for env var coverage when debugging E2E failures
+- MAX_FAILURES=5 is baseline too low for LIVE_PROCESSING runs; prefer 10+
+- When a workflow appears to skip tests "by design", check infrastructure setup first before assuming intentional behavior

@@ -203,12 +203,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Uses runtime config to get the correct backend URL
         const apiUrl = getClientApiUrl();
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        // 30s timeout: preview API can cold-start slowly; 5s was too aggressive
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         const response = await fetch(`${apiUrl}/api/auth/session`, {
           signal: controller.signal,
           credentials: 'include',
-          headers: { 'Accept': 'application/json' },
+          headers: { Accept: 'application/json' },
         });
 
         clearTimeout(timeoutId);

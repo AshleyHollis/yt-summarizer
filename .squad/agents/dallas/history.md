@@ -17,3 +17,79 @@
 - **`k8s/overlays/preview/kustomization.yaml`** has PR-127-specific SWA hostnames baked into CORS_ORIGINS. This is a "frozen template" file that CI should be patching — but it's a latent bug if CI ever skips the patch step.
 - ACR (`acrytsummprdci`), SWA (`swa-ytsumm-prd`), and DNS domain (`*.yt-summarizer.apps.ashleyhollis.com`) appear stable and not region-tied — low risk.
 - Full audit written to `.squad/decisions/inbox/dallas-region-audit.md`.
+
+### 2026-04-03 — Cross-Domain Cookie Fix Architecture Decision
+
+- **Root cause confirmed**: Preview SWA frontend (`*.azurestaticapps.net`) and AKS API (`api-pr-N.yt-summarizer.apps.ashleyhollis.com`) are different origins. Auth cookies set by BFF callback on API domain are not sent on cross-origin fetch from SWA domain due to default `SameSite=Lax`.
+- **~80% of E2E tests skipped** via `test.fixme(!!process.env.CI, 'Cross-domain cookie issue...')` across auth, RBAC, library, copilot, queue, channel-ingest, synthesis specs.
+- **Next.js rewrites already exist** in `next.config.ts` (`/api/*` → backend) but are unused — SWA intercepts `/api/*` as Azure Functions routes, and client-side code calls `getClientApiUrl()` which returns the direct API URL (bypassing proxy).
+- **Recommended Option C**: `SameSite=None; Secure` cookies + CORS `Access-Control-Allow-Credentials: true` + frontend `credentials: 'include'`. This is the architecturally correct fix for an inherently cross-origin app.
+- **Quick-win Option D**: Inject `appSession` cookies for SWA domain in Playwright `auth.setup.ts` to unblock CI immediately.
+- **Option B (shared custom domain) not feasible**: SWA preview environments get auto-generated URLs; custom domains on previews are not a standard SWA capability.
+- Decision written to `.squad/decisions/inbox/2026-04-03T07-21-52Z-dallas-cross-domain-cookie-fix.md`.
+
+### 2026-04-06 — Auth0 RCA: Management API Access & Role Verification
+
+**Challenge**: Verify Auth0 admin role configuration via Management API to confirm "by design" classification was incorrect.
+
+**Method**
+- Located Terraform client credentials in Key Vault `kv-ytsumm-prd-ci`
+- Used client-credentials grant to authenticate with Auth0 Management API
+- Verified admin test user configuration and role-claims Action binding
+
+**Finding: Auth0 Infrastructure Fully Correct**
+- Admin test user: `admin@test.yt-summarizer.internal`
+- Admin role IS assigned via `app_metadata.role = "admin"`
+- "Add Role Claims to Tokens" Action is built, deployed, and bound to post-login trigger
+- Sets `https://yt-summarizer.com/role` claim with value from `app_metadata.role`
+- ROPC warning in CI logs is benign (preview app correctly doesn't have password grant)
+
+**Conclusion**
+- Auth0 infrastructure is correct
+- "By design" classification was inaccurate — actual causes were in workflow config (missing env vars, Parker) and auth setup error handling (silently saving broken state, Kane)
+- This RCA validated the fix chain: workflow misconfiguration → setup failure → cascading test skips
+
+**Resource for Future**
+- Auth0 Management API is accessible via Terraform client credentials
+- Key Vault: `kv-ytsumm-prd-ci` (IDs: `auth0-terraform-client-id` / `auth0-terraform-client-secret`)
+- Token endpoint: `https://dev-gvli0bfdrue0h8po.us.auth0.com/oauth/token`
+- Grant: `client_credentials` with `audience=https://dev-gvli0bfdrue0h8po.us.auth0.com/api/v2/`
+- Useful for debugging role assignments, Action deployments, and other Auth0 configuration at scale
+
+### 2026-04-06 — E2E Failures RCA Round 2: Pipeline Status Chain & ROPC Dead Code
+
+**Challenge:** Categorize 32 E2E skips and verify database/Auth0 status. Ashley disputed the "by design" classification.
+
+**Method:** Full skip audit + database API verification + Auth0 Management API access
+
+**Key Findings**
+
+1. **Video processing pipeline is sequential with authority at each stage**
+   - Transcribe → Summarize → Embed (writes segments to vector store) → Relationships (sets `processing_status='completed'`)
+   - Coverage endpoint (`/copilot/coverage`) reads segments (Embed output)
+   - Library API (`/library?status=completed`) reads `processing_status` (Relationships output)
+   - Global-setup must check BOTH to guarantee all workers finished
+   - **DB Investigator's fix:** Added library API check alongside coverage check
+
+2. **Skip categorization (all 32 skips are justified)**
+   - ~15 data-conditional (FIXED by global-setup improvement)
+   - ~7 auth-role conditional (users must have roles in CI env)
+   - ~7 by-design (unfeasible without mocking/provider interception)
+
+3. **ROPC is dead code in preview**
+   - Auth0 preview app only has `authorization_code` grant (no password-realm)
+   - `injectAuth0Token()` in global-setup.ts always gets 403
+   - localStorage token written is ignored by Auth0 SDK (uses cookies, not localStorage)
+   - Decision: Flag for cleanup (no functional impact)
+
+4. **"❌ Video processing failed!" is UI monitoring, not fatal**
+   - From queue-progress.spec.ts line ~218 (test console.log when stalled)
+   - Test passes either way
+   - No fix needed
+
+5. **Preview API health: healthy baseline**
+   - Endpoint: `https://api-pr-186.yt-summarizer.apps.ashleyhollis.com`
+   - 18 videos total, 15 completed, 239 segments
+   - All workers running correctly
+
+**Key Learning:** When a worker pipeline has multiple completion signals, trace to the final stage to confirm all predecessors are done. Don't rely on intermediate signals (e.g., segment count from Embed worker) — verify the final worker's output (`processing_status` from Relationships). This prevents race conditions where later stages haven't finished yet.

@@ -18,6 +18,7 @@ except ImportError:
         class MockSettings:
             class auth:
                 session_cookie_name = "session"
+                session_secret = ""
 
         return MockSettings()
 
@@ -25,7 +26,7 @@ except ImportError:
         return logging.getLogger(name)
 
 
-from ..routes.auth import session_store
+from ..routes.auth import _parse_session_token
 
 logger = get_logger(__name__)
 
@@ -85,23 +86,24 @@ async def require_auth(request: Request) -> AuthenticatedUser:
 
     # Fall back to session cookie auth
     settings = get_settings()
-    session_cookie_name = settings.auth.session_cookie_name
+    auth = settings.auth
+    session_cookie_name = auth.session_cookie_name
 
-    session_id = request.cookies.get(session_cookie_name)
-    if not session_id:
+    cookie_value = request.cookies.get(session_cookie_name)
+    if not cookie_value:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
 
-    session_data = await session_store.get_session(session_id)
-    if not session_data:
+    payload = _parse_session_token(cookie_value, auth.session_secret)
+    if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session expired or invalid",
         )
 
-    user_info = session_data.user_info
+    user_info = payload["user"]
     return AuthenticatedUser(
         sub=user_info.get("sub", ""),
         email=user_info.get("email"),

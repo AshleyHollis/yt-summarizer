@@ -133,10 +133,9 @@ yt-summarizer/
 │   ├── runbooks/               # Operational guides
 │   └── adr/                    # Architecture decision records
 │
-├── .specify/                   # Speckit configuration
 ├── .github/
 │   ├── workflows/              # CI/CD pipelines
-│   └── prompts/                # Speckit prompts
+│   └── agents/                 # Squad agent definitions
 │
 ├── .gitignore
 └── README.md

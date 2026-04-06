@@ -24,8 +24,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Username/Password Authentication @auth', () => {
-  // Auth0 Universal Login: custom login form UI doesn't exist; tests need rework
-  test.fixme(!!process.env.CI, 'Auth0 Universal Login — custom login form tests not applicable');
   test.describe('Login Form UI', () => {
     test('renders username/password form on login page', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
@@ -35,11 +33,11 @@ test.describe('Username/Password Authentication @auth', () => {
       await expect(emailInput).toBeVisible();
 
       // Should show password input
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       await expect(passwordInput).toBeVisible();
 
       // Should show submit button
-      const submitButton = page.getByRole('button', { name: /sign in/i });
+      const submitButton = page.getByTestId('submit-button');
       await expect(submitButton).toBeVisible();
     });
 
@@ -77,7 +75,7 @@ test.describe('Username/Password Authentication @auth', () => {
     test('password input has correct type and attributes', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
 
       // Should be password type (hidden by default)
       await expect(passwordInput).toHaveAttribute('type', 'password');
@@ -102,7 +100,7 @@ test.describe('Username/Password Authentication @auth', () => {
     test('submit button is disabled when form is empty', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
-      const submitButton = page.getByRole('button', { name: /sign in/i }).last();
+      const submitButton = page.getByTestId('submit-button');
 
       // Button should be disabled when form is empty
       await expect(submitButton).toBeDisabled();
@@ -112,8 +110,8 @@ test.describe('Username/Password Authentication @auth', () => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
-      const passwordInput = page.getByLabel('Password');
-      const submitButton = page.getByRole('button', { name: /sign in/i }).last();
+      const passwordInput = page.getByTestId('password-input');
+      const submitButton = page.getByTestId('submit-button');
 
       // Fill in invalid email
       await emailInput.fill('invalid-email');
@@ -140,8 +138,8 @@ test.describe('Username/Password Authentication @auth', () => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
-      const passwordInput = page.getByLabel('Password');
-      const submitButton = page.getByRole('button', { name: /sign in/i }).last();
+      const passwordInput = page.getByTestId('password-input');
+      const submitButton = page.getByTestId('submit-button');
 
       // Fill in valid data
       await emailInput.fill('test@example.com');
@@ -156,7 +154,7 @@ test.describe('Username/Password Authentication @auth', () => {
     test('password visibility toggle shows/hides password', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       const toggleButton = page.getByLabel(/show password/i);
 
       // Initially password should be hidden
@@ -203,41 +201,13 @@ test.describe('Username/Password Authentication @auth', () => {
       const freshPage = await context.newPage();
 
       try {
-        await freshPage.goto('http://localhost:3000/sign-in', { waitUntil: 'networkidle' });
-
-        const emailInput = freshPage.getByLabel(/email/i);
-        const passwordInput = freshPage.getByLabel('Password');
-        const submitButton = freshPage.getByRole('button', { name: /sign in/i }).last();
-
-        // Fill in test credentials
-        await emailInput.fill(process.env.AUTH0_ADMIN_TEST_EMAIL!);
-        await passwordInput.fill(process.env.AUTH0_ADMIN_TEST_PASSWORD!);
-
-        // Submit form
-        await submitButton.click();
-
-        // Should redirect away from login page after successful auth
-        await freshPage.waitForURL((url) => !url.pathname.includes('/sign-in'), {
-          timeout: 10000,
+        await freshPage.goto(`${process.env.BASE_URL || 'http://localhost:3000'}/sign-in`, {
+          waitUntil: 'networkidle',
         });
 
-        // Verify we're authenticated
-        expect(freshPage.url()).not.toContain('/sign-in');
-      } finally {
-        await context.close();
-      }
-    });
-
-    test('displays loading state during login', async ({ browser }) => {
-      const context = await browser.newContext({ storageState: undefined });
-      const freshPage = await context.newPage();
-
-      try {
-        await freshPage.goto('http://localhost:3000/sign-in', { waitUntil: 'networkidle' });
-
         const emailInput = freshPage.getByLabel(/email/i);
-        const passwordInput = freshPage.getByLabel('Password');
-        const submitButton = freshPage.getByRole('button', { name: /sign in/i }).last();
+        const passwordInput = freshPage.getByTestId('password-input');
+        const submitButton = freshPage.getByTestId('submit-button');
 
         // Fill in test credentials
         await emailInput.fill(process.env.AUTH0_ADMIN_TEST_EMAIL!);
@@ -282,7 +252,7 @@ test.describe('Username/Password Authentication @auth', () => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
       const emailInput = page.getByLabel(/email/i);
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
 
       // Should have ARIA attributes
       await expect(emailInput).toHaveAttribute('aria-label');
@@ -316,11 +286,11 @@ test.describe('Username/Password Authentication @auth', () => {
       const emailInput = page.getByLabel(/email/i);
       await expect(emailInput).toBeVisible();
 
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       await expect(passwordInput).toBeVisible();
 
       // Should see submit button
-      const submitButton = page.getByRole('button', { name: /sign in/i }).last();
+      const submitButton = page.getByTestId('submit-button');
       await expect(submitButton).toBeVisible();
     });
 
@@ -338,7 +308,7 @@ test.describe('Username/Password Authentication @auth', () => {
       const emailInput = page.getByLabel(/email/i);
       await expect(emailInput).toBeVisible();
 
-      const passwordInput = page.getByLabel('Password');
+      const passwordInput = page.getByTestId('password-input');
       await expect(passwordInput).toBeVisible();
     });
   });

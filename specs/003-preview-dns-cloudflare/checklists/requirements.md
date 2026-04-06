@@ -2,6 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
 **Created**: January 11, 2026  
+**Migrated**: January 12, 2026  
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -32,6 +33,7 @@
 ## Notes
 
 - All items pass validation
-- Specification is ready for `/speckit.clarify` or `/speckit.plan`
-- The user provided extensive detail and locked-in decisions, eliminating need for clarification questions
-- Assumptions section documents reasonable defaults for Auth0 wildcard support, app naming, and gateway controller choice
+- **Migration (2026-01-12)**: Requirements section refactored to remove Kubernetes-specific resource types (Gateway, HTTPRoute, ClusterIssuer, GatewayClass) and replace with behaviour-focused, technology-agnostic language. Technology decisions live in `research.md` and `plan.md`.
+- **Problem Statement** renamed to **Context** to better reflect the section purpose (this is a completed feature — the "why" is historical record rather than a problem to solve).
+- **Assumptions** updated to remove technology-specific assumptions (NGINX Gateway Fabric, Let's Encrypt specifics) in favour of capability-level assumptions (DNS validation for wildcards, identity provider wildcard support).
+- Feature is **fully implemented** (46/46 tasks complete, validated with live PR #5). See `IMPLEMENTATION_COMPLETE.md` for full verification evidence.

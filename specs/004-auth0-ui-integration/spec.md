@@ -2,16 +2,21 @@
 
 **Feature Branch**: `004-auth0-ui-integration`  
 **Created**: 2026-01-19  
-**Status**: Draft  
+**Status**: In Progress (~50% implemented — authentication context, session management utilities, and infrastructure module exist; role-based access control and test account provisioning in progress)  
 **Input**: User description: "We've implemented Auth0 auth on the API. We now need to implement it E2E in the UI. There needs to be admin users and normal users. I want to use social logins so I don't have to store credentials. We will need to figure out a strategy to enable testers and AI to test/access the app so we will need test accounts. Test account credentials should be stored in Azure Key Vault so we can retrieve them later."
 
 ## Clarifications
 
 ### Session 2026-01-19
 
-- Q: What happens when a user's session expires during active use? → A: Redirect to login with "Session expired" message, preserve intended destination for post-login redirect
-- Q: How should the system handle OAuth authentication failures (e.g., user denies consent, provider error)? → A: Display inline error message on login page (e.g., "Login failed. Please try again.") with retry button and option to choose different provider
-- Q: What authentication events must be logged for security and audit purposes? → A: Log security-critical events only (login attempts, login failures, role changes, session expirations, unauthorized access attempts) with correlation IDs
+- **Q**: What happens when a user's session expires during active use?  
+  **A**: Redirect to login with "Session expired" message, preserve intended destination for post-login redirect
+
+- **Q**: How should the system handle OAuth authentication failures (e.g., user denies consent, provider error)?  
+  **A**: Display inline error message on login page (e.g., "Login failed. Please try again.") with retry button and option to choose different provider
+
+- **Q**: What authentication events must be logged for security and audit purposes?  
+  **A**: Log security-critical events only (login attempts, login failures, role changes, session expirations, unauthorized access attempts) with correlation IDs
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -96,27 +101,27 @@ Existing automated test suites (unit, integration, E2E) must continue to functio
 ### Edge Cases
 
 #### Authentication & Security
-- **Social provider account deleted or suspended**: Auth0 will return an authentication error; system displays a graceful error message on the login page informing the user their social account is unavailable and prompts them to try an alternative login method (see FR-015b).
-- **OAuth consent denial or provider errors**: System displays inline error message on login page with retry button and option to choose different login method (see FR-015b)
-- **Role changed while user has an active session**: The stale role persists until the user's session token is refreshed or expires (up to 24 hours). Role changes take effect on the next session. This is an accepted limitation of JWT-based auth with long-lived tokens; administrators should inform affected users to sign out and back in for immediate effect.
-- How does the system handle expired or invalid authentication tokens?
-- **Session expiration during active use**: System redirects to login with "Session expired" message and preserves intended destination URL for post-login redirect (see FR-015a)
-- What happens when secure credential storage is unavailable and test credentials cannot be retrieved?
-- How does the system handle users who attempt to authenticate with an email that exists in both social login and username/password methods?
-- What happens when the authentication service is temporarily unavailable?
-- What happens if a user tries to use username/password with an email that's already registered via social login?
+
+- **Social provider account deleted or suspended**: The system displays a graceful error message on the login page informing the user their social account is unavailable and prompts them to try an alternative login method.
+- **OAuth consent denial or provider errors**: The system displays an inline error message on the login page with a retry button and the option to choose a different login method.
+- **Expired or invalid authentication tokens**: Treated as unauthenticated state — the user is redirected to the login page with a "Session expired" message and their intended destination is preserved for post-login redirect.
+- **Session expiration during active use**: System redirects to login with "Session expired" message and preserves the intended destination URL for post-login redirect.
+- **Role changed while user has an active session**: The previous role persists until the user's session expires or they sign out and back in. Role changes take effect on the next login. Administrators should inform affected users to re-authenticate for immediate effect. This is an accepted trade-off for session-based auth with standard token lifetimes.
+- **Credential storage temporarily unavailable**: The system displays a user-friendly "Service temporarily unavailable" message and prompts the user to retry. No partial authentication state is created.
+- **Email registered under both social login and username/password**: Social login and username/password identities are treated as separate accounts. Users who registered via social login cannot authenticate via username/password with the same email unless explicitly provisioned. Account linking is out of scope for this feature.
 
 #### Testing & CI/CD
-- What happens when CI/CD pipeline cannot retrieve test credentials from secure storage?
-- How do tests handle authentication failures during pipeline execution?
-- What happens when authentication provider rate limits are hit during test execution?
+
+- **CI/CD pipeline cannot retrieve test credentials from secure storage**: The pipeline fails immediately with a descriptive error identifying which credentials could not be retrieved and the likely cause. Tests are not executed with missing credentials to prevent false results.
+- **Authentication failures during test pipeline execution**: Test failures due to authentication are clearly distinguished from test assertion failures in pipeline reporting. Transient failures (e.g., network blip) trigger a bounded retry before marking the run as failed.
+- **Authentication provider rate limits hit during test execution**: Tests reuse authenticated sessions where possible to minimise provider calls. If rate limits are hit, the pipeline reports a clear warning and implements backoff retry rather than silently failing.
 
 #### Engineering Quality & Maintainability
-- What happens when a developer imports auth context directly instead of using dependency injection?
-- How does the system handle circular dependencies if non-auth components try to import from auth internals?
-- What happens when a new developer tries to add auth to a component without reading documentation?
-- How does the system behave when auth module tests fail but non-auth tests pass?
-- What happens when a developer tries to add a third role without understanding the configuration-driven approach?
+
+- **Authentication module boundaries violated**: The module boundary design makes incorrect usage of internal auth details immediately apparent — any component attempting to depend on authentication internals rather than the public interface will fail clearly rather than silently misbehaving.
+- **New developer adds authentication to a component**: The authentication module documentation provides step-by-step guidance; following the documented approach should be the path of least resistance for any new team member.
+- **A third role needs to be added**: Adding a new role requires only configuration changes (infrastructure and role type definition) with no modification to core access-control logic, as designed for extensibility.
+- **Auth module tests fail while non-auth tests pass**: Test organisation separates authentication and non-authentication tests so failures can be diagnosed independently without noise from unrelated test suites.
 
 ## Requirements *(mandatory)*
 
@@ -151,26 +156,26 @@ Existing automated test suites (unit, integration, E2E) must continue to functio
 - **FR-023**: Test suites MUST be able to authenticate programmatically without manual intervention
 - **FR-024**: E2E tests MUST be able to test both authenticated and unauthenticated user flows
 
-#### Engineering Quality (Constitution VI.1-VI.5)
-- **FR-025**: Authentication components MUST be isolated in dedicated module with clear boundaries (Maintainability)
-- **FR-026**: Authentication logic MUST NOT leak into non-auth components; use dependency injection for auth context (Modularity)
-- **FR-027**: All authentication functions MUST be testable in isolation without Auth0 API calls (Testability)
-- **FR-028**: Authentication module MUST provide interfaces that can be mocked for testing (Testability)
-- **FR-029**: Role-based access control logic MUST be extensible to support additional roles without modifying core logic (Extensibility)
-- **FR-030**: Auth configuration (providers, roles) MUST be driven by configuration, not hardcoded conditionals (Extensibility)
-- **FR-031**: Authentication module MUST have README with setup instructions, usage examples, and architecture diagram (Onboarding)
-- **FR-032**: Public authentication API MUST be documented with TypeScript interfaces and JSDoc comments (Onboarding)
-- **FR-033**: Auth module MUST have single public entry point; internal implementation details MUST NOT be exported (Modularity)
-- **FR-034**: Error handling in auth flows MUST follow single responsibility principle (one error type per failure mode) (Maintainability)
+#### Engineering Quality (Maintainability, Testability, Extensibility, Onboarding)
+- **FR-025**: Authentication functionality MUST be contained within a clearly bounded, self-contained module that can be understood, modified, and tested independently of the rest of the application (Maintainability)
+- **FR-026**: Non-authentication application areas MUST interact with authentication only through a defined public interface — internal authentication details MUST NOT be depended upon outside that module (Modularity)
+- **FR-027**: All authentication functions MUST be independently verifiable through automated tests without requiring connections to external authentication services (Testability)
+- **FR-028**: The authentication module MUST support test environments where external provider calls can be simulated without real service dependencies (Testability)
+- **FR-029**: Role-based access control logic MUST be extensible to support additional roles without modifying core authentication logic (Extensibility)
+- **FR-030**: Authentication provider configuration (social connections, user roles) MUST be driven by configuration, not hardcoded conditionals in application logic (Extensibility)
+- **FR-031**: The authentication module MUST include developer documentation covering setup instructions, usage examples, and an architecture overview (Onboarding)
+- **FR-032**: The public authentication interface MUST be documented with usage examples and clearly defined contracts for each capability (Onboarding)
+- **FR-033**: The authentication module MUST expose a single, documented public interface; internal implementation details MUST remain private and unexposed to the rest of the application (Modularity)
+- **FR-034**: Each distinct authentication failure mode (session expired, unauthorized access, provider error) MUST produce a distinct, self-describing error state with clear recovery guidance for the user (Maintainability)
 - **FR-035**: System MUST log security-critical authentication events (login attempts, login failures, role changes, session expirations, unauthorized access attempts) with correlation IDs for audit and debugging purposes (Observability)
 
 ### Key Entities
 
-- **User**: Represents an authenticated person using the application; has attributes including unique identifier, email, display name, profile picture (if from social provider), username (if using username/password), role (admin or normal), and authentication method used (social provider name or username/password)
-- **Session**: Represents an active user session; contains authentication access token, refresh token, expiration time, and user profile information
-- **Role**: Defines user permissions; two types: "admin" (full access to all features) and "normal" (access to standard user features only)
-- **Test Account**: Special user accounts for testing using username/password authentication; stored in authentication provider with credentials in secure storage; includes account type (admin or normal) and credential retrieval path
-- **Authentication Method**: Defines how a user authenticates; either social provider (Google, GitHub, etc.) or username/password (for test accounts and admin users)
+- **User**: Represents an authenticated person using the application. Key attributes: unique identifier (scoped to the identity provider used), verified email address, display name (optional, populated by social providers), profile picture URL (optional, populated by social providers), username (only for test/database accounts), role (admin or normal), and the timestamp of last profile update.
+- **Session**: Represents an active user session. Contains the authenticated user's profile, a credential for making authorised API calls, session expiration time, and an optional renewal credential. Sessions are stored securely in the browser and are not accessible to client-side scripts.
+- **Role**: Defines user permissions. Two values: "admin" (full access including all administrative features) and "normal" (access to standard user features — video submission, viewing summaries, personal library — with no access to administrative features).
+- **Test Account**: Special user accounts created exclusively for automated testing and QA purposes. Provisioned via infrastructure automation with securely generated credentials stored in secure credential storage. Each test account has a designated role (admin or normal) and is independent of production end-user accounts.
+- **Authentication Method**: Defines how a user authenticated. Either via social provider (Google or GitHub OAuth consent flow) or direct username/password (database connection, test accounts only). The method is derivable from the user's unique identifier.
 
 ## Success Criteria *(mandatory)*
 
@@ -193,15 +198,15 @@ Existing automated test suites (unit, integration, E2E) must continue to functio
 - **SC-014**: CI/CD pipeline test execution time does not increase by more than 20% after adding authentication
 - **SC-015**: Test suites can authenticate and execute successfully in CI/CD environment without manual credential configuration
 
-#### Engineering Quality (Constitution VI.1-VI.5)
-- **SC-016**: Auth module has zero circular dependencies with other modules (Modularity)
-- **SC-017**: 100% of auth functions are unit testable without real Auth0 API calls (Testability)
-- **SC-018**: Adding a new role (e.g., "moderator") requires changes to configuration only, not core logic (Extensibility)
-- **SC-019**: Auth module README exists with setup guide, examples, and architecture diagram (Onboarding)
-- **SC-020**: All public auth functions have TypeScript types and JSDoc documentation (Maintainability)
-- **SC-021**: Auth context can be injected/mocked in any component without tight coupling (Testability)
-- **SC-022**: Auth error types are self-documenting with clear error messages and recovery guidance (Maintainability)
-- **SC-023**: All security-critical authentication events (login attempts, failures, role changes, session expirations, unauthorized access) are logged with correlation IDs and queryable in observability platform (Observability)
+#### Engineering Quality (Maintainability, Testability, Extensibility, Onboarding)
+- **SC-016**: The authentication module has no dependencies on non-authentication application modules — all dependency flow is one-directional, from application features toward authentication, never the reverse (Modularity)
+- **SC-017**: 100% of authentication functions are verifiable through automated tests that run without any external service connections (Testability)
+- **SC-018**: Adding a new role (e.g., "moderator") requires changes to configuration only, not to core authentication or access-control logic (Extensibility)
+- **SC-019**: Authentication module documentation exists covering setup guide, usage examples, and architecture overview, enabling a new developer to integrate authentication correctly without prior context (Onboarding)
+- **SC-020**: All public authentication capabilities are documented with usage examples and clearly defined input/output contracts (Maintainability)
+- **SC-021**: Authentication state can be substituted with a simulated test double in any application component without tight coupling to the authentication implementation (Testability)
+- **SC-022**: Each authentication error state is self-describing — it communicates what went wrong and how to recover, without requiring a developer to cross-reference external documentation (Maintainability)
+- **SC-023**: All security-critical authentication events (login attempts, failures, role changes, session expirations, unauthorized access) are captured with correlation IDs and queryable in the observability platform (Observability)
 
 ## Assumptions
 
@@ -213,7 +218,7 @@ Existing automated test suites (unit, integration, E2E) must continue to functio
 - Social provider OAuth applications (Google, GitHub) are already registered and their credentials are available for Terraform configuration
 - Auth0 database connection is enabled via Terraform for username/password authentication
 - Azure Key Vault instance exists and is accessible from CI/CD pipelines and authorized personnel
-- The API already validates Auth0 JWT tokens and extracts user role information
+- The API already validates authentication tokens issued by the authentication provider and extracts user role information
 - Test accounts and initial admin users will be provisioned via Terraform with credentials stored in Azure Key Vault
 - Test account passwords will be generated securely and stored in Azure Key Vault during Terraform deployment
 - End users will primarily use social login, but username/password option is available as fallback

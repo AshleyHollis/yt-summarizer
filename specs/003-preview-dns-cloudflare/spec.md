@@ -2,19 +2,20 @@
 
 **Feature Branch**: `003-preview-dns-cloudflare`  
 **Created**: January 11, 2026  
-**Status**: Draft  
+**Completed**: January 12, 2026  
+**Status**: Complete  
 **Input**: User description: "Migrate Preview DNS/TLS from nip.io to apps.ashleyhollis.com (Cloudflare Delegation + Gateway API + Per-App Wildcard Certs)"
 
 ---
 
-## Problem Statement
+## Context
 
-The current preview platform on AKS uses wildcard DNS services (nip.io/sslip.io) combined with cert-manager and Let's Encrypt for TLS in preview environments. This approach is hitting Let's Encrypt rate limits due to:
+The preview platform was using third-party wildcard DNS services (nip.io/sslip.io) together with individually-issued TLS certificates for each preview environment. This approach hit certificate authority rate limits because:
 
-1. Shared domains (nip.io) causing rate limit collisions with other users
-2. Per-preview certificate issuance creating excessive certificate requests
+1. Shared third-party domains caused rate limit collisions with other users on those services
+2. Issuing a fresh certificate per pull request consumed the weekly quota quickly
 
-Preview environments must remain fast to create, provide browser-trusted TLS, and eliminate dependency on external wildcard DNS services.
+This feature replaces that approach with a dedicated subdomain under the team's own domain (`apps.ashleyhollis.com`), automated DNS record management, and a single wildcard certificate per application that covers every environment — eliminating both the rate limit risk and the dependency on external DNS services.
 
 ---
 
@@ -115,67 +116,55 @@ When certificate issuance fails or DNS records aren't created, the platform team
 
 ### Functional Requirements
 
-#### DNS & Cloudflare
+#### DNS Management
 
-- **FR-001**: System MUST create DNS records within the existing Cloudflare zone `ashleyhollis.com` for hostnames under `apps.ashleyhollis.com` (e.g., wildcard record `*.yt-summarizer.apps` for routing, plus automated TXT records for DNS-01 challenges).
-- **FR-002**: System MUST use a Cloudflare API token with least-privilege permissions for cert-manager (TXT records for DNS-01) and ExternalDNS (A/CNAME record management).
-- **FR-003**: All DNS records under `apps.ashleyhollis.com` MUST be managed exclusively through automation (ExternalDNS) or documented manual procedures.
+- **FR-001**: The platform MUST provide dedicated, human-readable DNS hostnames under `apps.ashleyhollis.com` for every application environment (production, staging, and each pull request preview).
+- **FR-002**: DNS records MUST be created automatically when a new environment is provisioned and removed automatically when that environment is torn down — no manual DNS changes required.
+- **FR-003**: Automated DNS management MUST be scoped exclusively to `apps.ashleyhollis.com`; records in any other zone MUST NOT be modified automatically.
+- **FR-004**: The credentials used for automated DNS management MUST follow least-privilege — granting only the minimum permissions necessary and nothing broader.
 
-#### Gateway API & Routing
+#### Traffic Routing
 
-- **FR-004**: System MUST install Gateway API CRDs (standard channel) in the AKS cluster.
-- **FR-005**: System MUST deploy a Gateway API controller (NGINX Gateway Fabric) in the cluster.
-- **FR-006**: System MUST configure a shared `Gateway` resource in `gateway-system` namespace that terminates TLS for all `*.apps.ashleyhollis.com` traffic.
-- **FR-007**: System MUST define a `GatewayClass` resource for the NGINX Gateway Fabric controller.
-- **FR-008**: Each environment (prod, staging, preview) MUST have an `HTTPRoute` that routes traffic from its hostname to the appropriate backend service.
+- **FR-005**: All plain HTTP traffic to application hostnames MUST be automatically redirected to HTTPS.
+- **FR-006**: The platform MUST route each incoming hostname to the correct application service without additional manual configuration per environment.
+- **FR-007**: Production, staging, and all preview environments MUST be served through the same shared routing layer with no per-environment infrastructure duplication.
 
 #### Certificates & TLS
 
-- **FR-009**: System MUST configure a cert-manager `ClusterIssuer` using Let's Encrypt production with DNS-01 challenge via Cloudflare.
-- **FR-010**: System MUST issue one wildcard `Certificate` per app (e.g., `*.yt-summarizer.apps.ashleyhollis.com`) stored in `gateway-system` namespace.
-- **FR-011**: System MUST NOT issue per-preview certificates; all previews MUST use the app's wildcard certificate.
-- **FR-012**: Gateway listeners MUST reference the per-app wildcard certificate secrets for TLS termination.
-- **FR-013**: Certificates MUST auto-renew at least 30 days before expiry.
-
-#### ExternalDNS
-
-- **FR-014**: System MUST deploy ExternalDNS configured to watch Gateway API `HTTPRoute` resources.
-- **FR-015**: ExternalDNS MUST create A/CNAME records in Cloudflare when HTTPRoutes are created.
-- **FR-016**: ExternalDNS MUST delete DNS records when HTTPRoutes are deleted or namespaces are removed.
-- **FR-017**: ExternalDNS MUST use TXT registry ownership to prevent record collisions.
-- **FR-018**: ExternalDNS MUST be domain-filtered to only manage records under `apps.ashleyhollis.com`.
+- **FR-008**: The platform MUST provision browser-trusted TLS certificates covering all hostnames under `apps.ashleyhollis.com`.
+- **FR-009**: A single certificate per application MUST cover every environment for that application, including all current and future pull request previews.
+- **FR-010**: The platform MUST NOT request a new certificate when a pull request preview environment is created; the existing per-application certificate MUST be reused.
+- **FR-011**: Certificates MUST auto-renew at least 30 days before expiry without any service disruption or manual intervention.
 
 #### Preview Workflow
 
-- **FR-019**: GitHub Actions MUST compute preview hostnames using pattern `api-pr-<PR>.{app}.apps.ashleyhollis.com`.
-- **FR-020**: GitHub Actions MUST deploy preview resources: namespace, deployment, service, and HTTPRoute.
-- **FR-021**: GitHub Actions MUST pass `API_BASE_URL` to SWA build pointing to the preview API hostname.
-- **FR-022**: GitHub Actions MUST post a PR comment with both SWA preview URL and API preview URL.
-- **FR-023**: On PR close, GitHub Actions MUST delete the preview namespace, triggering cascade deletion of HTTPRoute and DNS records.
-- **FR-024**: System MUST NOT use nip.io, sslip.io, xip.io, or any similar wildcard DNS service.
+- **FR-012**: Pull request preview environments MUST be accessible at the URL pattern `api-pr-<PR_NUMBER>.<app>.apps.ashleyhollis.com`.
+- **FR-013**: Preview environments MUST be provisioned automatically when a pull request is opened and must be ready within 5 minutes.
+- **FR-014**: Preview environments MUST be fully removed automatically when their pull request is closed or merged.
+- **FR-015**: DNS records for a removed preview environment MUST be cleaned up within 10 minutes of the environment teardown.
+- **FR-016**: The system MUST NOT depend on any third-party wildcard DNS service (nip.io, sslip.io, xip.io, or equivalent).
+- **FR-017**: The CI/CD pipeline MUST post a comment on each pull request containing both the SWA preview URL and the API preview URL.
 
 #### Authentication (Auth0 BFF)
 
-- **FR-025**: API MUST implement `/api/auth/login?returnTo=<web-url>` endpoint that initiates Auth0 authorization flow.
-- **FR-026**: API MUST implement `/api/auth/callback/auth0` endpoint that handles Auth0 callback and sets session cookie.
-- **FR-027**: API MUST implement `POST /api/auth/logout` endpoint that clears the session cookie (local logout only initially).
-- **FR-028**: Session cookies MUST be configured with: `HttpOnly`, `Secure`, `Path=/`, `SameSite=None` (for cross-origin SWA requests).
-- **FR-029**: Cookies MUST NOT set a `Domain` attribute (host-only cookies).
-- **FR-030**: API MUST implement strict CORS origin allowlist supporting credentialed requests from production web domain and `*.azurestaticapps.net` SWA previews.
-- **FR-031**: API MUST NOT use `Access-Control-Allow-Origin: *` with credentials.
+- **FR-018**: The API MUST provide an authentication initiation endpoint (`/api/auth/login`) that redirects users to the identity provider and accepts an optional post-login return URL.
+- **FR-019**: The API MUST provide an authentication callback endpoint that completes the identity provider flow and establishes a user session.
+- **FR-020**: The API MUST provide a logout endpoint that clears the user's session.
+- **FR-021**: Session credentials MUST be delivered as secure, HTTP-only cookies that work correctly for credentialed cross-origin requests from SWA preview domains.
+- **FR-022**: The API MUST enforce a strict allowlist of permitted cross-origin origins for all credentialed requests.
+- **FR-023**: The API MUST NOT permit unrestricted cross-origin access (`*`) for credentialed requests.
 
-#### Auth0 Configuration
+#### Identity Provider Configuration
 
-- **FR-032**: Auth0 application MUST have allowed callback URLs for prod, staging, and preview API hostnames.
-- **FR-033**: Auth0 application MUST have allowed web origins for production web domain and SWA preview domains.
+- **FR-024**: The identity provider application MUST permit authentication callbacks from all application hostnames (production, staging, and preview).
+- **FR-025**: The identity provider application MUST permit cross-origin requests from the production web domain and SWA preview domains.
 
 ### Key Entities
 
-- **Gateway**: Shared Kubernetes resource that terminates TLS and routes traffic to HTTPRoutes. Lives in `gateway-system` namespace.
-- **HTTPRoute**: Per-environment routing rule that maps a hostname to a backend service. Created in each environment's namespace.
-- **Certificate**: Per-app wildcard TLS certificate issued by cert-manager. Referenced by Gateway listeners.
-- **ClusterIssuer**: Cluster-wide cert-manager configuration for Let's Encrypt DNS-01 via Cloudflare.
-- **Preview Namespace**: Ephemeral namespace (`preview-pr-<PR>`) containing all preview resources for a PR.
+- **Application Environment**: A running instance of the application (production, staging, or pull-request preview) with its own hostname and routing configuration.
+- **Per-App Wildcard Certificate**: A single TLS certificate that covers every environment for one application, shared across all current and future previews to avoid certificate authority rate limits.
+- **Preview Environment**: An ephemeral, isolated deployment created for a pull request, identified by its PR number, and automatically removed on PR closure.
+- **DNS Ownership Record**: A companion record created alongside each DNS entry to track which automation system owns it, preventing record collisions when multiple tools are running.
 
 ---
 
@@ -183,35 +172,35 @@ When certificate issuance fails or DNS records aren't created, the platform team
 
 ### Measurable Outcomes
 
-- **SC-001**: Preview environments are accessible via browser-trusted HTTPS within 5 minutes of PR creation.
-- **SC-002**: No certificate warnings or errors appear when accessing any preview URL in modern browsers.
-- **SC-003**: Zero Let's Encrypt rate limit errors occur during normal operation (no per-preview certificate issuance).
-- **SC-004**: Only one Certificate resource exists per app, regardless of the number of active preview environments.
-- **SC-005**: DNS records for closed PRs are removed within 10 minutes of PR closure.
-- **SC-006**: Preview cleanup completes without orphaned resources (namespaces, DNS records, or secrets).
-- **SC-007**: Zero references to nip.io, sslip.io, or xip.io remain in code, workflows, or manifests.
-- **SC-008**: Authenticated SWA preview users can successfully call protected API preview endpoints.
-- **SC-009**: Runbooks exist and are verified for: cert-manager DNS-01 failures, ExternalDNS record creation failures, and Gateway/HTTPRoute attachment issues.
+- **SC-001**: Pull request preview environments are accessible via browser-trusted HTTPS within 5 minutes of the PR being opened.
+- **SC-002**: No certificate warnings or errors appear when accessing any preview URL in any modern browser.
+- **SC-003**: Zero certificate authority rate limit errors occur during normal operation, regardless of how many simultaneous preview environments exist.
+- **SC-004**: Exactly one certificate exists per application at all times, regardless of the number of active pull request previews.
+- **SC-005**: DNS records for closed pull requests are removed within 10 minutes of PR closure.
+- **SC-006**: Preview cleanup leaves no orphaned resources — no dangling namespaces, DNS records, or credentials remain after a PR is closed.
+- **SC-007**: Zero references to third-party wildcard DNS services (nip.io, sslip.io, xip.io) remain anywhere in code, workflows, or configuration.
+- **SC-008**: Authenticated SWA preview users can successfully call protected API preview endpoints with their credentials intact.
+- **SC-009**: Runbooks exist and are verified for all foreseeable failure modes: certificate issuance failures, DNS record creation failures, and routing attachment issues.
 
 ---
 
 ## Assumptions
 
 1. **App naming**: The primary application is named `yt-summarizer`. Hostname patterns use this app name (e.g., `api-pr-42.yt-summarizer.apps.ashleyhollis.com`).
-2. **Cloudflare Free tier**: Cloudflare Free tier is sufficient for the required DNS and API features.
-3. **NGINX Gateway Fabric**: NGINX Gateway Fabric is the chosen Gateway API controller unless the platform already uses a different controller.
-4. **Let's Encrypt production**: Using Let's Encrypt production (not staging) for trusted certificates.
-5. **Single Gateway**: A single shared Gateway in `gateway-system` handles all app traffic; multi-gateway is not required initially.
-6. **Auth0 wildcard support**: Auth0 supports wildcard patterns in allowed callback URLs (e.g., `https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/...`) or requires enumeration of allowed URLs.
-7. **SWA preview URL format**: Azure Static Web Apps preview URLs follow a predictable pattern under `*.azurestaticapps.net`.
+2. **DNS zone ownership**: The team owns and controls the `ashleyhollis.com` DNS zone and can delegate `apps.ashleyhollis.com` records to automated management.
+3. **Certificate authority**: The certificate authority (Let's Encrypt) supports DNS-based validation for wildcard certificates via a DNS provider API.
+4. **Single routing layer**: A single shared routing component in the cluster handles all application traffic; multi-instance routing is not required initially.
+5. **Identity provider wildcard support**: The identity provider supports wildcard patterns in allowed callback URLs (e.g., `https://api-pr-*.yt-summarizer.apps.ashleyhollis.com/...`) or enumeration of specific preview URLs.
+6. **SWA preview URL format**: Azure Static Web Apps preview URLs follow a predictable pattern under `*.azurestaticapps.net`.
+7. **Cloudflare Free tier**: The Cloudflare Free tier is sufficient for the required DNS management API features.
 
 ---
 
 ## Out of Scope
 
-- Global Auth0 logout (initially implementing local logout only)
-- Multi-app support beyond `yt-summarizer` (can be added later using the same patterns)
-- Custom domains for SWA preview environments (SWA previews use `azurestaticapps.net`)
-- IPv6 (AAAA records) support
-- mTLS or client certificate authentication
-- Rate limiting or WAF rules at the Gateway level
+- Global identity provider logout (local session logout only — invalidating the session at the identity provider is a separate feature)
+- Multi-app support beyond `yt-summarizer` (the same patterns apply and can be extended, but configuration is out of scope here)
+- Custom domains for SWA preview environments (SWA previews use `azurestaticapps.net` managed by Azure)
+- IPv6 address record support
+- Mutual TLS or client certificate authentication
+- Rate limiting or web application firewall rules at the routing layer

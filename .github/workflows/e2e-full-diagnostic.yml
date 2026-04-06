@@ -1,0 +1,138 @@
+# =============================================================================
+# Full E2E Diagnostic Run
+# =============================================================================
+# Runs ALL Playwright E2E tests against a preview environment with no failure
+# limit. Used to get a complete picture of all failing tests so they can be
+# fixed in a single batch.
+#
+# USAGE:
+#   gh workflow run e2e-full-diagnostic.yml \
+#     -f environment_url=https://preview-pr-186.example.com \
+#     -f api_url=https://api-pr-186.example.com \
+#     -f pr_number=186
+#
+# CONFLICT PREVENTION:
+#   Uses the same concurrency group as preview-e2e.yml. If a regular E2E run
+#   is in progress this workflow will queue and start automatically when clear.
+
+name: E2E Full Diagnostic Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment_url:
+        description: "Base URL of the preview environment (e.g., https://pr-123.preview.ytsumm.dev)"
+        required: true
+        type: string
+      api_url:
+        description: "API URL of the preview environment (e.g., https://api-pr-123.preview.ytsumm.dev)"
+        required: true
+        type: string
+      pr_number:
+        description: "PR number for status reporting and artifact naming"
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: "22"
+
+# Same group as preview.yml — queues behind any in-progress deployment
+concurrency:
+  group: preview-${{ inputs.pr_number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  e2e-diagnostic:
+    name: E2E Full Diagnostic (all tests, no failure limit)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: AshleyHollis/shared-infra/.github/actions/setup-node@v1
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          working-directory: apps/web
+
+      - name: Wait for Frontend to be ready
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
+        with:
+          url: ${{ inputs.environment_url }}
+          max-attempts: "30"
+          interval-seconds: "10"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Preview Frontend"
+
+      - name: Wait for API to be ready
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
+        with:
+          url: ${{ inputs.api_url }}/health/live
+          max-attempts: "30"
+          interval-seconds: "10"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Preview API"
+
+      - name: Run ALL E2E tests (no failure limit)
+        uses: AshleyHollis/shared-infra/.github/actions/run-playwright-tests@v1
+        # Run all tests even when many fail — this is intentional for diagnostics
+        continue-on-error: true
+        env:
+          USE_EXTERNAL_SERVER: "true"
+          BASE_URL: ${{ inputs.environment_url }}
+          NEXT_PUBLIC_API_URL: ${{ inputs.api_url }}
+          API_URL: ${{ inputs.api_url }}
+          # Run ALL tests — no early exit
+          MAX_FAILURES: "0"
+          AUTH0_SECRET: ${{ secrets.AUTH0_SECRET }}
+          AUTH0_BASE_URL: ${{ inputs.environment_url }}
+          AUTH0_ISSUER_BASE_URL: ${{ secrets.AUTH0_ISSUER_BASE_URL }}
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+          AUTH0_ADMIN_TEST_EMAIL: ${{ secrets.AUTH0_ADMIN_TEST_EMAIL }}
+          AUTH0_ADMIN_TEST_PASSWORD: ${{ secrets.AUTH0_ADMIN_TEST_PASSWORD }}
+          AUTH0_USER_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
+          AUTH0_USER_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
+          AUTH0_TEST_EMAIL: ${{ secrets.AUTH0_USER_TEST_EMAIL }}
+          AUTH0_TEST_PASSWORD: ${{ secrets.AUTH0_USER_TEST_PASSWORD }}
+          YT_SUMMARIZER_API_KEY: ${{ secrets.YT_SUMMARIZER_API_KEY }}
+          LIVE_PROCESSING: "true"
+        with:
+          playwright-args: "--reporter=html,json"
+
+      - name: Upload full diagnostic report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-diagnostic-pr-${{ inputs.pr_number || 'manual' }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 14
+
+      - name: Comment on PR with diagnostic results
+        if: inputs.pr_number && always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const icon = status === 'success' ? '✅' : '🔬';
+            const reportUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt('${{ inputs.pr_number }}'),
+              body: `## ${icon} Full E2E Diagnostic Run\n\n` +
+                    `> This run had **no failure limit** — all tests ran to completion.\n\n` +
+                    `**Environment:** ${{ inputs.environment_url }}\n` +
+                    `**Status:** ${status}\n\n` +
+                    `📊 [View Full Playwright Report](${reportUrl}) — download the \`playwright-report-diagnostic-pr-${{ inputs.pr_number }}\` artifact for the interactive HTML report with all failure details.`
+            });

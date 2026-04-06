@@ -1,0 +1,14 @@
+{
+  "featureName": "Webshare Rotating Proxy Pool",
+  "featureId": "F005",
+  "phase": "execution",
+  "intent": "GREENFIELD",
+  "workflow": "poc",
+  "milestone": "M3",
+  "taskIndex": 15,
+  "totalTasks": 27,
+  "completedTasks": 15,
+  "currentAgent": null,
+  "awaitingApproval": false,
+  "updatedAt": "2026-04-04T16:01:00Z"
+}

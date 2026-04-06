@@ -27,8 +27,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Social Login Authentication @auth', () => {
-  // Cross-domain cookie issue: auth cookies on API domain aren't sent to SWA domain
-  test.fixme(!!process.env.CI, 'Cross-domain cookie issue in SWA preview environment');
   /**
    * Tests in this suite require authentication to be configured.
    * They will be skipped if auth setup failed or is not configured.
@@ -87,9 +85,9 @@ test.describe('Social Login Authentication @auth', () => {
     test('login page has beautiful gradient design', async ({ page }) => {
       await page.goto('/sign-in', { waitUntil: 'networkidle' });
 
-      // Check for main content container
-      const mainContent = page.locator('main');
-      await expect(mainContent).toBeVisible();
+      // Check for Google login button (present on the sign-in page)
+      const googleButton = page.getByTestId('google-login');
+      await expect(googleButton).toBeVisible();
 
       // Verify the page has semantic structure
       const heading = page.getByRole('heading', { level: 1 });
@@ -119,18 +117,15 @@ test.describe('Social Login Authentication @auth', () => {
     }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
     test('authenticated user is redirected from login page to dashboard', async ({ page }) => {
-      // Navigate to login page while authenticated
-      await page.goto('/sign-in');
+      // Navigate to home page — should show user profile (authenticated)
+      await page.goto('/');
 
-      // Should redirect away from login page (already authenticated)
-      // The exact redirect location depends on the app's auth flow
-      // It might go to /dashboard, /, or /add
-      await page.waitForURL((url) => !url.pathname.includes('/sign-in'), {
-        timeout: 5000,
-      });
+      // Should see user profile (authenticated state)
+      await expect(page.getByTestId('user-profile')).toBeVisible({ timeout: 10000 });
 
-      // Verify we're not on the login page anymore
-      expect(page.url()).not.toContain('/sign-in');
+      // Should NOT see the sign-in heading on the home page
+      const signInHeading = page.getByRole('heading', { name: /sign in/i });
+      await expect(signInHeading).not.toBeVisible();
     });
 
     test('authenticated user can see user profile component', async ({ page }) => {
@@ -223,30 +218,18 @@ test.describe('Social Login Authentication @auth', () => {
      * 5. Verify you're redirected back to the app with an active session
      */
 
-    test.skip('Google OAuth flow redirects to Auth0 login', async ({ page }) => {
-      // This test would require handling OAuth popups/redirects
-      // For now, it's documented as a manual test case
-
-      await page.goto('/sign-in');
-      const googleButton = page.getByRole('button', { name: /google/i });
-      await googleButton.click();
-
-      // Would need to handle Auth0 redirect and Google OAuth consent screen
-      // This is complex to automate and slow (30+ seconds)
-      // Instead, we use programmatic auth in auth.setup.ts
+    // BY DESIGN: OAuth flows require live browser interaction with third-party providers
+    // (Google, GitHub) and cannot be automated in CI. We use programmatic auth (auth.setup.ts)
+    // for authenticated test suites instead.
+    // TODO: If needed, implement with Auth0 test tenants and intercepted OAuth redirects.
+    test.skip('Google OAuth flow redirects to Auth0 login', async () => {
+      // Not automated: requires OAuth provider interaction (Google consent screen).
+      // Covered manually; programmatic auth in auth.setup.ts covers the authenticated path.
     });
 
-    test.skip('GitHub OAuth flow redirects to Auth0 login', async ({ page }) => {
-      // This test would require handling OAuth popups/redirects
-      // For now, it's documented as a manual test case
-
-      await page.goto('/sign-in');
-      const githubButton = page.getByRole('button', { name: /github/i });
-      await githubButton.click();
-
-      // Would need to handle Auth0 redirect and GitHub OAuth consent screen
-      // This is complex to automate and slow (30+ seconds)
-      // Instead, we use programmatic auth in auth.setup.ts
+    test.skip('GitHub OAuth flow redirects to Auth0 login', async () => {
+      // Not automated: requires OAuth provider interaction (GitHub consent screen).
+      // Covered manually; programmatic auth in auth.setup.ts covers the authenticated path.
     });
   });
 
@@ -262,15 +245,15 @@ test.describe('Social Login Authentication @auth', () => {
       const page = await context.newPage();
 
       try {
-        // Try to access the main app
-        await page.goto('http://localhost:3000/');
+        // Try to access a protected route — AuthGate shows login card inline (no redirect)
+        await page.goto(`${process.env.BASE_URL || 'http://localhost:3000'}/add`);
 
-        // Should redirect to login page
-        await page.waitForURL((url) => url.pathname.includes('/sign-in'), {
-          timeout: 5000,
-        });
+        // Protected content is gated — login card (Google button) should appear
+        const loginCard = page.getByRole('button', { name: /google/i });
+        await expect(loginCard).toBeVisible({ timeout: 10000 });
 
-        expect(page.url()).toContain('/sign-in');
+        // Should NOT see the user profile (not authenticated)
+        await expect(page.getByTestId('user-profile')).not.toBeVisible({ timeout: 5000 });
       } finally {
         await context.close();
       }
@@ -281,7 +264,7 @@ test.describe('Social Login Authentication @auth', () => {
       const page = await context.newPage();
 
       try {
-        await page.goto('http://localhost:3000/sign-in');
+        await page.goto(`${process.env.BASE_URL || 'http://localhost:3000'}/sign-in`);
 
         // Should see login page with social buttons
         const googleButton = page.getByRole('button', { name: /google/i });

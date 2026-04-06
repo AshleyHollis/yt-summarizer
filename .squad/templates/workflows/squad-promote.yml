@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run — show what would happen without pushing"
+        description: 'Dry run — show what would happen without pushing'
         required: false
-        default: "false"
+        default: 'false'
         type: choice
-        options: ["false", "true"]
+        options: ['false', 'true']
 
 permissions:
   contents: write

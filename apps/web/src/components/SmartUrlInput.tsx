@@ -85,6 +85,14 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
       }, 1500);
     } catch (err) {
       console.error('Video submission error:', err);
+      if (err instanceof ApiClientError && err.status === 409) {
+        // Video already exists — extract its ID and redirect rather than showing an error
+        const match = err.message.match(/video_id=([a-fA-F0-9-]{36})/);
+        if (match) {
+          setTimeout(() => router.push(`/videos/${match[1]}`), 500);
+          return;
+        }
+      }
       if (err instanceof ApiClientError) {
         setError(err.message);
       } else {

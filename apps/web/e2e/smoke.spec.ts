@@ -76,25 +76,17 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders submit form with URL input', async ({ page }) => {
-      test.fixme(
-        !!process.env.CI,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
-      // Check for URL input
+      // AuthGate requires auth — wait up to 15s for session fetch to complete
       const input = page.getByLabel(/YouTube URL/i);
-      await expect(input).toBeVisible();
+      await expect(input).toBeVisible({ timeout: 15000 });
 
       // Check placeholder text
       await expect(input).toHaveAttribute('placeholder', /YouTube URL/);
     });
 
     test('renders submit button', async ({ page }) => {
-      test.fixme(
-        !!process.env.CI,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
       const submitButton = page.getByRole('button', { name: /Enter URL/i });
-      await expect(submitButton).toBeVisible();
+      await expect(submitButton).toBeVisible({ timeout: 15000 });
     });
 
     test('renders add content heading', async ({ page }) => {
@@ -104,11 +96,9 @@ test.describe('Core User Flows @smoke', () => {
 
   test.describe('Form Validation', () => {
     test.beforeEach(async ({ page }) => {
-      test.skip(
-        !!process.env.CI,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
       await page.goto('/add');
+      // Wait for AuthGate to resolve (auth context fetches session cross-origin)
+      await expect(page.getByLabel(/YouTube URL/i)).toBeVisible({ timeout: 15000 });
     });
 
     test('submit button is disabled when URL is empty', async ({ page }) => {
@@ -157,11 +147,9 @@ test.describe('Core User Flows @smoke', () => {
 
   test.describe('Valid URL Input', () => {
     test.beforeEach(async ({ page }) => {
-      test.skip(
-        !!process.env.CI,
-        'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-      );
       await page.goto('/add');
+      // Wait for AuthGate to resolve before interacting with form
+      await expect(page.getByLabel(/YouTube URL/i)).toBeVisible({ timeout: 15000 });
     });
 
     test('accepts standard YouTube watch URL', async ({ page }) => {
@@ -202,11 +190,6 @@ test.describe('Video Submission (Requires Backend)', () => {
   test.skip(
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
-  );
-
-  test.fixme(
-    !!process.env.CI,
-    'Video submission pipeline not fully configured in preview (missing Azure OpenAI secrets)'
   );
 
   // Use a seeded video with verified auto-captions. dQw4w9WgXcQ (Rick Astley) has NO
@@ -256,6 +239,7 @@ test.describe('Video Submission (Requires Backend)', () => {
     // setTimeout in SmartUrlInput fires after the API resolves.
     await page.waitForFunction(
       () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
+      undefined,
       { timeout: 90_000 }
     );
     await expect(page).toHaveURL(/\/(?:videos|library)\/[a-zA-Z0-9-]+/);
@@ -279,6 +263,7 @@ test.describe('Video Submission (Requires Backend)', () => {
     // Allow 60s — under load the API can be slow to respond.
     await page.waitForFunction(
       () => /\/(?:videos|library)\/[a-zA-Z0-9-]+/.test(window.location.pathname),
+      undefined,
       { timeout: 60_000 }
     );
 
@@ -331,10 +316,6 @@ test.describe('Error Handling (Requires Backend)', () => {
   });
 
   test('handles non-existent video ID gracefully', async ({ page }) => {
-    test.fixme(
-      !!process.env.CI,
-      'Cross-domain auth cookies cause inconsistent error responses in preview'
-    );
     // Navigate directly to a non-existent video on /library/ (not /videos/)
     // /videos/ triggers a server-side redirect that can loop with CopilotKit
     await page.goto('/library/non-existent-video-id-12345');
@@ -349,30 +330,26 @@ test.describe('Error Handling (Requires Backend)', () => {
 
 test.describe('Accessibility', () => {
   test('submit form is keyboard accessible', async ({ page }) => {
-    test.fixme(
-      !!process.env.CI,
-      'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-    );
     await page.goto('/add');
-    await page.waitForLoadState('domcontentloaded');
 
-    // Wait for the URL input to be visible before testing keyboard navigation
-    const urlInput = page.getByLabel(/YouTube URL/i);
-    await expect(urlInput).toBeVisible({ timeout: 10_000 });
+    // Wait for auth to settle — the /add page renders a login gate while isLoading=true,
+    // then shows either the form (authenticated) or a sign-in prompt (unauthenticated).
+    await page.waitForLoadState('networkidle');
 
-    // Tab to the input
+    // Click body to ensure page focus is captured (required before Tab works reliably)
+    await page.locator('body').click({ position: { x: 1, y: 1 } });
+
+    // Tab to the first focusable element
     await page.keyboard.press('Tab');
+    await page.waitForTimeout(200);
 
-    // Should focus on the URL input or a focusable element
+    // Whether authenticated (URL input visible) or unauthenticated (social login buttons),
+    // Tab must move focus away from BODY to an interactive element.
     const activeElement = await page.evaluate(() => document.activeElement?.tagName);
     expect(['INPUT', 'BUTTON', 'A']).toContain(activeElement);
   });
 
   test('form input has accessible label', async ({ page }) => {
-    test.fixme(
-      !!process.env.CI,
-      'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-    );
     await page.goto('/add');
 
     // The input should be associated with a label
@@ -381,10 +358,6 @@ test.describe('Accessibility', () => {
   });
 
   test('form shows disabled button for invalid URLs', async ({ page }) => {
-    test.fixme(
-      !!process.env.CI,
-      'Cross-domain auth cookies prevent access to form behind AuthGate in preview'
-    );
     await page.goto('/add');
 
     const input = page.getByLabel(/YouTube URL/i);
