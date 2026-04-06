@@ -48,17 +48,22 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
       try {
         await page.goto('/');
 
+        // Wait for auth to finish loading — user-profile only renders after isLoading=false
+        // Without this wait, adminLinkCount is checked before the session API call completes
+        const userProfile = page.getByTestId('user-profile');
+        await expect(userProfile).toBeVisible({ timeout: 20000 });
+
         // Look for admin navigation link
         const adminLink = page.getByTestId('admin-nav-link');
         const adminLinkCount = await adminLink.count();
 
-        // If no admin link found, test user doesn't have admin role
+        // If no admin link found after auth loaded, admin role is missing from session
         if (adminLinkCount === 0) {
           test.skip(true, 'Test user does not have admin role - cannot test admin navigation');
         }
 
         // Admin link should be visible
-        await expect(adminLink).toBeVisible({ timeout: 10000 });
+        await expect(adminLink).toBeVisible({ timeout: 5000 });
       } finally {
         await context.close();
       }
@@ -74,6 +79,10 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
       try {
         await page.goto('/');
+
+        // Wait for auth to load before counting admin link
+        const userProfile1 = page.getByTestId('user-profile');
+        await expect(userProfile1).toBeVisible({ timeout: 20000 });
 
         const adminLink = page.getByTestId('admin-nav-link');
         const adminLinkCount = await adminLink.count();
@@ -103,6 +112,10 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
 
       try {
         await page.goto('/');
+
+        // Wait for auth to load before counting admin link
+        const userProfileCheck = page.getByTestId('user-profile');
+        await expect(userProfileCheck).toBeVisible({ timeout: 20000 });
 
         const adminLink = page.getByTestId('admin-nav-link');
         const adminLinkCount = await adminLink.count();
@@ -153,6 +166,10 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
           test.skip(true, 'Test user does not have admin role');
         }
 
+        // Wait for auth to load — user-profile only renders when isLoading=false && isAuthenticated
+        const userProfileBeforeAdminLink = page.getByTestId('user-profile');
+        await expect(userProfileBeforeAdminLink).toBeVisible({ timeout: 20000 });
+
         // In preview/external environments, cross-domain auth prevents the nav from
         // detecting the admin role — the admin-nav-link won't be rendered.
         const adminLink = page.getByTestId('admin-nav-link');
@@ -160,7 +177,7 @@ test.describe('Role-Based Navigation Menu Visibility @auth @rbac', () => {
         if (adminLinkCount === 0) {
           test.skip(
             true,
-            'Admin nav link not rendered — cross-domain auth prevents role detection in preview'
+            'Admin nav link not rendered — role may be missing from session after auth load'
           );
         }
 

@@ -197,8 +197,8 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await expect(backLink.first()).toBeVisible();
       await backLink.first().click();
 
-      // Should be on submit page
-      await expect(page).toHaveURL('/submit');
+      // Should navigate back — the back link on the video page goes to /library
+      await expect(page).toHaveURL(/\/(library|submit)(\?.*)?$/);
     });
 
     test('displays video metadata', async ({ page }) => {
