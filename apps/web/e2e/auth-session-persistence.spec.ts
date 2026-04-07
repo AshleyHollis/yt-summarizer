@@ -132,8 +132,8 @@ test.describe('Session Persistence @auth', () => {
       // Go back
       await page.goBack();
 
-      // Go forward
-      await page.goForward();
+      // Go forward — use domcontentloaded to avoid SWA full-load timeout in preview environments
+      await page.goForward({ waitUntil: 'domcontentloaded' });
 
       // Should still be authenticated
       await expect(userProfile).toBeVisible({ timeout: 10000 });
