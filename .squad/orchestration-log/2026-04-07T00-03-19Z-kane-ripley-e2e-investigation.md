@@ -14,7 +14,7 @@
 - **Mode:** background
 - **Model:** claude-sonnet-4.6
 - **Objective:** Investigate E2E test failures in preview run 24054339113 (job 70157864414). Previous run had 12 failed, 42 skipped. Fixes pushed in eebb47b5 — verify impact and fix remaining issues.
-- **Files Authorized:** 
+- **Files Authorized:**
   - apps/web/e2e/*
   - GitHub Actions logs (read via MCP)
 
