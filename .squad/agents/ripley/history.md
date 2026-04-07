@@ -16,6 +16,20 @@
 ## Learnings
 <!-- Append learnings below -->
 
+### 2026-05-xx — Library 500 fix: noload all lazy-selectin Video relationships
+
+**Root cause of 42 E2E skips:** `Video.segments`, `Video.artifacts`, and `Video.jobs` all have `lazy="selectin"` on the SQLAlchemy model. When SQLAlchemy loads a `Video` object, it auto-fires a SELECT for every `lazy="selectin"` relationship not explicitly overridden. Migration 015 added a `label` column to Segments — any `selectin` load of `Video.segments` on a DB without migration 015 would fail with a 500.
+
+**Fix in library_service.py:**
+- `_build_video_query`: noload `segments`, `artifacts`, AND `jobs` (all three have `lazy="selectin"`)
+- `get_video_detail`: noload `segments` and `jobs` (artifacts intentionally loaded via `selectinload`)
+- Use explicit COUNT queries for segment counts rather than loading the relationship
+
+**Fix in k8s/base/migration-job.yaml:**
+- Changed hook from `Sync` (wave 1) to `PreSync`. The old config ran the migration job AFTER default-wave (0) resources like the API deployment — so API pods could start while the DB was still unmigrated. `PreSync` guarantees migrations finish before any sync-phase resource starts.
+
+**Rule:** For any model with `lazy="selectin"` relationships, always explicitly add `noload()` in every query that doesn't need that relationship. Never rely on "not accessing the attribute" to prevent the auto-fire — SQLAlchemy fires on load, not on access.
+
 ### 2026-05-xx — CORS custom domain fix for preview environments
 
 **Root cause:** `cors_origin_regex` in `services/shared/shared/config.py` only matched `*.azurestaticapps.net`. E2E tests hit the SWA custom domain (`pr-NNN.yt-summarizer.apps.ashleyhollis.com`) which was rejected by CORS, stripping credentials and making all auth-protected tests fail.
