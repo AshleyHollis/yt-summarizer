@@ -85,7 +85,12 @@ class LibraryService:
         Returns:
             SQLAlchemy select query.
         """
-        query = select(Video).options(selectinload(Video.channel), noload(Video.segments))
+        query = select(Video).options(
+            selectinload(Video.channel),
+            noload(Video.segments),
+            noload(Video.artifacts),
+            noload(Video.jobs),
+        )
 
         # Apply filters
         if filters.channel_id:
@@ -212,6 +217,8 @@ class LibraryService:
             .options(
                 selectinload(Video.channel),
                 selectinload(Video.artifacts),
+                noload(Video.segments),
+                noload(Video.jobs),
             )
             .where(Video.video_id == video_id)
         )
