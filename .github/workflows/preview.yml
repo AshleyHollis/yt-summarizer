@@ -388,7 +388,7 @@ jobs:
             az aks start --name "$CLUSTER" --resource-group "$RG" --no-wait || true
           fi
 
-      - name: Wait for AKS cluster to be Running
+      - name: Wait for AKS powerState to be Running
         run: |
           CLUSTER="${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}"
           RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}"
@@ -404,6 +404,28 @@ jobs:
             sleep 30
           done
           echo "❌ Timed out waiting for AKS cluster to start."
+          exit 1
+
+      - name: Wait for AKS API server DNS to resolve
+        run: |
+          CLUSTER="${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}"
+          fqdn=$(az aks show --name "$CLUSTER" --resource-group "$RG" \
+            --query "fqdn" -o tsv 2>/dev/null)
+          if [ -z "$fqdn" ]; then
+            echo "❌ Could not retrieve cluster FQDN."
+            exit 1
+          fi
+          echo "Waiting for DNS resolution of $fqdn (max 20 attempts × 30s = 10 min)..."
+          for i in $(seq 1 20); do
+            if nslookup "$fqdn" >/dev/null 2>&1; then
+              echo "✅ DNS resolved: $fqdn"
+              exit 0
+            fi
+            echo "  attempt $i/20: DNS not yet resolvable, waiting 30s..."
+            sleep 30
+          done
+          echo "❌ Timed out waiting for AKS API server DNS to resolve."
           exit 1
 
   # ===========================================================================
