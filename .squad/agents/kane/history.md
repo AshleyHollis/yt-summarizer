@@ -312,4 +312,3 @@ the HIGH audit-level threshold the CI script uses.
 on the same package version if a new CVE is published. Monitor for new advisories between runs.
 When E2E tests are not running at all (result: skipped), check "Wait for CI" and "Frontend Quality"
 jobs first before assuming the E2E tests themselves have failures.
-
