@@ -351,6 +351,62 @@ jobs:
           base-domain: ${{ env.APPS_BASE_DOMAIN }}
 
   # ===========================================================================
+  # PHASE 4A: ENSURE AKS CLUSTER IS RUNNING
+  # ===========================================================================
+  ensure-aks-running:
+    name: Ensure AKS Running
+    runs-on: ubuntu-latest
+    needs: [check-concurrency]
+    if: |
+      always() && !cancelled() &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.check-concurrency.result == 'success' &&
+      needs.check-concurrency.outputs.can_deploy == 'true'
+    steps:
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start AKS cluster if stopped
+        run: |
+          CLUSTER="${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}"
+          state=$(az aks show --name "$CLUSTER" --resource-group "$RG" \
+            --query "powerState.code" -o tsv 2>/dev/null || echo "Unknown")
+          echo "Current AKS power state: $state"
+          if [ "$state" = "Stopped" ]; then
+            echo "Cluster is stopped — starting..."
+            az aks start --name "$CLUSTER" --resource-group "$RG" --no-wait
+          elif [ "$state" = "Running" ]; then
+            echo "Cluster is already running."
+            exit 0
+          else
+            echo "Cluster state is '$state' — proceeding with start attempt..."
+            az aks start --name "$CLUSTER" --resource-group "$RG" --no-wait || true
+          fi
+
+      - name: Wait for AKS cluster to be Running
+        run: |
+          CLUSTER="${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}"
+          echo "Polling for Running state (max 20 attempts × 30s = 10 min)..."
+          for i in $(seq 1 20); do
+            state=$(az aks show --name "$CLUSTER" --resource-group "$RG" \
+              --query "powerState.code" -o tsv 2>/dev/null || echo "Unknown")
+            echo "  attempt $i/20: powerState=$state"
+            if [ "$state" = "Running" ]; then
+              echo "✅ Cluster is Running."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "❌ Timed out waiting for AKS cluster to start."
+          exit 1
+
+  # ===========================================================================
   # PHASE 4B: SYNC ARGOCD MANIFESTS
   # ===========================================================================
   # Apply preview-appset.yaml to ensure ArgoCD Git Generator detects overlay updates
@@ -358,12 +414,13 @@ jobs:
   sync-argocd-manifests:
     name: Sync ArgoCD Manifests
     runs-on: ubuntu-latest
-    needs: [check-concurrency, terraform]
+    needs: [check-concurrency, terraform, ensure-aks-running]
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
+      needs.ensure-aks-running.result == 'success' &&
       (needs.terraform.result != 'failure')
     steps:
       - name: Checkout code
