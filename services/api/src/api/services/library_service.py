@@ -216,8 +216,8 @@ class LibraryService:
             select(Video)
             .options(
                 selectinload(Video.channel),
-                selectinload(Video.artifacts),
                 noload(Video.segments),
+                noload(Video.artifacts),
                 noload(Video.jobs),
             )
             .where(Video.video_id == video_id)

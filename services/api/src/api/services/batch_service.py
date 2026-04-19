@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 
 try:
     from shared.config import get_settings
@@ -537,6 +537,9 @@ class BatchService:
             select(Batch)
             .options(
                 selectinload(Batch.items).selectinload(BatchItem.video).selectinload(Video.channel),
+                selectinload(Batch.items).selectinload(BatchItem.video).noload(Video.segments),
+                selectinload(Batch.items).selectinload(BatchItem.video).noload(Video.artifacts),
+                selectinload(Batch.items).selectinload(BatchItem.video).noload(Video.jobs),
                 selectinload(Batch.channel),
             )
             .where(Batch.batch_id == batch_id)
@@ -643,6 +646,9 @@ class BatchService:
             select(Batch)
             .options(
                 selectinload(Batch.items).selectinload(BatchItem.video).selectinload(Video.channel),
+                selectinload(Batch.items).selectinload(BatchItem.video).noload(Video.segments),
+                selectinload(Batch.items).selectinload(BatchItem.video).noload(Video.artifacts),
+                selectinload(Batch.items).selectinload(BatchItem.video).noload(Video.jobs),
                 selectinload(Batch.channel),
             )
             .where(Batch.batch_id == batch_id)
