@@ -14,10 +14,12 @@ resources:
   - ../prod
 
 images:
-  - name: yt-summarizer-api
+  # The nested ../prod overlay rewrites short image names to ACR names first.
+  # Match those rewritten names here so OpenClaw production receives the new tag.
+  - name: acrytsummprdci.azurecr.io/yt-summarizer-api
     newName: acrytsummprdci.azurecr.io/yt-summarizer-api
     newTag: sha-2a00302
-  - name: yt-summarizer-workers
+  - name: acrytsummprdci.azurecr.io/yt-summarizer-workers
     newName: acrytsummprdci.azurecr.io/yt-summarizer-workers
     newTag: sha-2a00302
 
