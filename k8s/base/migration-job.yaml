@@ -1,7 +1,7 @@
 # =============================================================================
 # Database Migration Job
 # =============================================================================
-# Argo CD PreSync hook - runs before new deployments
+# Argo CD Sync hook - runs after prerequisites and before deployments
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -12,8 +12,9 @@ metadata:
     app.kubernetes.io/component: migration
     app.kubernetes.io/part-of: yt-summarizer
   annotations:
-    # Argo CD sync hook - runs before deployments and auto-deletes old jobs
-    argocd.argoproj.io/hook: PreSync
+    # Run after ServiceAccount/ExternalSecrets and before workload deployments.
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "1"
     # Delete old job before creating new one, and delete successful job after completion
     # This ensures Argo CD waits for job completion and doesn't get stuck
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
