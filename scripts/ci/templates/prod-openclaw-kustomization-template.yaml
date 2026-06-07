@@ -1,0 +1,78 @@
+# =============================================================================
+# OpenClaw Production Overlay Kustomization Template
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: yt-summarizer
+
+resources:
+  - ../prod
+
+images:
+  - name: yt-summarizer-api
+    newName: acrytsummprdci.azurecr.io/yt-summarizer-api
+    newTag: ${IMAGE_TAG}
+  - name: yt-summarizer-workers
+    newName: acrytsummprdci.azurecr.io/yt-summarizer-workers
+    newTag: ${IMAGE_TAG}
+
+patches:
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: SecretStore
+      name: azure-keyvault
+    patch: |-
+      apiVersion: external-secrets.io/v1beta1
+      kind: SecretStore
+      metadata:
+        name: azure-keyvault
+      $patch: delete
+
+  - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: ExternalSecret
+    patch: |-
+      - op: replace
+        path: /spec/secretStoreRef/kind
+        value: ClusterSecretStore
+      - op: replace
+        path: /spec/secretStoreRef/name
+        value: azure-keyvault-cluster
+
+  - target:
+      version: v1
+      kind: ServiceAccount
+      name: yt-summarizer-sa
+    patch: |-
+      - op: add
+        path: /imagePullSecrets
+        value:
+          - name: acr-pull-secret
+      - op: remove
+        path: /metadata/annotations/azure.workload.identity~1client-id
+      - op: remove
+        path: /metadata/annotations/azure.workload.identity~1tenant-id
+      - op: remove
+        path: /metadata/labels/azure.workload.identity~1use
+
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+      name: api-httproute
+    patch: |-
+      - op: replace
+        path: /spec/parentRefs/0/sectionName
+        value: http-yt-summarizer
+      - op: remove
+        path: /metadata/annotations/external-dns.alpha.kubernetes.io~1hostname
+
+labels:
+  - pairs:
+      app.kubernetes.io/platform: openclaw
+
+commonAnnotations:
+  deployment.kubernetes.io/platform: openclaw

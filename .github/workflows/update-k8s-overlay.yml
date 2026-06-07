@@ -105,6 +105,16 @@ on:
         required: false
         type: string
         default: "scripts/ci/templates/prod-kustomization-template.yaml"
+      preview-template-path:
+        description: "Path to kustomization template (preview only)"
+        required: false
+        type: string
+        default: "scripts/ci/templates/preview-kustomization-template.yaml"
+      k8s-platform:
+        description: "Target Kubernetes platform: aks or openclaw"
+        required: false
+        type: string
+        default: "aks"
       run-k8s-pull-test:
         description: "Test that AKS can pull the image"
         required: false
@@ -197,7 +207,7 @@ jobs:
       # Production overlay update
       - name: Update production kustomization
         if: inputs.environment == 'prod'
-        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@v1
+        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@codex/openclaw-vps-migration
         with:
           operation: update-prod
           image-tag: ${{ inputs.image-tag }}
@@ -209,7 +219,7 @@ jobs:
       # Preview overlay update
       - name: Update preview kustomization
         if: inputs.environment == 'preview'
-        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@v1
+        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@codex/openclaw-vps-migration
         with:
           operation: update-preview
           pr-number: ${{ inputs.pr-number }}
@@ -219,6 +229,7 @@ jobs:
           tls-secret: ${{ inputs.tls-secret }}
           preview-url: ${{ inputs.preview-url }}
           commit-sha: ${{ inputs.commit-sha }}
+          preview-template-path: ${{ inputs.preview-template-path }}
           auto-commit: "true"
           pr-branch: ${{ inputs.pr-branch }}
 
@@ -236,14 +247,14 @@ jobs:
           timeout-seconds: "30"
 
       - name: Setup AKS context for pull test
-        if: inputs.run-k8s-pull-test
+        if: inputs.run-k8s-pull-test && inputs.k8s-platform == 'aks'
         uses: azure/aks-set-context@v4
         with:
           resource-group: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}
 
       - name: Verify cluster can pull image
-        if: inputs.run-k8s-pull-test
+        if: inputs.run-k8s-pull-test && inputs.k8s-platform == 'aks'
         uses: AshleyHollis/shared-infra/.github/actions/validate-docker-image@v1
         with:
           validation-type: acr-exists

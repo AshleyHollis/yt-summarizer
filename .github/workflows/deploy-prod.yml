@@ -73,13 +73,14 @@ env:
   # GitHub Variables (can override shared.env defaults)
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprdci' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
+  K8S_PLATFORM: ${{ vars.K8S_PLATFORM || 'aks' }}
 
   # Production-specific values
   ARGOCD_APP_NAME_PROD: "yt-summarizer-prod"
   NAMESPACE_PROD: "yt-summarizer"
-  PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
+  PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.apps.ashleyhollis.com' }}
   ARGOCD_SYNC_TIMEOUT: "360"
-  KUSTOMIZE_OVERLAY_PROD: "k8s/overlays/prod"
+  KUSTOMIZE_OVERLAY_PROD: ${{ vars.K8S_PLATFORM == 'openclaw' && 'k8s/overlays/openclaw-prod' || 'k8s/overlays/prod' }}
 
 permissions:
   id-token: write
@@ -149,7 +150,8 @@ jobs:
     needs: [terraform]
     if: |
       !cancelled() &&
-      needs.terraform.result != 'failure'
+      needs.terraform.result != 'failure' &&
+      (vars.K8S_PLATFORM || 'aks') == 'aks'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -181,7 +183,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [wait-for-ci, terraform, sync-argocd-manifests]
     if: |
-      !cancelled() &&
+      always() && !cancelled() &&
       needs.wait-for-ci.result == 'success' &&
       needs.terraform.result != 'failure' &&
       needs.sync-argocd-manifests.result != 'failure' &&
@@ -266,12 +268,13 @@ jobs:
       needs.get-image-tag.result == 'success'
     with:
       environment: prod
-      overlay-path: k8s/overlays/prod
+      overlay-path: ${{ vars.K8S_PLATFORM == 'openclaw' && 'k8s/overlays/openclaw-prod' || 'k8s/overlays/prod' }}
       image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
       commit-sha: ${{ needs.get-image-tag.outputs.commit_sha }}
       git-branch: main
-      template-path: scripts/ci/templates/prod-kustomization-template.yaml
-      run-k8s-pull-test: true
+      template-path: ${{ vars.K8S_PLATFORM == 'openclaw' && 'scripts/ci/templates/prod-openclaw-kustomization-template.yaml' || 'scripts/ci/templates/prod-kustomization-template.yaml' }}
+      k8s-platform: ${{ vars.K8S_PLATFORM || 'aks' }}
+      run-k8s-pull-test: ${{ vars.K8S_PLATFORM != 'openclaw' }}
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -288,13 +291,14 @@ jobs:
     needs: [update-overlay, get-image-tag]
     if: |
       !cancelled() &&
-      needs.update-overlay.result == 'success'
+      needs.update-overlay.result == 'success' &&
+      (vars.K8S_PLATFORM || 'aks') == 'aks'
     with:
       environment: prod
       namespace: yt-summarizer
       argocd-app-name: yt-summarizer-prod
       expected-image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
-      api-url: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
+      api-url: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.apps.ashleyhollis.com' }}
       host: api.yt-summarizer.apps.ashleyhollis.com
       max-wait-seconds: "360"
       auto-recovery: false
@@ -302,6 +306,41 @@ jobs:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+  verify-openclaw-health:
+    name: Verify OpenClaw Health
+    runs-on: ubuntu-latest
+    needs: [update-overlay, get-image-tag]
+    if: |
+      !cancelled() &&
+      needs.update-overlay.result == 'success' &&
+      (vars.K8S_PLATFORM || 'aks') == 'openclaw'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Load shared environment
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
+
+      - name: Wait for OpenClaw API readiness
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
+        with:
+          url: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.apps.ashleyhollis.com' }}${{ env.HEALTH_CHECK_PATH }}
+          max-attempts: "30"
+          interval-seconds: "20"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Production API (OpenClaw)"
+
+      - name: Check OpenClaw API liveness
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
+        with:
+          url: ${{ vars.PRODUCTION_URL || 'https://api.yt-summarizer.apps.ashleyhollis.com' }}/health/live
+          max-attempts: "5"
+          interval-seconds: "10"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Production API liveness (OpenClaw)"
 
   # ---------------------------------------------------------------------------
   # Deploy Frontend to SWA (Reusable Workflow)
@@ -319,7 +358,7 @@ jobs:
     with:
       environment: prod
       ci-run-id: ${{ needs.wait-for-ci.outputs.ci_run_id }}
-      api-url: ${{ vars.PRODUCTION_API_URL || vars.PRODUCTION_URL || 'https://api.yt-summarizer.example.com' }}
+      api-url: ${{ vars.PRODUCTION_API_URL || vars.PRODUCTION_URL || 'https://api.yt-summarizer.apps.ashleyhollis.com' }}
       deployment-environment: default
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -338,6 +377,7 @@ jobs:
       - sync-argocd-manifests
       - update-overlay
       - verify-deployment
+      - verify-openclaw-health
       - deploy-frontend
       - wait-for-ci
       - terraform
@@ -366,6 +406,7 @@ jobs:
             echo "- Backend deploy tag: ${{ needs.get-image-tag.outputs.image_tag || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
             echo "- Deployment verification: ${{ needs.verify-deployment.result }}"
+            echo "- OpenClaw health verification: ${{ needs.verify-openclaw-health.result }}"
             echo "- Frontend deploy: ${{ needs.deploy-frontend.result }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -376,5 +417,5 @@ jobs:
           image-tag: ${{ needs.get-image-tag.outputs.image_tag }}
           commit-sha: ${{ github.sha }}
           update-overlay-result: ${{ needs.update-overlay.result }}
-          verify-deployment-result: ${{ needs.verify-deployment.result }}
+          verify-deployment-result: ${{ needs.verify-deployment.result == 'skipped' && needs.verify-openclaw-health.result || needs.verify-deployment.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend.result }}
