@@ -1,6 +1,7 @@
 """Tests for auth endpoints."""
 
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -45,6 +46,66 @@ def test_login_redirects_to_auth0():
         # Should redirect to Auth0 domain
         location = response.headers.get("location", "")
         assert "authorize" in location or "auth0.com" in location
+
+
+def _fake_auth_settings():
+    class FakeAuth:
+        domain = "test.auth0.com"
+        client_id = "test-client-id"
+        client_secret = "test-client-secret"
+        audience = None
+        session_secret = "test-session-secret-at-least-32-chars"
+        session_ttl_seconds = 86400
+        default_return_to = "http://localhost:3000"
+        session_cookie_name = "session"
+
+    class FakeAPI:
+        cors_origins = [
+            "http://localhost:3000",
+            "https://proud-hill-0940e7300.6.azurestaticapps.net",
+        ]
+        cors_origin_regex = None
+
+    class FakeSettings:
+        api = FakeAPI()
+        auth = FakeAuth()
+
+    return FakeSettings()
+
+
+def _login_redirect_uri(headers: dict[str, str], return_to: str) -> str:
+    with patch("api.routes.auth.get_settings", return_value=_fake_auth_settings()):
+        response = client.get(
+            "/api/auth/login",
+            params={"returnTo": return_to},
+            headers=headers,
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 302
+    location = response.headers["location"]
+    return parse_qs(urlparse(location).query)["redirect_uri"][0]
+
+
+@pytest.mark.unit
+def test_login_uses_https_callback_for_public_tunnel_host_without_forwarded_proto():
+    """Cloudflare Tunnel may forward to the service over HTTP without X-Forwarded-Proto."""
+    redirect_uri = _login_redirect_uri(
+        headers={"Host": "api-ytsummarizer.ashleyhollis.com"},
+        return_to="https://proud-hill-0940e7300.6.azurestaticapps.net",
+    )
+
+    assert redirect_uri == "https://api-ytsummarizer.ashleyhollis.com/api/auth/callback"
+
+
+@pytest.mark.unit
+def test_login_keeps_http_callback_for_localhost_without_forwarded_proto():
+    redirect_uri = _login_redirect_uri(
+        headers={"Host": "localhost:8000"},
+        return_to="http://localhost:3000",
+    )
+
+    assert redirect_uri == "http://localhost:8000/api/auth/callback"
 
 
 @pytest.mark.unit
