@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: yt-summarizer-openclaw-canary
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: yt-summarizer
+    app.kubernetes.io/instance: openclaw-canary
+    app.kubernetes.io/part-of: yt-summarizer
+    app.kubernetes.io/platform: openclaw
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AshleyHollis/yt-summarizer.git
+    targetRevision: codex/openclaw-vps-migration
+    path: k8s/overlays/openclaw-canary
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yt-summarizer-openclaw-canary
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5
+  ignoreDifferences:
+    - group: batch
+      kind: Job
+      jqPathExpressions:
+        - .status.completionTime
+        - .status.conditions
+        - .status.startTime
+        - .status.succeeded
+        - .status.active
+        - .status.failed
