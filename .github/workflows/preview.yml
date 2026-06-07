@@ -78,7 +78,7 @@ env:
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
   K8S_PLATFORM: ${{ vars.K8S_PLATFORM || 'aks' }}
   PREVIEW_NAMESPACE_PREFIX: "preview-pr-"
-  APPS_BASE_DOMAIN: "yt-summarizer.apps.ashleyhollis.com"
+  APPS_BASE_DOMAIN: ${{ (vars.K8S_PLATFORM || 'aks') == 'openclaw' && 'ashleyhollis.com' || 'yt-summarizer.apps.ashleyhollis.com' }}
   ARGOCD_SYNC_TIMEOUT: "180"
   KUSTOMIZE_OVERLAY_PREVIEW: "k8s/overlays/preview"
   MAX_PREVIEWS: 3
@@ -430,6 +430,50 @@ jobs:
           echo "❌ Timed out waiting for AKS API server DNS to resolve."
           exit 1
 
+  ensure-openclaw-preview-dns:
+    name: Ensure OpenClaw Preview DNS
+    runs-on: ubuntu-latest
+    needs: [get-ingress, check-concurrency, detect-changes]
+    if: |
+      always() && !cancelled() &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
+      needs.check-concurrency.result == 'success' &&
+      needs.check-concurrency.outputs.can_deploy == 'true' &&
+      needs.get-ingress.result == 'success' &&
+      (vars.K8S_PLATFORM || 'aks') == 'openclaw'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Load Cloudflare API token from Key Vault
+        id: cloudflare-token
+        shell: bash
+        run: |
+          token="$(az keyvault secret show \
+            --vault-name "${{ vars.KEY_VAULT_NAME || 'kv-ytsumm-prd-ci' }}" \
+            --name cloudflare-api-token \
+            --query value \
+            --output tsv)"
+          echo "::add-mask::${token}"
+          echo "token=${token}" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert OpenClaw preview DNS
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.cloudflare-token.outputs.token }}
+        run: |
+          scripts/workflows/openclaw-preview-dns.sh \
+            upsert \
+            "${{ needs.get-ingress.outputs.preview_host }}"
+
   # ===========================================================================
   # PHASE 4B: SYNC ARGOCD MANIFESTS
   # ===========================================================================
@@ -619,8 +663,16 @@ jobs:
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.update-overlay.result == 'success' &&
+      needs.ensure-openclaw-preview-dns.result == 'success' &&
       (vars.K8S_PLATFORM || 'aks') == 'openclaw'
-    needs: [update-overlay, check-concurrency, get-ingress, detect-changes]
+    needs:
+      [
+        update-overlay,
+        ensure-openclaw-preview-dns,
+        check-concurrency,
+        get-ingress,
+        detect-changes,
+      ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -941,6 +993,7 @@ jobs:
       - update-overlay
       - verify-deployment
       - verify-openclaw-health
+      - ensure-openclaw-preview-dns
       - deploy-frontend-preview
       - e2e-tests
       - get-ingress
@@ -987,6 +1040,7 @@ jobs:
             echo "- Concurrency gate: ${{ needs.check-concurrency.outputs.can_deploy || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
             echo "- Backend verify: ${{ needs.verify-deployment.result }}"
+            echo "- OpenClaw DNS: ${{ needs.ensure-openclaw-preview-dns.result }}"
             echo "- OpenClaw health verify: ${{ needs.verify-openclaw-health.result }}"
             echo "- Frontend deploy: ${{ needs.deploy-frontend-preview.result }}"
             echo "- E2E tests: ${{ needs.e2e-tests.result }}"

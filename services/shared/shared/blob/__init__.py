@@ -7,9 +7,11 @@ from .client import (
     compute_content_hash,
     create_async_blob_service_client,
     create_blob_service_client,
+    extract_blob_name_from_uri,
     get_blob_client,
     get_connection_string,
     get_segments_blob_path,
+    get_summary_blob_path,
     get_transcript_blob_path,
     sanitize_channel_name,
 )
@@ -21,9 +23,11 @@ __all__ = [
     "compute_content_hash",
     "create_async_blob_service_client",
     "create_blob_service_client",
+    "extract_blob_name_from_uri",
     "get_blob_client",
     "get_connection_string",
     "get_segments_blob_path",
+    "get_summary_blob_path",
     "get_transcript_blob_path",
     "sanitize_channel_name",
 ]

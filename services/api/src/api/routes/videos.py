@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import PlainTextResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import shared modules
@@ -11,11 +12,13 @@ try:
     from shared.blob.client import (
         SUMMARIES_CONTAINER,
         TRANSCRIPTS_CONTAINER,
+        extract_blob_name_from_uri,
         get_blob_client,
         get_summary_blob_path,
         get_transcript_blob_path,
     )
     from shared.db.connection import get_session
+    from shared.db.models import Artifact
 except ImportError:
     # Fallback for development
     async def get_session():
@@ -30,6 +33,10 @@ except ImportError:
     def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
         raise NotImplementedError("Blob path helper not available")
 
+    def extract_blob_name_from_uri(blob_uri: str, container_name: str) -> str:
+        raise NotImplementedError("Blob URI helper not available")
+
+    Artifact = None
     TRANSCRIPTS_CONTAINER = "transcripts"
     SUMMARIES_CONTAINER = "summaries"
 
@@ -51,6 +58,28 @@ router = APIRouter(prefix="/api/v1/videos", tags=["Videos"])
 def get_video_service(session: AsyncSession = Depends(get_session)) -> VideoService:
     """Dependency to get video service."""
     return VideoService(session)
+
+
+async def get_artifact_blob_name(
+    session: AsyncSession,
+    video_id: UUID,
+    artifact_type: str,
+    container_name: str,
+) -> str | None:
+    """Get the blob name recorded for a video artifact."""
+    if Artifact is None:
+        return None
+
+    result = await session.execute(
+        select(Artifact.blob_uri)
+        .where(Artifact.video_id == video_id, Artifact.artifact_type == artifact_type)
+        .limit(1)
+    )
+    blob_uri = result.scalar_one_or_none()
+    if not blob_uri:
+        return None
+
+    return extract_blob_name_from_uri(blob_uri, container_name)
 
 
 @router.post(
@@ -225,20 +254,39 @@ async def get_video_transcript(
             detail="Video not found",
         )
 
-    # Get channel name for blob path lookup
+    # Prefer the persisted artifact URI. It matches how completed videos are stored
+    # and avoids probing stale path formats that can be slow when missing.
     channel_name = video.channel.name if video.channel else "unknown-channel"
+    artifact_blob_name = await get_artifact_blob_name(
+        service.session,
+        video_id,
+        "transcript",
+        TRANSCRIPTS_CONTAINER,
+    )
+    fallback_blob_name = get_transcript_blob_path(channel_name, video.youtube_video_id)
+    blob_names = [name for name in [artifact_blob_name, fallback_blob_name] if name]
 
-    # Try to fetch transcript from blob storage using channel-based path
-    try:
-        blob_client = get_blob_client()
-        blob_name = get_transcript_blob_path(channel_name, video.youtube_video_id)
-        content = blob_client.download_blob(TRANSCRIPTS_CONTAINER, blob_name)
-        return PlainTextResponse(content.decode("utf-8"), media_type="text/plain")
-    except Exception as e:
+    blob_client = get_blob_client()
+    last_error: Exception | None = None
+    for index, blob_name in enumerate(dict.fromkeys(blob_names)):
+        try:
+            if index > 0 and not blob_client.blob_exists(TRANSCRIPTS_CONTAINER, blob_name):
+                continue
+            content = blob_client.download_blob(TRANSCRIPTS_CONTAINER, blob_name)
+            return PlainTextResponse(content.decode("utf-8"), media_type="text/plain")
+        except Exception as e:
+            last_error = e
+
+    if last_error is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Transcript not found: {str(e)}",
+            detail=f"Transcript not found: {str(last_error)}",
         )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Transcript not found",
+    )
 
 
 @router.get(
@@ -263,20 +311,39 @@ async def get_video_summary(
             detail="Video not found",
         )
 
-    # Get channel name for blob path lookup
+    # Prefer the persisted artifact URI. It matches how completed videos are stored
+    # and avoids probing stale path formats that can be slow when missing.
     channel_name = video.channel.name if video.channel else "unknown-channel"
+    artifact_blob_name = await get_artifact_blob_name(
+        service.session,
+        video_id,
+        "summary",
+        SUMMARIES_CONTAINER,
+    )
+    fallback_blob_name = get_summary_blob_path(channel_name, video.youtube_video_id)
+    blob_names = [name for name in [artifact_blob_name, fallback_blob_name] if name]
 
-    # Try to fetch summary from blob storage using channel-based path
-    try:
-        blob_client = get_blob_client()
-        blob_name = get_summary_blob_path(channel_name, video.youtube_video_id)
-        content = blob_client.download_blob(SUMMARIES_CONTAINER, blob_name)
-        return PlainTextResponse(content.decode("utf-8"), media_type="text/markdown")
-    except Exception as e:
+    blob_client = get_blob_client()
+    last_error: Exception | None = None
+    for index, blob_name in enumerate(dict.fromkeys(blob_names)):
+        try:
+            if index > 0 and not blob_client.blob_exists(SUMMARIES_CONTAINER, blob_name):
+                continue
+            content = blob_client.download_blob(SUMMARIES_CONTAINER, blob_name)
+            return PlainTextResponse(content.decode("utf-8"), media_type="text/markdown")
+        except Exception as e:
+            last_error = e
+
+    if last_error is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Summary not found: {str(e)}",
+            detail=f"Summary not found: {str(last_error)}",
         )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Summary not found",
+    )
 
 
 @router.post(

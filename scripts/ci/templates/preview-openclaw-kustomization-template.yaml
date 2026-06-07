@@ -84,7 +84,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/parentRefs/0/sectionName
-        value: http-yt-summarizer
+        value: http-yt-summarizer-preview
       - op: replace
         path: /spec/hostnames/0
         value: "${PREVIEW_HOST}"
