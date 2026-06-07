@@ -137,12 +137,12 @@ spec:
   source:
     repoURL: https://charts.jetstack.io
     chart: cert-manager
-    targetRevision: v1.14.0
+    targetRevision: v1.20.2
     helm:
       valuesObject:
-        installCRDs: true
-        webhook:
+        crds:
           enabled: true
+          keep: true
         cainjector:
           enabled: true
         # Cost-optimized resources for single-node cluster

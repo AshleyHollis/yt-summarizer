@@ -16,6 +16,61 @@
 ## Learnings
 <!-- Append learnings below -->
 
+### 2026-05-xx — library_service, search_service, batch_service missing noload guards
+
+**Root cause:** Kane identified POST `/api/v1/library/videos` returning 5xx in preview. The same class of bug as `video_service.py` (fixed in 59dc0c58): SQLAlchemy fires `selectin` loads for ALL `lazy="selectin"` relationships on `Video` unless explicitly suppressed with `noload()`. Migration 015 tables (segments/artifacts/jobs) don't exist in preview yet.
+
+**Files fixed in a2d8974c:**
+1. `library_service.get_video_detail` — had `selectinload(Video.artifacts)` which fires on every video detail fetch. Changed to `noload(Video.artifacts)`.
+2. `search_service` (text-search query) — had only `selectinload(Video.channel)` with no noload guards. Added `noload` for all three lazy relationships.
+3. `batch_service` (retry_batch, retry_batch_item) — chained selectinload `Batch.items → BatchItem.video → Video.channel` with no noload for Video's other relationships. Added three extra chained noload paths per query.
+
+**Rule:** When adding noload guards, scan ALL service files — not just the one reported. `grep -r "select(Video)" services/api/` before closing the ticket. Also check for chained selectinloads that land on `Video` (e.g. `BatchItem.video`).
+
+**SQLAlchemy chained noload syntax:**
+```python
+selectinload(Batch.items).selectinload(BatchItem.video).noload(Video.segments)
+```
+This correctly suppresses the lazy-selectin on Video.segments when Video is loaded through the chain.
+
+### 2026-04-19 — base-preview migration job had Sync (not PreSync); video_service.py missing noload guards
+
+**Root cause of continued E2E failures after d6d4e4c4:**
+
+Two separate issues found:
+
+1. **Two migration job files, only one was fixed.** `k8s/base/migration-job.yaml` was updated to
+   `PreSync` in d6d4e4c4 but `k8s/base-preview/migration-job.yaml` (used by all preview apps via
+   `k8s/base-preview/` base) still had `argocd.argoproj.io/hook: Sync` with `sync-wave: "1"`.
+   Sync wave 1 still runs AFTER default-wave (0) deployments start, so API pods race with migration.
+   Fixed in 59dc0c58 by changing to `PreSync` (removed sync-wave — not needed for PreSync).
+
+2. **`video_service.py` had zero noload guards.** Only `library_service.py` was patched in d6d4e4c4.
+   All 5 Video query methods in `video_service.py` had only `selectinload(Video.channel)` with no
+   `noload` for the three `lazy="selectin"` relationships (segments, artifacts, jobs). Fixed all 5
+   query sites: `submit_video` (existence check), `get_video`, `get_video_by_youtube_id`,
+   `reprocess_video`, `refresh_metadata`.
+
+**Rule:** When fixing a lazy-selectin 500, search ALL service files for `select(Video)` or
+`select(Channel)` and add noload guards everywhere. Fixing only one service file is insufficient.
+
+**Rule:** When there are multiple K8s base layers (base/, base-preview/), a change to one must be
+replicated to the other unless there's an explicit reason not to.
+
+### 2026-05-xx — Library 500 fix: noload all lazy-selectin Video relationships
+
+**Root cause of 42 E2E skips:** `Video.segments`, `Video.artifacts`, and `Video.jobs` all have `lazy="selectin"` on the SQLAlchemy model. When SQLAlchemy loads a `Video` object, it auto-fires a SELECT for every `lazy="selectin"` relationship not explicitly overridden. Migration 015 added a `label` column to Segments — any `selectin` load of `Video.segments` on a DB without migration 015 would fail with a 500.
+
+**Fix in library_service.py:**
+- `_build_video_query`: noload `segments`, `artifacts`, AND `jobs` (all three have `lazy="selectin"`)
+- `get_video_detail`: noload `segments` and `jobs` (artifacts intentionally loaded via `selectinload`)
+- Use explicit COUNT queries for segment counts rather than loading the relationship
+
+**Fix in k8s/base/migration-job.yaml:**
+- Changed hook from `Sync` (wave 1) to `PreSync`. The old config ran the migration job AFTER default-wave (0) resources like the API deployment — so API pods could start while the DB was still unmigrated. `PreSync` guarantees migrations finish before any sync-phase resource starts.
+
+**Rule:** For any model with `lazy="selectin"` relationships, always explicitly add `noload()` in every query that doesn't need that relationship. Never rely on "not accessing the attribute" to prevent the auto-fire — SQLAlchemy fires on load, not on access.
+
 ### 2026-05-xx — CORS custom domain fix for preview environments
 
 **Root cause:** `cors_origin_regex` in `services/shared/shared/config.py` only matched `*.azurestaticapps.net`. E2E tests hit the SWA custom domain (`pr-NNN.yt-summarizer.apps.ashleyhollis.com`) which was rejected by CORS, stripping credentials and making all auth-protected tests fail.

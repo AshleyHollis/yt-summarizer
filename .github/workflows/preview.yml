@@ -76,6 +76,7 @@ concurrency:
 env:
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprdci' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
+  K8S_PLATFORM: ${{ vars.K8S_PLATFORM || 'aks' }}
   PREVIEW_NAMESPACE_PREFIX: "preview-pr-"
   APPS_BASE_DOMAIN: "yt-summarizer.apps.ashleyhollis.com"
   ARGOCD_SYNC_TIMEOUT: "180"
@@ -351,6 +352,85 @@ jobs:
           base-domain: ${{ env.APPS_BASE_DOMAIN }}
 
   # ===========================================================================
+  # PHASE 4A: ENSURE AKS CLUSTER IS RUNNING
+  # ===========================================================================
+  ensure-aks-running:
+    name: Ensure AKS Running
+    runs-on: ubuntu-latest
+    needs: [check-concurrency]
+    if: |
+      always() && !cancelled() &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.check-concurrency.result == 'success' &&
+      needs.check-concurrency.outputs.can_deploy == 'true' &&
+      (vars.K8S_PLATFORM || 'aks') == 'aks'
+    steps:
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start AKS cluster if stopped
+        run: |
+          CLUSTER="${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}"
+          state=$(az aks show --name "$CLUSTER" --resource-group "$RG" \
+            --query "powerState.code" -o tsv 2>/dev/null || echo "Unknown")
+          echo "Current AKS power state: $state"
+          if [ "$state" = "Stopped" ]; then
+            echo "Cluster is stopped — starting..."
+            az aks start --name "$CLUSTER" --resource-group "$RG" --no-wait
+          elif [ "$state" = "Running" ]; then
+            echo "Cluster is already running."
+            exit 0
+          else
+            echo "Cluster state is '$state' — proceeding with start attempt..."
+            az aks start --name "$CLUSTER" --resource-group "$RG" --no-wait || true
+          fi
+
+      - name: Wait for AKS powerState to be Running
+        run: |
+          CLUSTER="${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}"
+          echo "Polling for Running state (max 20 attempts × 30s = 10 min)..."
+          for i in $(seq 1 20); do
+            state=$(az aks show --name "$CLUSTER" --resource-group "$RG" \
+              --query "powerState.code" -o tsv 2>/dev/null || echo "Unknown")
+            echo "  attempt $i/20: powerState=$state"
+            if [ "$state" = "Running" ]; then
+              echo "✅ Cluster is Running."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "❌ Timed out waiting for AKS cluster to start."
+          exit 1
+
+      - name: Wait for AKS API server DNS to resolve
+        run: |
+          CLUSTER="${{ vars.AKS_CLUSTER_NAME || 'aks-ytsumm-prd-ci' }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-ytsumm-prd-ci' }}"
+          fqdn=$(az aks show --name "$CLUSTER" --resource-group "$RG" \
+            --query "fqdn" -o tsv 2>/dev/null)
+          if [ -z "$fqdn" ]; then
+            echo "❌ Could not retrieve cluster FQDN."
+            exit 1
+          fi
+          echo "Waiting for DNS resolution of $fqdn (max 20 attempts × 30s = 10 min)..."
+          for i in $(seq 1 20); do
+            if nslookup "$fqdn" >/dev/null 2>&1; then
+              echo "✅ DNS resolved: $fqdn"
+              exit 0
+            fi
+            echo "  attempt $i/20: DNS not yet resolvable, waiting 30s..."
+            sleep 30
+          done
+          echo "❌ Timed out waiting for AKS API server DNS to resolve."
+          exit 1
+
+  # ===========================================================================
   # PHASE 4B: SYNC ARGOCD MANIFESTS
   # ===========================================================================
   # Apply preview-appset.yaml to ensure ArgoCD Git Generator detects overlay updates
@@ -358,13 +438,15 @@ jobs:
   sync-argocd-manifests:
     name: Sync ArgoCD Manifests
     runs-on: ubuntu-latest
-    needs: [check-concurrency, terraform]
+    needs: [check-concurrency, terraform, ensure-aks-running]
     if: |
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
-      (needs.terraform.result != 'failure')
+      needs.ensure-aks-running.result == 'success' &&
+      (needs.terraform.result != 'failure') &&
+      (vars.K8S_PLATFORM || 'aks') == 'aks'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -465,7 +547,8 @@ jobs:
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success' &&
       (needs.terraform.result != 'failure') &&
-      needs.sync-argocd-manifests.result == 'success'
+      ((vars.K8S_PLATFORM || 'aks') == 'openclaw' ||
+       needs.sync-argocd-manifests.result == 'success')
     needs:
       [
         check-concurrency,
@@ -487,7 +570,9 @@ jobs:
       preview-host: ${{ needs.get-ingress.outputs.preview_host }}
       preview-url: ${{ needs.get-ingress.outputs.preview_url }}
       tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
-      run-k8s-pull-test: true
+      preview-template-path: ${{ vars.K8S_PLATFORM == 'openclaw' && 'scripts/ci/templates/preview-openclaw-kustomization-template.yaml' || 'scripts/ci/templates/preview-kustomization-template.yaml' }}
+      k8s-platform: ${{ vars.K8S_PLATFORM || 'aks' }}
+      run-k8s-pull-test: ${{ vars.K8S_PLATFORM != 'openclaw' }}
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -505,7 +590,8 @@ jobs:
       needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
-      needs.update-overlay.result == 'success'
+      needs.update-overlay.result == 'success' &&
+      (vars.K8S_PLATFORM || 'aks') == 'aks'
     needs: [update-overlay, check-concurrency, get-ingress, detect-changes]
     with:
       environment: preview
@@ -522,6 +608,45 @@ jobs:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+  verify-openclaw-health:
+    name: Verify OpenClaw Preview Health
+    runs-on: ubuntu-latest
+    if: |
+      always() && !cancelled() &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
+      needs.check-concurrency.result == 'success' &&
+      needs.check-concurrency.outputs.can_deploy == 'true' &&
+      needs.update-overlay.result == 'success' &&
+      (vars.K8S_PLATFORM || 'aks') == 'openclaw'
+    needs: [update-overlay, check-concurrency, get-ingress, detect-changes]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Load shared environment
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
+
+      - name: Wait for OpenClaw preview readiness
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
+        with:
+          url: ${{ needs.get-ingress.outputs.preview_url }}${{ env.HEALTH_CHECK_PATH }}
+          max-attempts: "30"
+          interval-seconds: "20"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Preview API (OpenClaw)"
+
+      - name: Check OpenClaw preview liveness
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
+        with:
+          url: ${{ needs.get-ingress.outputs.preview_url }}/health/live
+          max-attempts: "5"
+          interval-seconds: "10"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Preview API liveness (OpenClaw)"
 
   # ===========================================================================
   # PHASE 7: DEPLOY FRONTEND (Reusable Workflow)
@@ -561,11 +686,15 @@ jobs:
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
-      needs.verify-deployment.result == 'success' &&
+      (((vars.K8S_PLATFORM || 'aks') == 'openclaw' &&
+        needs.verify-openclaw-health.result == 'success') ||
+       ((vars.K8S_PLATFORM || 'aks') == 'aks' &&
+        needs.verify-deployment.result == 'success')) &&
       needs.deploy-frontend-preview.result == 'success'
     needs:
       - update-overlay
       - verify-deployment
+      - verify-openclaw-health
       - deploy-frontend-preview
       - detect-changes
       - get-ingress
@@ -609,6 +738,7 @@ jobs:
     needs:
       - update-overlay
       - verify-deployment
+      - verify-openclaw-health
       - deploy-frontend-preview
       - post-preview-comment
       - detect-changes
@@ -620,6 +750,10 @@ jobs:
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.post-preview-comment.result == 'success' &&
+      (((vars.K8S_PLATFORM || 'aks') == 'openclaw' &&
+        needs.verify-openclaw-health.result == 'success') ||
+       ((vars.K8S_PLATFORM || 'aks') == 'aks' &&
+        needs.verify-deployment.result == 'success')) &&
       needs.get-ingress.outputs.preview_url != ''
     outputs:
       result: ${{ steps.run-tests.outcome }}
@@ -806,6 +940,7 @@ jobs:
       - wait-for-ci
       - update-overlay
       - verify-deployment
+      - verify-openclaw-health
       - deploy-frontend-preview
       - e2e-tests
       - get-ingress
@@ -852,6 +987,7 @@ jobs:
             echo "- Concurrency gate: ${{ needs.check-concurrency.outputs.can_deploy || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
             echo "- Backend verify: ${{ needs.verify-deployment.result }}"
+            echo "- OpenClaw health verify: ${{ needs.verify-openclaw-health.result }}"
             echo "- Frontend deploy: ${{ needs.deploy-frontend-preview.result }}"
             echo "- E2E tests: ${{ needs.e2e-tests.result }}"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -863,7 +999,7 @@ jobs:
           needs-deployment: ${{ needs.detect-changes.outputs.needs_deployment }}
           wait-for-ci-result: ${{ needs.wait-for-ci.result }}
           update-overlay-result: ${{ needs.update-overlay.result }}
-          verify-deployment-result: ${{ needs.verify-deployment.result }}
+          verify-deployment-result: ${{ needs.verify-deployment.result == 'skipped' && needs.verify-openclaw-health.result || needs.verify-deployment.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend-preview.result }}
           e2e-tests-result: ${{ needs.e2e-tests.result }}
           api-url-configured: ${{ needs.get-ingress.outputs.preview_url }}

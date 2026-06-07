@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 
 # Import shared modules
 try:
@@ -130,7 +130,12 @@ class VideoService:
         # Check if video already exists
         existing = await self.session.execute(
             select(Video)
-            .options(selectinload(Video.channel))
+            .options(
+                selectinload(Video.channel),
+                noload(Video.segments),
+                noload(Video.artifacts),
+                noload(Video.jobs),
+            )
             .where(Video.youtube_video_id == youtube_video_id)
         )
         existing_video = existing.scalar_one_or_none()
@@ -335,7 +340,14 @@ class VideoService:
             VideoResponse or None if not found.
         """
         result = await self.session.execute(
-            select(Video).options(selectinload(Video.channel)).where(Video.video_id == video_id)
+            select(Video)
+            .options(
+                selectinload(Video.channel),
+                noload(Video.segments),
+                noload(Video.artifacts),
+                noload(Video.jobs),
+            )
+            .where(Video.video_id == video_id)
         )
         video = result.scalar_one_or_none()
 
@@ -386,7 +398,12 @@ class VideoService:
         """
         result = await self.session.execute(
             select(Video)
-            .options(selectinload(Video.channel))
+            .options(
+                selectinload(Video.channel),
+                noload(Video.segments),
+                noload(Video.artifacts),
+                noload(Video.jobs),
+            )
             .where(Video.youtube_video_id == youtube_video_id)
         )
         video = result.scalar_one_or_none()
@@ -416,7 +433,14 @@ class VideoService:
             ValueError: If video not found.
         """
         result = await self.session.execute(
-            select(Video).options(selectinload(Video.channel)).where(Video.video_id == video_id)
+            select(Video)
+            .options(
+                selectinload(Video.channel),
+                noload(Video.segments),
+                noload(Video.artifacts),
+                noload(Video.jobs),
+            )
+            .where(Video.video_id == video_id)
         )
         video = result.scalar_one_or_none()
 
@@ -809,7 +833,14 @@ class VideoService:
         """
         # Get the video
         result = await self.session.execute(
-            select(Video).options(selectinload(Video.channel)).where(Video.video_id == video_id)
+            select(Video)
+            .options(
+                selectinload(Video.channel),
+                noload(Video.segments),
+                noload(Video.artifacts),
+                noload(Video.jobs),
+            )
+            .where(Video.video_id == video_id)
         )
         video = result.scalar_one_or_none()
 

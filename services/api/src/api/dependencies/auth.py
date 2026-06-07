@@ -113,7 +113,22 @@ async def require_auth(request: Request) -> AuthenticatedUser:
     )
 
 
-async def optional_auth(request: Request) -> AuthenticatedUser | None:
+async def require_api_key(request: Request) -> AuthenticatedUser:
+    """FastAPI dependency that requires a valid X-API-Key header.
+
+    API-key-only authentication — does NOT fall back to session cookie.
+    Used by agent-facing routes (/api/v1/agent/*).
+
+    Raises:
+        HTTPException 401 if X-API-Key header is missing or invalid.
+    """
+    user = _check_api_key(request)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Valid X-API-Key header required",
+        )
+    return user
     """FastAPI dependency that returns the authenticated user if present, or None.
 
     Useful for routes that work for both authenticated and anonymous users

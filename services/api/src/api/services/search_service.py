@@ -12,7 +12,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 
 # Import shared modules
 try:
@@ -498,7 +498,12 @@ class SearchService:
 
         query = (
             select(Video)
-            .options(selectinload(Video.channel))
+            .options(
+                selectinload(Video.channel),
+                noload(Video.segments),
+                noload(Video.artifacts),
+                noload(Video.jobs),
+            )
             .where(and_(*conditions))
             .limit(request.limit)
         )
