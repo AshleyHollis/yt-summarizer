@@ -10,7 +10,7 @@ from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 # Default container names
 TRANSCRIPTS_CONTAINER = "transcripts"
@@ -111,6 +111,16 @@ def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
     """
     sanitized = sanitize_channel_name(channel_name)
     return f"{sanitized}/{youtube_video_id}/summary.md"
+
+
+def extract_blob_name_from_uri(blob_uri: str, container_name: str) -> str:
+    """Extract a blob name from a stored blob URI.
+
+    Artifacts store the full blob URL, but Azure clients need the blob name within
+    the container. Preserve nested prefixes such as "{video_id}/summary.md".
+    """
+    parts = blob_uri.split(f"/{container_name}/")
+    return parts[1] if len(parts) > 1 else blob_uri.split("/")[-1]
 
 
 def convert_uri_to_connection_string(uri: str, service: str = "blob") -> str:
@@ -336,6 +346,7 @@ class BlobClient:
         return blob_client.url
 
     @retry(
+        retry=retry_if_not_exception_type(ResourceNotFoundError),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         reraise=True,

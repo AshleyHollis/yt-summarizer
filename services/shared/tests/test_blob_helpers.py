@@ -1,6 +1,14 @@
 """Tests for blob storage helper functions."""
 
+from unittest.mock import MagicMock
+
+import pytest
+from azure.core.exceptions import ResourceNotFoundError
+
 from shared.blob.client import (
+    SUMMARIES_CONTAINER,
+    BlobClient,
+    extract_blob_name_from_uri,
     get_segments_blob_path,
     get_transcript_blob_path,
     sanitize_channel_name,
@@ -88,3 +96,43 @@ class TestGetSegmentsBlobPath:
         """Test that YouTube video ID is preserved exactly."""
         result = get_segments_blob_path("Channel", "ABC123xyz")
         assert result == "channel/ABC123xyz/segments.json"
+
+
+class TestExtractBlobNameFromUri:
+    """Tests for extracting blob names from stored artifact URIs."""
+
+    def test_preserves_nested_blob_prefix(self):
+        """Test that nested video ID prefixes are preserved."""
+        blob_uri = (
+            "https://account.blob.core.windows.net/summaries/"
+            "87af0899-c22d-4a54-9c01-bd2c3de59df7/video_summary.md"
+        )
+
+        result = extract_blob_name_from_uri(blob_uri, SUMMARIES_CONTAINER)
+
+        assert result == "87af0899-c22d-4a54-9c01-bd2c3de59df7/video_summary.md"
+
+    def test_falls_back_to_filename_for_simple_value(self):
+        """Test fallback behavior for legacy simple blob names."""
+        assert extract_blob_name_from_uri("video_summary.md", SUMMARIES_CONTAINER) == (
+            "video_summary.md"
+        )
+
+
+class TestBlobClientDownload:
+    """Tests for blob download retry behavior."""
+
+    def test_download_blob_does_not_retry_missing_blob(self):
+        """Missing blobs should fail quickly instead of retrying slow 404s."""
+        blob_client = MagicMock()
+        blob_client.download_blob.side_effect = ResourceNotFoundError("missing")
+        service_client = MagicMock()
+        service_client.get_blob_client.return_value = blob_client
+
+        client = BlobClient()
+        client._client = service_client
+
+        with pytest.raises(ResourceNotFoundError):
+            client.download_blob("summaries", "missing.md")
+
+        blob_client.download_blob.assert_called_once()

@@ -9,7 +9,7 @@ from sqlalchemy.orm import contains_eager, noload, selectinload
 
 # Import shared modules
 try:
-    from shared.blob.client import SUMMARIES_CONTAINER, get_blob_client
+    from shared.blob.client import SUMMARIES_CONTAINER, extract_blob_name_from_uri, get_blob_client
     from shared.db.models import (
         Artifact,
         Channel,
@@ -36,6 +36,10 @@ except ImportError as e:
     VideoFacet = Any
     get_blob_client = None
     SUMMARIES_CONTAINER = "summaries"
+
+    def extract_blob_name_from_uri(blob_uri: str, container_name: str) -> str:
+        parts = blob_uri.split(f"/{container_name}/")
+        return parts[1] if len(parts) > 1 else blob_uri.split("/")[-1]
 
     def get_logger(name):
         import logging
@@ -160,25 +164,40 @@ class LibraryService:
         Returns:
             Paginated list of video cards.
         """
-        # Build base query
-        query = self._build_video_query(filters)
-
-        # Get total count
-        count_query = select(func.count()).select_from(query.subquery())
-        total_result = await self.session.execute(count_query)
-        total_count = total_result.scalar() or 0
+        segment_count_subquery = (
+            select(func.count())
+            .where(Segment.video_id == Video.video_id)
+            .correlate(Video)
+            .scalar_subquery()
+        )
 
         # Apply pagination
         offset = (filters.page - 1) * filters.page_size
-        query = query.offset(offset).limit(filters.page_size)
+        query = (
+            self._build_video_query(filters)
+            .add_columns(
+                segment_count_subquery.label("segment_count"),
+                func.count().over().label("total_count"),
+            )
+            .offset(offset)
+            .limit(filters.page_size)
+        )
 
         # Execute query
         result = await self.session.execute(query)
-        videos = result.scalars().all()
+        rows = list(result.all())
+        videos = [row[0] for row in rows]
+        total_count = rows[0].total_count if rows else 0
 
-        # Get segment counts for all videos
+        if not rows and filters.page > 1:
+            count_query = select(func.count()).select_from(
+                self._build_video_query(filters).subquery()
+            )
+            total_result = await self.session.execute(count_query)
+            total_count = total_result.scalar() or 0
+
         video_ids = [v.video_id for v in videos]
-        segment_counts = await self._get_segment_counts(video_ids)
+        segment_counts = {row[0].video_id: row.segment_count or 0 for row in rows}
 
         # Get facets for all videos
         video_facets = await self._get_video_facets(video_ids)
@@ -289,9 +308,9 @@ class LibraryService:
                 # blob_uri format: http://host/account/container/{video_id}/{youtube_video_id}_summary.md
                 # We need to extract: {video_id}/{youtube_video_id}_summary.md (everything after container name)
                 if artifact.blob_uri:
-                    parts = artifact.blob_uri.split(f"/{SUMMARIES_CONTAINER}/")
-                    summary_blob_name = (
-                        parts[1] if len(parts) > 1 else artifact.blob_uri.split("/")[-1]
+                    summary_blob_name = extract_blob_name_from_uri(
+                        artifact.blob_uri,
+                        SUMMARIES_CONTAINER,
                     )
                 else:
                     summary_blob_name = None
@@ -350,32 +369,34 @@ class LibraryService:
         Returns:
             Paginated list of segments or None if video not found.
         """
-        # Verify video exists
-        video_result = await self.session.execute(
-            select(Video.video_id, Video.youtube_video_id).where(Video.video_id == video_id)
-        )
-        video = video_result.one_or_none()
-        if not video:
-            return None
-
-        # Get total count
-        count_result = await self.session.execute(
-            select(func.count()).where(Segment.video_id == video_id)
-        )
-        total_count = count_result.scalar() or 0
-
-        # Get segments
         offset = (page - 1) * page_size
         segments_result = await self.session.execute(
-            select(Segment)
+            select(
+                Segment,
+                Video.youtube_video_id,
+                func.count().over().label("total_count"),
+            )
+            .join(Video, Segment.video_id == Video.video_id)
             .where(Segment.video_id == video_id)
             .order_by(Segment.sequence_number)
             .offset(offset)
             .limit(page_size)
         )
-        segments = segments_result.scalars().all()
+        rows = list(segments_result.all())
 
-        youtube_video_id = video.youtube_video_id
+        if rows:
+            segments = [row[0] for row in rows]
+            youtube_video_id = rows[0].youtube_video_id
+            total_count = rows[0].total_count or 0
+        else:
+            video_result = await self.session.execute(
+                select(Video.youtube_video_id).where(Video.video_id == video_id)
+            )
+            youtube_video_id = video_result.scalar_one_or_none()
+            if not youtube_video_id:
+                return None
+            segments = []
+            total_count = 0
 
         return SegmentListResponse(
             video_id=video_id,
@@ -411,38 +432,48 @@ class LibraryService:
         Returns:
             Paginated list of channel cards.
         """
-        query = select(Channel).options(noload(Channel.videos), noload(Channel.batches))
+        video_count_subquery = (
+            select(func.count())
+            .where(Video.channel_id == Channel.channel_id)
+            .correlate(Channel)
+            .scalar_subquery()
+        )
+
+        query = select(
+            Channel,
+            video_count_subquery.label("video_count"),
+            func.count().over().label("total_count"),
+        ).options(noload(Channel.videos), noload(Channel.batches))
 
         if search:
             query = query.where(Channel.name.ilike(f"%{search}%"))
-
-        # Get total count
-        count_query = select(func.count()).select_from(query.subquery())
-        total_result = await self.session.execute(count_query)
-        total_count = total_result.scalar() or 0
 
         # Apply pagination and ordering
         offset = (page - 1) * page_size
         query = query.order_by(Channel.name).offset(offset).limit(page_size)
 
         result = await self.session.execute(query)
-        channels = result.scalars().all()
+        rows = list(result.all())
+        total_count = rows[0].total_count if rows else 0
 
-        # Get video counts for each channel
-        channel_ids = [c.channel_id for c in channels]
-        video_counts = await self._get_channel_video_counts(channel_ids)
+        if not rows and page > 1:
+            count_query = select(func.count()).select_from(Channel)
+            if search:
+                count_query = count_query.where(Channel.name.ilike(f"%{search}%"))
+            total_result = await self.session.execute(count_query)
+            total_count = total_result.scalar() or 0
 
         return ChannelListResponse(
             channels=[
                 ChannelCard(
-                    channel_id=c.channel_id,
-                    youtube_channel_id=c.youtube_channel_id,
-                    name=c.name,
-                    thumbnail_url=c.thumbnail_url,
-                    video_count=video_counts.get(c.channel_id, 0),
-                    last_synced_at=c.last_synced_at,
+                    channel_id=row[0].channel_id,
+                    youtube_channel_id=row[0].youtube_channel_id,
+                    name=row[0].name,
+                    thumbnail_url=row[0].thumbnail_url,
+                    video_count=row.video_count or 0,
+                    last_synced_at=row[0].last_synced_at,
                 )
-                for c in channels
+                for row in rows
             ],
             page=page,
             page_size=page_size,
@@ -551,44 +582,44 @@ class LibraryService:
         Returns:
             Library statistics.
         """
-        # Total channels
-        channel_count = await self.session.execute(select(func.count()).select_from(Channel))
-        total_channels = channel_count.scalar() or 0
-
-        # Total videos
-        video_count = await self.session.execute(select(func.count()).select_from(Video))
-        total_videos = video_count.scalar() or 0
-
-        # Completed videos
-        completed_count = await self.session.execute(
-            select(func.count()).where(Video.processing_status == "completed")
+        result = await self.session.execute(
+            select(
+                select(func.count()).select_from(Channel).scalar_subquery().label("total_channels"),
+                select(func.count()).select_from(Video).scalar_subquery().label("total_videos"),
+                select(func.count())
+                .where(Video.processing_status == "completed")
+                .scalar_subquery()
+                .label("completed_videos"),
+                select(func.count()).select_from(Segment).scalar_subquery().label("total_segments"),
+                select(func.count())
+                .select_from(Relationship)
+                .scalar_subquery()
+                .label("total_relationships"),
+                select(func.count()).select_from(Facet).scalar_subquery().label("total_facets"),
+                select(func.max(Video.updated_at)).scalar_subquery().label("last_updated_at"),
+            )
         )
-        completed_videos = completed_count.scalar() or 0
+        row = result.one_or_none()
 
-        # Total segments
-        segment_count = await self.session.execute(select(func.count()).select_from(Segment))
-        total_segments = segment_count.scalar() or 0
-
-        # Total relationships
-        rel_count = await self.session.execute(select(func.count()).select_from(Relationship))
-        total_relationships = rel_count.scalar() or 0
-
-        # Total facets
-        facet_count = await self.session.execute(select(func.count()).select_from(Facet))
-        total_facets = facet_count.scalar() or 0
-
-        # Last updated
-        last_updated_result = await self.session.execute(select(func.max(Video.updated_at)))
-        last_updated_at = last_updated_result.scalar()
+        if row is None:
+            return LibraryStatsResponse(
+                total_channels=0,
+                total_videos=0,
+                completed_videos=0,
+                total_segments=0,
+                total_relationships=0,
+                total_facets=0,
+                last_updated_at=None,
+            )
 
         return LibraryStatsResponse(
-            total_channels=total_channels,
-            total_videos=total_videos,
-            completed_videos=completed_videos,
-            total_segments=total_segments,
-            total_relationships=total_relationships,
-            total_facets=total_facets,
-            last_updated_at=last_updated_at,
+            total_channels=row.total_channels or 0,
+            total_videos=row.total_videos or 0,
+            completed_videos=row.completed_videos or 0,
+            total_segments=row.total_segments or 0,
+            total_relationships=row.total_relationships or 0,
+            total_facets=row.total_facets or 0,
+            last_updated_at=row.last_updated_at,
         )
 
     async def _get_segment_counts(self, video_ids: list[UUID]) -> dict[UUID, int]:
