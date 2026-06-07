@@ -14,7 +14,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/AshleyHollis/yt-summarizer.git
-    targetRevision: codex/openclaw-vps-migration
+    targetRevision: main
     path: k8s/overlays/openclaw-canary
   destination:
     server: https://kubernetes.default.svc
