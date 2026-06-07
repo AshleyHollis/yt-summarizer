@@ -99,6 +99,20 @@ def test_login_uses_https_callback_for_public_tunnel_host_without_forwarded_prot
 
 
 @pytest.mark.unit
+def test_login_uses_https_callback_for_public_tunnel_host_with_internal_http_proto():
+    """Cloudflare Tunnel may report the internal hop as HTTP after terminating TLS."""
+    redirect_uri = _login_redirect_uri(
+        headers={
+            "Host": "api-ytsummarizer.ashleyhollis.com",
+            "X-Forwarded-Proto": "http",
+        },
+        return_to="https://proud-hill-0940e7300.6.azurestaticapps.net",
+    )
+
+    assert redirect_uri == "https://api-ytsummarizer.ashleyhollis.com/api/auth/callback"
+
+
+@pytest.mark.unit
 def test_login_keeps_http_callback_for_localhost_without_forwarded_proto():
     redirect_uri = _login_redirect_uri(
         headers={"Host": "localhost:8000"},

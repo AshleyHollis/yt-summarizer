@@ -223,10 +223,12 @@ def _build_callback_url(request: Request) -> str:
         host = request.headers.get("Host", str(request.base_url.netloc))
 
     proto = _forwarded_proto(request)
-    if not proto:
+    if not _is_local_host(host):
         # Cloudflare Tunnel terminates TLS before forwarding to the in-cluster HTTP service.
-        # If no proxy header survives, public hosts still need the external HTTPS URL for Auth0.
-        proto = "http" if _is_local_host(host) else "https"
+        # Auth0 needs the external HTTPS callback, not the proxy's internal HTTP hop.
+        proto = "https"
+    elif not proto:
+        proto = "http"
 
     # Use /auth/callback as the primary callback URL
     return f"{proto}://{host}/api/auth/callback"
