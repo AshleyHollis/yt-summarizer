@@ -36,6 +36,9 @@ patches:
       kind: ExternalSecret
     patch: |-
       - op: replace
+        path: /apiVersion
+        value: external-secrets.io/v1
+      - op: replace
         path: /spec/secretStoreRef/kind
         value: ClusterSecretStore
       - op: replace

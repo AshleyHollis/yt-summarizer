@@ -207,7 +207,7 @@ jobs:
       # Production overlay update
       - name: Update production kustomization
         if: inputs.environment == 'prod'
-        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@codex/openclaw-vps-migration
+        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@main
         with:
           operation: update-prod
           image-tag: ${{ inputs.image-tag }}
@@ -219,7 +219,7 @@ jobs:
       # Preview overlay update
       - name: Update preview kustomization
         if: inputs.environment == 'preview'
-        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@codex/openclaw-vps-migration
+        uses: AshleyHollis/shared-infra/.github/actions/manage-kustomization@main
         with:
           operation: update-preview
           pr-number: ${{ inputs.pr-number }}

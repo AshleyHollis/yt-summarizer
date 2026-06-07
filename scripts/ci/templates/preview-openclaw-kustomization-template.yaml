@@ -25,6 +25,15 @@ images:
 
 patches:
   - target:
+      group: external-secrets.io
+      version: v1beta1
+      kind: ExternalSecret
+    patch: |-
+      - op: replace
+        path: /apiVersion
+        value: external-secrets.io/v1
+
+  - target:
       version: v1
       kind: ServiceAccount
       name: yt-summarizer-sa
