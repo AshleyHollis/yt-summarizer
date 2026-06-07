@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 
 # Import shared modules
 try:
@@ -166,10 +167,11 @@ class JobService:
         Returns:
             VideoJobsProgress or None if video not found.
         """
-        # Check video exists
-        video_result = await self.session.execute(select(Video).where(Video.video_id == video_id))
-        video = video_result.scalar_one_or_none()
-        if not video:
+        # Check video exists without loading selectin relationships like transcript segments.
+        video_result = await self.session.execute(
+            select(Video.video_id).where(Video.video_id == video_id)
+        )
+        if video_result.scalar_one_or_none() is None:
             return None
 
         # Get all jobs for this video
@@ -338,9 +340,9 @@ class JobService:
 
             # Get video info
             video_result = await self.session.execute(
-                select(Video).where(Video.video_id == job.video_id)
+                select(Video.youtube_video_id).where(Video.video_id == job.video_id)
             )
-            video = video_result.scalar_one_or_none()
+            youtube_video_id = video_result.scalar_one_or_none()
 
             queue_client.send_message(
                 queue_name,
@@ -348,7 +350,7 @@ class JobService:
                     {
                         "job_id": str(job.job_id),
                         "video_id": str(job.video_id),
-                        "youtube_video_id": video.youtube_video_id if video else "",
+                        "youtube_video_id": youtube_video_id or "",
                         "correlation_id": correlation_id,
                         "retry_count": job.retry_count,
                     }
@@ -430,7 +432,16 @@ class JobService:
             VideoProcessingHistory or None if video not found.
         """
         # Get video
-        video_result = await self.session.execute(select(Video).where(Video.video_id == video_id))
+        video_result = await self.session.execute(
+            select(Video)
+            .options(
+                noload(Video.channel),
+                noload(Video.segments),
+                noload(Video.artifacts),
+                noload(Video.jobs),
+            )
+            .where(Video.video_id == video_id)
+        )
         video = video_result.scalar_one_or_none()
         if not video:
             return None

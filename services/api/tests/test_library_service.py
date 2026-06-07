@@ -192,7 +192,7 @@ class TestGetVideoDetailSummaryFetching:
 
         # For the video query (first call)
         mock_video_result = MagicMock()
-        mock_video_result.scalar_one_or_none.return_value = video
+        mock_video_result.one_or_none.return_value = (video, 0, 0)
 
         # For count queries (segment_count, relationship_count)
         mock_count_result = MagicMock()
@@ -214,10 +214,10 @@ class TestGetVideoDetailSummaryFetching:
         expected_blob_name = f"{video_id}/{youtube_video_id}_summary.md"
         mock_summary_content = b"# Test Summary\n\nThis is the summary content."
 
-        with patch("api.services.library_service.BlobClient") as MockBlobClient:
+        with patch("api.services.library_service.get_blob_client") as mock_get_blob_client:
             mock_blob_instance = MagicMock()
             mock_blob_instance.download_blob.return_value = mock_summary_content
-            MockBlobClient.return_value = mock_blob_instance
+            mock_get_blob_client.return_value = mock_blob_instance
 
             from api.services.library_service import LibraryService
 
@@ -245,15 +245,15 @@ class TestGetVideoDetailSummaryFetching:
 
         mock_session = AsyncMock()
         mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = video
+        mock_result.one_or_none.return_value = (video, 0, 0)
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         mock_summary_content = b"# Test Summary\n\nThis is the summary content."
 
-        with patch("api.services.library_service.BlobClient") as MockBlobClient:
+        with patch("api.services.library_service.get_blob_client") as mock_get_blob_client:
             mock_blob_instance = MagicMock()
             mock_blob_instance.download_blob.return_value = mock_summary_content
-            MockBlobClient.return_value = mock_blob_instance
+            mock_get_blob_client.return_value = mock_blob_instance
 
             from api.services.library_service import LibraryService
 
@@ -273,13 +273,13 @@ class TestGetVideoDetailSummaryFetching:
 
         mock_session = AsyncMock()
         mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = video
+        mock_result.one_or_none.return_value = (video, 0, 0)
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        with patch("api.services.library_service.BlobClient") as MockBlobClient:
+        with patch("api.services.library_service.get_blob_client") as mock_get_blob_client:
             mock_blob_instance = MagicMock()
             mock_blob_instance.download_blob.side_effect = Exception("BlobNotFound")
-            MockBlobClient.return_value = mock_blob_instance
+            mock_get_blob_client.return_value = mock_blob_instance
 
             from api.services.library_service import LibraryService
 
@@ -319,10 +319,10 @@ class TestGetVideoDetailSummaryFetching:
 
         mock_session = AsyncMock()
         mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = video
+        mock_result.one_or_none.return_value = (video, 0, 0)
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        with patch("api.services.library_service.BlobClient") as MockBlobClient:
+        with patch("api.services.library_service.get_blob_client") as mock_get_blob_client:
             from api.services.library_service import LibraryService
 
             service = LibraryService(mock_session)
@@ -331,7 +331,7 @@ class TestGetVideoDetailSummaryFetching:
             result = await service.get_video_detail(str(video_id))
 
             # Should not have called blob client at all
-            MockBlobClient.return_value.download_blob.assert_not_called()
+            mock_get_blob_client.assert_not_called()
 
             assert result.summary is None, (
                 "Summary should be None when video has no summary artifact"
@@ -394,15 +394,15 @@ class TestCompletedStatusValidation:
 
         mock_session = AsyncMock()
         mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = video
+        mock_result.one_or_none.return_value = (video, 0, 0)
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         expected_summary = "# Summary\n\nThis is the actual summary content."
 
-        with patch("api.services.library_service.BlobClient") as MockBlobClient:
+        with patch("api.services.library_service.get_blob_client") as mock_get_blob_client:
             mock_blob_instance = MagicMock()
             mock_blob_instance.download_blob.return_value = expected_summary.encode("utf-8")
-            MockBlobClient.return_value = mock_blob_instance
+            mock_get_blob_client.return_value = mock_blob_instance
 
             from api.services.library_service import LibraryService
 
