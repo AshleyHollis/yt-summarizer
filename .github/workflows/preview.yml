@@ -78,7 +78,7 @@ env:
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
   K8S_PLATFORM: ${{ vars.K8S_PLATFORM || 'aks' }}
   PREVIEW_NAMESPACE_PREFIX: "preview-pr-"
-  APPS_BASE_DOMAIN: "yt-summarizer.apps.ashleyhollis.com"
+  APPS_BASE_DOMAIN: ${{ (vars.K8S_PLATFORM || 'aks') == 'openclaw' && 'ashleyhollis.com' || 'yt-summarizer.apps.ashleyhollis.com' }}
   ARGOCD_SYNC_TIMEOUT: "180"
   KUSTOMIZE_OVERLAY_PREVIEW: "k8s/overlays/preview"
   MAX_PREVIEWS: 3
