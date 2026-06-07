@@ -58,7 +58,10 @@ patches:
     patch: |-
       - op: replace
         path: /spec/parentRefs/0/sectionName
-        value: http-yt-summarizer
+        value: http-yt-summarizer-prod
+      - op: replace
+        path: /spec/hostnames/0
+        value: api-ytsummarizer.ashleyhollis.com
       - op: remove
         path: /metadata/annotations/external-dns.alpha.kubernetes.io~1hostname
 
