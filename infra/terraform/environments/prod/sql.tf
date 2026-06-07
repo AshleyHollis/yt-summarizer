@@ -22,5 +22,13 @@ module "sql" {
   auto_pause_delay_in_minutes = null
   min_capacity                = null
 
+  firewall_rules = [
+    {
+      name             = "OpenClawVps"
+      start_ip_address = var.openclaw_vps_public_ip
+      end_ip_address   = var.openclaw_vps_public_ip
+    }
+  ]
+
   tags = local.common_tags
 }

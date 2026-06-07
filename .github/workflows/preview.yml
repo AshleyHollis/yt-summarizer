@@ -76,6 +76,7 @@ concurrency:
 env:
   ACR_NAME: ${{ vars.ACR_NAME || 'acrytsummprdci' }}
   ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || 'acrytsummprdci.azurecr.io' }}
+  K8S_PLATFORM: ${{ vars.K8S_PLATFORM || 'aks' }}
   PREVIEW_NAMESPACE_PREFIX: "preview-pr-"
   APPS_BASE_DOMAIN: "yt-summarizer.apps.ashleyhollis.com"
   ARGOCD_SYNC_TIMEOUT: "180"
@@ -361,7 +362,8 @@ jobs:
       always() && !cancelled() &&
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
-      needs.check-concurrency.outputs.can_deploy == 'true'
+      needs.check-concurrency.outputs.can_deploy == 'true' &&
+      (vars.K8S_PLATFORM || 'aks') == 'aks'
     steps:
       - name: Azure Login via OIDC
         uses: azure/login@v2
@@ -443,7 +445,8 @@ jobs:
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.ensure-aks-running.result == 'success' &&
-      (needs.terraform.result != 'failure')
+      (needs.terraform.result != 'failure') &&
+      (vars.K8S_PLATFORM || 'aks') == 'aks'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -544,7 +547,8 @@ jobs:
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.get-ingress.result == 'success' &&
       (needs.terraform.result != 'failure') &&
-      needs.sync-argocd-manifests.result == 'success'
+      ((vars.K8S_PLATFORM || 'aks') == 'openclaw' ||
+       needs.sync-argocd-manifests.result == 'success')
     needs:
       [
         check-concurrency,
@@ -566,7 +570,9 @@ jobs:
       preview-host: ${{ needs.get-ingress.outputs.preview_host }}
       preview-url: ${{ needs.get-ingress.outputs.preview_url }}
       tls-secret: ${{ needs.get-ingress.outputs.tls_secret }}
-      run-k8s-pull-test: true
+      preview-template-path: ${{ vars.K8S_PLATFORM == 'openclaw' && 'scripts/ci/templates/preview-openclaw-kustomization-template.yaml' || 'scripts/ci/templates/preview-kustomization-template.yaml' }}
+      k8s-platform: ${{ vars.K8S_PLATFORM || 'aks' }}
+      run-k8s-pull-test: ${{ vars.K8S_PLATFORM != 'openclaw' }}
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -584,7 +590,8 @@ jobs:
       needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
-      needs.update-overlay.result == 'success'
+      needs.update-overlay.result == 'success' &&
+      (vars.K8S_PLATFORM || 'aks') == 'aks'
     needs: [update-overlay, check-concurrency, get-ingress, detect-changes]
     with:
       environment: preview
@@ -601,6 +608,45 @@ jobs:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+  verify-openclaw-health:
+    name: Verify OpenClaw Preview Health
+    runs-on: ubuntu-latest
+    if: |
+      always() && !cancelled() &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
+      needs.detect-changes.outputs.needs_backend_deployment == 'true' &&
+      needs.check-concurrency.result == 'success' &&
+      needs.check-concurrency.outputs.can_deploy == 'true' &&
+      needs.update-overlay.result == 'success' &&
+      (vars.K8S_PLATFORM || 'aks') == 'openclaw'
+    needs: [update-overlay, check-concurrency, get-ingress, detect-changes]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Load shared environment
+        uses: AshleyHollis/shared-infra/.github/actions/load-shared-env@v1
+
+      - name: Wait for OpenClaw preview readiness
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
+        with:
+          url: ${{ needs.get-ingress.outputs.preview_url }}${{ env.HEALTH_CHECK_PATH }}
+          max-attempts: "30"
+          interval-seconds: "20"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Preview API (OpenClaw)"
+
+      - name: Check OpenClaw preview liveness
+        uses: AshleyHollis/shared-infra/.github/actions/health-check@v1
+        with:
+          url: ${{ needs.get-ingress.outputs.preview_url }}/health/live
+          max-attempts: "5"
+          interval-seconds: "10"
+          timeout-seconds: "5"
+          expected-status: "200"
+          service-name: "Preview API liveness (OpenClaw)"
 
   # ===========================================================================
   # PHASE 7: DEPLOY FRONTEND (Reusable Workflow)
@@ -640,11 +686,15 @@ jobs:
       (github.event_name != 'workflow_dispatch' || inputs.run_preview == true) &&
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
-      needs.verify-deployment.result == 'success' &&
+      (((vars.K8S_PLATFORM || 'aks') == 'openclaw' &&
+        needs.verify-openclaw-health.result == 'success') ||
+       ((vars.K8S_PLATFORM || 'aks') == 'aks' &&
+        needs.verify-deployment.result == 'success')) &&
       needs.deploy-frontend-preview.result == 'success'
     needs:
       - update-overlay
       - verify-deployment
+      - verify-openclaw-health
       - deploy-frontend-preview
       - detect-changes
       - get-ingress
@@ -688,6 +738,7 @@ jobs:
     needs:
       - update-overlay
       - verify-deployment
+      - verify-openclaw-health
       - deploy-frontend-preview
       - post-preview-comment
       - detect-changes
@@ -699,6 +750,10 @@ jobs:
       needs.check-concurrency.result == 'success' &&
       needs.check-concurrency.outputs.can_deploy == 'true' &&
       needs.post-preview-comment.result == 'success' &&
+      (((vars.K8S_PLATFORM || 'aks') == 'openclaw' &&
+        needs.verify-openclaw-health.result == 'success') ||
+       ((vars.K8S_PLATFORM || 'aks') == 'aks' &&
+        needs.verify-deployment.result == 'success')) &&
       needs.get-ingress.outputs.preview_url != ''
     outputs:
       result: ${{ steps.run-tests.outcome }}
@@ -885,6 +940,7 @@ jobs:
       - wait-for-ci
       - update-overlay
       - verify-deployment
+      - verify-openclaw-health
       - deploy-frontend-preview
       - e2e-tests
       - get-ingress
@@ -931,6 +987,7 @@ jobs:
             echo "- Concurrency gate: ${{ needs.check-concurrency.outputs.can_deploy || 'n/a' }}"
             echo "- Overlay update: ${{ needs.update-overlay.result }}"
             echo "- Backend verify: ${{ needs.verify-deployment.result }}"
+            echo "- OpenClaw health verify: ${{ needs.verify-openclaw-health.result }}"
             echo "- Frontend deploy: ${{ needs.deploy-frontend-preview.result }}"
             echo "- E2E tests: ${{ needs.e2e-tests.result }}"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -942,7 +999,7 @@ jobs:
           needs-deployment: ${{ needs.detect-changes.outputs.needs_deployment }}
           wait-for-ci-result: ${{ needs.wait-for-ci.result }}
           update-overlay-result: ${{ needs.update-overlay.result }}
-          verify-deployment-result: ${{ needs.verify-deployment.result }}
+          verify-deployment-result: ${{ needs.verify-deployment.result == 'skipped' && needs.verify-openclaw-health.result || needs.verify-deployment.result }}
           deploy-frontend-result: ${{ needs.deploy-frontend-preview.result }}
           e2e-tests-result: ${{ needs.e2e-tests.result }}
           api-url-configured: ${{ needs.get-ingress.outputs.preview_url }}

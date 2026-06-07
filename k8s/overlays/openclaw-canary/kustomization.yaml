@@ -1,0 +1,76 @@
+# =============================================================================
+# OpenClaw Canary Overlay
+# =============================================================================
+# Deploys the API to OpenClaw for tunnel/Gateway smoke testing without running
+# production queue workers or migration hooks.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: yt-summarizer-openclaw-canary
+
+resources:
+  - ../openclaw-prod
+
+patches:
+  - target:
+      version: v1
+      kind: Namespace
+      name: yt-summarizer
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: yt-summarizer-openclaw-canary
+
+  - target:
+      group: batch
+      version: v1
+      kind: Job
+      name: db-migration
+    patch: |-
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: db-migration
+      $patch: delete
+
+  - target:
+      group: scheduling.k8s.io
+      version: v1
+      kind: PriorityClass
+      name: production-critical
+    patch: |-
+      apiVersion: scheduling.k8s.io/v1
+      kind: PriorityClass
+      metadata:
+        name: production-critical
+      $patch: delete
+
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+      name: api-httproute
+    patch: |-
+      - op: replace
+        path: /spec/parentRefs/0/sectionName
+        value: http-yt-summarizer-canary
+      - op: replace
+        path: /spec/hostnames/0
+        value: api-openclaw.ashleyhollis.com
+
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component=worker
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+
+labels:
+  - pairs:
+      app.kubernetes.io/instance: openclaw-canary
+
+commonAnnotations:
+  deployment.kubernetes.io/canary-host: api-openclaw.ashleyhollis.com
