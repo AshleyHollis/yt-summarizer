@@ -168,10 +168,66 @@ def _sanitize_return_to(return_to: str, settings: Any) -> str:
     return return_to
 
 
+def _first_header_value(value: str | None) -> str | None:
+    if not value:
+        return None
+    return value.split(",", 1)[0].strip()
+
+
+def _host_name(host: str) -> str:
+    parsed = urlparse(f"//{host}")
+    return (parsed.hostname or host.split(":", 1)[0]).strip("[]").lower()
+
+
+def _is_local_host(host: str) -> bool:
+    hostname = _host_name(host)
+    return hostname in {"localhost", "127.0.0.1", "::1", "testserver"} or hostname.endswith(
+        ".local"
+    )
+
+
+def _forwarded_proto(request: Request) -> str | None:
+    proto = _first_header_value(request.headers.get("X-Forwarded-Proto"))
+    if proto:
+        return proto.lower()
+
+    proto = _first_header_value(request.headers.get("X-Forwarded-Scheme"))
+    if proto:
+        return proto.lower()
+
+    if request.headers.get("X-Forwarded-SSL", "").lower() == "on":
+        return "https"
+
+    forwarded = _first_header_value(request.headers.get("Forwarded"))
+    if forwarded:
+        for part in forwarded.split(";"):
+            key, _, value = part.strip().partition("=")
+            if key.lower() == "proto" and value:
+                return value.strip('"').lower()
+
+    cf_visitor = request.headers.get("CF-Visitor")
+    if cf_visitor:
+        try:
+            scheme = json.loads(cf_visitor).get("scheme")
+            if scheme:
+                return str(scheme).lower()
+        except (TypeError, ValueError):
+            pass
+
+    return None
+
+
 def _build_callback_url(request: Request) -> str:
-    # Check for X-Forwarded-Proto header to handle reverse proxy HTTPS
-    proto = request.headers.get("X-Forwarded-Proto", "http")
-    host = request.headers.get("Host", str(request.base_url.netloc))
+    host = _first_header_value(request.headers.get("X-Forwarded-Host"))
+    if not host:
+        host = request.headers.get("Host", str(request.base_url.netloc))
+
+    proto = _forwarded_proto(request)
+    if not proto:
+        # Cloudflare Tunnel terminates TLS before forwarding to the in-cluster HTTP service.
+        # If no proxy header survives, public hosts still need the external HTTPS URL for Auth0.
+        proto = "http" if _is_local_host(host) else "https"
+
     # Use /auth/callback as the primary callback URL
     return f"{proto}://{host}/api/auth/callback"
 
