@@ -37,9 +37,10 @@ spec:
             - /bin/sh
             - -c
             - |
+              set -eu
               echo "Starting database migrations..."
-              cd /app
-              alembic upgrade head
+              cd /app/shared
+              python scripts/run_migrations.py
               echo "Migrations completed successfully!"
           env:
             - name: DATABASE_URL
