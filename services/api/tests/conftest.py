@@ -45,6 +45,7 @@ def mock_session():
     mock_result.scalars.return_value = mock_scalars
     mock_result.scalar.return_value = 0  # For count queries
     mock_result.scalar_one_or_none.return_value = None
+    mock_result.one_or_none.return_value = None
     mock_result.fetchone.return_value = None
     mock_result.fetchall.return_value = []
 

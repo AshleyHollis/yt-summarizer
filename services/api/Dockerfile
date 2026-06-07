@@ -69,6 +69,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY services/shared/shared/ /app/shared/shared/
+COPY services/shared/alembic.ini /app/shared/alembic.ini
+COPY services/shared/alembic/ /app/shared/alembic/
+COPY services/shared/scripts/ /app/shared/scripts/
 COPY services/api/src/ ./src/
 
 # Set Python path

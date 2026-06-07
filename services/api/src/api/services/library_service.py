@@ -5,11 +5,11 @@ from uuid import UUID
 
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import contains_eager, noload, selectinload
 
 # Import shared modules
 try:
-    from shared.blob.client import SUMMARIES_CONTAINER, BlobClient
+    from shared.blob.client import SUMMARIES_CONTAINER, get_blob_client
     from shared.db.models import (
         Artifact,
         Channel,
@@ -34,7 +34,7 @@ except ImportError as e:
     Segment = Any
     Video = Any
     VideoFacet = Any
-    BlobClient = None
+    get_blob_client = None
     SUMMARIES_CONTAINER = "summaries"
 
     def get_logger(name):
@@ -85,11 +85,18 @@ class LibraryService:
         Returns:
             SQLAlchemy select query.
         """
-        query = select(Video).options(
-            selectinload(Video.channel),
-            noload(Video.segments),
-            noload(Video.artifacts),
-            noload(Video.jobs),
+        query = (
+            select(Video)
+            .join(Video.channel)
+            .options(
+                contains_eager(Video.channel).options(
+                    noload(Channel.videos),
+                    noload(Channel.batches),
+                ),
+                noload(Video.segments),
+                noload(Video.artifacts),
+                noload(Video.jobs),
+            )
         )
 
         # Apply filters
@@ -212,38 +219,51 @@ class LibraryService:
         Returns:
             Video detail response or None if not found.
         """
+        segment_count_subquery = (
+            select(func.count())
+            .where(Segment.video_id == Video.video_id)
+            .correlate(Video)
+            .scalar_subquery()
+        )
+        relationship_count_subquery = (
+            select(func.count())
+            .where(
+                or_(
+                    Relationship.source_video_id == Video.video_id,
+                    Relationship.target_video_id == Video.video_id,
+                )
+            )
+            .correlate(Video)
+            .scalar_subquery()
+        )
+
         query = (
-            select(Video)
+            select(
+                Video,
+                segment_count_subquery.label("segment_count"),
+                relationship_count_subquery.label("relationship_count"),
+            )
+            .join(Video.channel)
             .options(
-                selectinload(Video.channel),
+                contains_eager(Video.channel).options(
+                    noload(Channel.videos),
+                    noload(Channel.batches),
+                ),
+                selectinload(Video.artifacts),
                 noload(Video.segments),
-                noload(Video.artifacts),
                 noload(Video.jobs),
             )
             .where(Video.video_id == video_id)
         )
         result = await self.session.execute(query)
-        video = result.scalar_one_or_none()
+        row = result.one_or_none()
 
-        if not video:
+        if not row:
             return None
 
-        # Get segment count
-        segment_count_result = await self.session.execute(
-            select(func.count()).where(Segment.video_id == video_id)
-        )
-        segment_count = segment_count_result.scalar() or 0
-
-        # Get relationship count
-        relationship_count_result = await self.session.execute(
-            select(func.count()).where(
-                or_(
-                    Relationship.source_video_id == video_id,
-                    Relationship.target_video_id == video_id,
-                )
-            )
-        )
-        relationship_count = relationship_count_result.scalar() or 0
+        video, segment_count, relationship_count = row
+        segment_count = segment_count or 0
+        relationship_count = relationship_count or 0
 
         # Get facets
         video_facets = await self._get_video_facets([video_id])
@@ -279,9 +299,9 @@ class LibraryService:
                 transcript_artifact = artifact_info
 
         # Fetch summary content from blob storage if available
-        if summary_blob_name and BlobClient is not None:
+        if summary_blob_name and get_blob_client is not None:
             try:
-                blob_client = BlobClient()
+                blob_client = get_blob_client()
                 summary_bytes = blob_client.download_blob(SUMMARIES_CONTAINER, summary_blob_name)
                 summary_text = summary_bytes.decode("utf-8")
             except Exception as e:
@@ -391,7 +411,7 @@ class LibraryService:
         Returns:
             Paginated list of channel cards.
         """
-        query = select(Channel)
+        query = select(Channel).options(noload(Channel.videos), noload(Channel.batches))
 
         if search:
             query = query.where(Channel.name.ilike(f"%{search}%"))
@@ -438,7 +458,11 @@ class LibraryService:
         Returns:
             Channel detail response or None if not found.
         """
-        result = await self.session.execute(select(Channel).where(Channel.channel_id == channel_id))
+        result = await self.session.execute(
+            select(Channel)
+            .options(noload(Channel.videos), noload(Channel.batches))
+            .where(Channel.channel_id == channel_id)
+        )
         channel = result.scalar_one_or_none()
 
         if not channel:
@@ -601,6 +625,7 @@ class LibraryService:
 
         result = await self.session.execute(
             select(VideoFacet.video_id, Facet)
+            .options(noload(Facet.video_facets))
             .join(Facet, VideoFacet.facet_id == Facet.facet_id)
             .where(VideoFacet.video_id.in_(video_ids))
         )
@@ -650,6 +675,7 @@ class LibraryService:
         """
         result = await self.session.execute(
             select(Facet, func.count().label("count"))
+            .options(noload(Facet.video_facets))
             .join(VideoFacet, Facet.facet_id == VideoFacet.facet_id)
             .join(Video, VideoFacet.video_id == Video.video_id)
             .where(Video.channel_id == channel_id)
