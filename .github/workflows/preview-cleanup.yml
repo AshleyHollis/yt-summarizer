@@ -27,6 +27,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Azure Login via OIDC
+        if: (vars.K8S_PLATFORM || 'aks') == 'openclaw'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Load Cloudflare API token from Key Vault
+        id: cloudflare-token
+        if: (vars.K8S_PLATFORM || 'aks') == 'openclaw'
+        shell: bash
+        run: |
+          token="$(az keyvault secret show \
+            --vault-name "${{ vars.KEY_VAULT_NAME || 'kv-ytsumm-prd-ci' }}" \
+            --name cloudflare-api-token \
+            --query value \
+            --output tsv)"
+          echo "::add-mask::${token}"
+          echo "token=${token}" >> "$GITHUB_OUTPUT"
+
+      - name: Delete OpenClaw preview DNS
+        if: (vars.K8S_PLATFORM || 'aks') == 'openclaw'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.cloudflare-token.outputs.token }}
+        run: |
+          scripts/workflows/openclaw-preview-dns.sh \
+            delete \
+            "api-pr-${{ github.event.pull_request.number }}.ashleyhollis.com"
+
       - name: Close SWA staging environment
         id: swa-cleanup
         uses: AshleyHollis/shared-infra/.github/actions/close-swa-environment@v1
