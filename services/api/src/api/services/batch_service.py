@@ -408,7 +408,7 @@ class BatchService:
 
         ctx = (
             self._proxy_service.log_request(
-                url=f"https://www.youtube.com/watch?v={youtube_video_id}",
+                service="api",
                 operation="batch_fetch_video_metadata",
             )
             if self._proxy_service is not None
