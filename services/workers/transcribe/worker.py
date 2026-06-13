@@ -41,14 +41,27 @@ RETRYABLE_YOUTUBE_ERROR_PHRASES = (
     "sign in to confirm",
     "not a bot",
     "cookies",
-    "age",
     "payment required",
     "unable to connect to proxy",
+)
+AGE_GATED_YOUTUBE_ERROR_PHRASES = (
+    "sign in to confirm your age",
+    "age-restricted",
+    "inappropriate for some users",
+)
+AGE_GATED_TRANSCRIPT_ERROR = (
+    "Age-gated video requires an age-gated transcript worker with authenticated YouTube cookies."
 )
 
 
 class RateLimitError(Exception):
     """Raised when YouTube rate limits or IP blocks our requests."""
+
+    pass
+
+
+class AgeGatedTranscriptError(Exception):
+    """Raised when YouTube requires authenticated age confirmation."""
 
     pass
 
@@ -65,6 +78,7 @@ class TranscribeMessage:
     batch_id: str | None = None
     processing_mode: str = "full_analysis"
     retry_count: int = 0
+    required_capabilities: list[str] | None = None
 
 
 class TranscribeWorker(BaseWorker[TranscribeMessage]):
@@ -82,6 +96,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
     def __init__(self):
         """Initialize with proxy-aware rate limiting."""
         settings = get_settings()
+        self._settings = settings
         self._proxy_service = ProxyService(settings.proxy)
 
         # When proxy is active the gateway provides IP rotation — no need for
@@ -98,6 +113,12 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         self._last_youtube_request_time: float | None = None
         self._youtube_request_count: int = 0
         self._youtube_timing_lock = asyncio.Lock()
+
+        if settings.yt_dlp.has_authentication and not self.can_process_age_gated:
+            logger.warning(
+                "yt-dlp authentication is configured but age_gated capability is missing; "
+                "cookie settings will be ignored",
+            )
 
     @property
     def queue_name(self) -> str:
@@ -163,7 +184,76 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             batch_id=raw_message.get("batch_id"),
             processing_mode=raw_message.get("processing_mode", "full_analysis"),
             retry_count=raw_message.get("retry_count", 0),
+            required_capabilities=self._normalize_capabilities(
+                raw_message.get("required_capabilities")
+            ),
         )
+
+    @property
+    def capabilities(self) -> set[str]:
+        """Return capabilities declared by this worker instance."""
+        return self._settings.transcribe.normalized_capabilities
+
+    @property
+    def can_process_age_gated(self) -> bool:
+        """Whether this worker is explicitly allowed to use authenticated YouTube cookies."""
+        return self._settings.transcribe.can_process_age_gated
+
+    def _normalize_capabilities(self, capabilities: Any) -> list[str] | None:
+        """Normalize queue capability hints from list or comma-separated payloads."""
+        if capabilities is None:
+            return None
+        if isinstance(capabilities, str):
+            items = capabilities.split(",")
+        else:
+            items = capabilities
+        normalized = [
+            str(capability).strip().lower() for capability in items if str(capability).strip()
+        ]
+        return normalized or None
+
+    def _missing_required_capabilities(self, message: TranscribeMessage) -> list[str]:
+        """Return message capabilities that this worker does not provide."""
+        required = {
+            capability.strip().lower()
+            for capability in (message.required_capabilities or [])
+            if capability.strip()
+        }
+        return sorted(required - self.capabilities)
+
+    def _get_yt_dlp_auth_opts(self) -> dict[str, Any]:
+        """Return authenticated yt-dlp options for age-gated workers only."""
+        if not self.can_process_age_gated:
+            return {}
+
+        yt_dlp_settings = self._settings.yt_dlp
+        if yt_dlp_settings.cookies_file:
+            return {"cookiefile": yt_dlp_settings.cookies_file}
+        if yt_dlp_settings.cookies_from_browser:
+            return {
+                "cookiesfrombrowser": self._parse_cookies_from_browser(
+                    yt_dlp_settings.cookies_from_browser
+                )
+            }
+        return {}
+
+    def _parse_cookies_from_browser(
+        self, cookies_from_browser: str
+    ) -> tuple[str, str | None, str | None, str | None]:
+        """Parse yt-dlp's BROWSER[+KEYRING][:PROFILE][::CONTAINER] browser cookie spec."""
+        import re
+
+        match = re.fullmatch(
+            r"(?P<name>[^+:]+)(?:\s*\+\s*(?P<keyring>[^:]+))?"
+            r"(?:\s*:\s*(?!:)(?P<profile>.+?))?(?:\s*::\s*(?P<container>.+))?",
+            cookies_from_browser,
+        )
+        if not match:
+            raise ValueError(f"Invalid YTDLP_COOKIES_FROM_BROWSER value: {cookies_from_browser}")
+        browser_name, keyring, profile, container = match.group(
+            "name", "keyring", "profile", "container"
+        )
+        return browser_name.lower(), profile, keyring.upper() if keyring else None, container
 
     async def _has_permanent_no_captions(self, video_id: str) -> bool:
         """Check if a prior job already determined this video has no captions.
@@ -221,6 +311,15 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         try:
             # Mark job as running
             await mark_job_running(message.job_id, "transcribing")
+
+            missing_capabilities = self._missing_required_capabilities(message)
+            if missing_capabilities:
+                error_msg = (
+                    "Transcribe job requires worker capabilities that this worker does not have: "
+                    f"{', '.join(missing_capabilities)}."
+                )
+                await mark_job_failed(message.job_id, error_msg)
+                return WorkerResult.dead_letter(error_msg)
 
             # Short-circuit: if a prior job already determined this video has no captions,
             # fail immediately instead of hitting YouTube (which may rate-limit us again).
@@ -289,6 +388,17 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 message="YouTube is rate limiting requests. Will retry automatically in 5 minutes.",
                 retry_delay=retry_delay,
             )
+        except AgeGatedTranscriptError:
+            logger.warning(
+                "Age-gated video requires authenticated transcript worker",
+                job_id=message.job_id,
+                video_id=message.video_id,
+                youtube_video_id=message.youtube_video_id,
+                age_gated_capability=self.can_process_age_gated,
+                ytdlp_auth_configured=self._settings.yt_dlp.has_authentication,
+            )
+            await mark_job_failed(message.job_id, AGE_GATED_TRANSCRIPT_ERROR)
+            return WorkerResult.dead_letter(AGE_GATED_TRANSCRIPT_ERROR)
 
         try:
             # Store transcript in blob storage (using channel-based path)
@@ -546,6 +656,8 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 },
                 # Proxy routing — empty dict when proxy is disabled (T013)
                 **self._proxy_service.get_ydl_opts(),
+                # Authenticated YouTube access is only enabled on explicit age-gated workers.
+                **self._get_yt_dlp_auth_opts(),
             }
 
             logger.info(
@@ -553,6 +665,8 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 video_id=youtube_video_id,
                 sleep_seconds=subtitle_sleep,
                 proxy_enabled=self._proxy_service.enabled,
+                age_gated_capability=self.can_process_age_gated,
+                ytdlp_auth_configured=self._settings.yt_dlp.has_authentication,
             )
 
             try:
@@ -643,6 +757,8 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 raise  # Re-raise rate limit errors
             except yt_dlp.utils.DownloadError as e:
                 error_str = str(e)
+                if any(phrase in error_str.lower() for phrase in AGE_GATED_YOUTUBE_ERROR_PHRASES):
+                    raise AgeGatedTranscriptError(AGE_GATED_TRANSCRIPT_ERROR)
                 if any(phrase in error_str.lower() for phrase in RETRYABLE_YOUTUBE_ERROR_PHRASES):
                     raise RateLimitError(
                         "YouTube is blocking requests from this IP. This may take hours to resolve."
@@ -651,6 +767,8 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 return None, None
             except Exception as e:
                 error_str = str(e)
+                if any(phrase in error_str.lower() for phrase in AGE_GATED_YOUTUBE_ERROR_PHRASES):
+                    raise AgeGatedTranscriptError(AGE_GATED_TRANSCRIPT_ERROR)
                 if any(phrase in error_str.lower() for phrase in RETRYABLE_YOUTUBE_ERROR_PHRASES):
                     raise RateLimitError(
                         "YouTube is blocking requests from this IP. This may take hours to resolve."

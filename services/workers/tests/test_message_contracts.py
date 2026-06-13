@@ -301,6 +301,29 @@ class TestWorkerMessageOptionalFields:
             )
             assert transcript_only_message.processing_mode == "transcript_only"
 
+    def test_transcribe_worker_parses_required_capabilities(self, minimal_api_message):
+        """TranscribeWorker preserves optional capability routing hints."""
+        from transcribe.worker import TranscribeWorker
+
+        worker = TranscribeWorker()
+        message = worker.parse_message(
+            {
+                **minimal_api_message,
+                "required_capabilities": ["age_gated"],
+            }
+        )
+
+        assert message.required_capabilities == ["age_gated"]
+
+        message = worker.parse_message(
+            {
+                **minimal_api_message,
+                "required_capabilities": "age_gated, local",
+            }
+        )
+
+        assert message.required_capabilities == ["age_gated", "local"]
+
 
 # ============================================================================
 # Message Schema Tests - Missing Required Fields
