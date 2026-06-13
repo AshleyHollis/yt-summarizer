@@ -213,6 +213,56 @@ class TestBatchServiceCreate:
             ProcessingMode.TRANSCRIPT_ONLY
         )
 
+    @pytest.mark.asyncio
+    async def test_fetch_video_metadata_uses_proxy_log_contract(self):
+        """Regression: proxy logging in batch metadata fetch must match ProxyService."""
+        from api.services.batch_service import BatchService
+
+        class AsyncContext:
+            async def __aenter__(self):
+                return None
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        class FakeYoutubeDL:
+            def __init__(self, opts):
+                self.opts = opts
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def extract_info(self, url, download=False):
+                return {
+                    "title": "Test Video",
+                    "description": "Description",
+                    "duration": 123,
+                    "upload_date": "20260102",
+                    "thumbnails": [{"url": "https://example.com/thumb.jpg", "height": 720}],
+                    "channel_id": "UC_test",
+                    "channel": "Test Channel",
+                    "channel_thumbnail_url": "https://example.com/channel.jpg",
+                }
+
+        proxy_service = MagicMock()
+        proxy_service.get_ydl_opts.return_value = {"proxy": "http://proxy.example"}
+        proxy_service.log_request.return_value = AsyncContext()
+
+        service = BatchService(MagicMock())
+        service._proxy_service = proxy_service
+
+        with patch("yt_dlp.YoutubeDL", FakeYoutubeDL):
+            metadata = await service._fetch_video_metadata("abc123")
+
+        assert metadata["title"] == "Test Video"
+        proxy_service.log_request.assert_called_once_with(
+            service="api",
+            operation="batch_fetch_video_metadata",
+        )
+
 
 # ============================================================================
 # List Batches Tests
