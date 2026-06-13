@@ -38,13 +38,15 @@ test.describe('Core User Flows @smoke', () => {
     test('Browse Library CTA navigates to library @smoke', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
       await page.getByRole('link', { name: /Browse Library/i }).click();
-      await page.waitForURL('**/library');
+      await expect(page).toHaveURL(/\/library\/?(?:[?#].*)?$/, { timeout: 15_000 });
+      await expect(page.getByRole('button', { name: /Select videos/i })).toBeVisible();
     });
 
     test('Add Content CTA navigates to add page @smoke', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
       await page.getByRole('link', { name: /Add Content/i }).click();
-      await page.waitForURL('**/add');
+      await expect(page).toHaveURL(/\/add\/?(?:[?#].*)?$/, { timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: /Add Content/i })).toBeVisible();
     });
 
     test('landing page renders feature cards @smoke', async ({ page }) => {
