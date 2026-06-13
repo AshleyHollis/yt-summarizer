@@ -1,0 +1,22 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: transcribe-worker
+  namespace: yt-summarizer
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  scaleTargetRef:
+    name: transcribe-worker
+  pollingInterval: 30
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  triggers:
+    - type: azure-queue
+      metadata:
+        queueName: transcribe-jobs
+        queueLength: "4"
+        queueLengthStrategy: all
+        activationQueueLength: "1"
+        connectionFromEnv: AZURE_STORAGE_CONNECTION_STRING
