@@ -440,6 +440,39 @@ class TestIngest:
         assert data["job_id"] == str(job_id)
         assert data["video_id"] == str(vid_id)
         assert "status" in data
+        assert data["processing_mode"] == "transcript_only"
+        mock_instance.submit_video.assert_called_once()
+        assert mock_instance.submit_video.call_args.kwargs["processing_mode"] == "transcript_only"
+
+    def test_full_analysis_must_be_explicit(self):
+        app, _ = _make_agent_app()
+
+        job_id = uuid4()
+        vid_id = uuid4()
+
+        mock_result = MagicMock()
+        mock_result.job_id = job_id
+        mock_result.video_id = vid_id
+        mock_result.status = MagicMock()
+        mock_result.status.value = "pending"
+
+        with patch("api.services.video_service.VideoService") as MockVS:
+            mock_instance = AsyncMock()
+            mock_instance.submit_video = AsyncMock(return_value=mock_result)
+            MockVS.return_value = mock_instance
+
+            client = TestClient(app)
+            resp = client.post(
+                "/api/v1/agent/videos",
+                json={
+                    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    "processing_mode": "full_analysis",
+                },
+            )
+
+        assert resp.status_code == 202
+        assert resp.json()["processing_mode"] == "full_analysis"
+        assert mock_instance.submit_video.call_args.kwargs["processing_mode"] == "full_analysis"
 
     def test_duplicate_ingest_returns_409(self):
         app, _ = _make_agent_app()
@@ -468,6 +501,175 @@ class TestIngest:
         assert resp.status_code == 409
         data = resp.json()
         assert data["detail"]["video_id"] == str(vid_id)
+
+
+@pytest.mark.unit
+class TestBatchIngest:
+    def _batch_response(self, total_count=2):
+        from api.models.batch import BatchResponse, BatchStatus
+        from api.models.processing import ProcessingMode
+
+        now = datetime.now(timezone.utc)
+        return BatchResponse(
+            id=uuid4(),
+            name="OpenClaw Transcript Import - 2 videos",
+            channel_name=None,
+            processing_mode=ProcessingMode.TRANSCRIPT_ONLY,
+            status=BatchStatus.PENDING,
+            total_count=total_count,
+            pending_count=total_count,
+            running_count=0,
+            succeeded_count=0,
+            failed_count=0,
+            created_at=now,
+            updated_at=now,
+        )
+
+    def test_batch_ingest_accepts_urls_and_defaults_transcript_only(self):
+        app, _ = _make_agent_app()
+        batch_response = self._batch_response()
+
+        with patch("api.routes.agent.BatchService") as MockBatchService:
+            mock_service = AsyncMock()
+            mock_service.create_batch = AsyncMock(return_value=batch_response)
+            MockBatchService.return_value = mock_service
+
+            client = TestClient(app)
+            resp = client.post(
+                "/api/v1/agent/batches",
+                json={
+                    "urls": [
+                        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                        "https://youtu.be/dQw4w9WgXcQ",
+                    ]
+                },
+            )
+
+        assert resp.status_code == 202
+        data = resp.json()
+        assert data["processing_mode"] == "transcript_only"
+        create_request = mock_service.create_batch.call_args.args[0]
+        assert create_request.video_ids == ["dQw4w9WgXcQ"]
+        assert create_request.processing_mode == "transcript_only"
+
+    def test_batch_ingest_rejects_invalid_urls(self):
+        app, _ = _make_agent_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/api/v1/agent/batches", json={"urls": ["https://example.com"]})
+        assert resp.status_code == 400
+        assert resp.json()["detail"]["message"] == "Invalid YouTube URLs"
+
+    def test_channel_ingest_fetches_channel_sample(self):
+        app, _ = _make_agent_app()
+        batch_response = self._batch_response(total_count=1)
+
+        with (
+            patch(
+                "api.routes.agent.YouTubeService.fetch_channel_videos",
+                new=AsyncMock(
+                    return_value={
+                        "youtube_channel_id": "UC123",
+                        "channel_name": "Test Channel",
+                        "videos": [{"youtube_video_id": "abc123def45"}],
+                    }
+                ),
+            ) as mock_fetch,
+            patch("api.routes.agent.BatchService") as MockBatchService,
+        ):
+            mock_service = AsyncMock()
+            mock_service.create_batch = AsyncMock(return_value=batch_response)
+            MockBatchService.return_value = mock_service
+
+            client = TestClient(app)
+            resp = client.post(
+                "/api/v1/agent/batches",
+                json={"channel_url": "https://www.youtube.com/@Test", "channel_limit": 1},
+            )
+
+        assert resp.status_code == 202
+        mock_fetch.assert_called_once()
+        create_request = mock_service.create_batch.call_args.args[0]
+        assert create_request.youtube_channel_id == "UC123"
+        assert create_request.video_ids == ["abc123def45"]
+
+
+@pytest.mark.unit
+class TestKnowledgeExtract:
+    def test_extracts_para_markdown_from_segments(self):
+        app, mock_sess = _make_agent_app()
+
+        vid_id = uuid4()
+        mock_video = MagicMock()
+        mock_video.video_id = vid_id
+        mock_video.youtube_video_id = "dQw4w9WgXcQ"
+        mock_video.title = "Clubbell Basics"
+        mock_video.channel = MagicMock()
+        mock_video.channel.name = "Mark Wildman"
+
+        mock_segment = MagicMock()
+        mock_segment.video_id = vid_id
+        mock_segment.sequence_number = 1
+        mock_segment.start_time = 12.0
+        mock_segment.text = "Use the clubbell to train shoulder mobility."
+
+        video_result = MagicMock()
+        video_result.scalars.return_value.all.return_value = [mock_video]
+        segment_result = MagicMock()
+        segment_result.scalars.return_value.all.return_value = [mock_segment]
+        mock_sess.execute = AsyncMock(side_effect=[video_result, segment_result])
+
+        mock_llm = AsyncMock()
+        mock_llm.generate_structured_output = AsyncMock(
+            return_value={
+                "title": "Clubbell Shoulder Mobility",
+                "para_path": "Resources/Training/YouTube/Clubbell Shoulder Mobility.md",
+                "markdown": "# Clubbell Shoulder Mobility\n\nUseful note.",
+                "tags": ["youtube", "training"],
+            }
+        )
+
+        with patch("api.services.llm_service.get_llm_service", return_value=mock_llm):
+            client = TestClient(app)
+            resp = client.post(
+                "/api/v1/agent/knowledge/extract",
+                json={
+                    "video_ids": [str(vid_id)],
+                    "topic": "shoulder mobility",
+                    "para_destination": "Resources/Training/YouTube",
+                },
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["title"] == "Clubbell Shoulder Mobility"
+        assert data["para_path"].startswith("Resources/Training/YouTube")
+        assert data["markdown"].startswith("# Clubbell")
+        assert data["sources"][0]["video_id"] == str(vid_id)
+        mock_llm.generate_structured_output.assert_called_once()
+
+    def test_extract_returns_400_without_segments(self):
+        app, mock_sess = _make_agent_app()
+
+        vid_id = uuid4()
+        mock_video = MagicMock()
+        mock_video.video_id = vid_id
+        mock_video.youtube_video_id = "dQw4w9WgXcQ"
+        mock_video.title = "No Transcript"
+        mock_video.channel = None
+
+        video_result = MagicMock()
+        video_result.scalars.return_value.all.return_value = [mock_video]
+        segment_result = MagicMock()
+        segment_result.scalars.return_value.all.return_value = []
+        mock_sess.execute = AsyncMock(side_effect=[video_result, segment_result])
+
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post(
+            "/api/v1/agent/knowledge/extract",
+            json={"video_ids": [str(vid_id)]},
+        )
+
+        assert resp.status_code == 400
 
 
 @pytest.mark.unit

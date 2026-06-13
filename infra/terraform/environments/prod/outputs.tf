@@ -19,6 +19,21 @@ output "storage_primary_endpoint" {
   value = module.storage.primary_blob_endpoint
 }
 
+output "backup_storage_account_name" {
+  description = "Name of the storage account used for channel backups."
+  value       = module.backup_storage.name
+}
+
+output "backup_storage_primary_endpoint" {
+  description = "Primary blob endpoint for channel backup storage."
+  value       = module.backup_storage.primary_blob_endpoint
+}
+
+output "backup_job_name" {
+  description = "Azure Container Apps Job name for nightly channel backups."
+  value       = azurerm_container_app_job.nightly_backup.name
+}
+
 output "auth0_application_client_id" {
   description = "Auth0 BFF application client ID (also stored in Key Vault as 'auth0-client-id')"
   value       = var.enable_auth0 ? module.auth0[0].application_client_id : null

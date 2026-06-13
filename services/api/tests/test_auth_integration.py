@@ -20,6 +20,7 @@ Implementation: T056 (Create integration test for API auth token validation)
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -27,9 +28,17 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import create_app
-from api.routes.auth import _build_session_token
+from api.routes.auth import _build_session_token, _build_state
 
 pytestmark = pytest.mark.integration
+
+
+def _error_message(response) -> str:
+    """Return the project-standard error message from an HTTP error response."""
+    data = response.json()
+    if "detail" in data:
+        return data["detail"]
+    return data.get("error", {}).get("message", "")
 
 
 @pytest.fixture
@@ -128,7 +137,7 @@ class TestAuthMeEndpoint:
         response = client.get("/api/auth/me")
 
         assert response.status_code == 401
-        assert response.json()["detail"] == "Not authenticated"
+        assert _error_message(response) == "Not authenticated"
 
     @patch("api.routes.auth.get_settings")
     async def test_me_endpoint_with_expired_session(
@@ -147,7 +156,7 @@ class TestAuthMeEndpoint:
         response = client.get("/api/auth/me", cookies={"session": session_token})
 
         assert response.status_code == 401
-        assert response.json()["detail"] == "Not authenticated"
+        assert _error_message(response) == "Not authenticated"
 
     @patch("api.routes.auth.get_settings")
     def test_me_endpoint_with_invalid_session_id(self, mock_settings, client, mock_auth_settings):
@@ -164,7 +173,7 @@ class TestAuthMeEndpoint:
         )
 
         assert response.status_code == 401
-        assert response.json()["detail"] == "Not authenticated"
+        assert _error_message(response) == "Not authenticated"
 
 
 class TestSessionCookieSecurity:
@@ -196,11 +205,15 @@ class TestSessionCookieSecurity:
         }
 
         # Make callback request
+        state = _build_state(
+            "http://localhost:3000",
+            mock_auth_settings["session_secret"],
+        )
         response = client.get(
             "/api/auth/callback/auth0",
             params={
                 "code": "test_code",
-                "state": "valid_state",  # You'll need to generate valid state
+                "state": state,
             },
             follow_redirects=False,
         )
@@ -290,7 +303,7 @@ class TestLogoutEndpoint:
         response = client.post("/api/auth/logout")
 
         assert response.status_code == 401
-        assert response.json()["detail"] == "Not authenticated"
+        assert _error_message(response) == "Not authenticated"
 
     @patch("api.routes.auth.get_settings")
     async def test_session_cleared_after_logout(
@@ -327,9 +340,10 @@ class TestLogoutEndpoint:
 @pytest.mark.skipif(
     not all(
         [
-            # Add your environment variable checks here
-            # os.getenv("AUTH0_DOMAIN"),
-            # os.getenv("AUTH0_CLIENT_ID"),
+            os.getenv("AUTH0_DOMAIN"),
+            os.getenv("AUTH0_CLIENT_ID"),
+            os.getenv("AUTH0_CLIENT_SECRET"),
+            os.getenv("AUTH0_SESSION_SECRET"),
         ]
     ),
     reason="Auth0 credentials not configured",

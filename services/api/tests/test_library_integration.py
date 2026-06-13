@@ -19,10 +19,19 @@ Prerequisites:
 
 import os
 
+import httpx
 import pytest
 
 # Mark all tests as integration tests
 pytestmark = pytest.mark.integration
+
+
+async def _get_or_skip(client: httpx.AsyncClient, path: str, **kwargs) -> httpx.Response:
+    """GET a live API endpoint, skipping when the external API is unavailable."""
+    try:
+        return await client.get(path, **kwargs)
+    except httpx.ConnectError as exc:
+        pytest.skip(f"API not available: {exc}")
 
 
 class TestLibrarySummaryFetchingIntegration:
@@ -43,11 +52,10 @@ class TestLibrarySummaryFetchingIntegration:
         2. The API doesn't return 500 errors due to blob fetch failures
         3. Response time is acceptable (no retry delays from 404s)
         """
-        import httpx
-
         async with httpx.AsyncClient(base_url=api_base_url) as client:
             # Get completed videos
-            list_response = await client.get(
+            list_response = await _get_or_skip(
+                client,
                 "/api/v1/library/videos",
                 params={"status": "completed", "page_size": 1},
                 headers={"X-Correlation-ID": "integration-summary-test"},
@@ -69,7 +77,8 @@ class TestLibrarySummaryFetchingIntegration:
 
             start_time = time.time()
 
-            detail_response = await client.get(
+            detail_response = await _get_or_skip(
+                client,
                 f"/api/v1/library/videos/{video_id}",
                 headers={"X-Correlation-ID": "integration-summary-test"},
             )
@@ -106,11 +115,10 @@ class TestLibrarySummaryFetchingIntegration:
         exposed in the API response. What matters is that the summary content
         is successfully retrieved and returned.
         """
-        import httpx
-
         async with httpx.AsyncClient(base_url=api_base_url) as client:
             # Get completed videos
-            list_response = await client.get(
+            list_response = await _get_or_skip(
+                client,
                 "/api/v1/library/videos",
                 params={"status": "completed", "page_size": 10},
                 headers={"X-Correlation-ID": "integration-blob-uri-test"},
@@ -128,7 +136,8 @@ class TestLibrarySummaryFetchingIntegration:
             for video in list_data["videos"]:
                 video_id = video["video_id"]
 
-                detail_response = await client.get(
+                detail_response = await _get_or_skip(
+                    client,
                     f"/api/v1/library/videos/{video_id}",
                     headers={"X-Correlation-ID": "integration-blob-uri-test"},
                 )
@@ -200,11 +209,10 @@ class TestBlobStorageConnectivity:
         This test validates the end-to-end flow by checking that the API
         can successfully fetch and return summary content for completed videos.
         """
-        import httpx
-
         async with httpx.AsyncClient(base_url=api_base_url) as client:
             # Get a completed video
-            list_response = await client.get(
+            list_response = await _get_or_skip(
+                client,
                 "/api/v1/library/videos",
                 params={"status": "completed", "page_size": 1},
                 headers={"X-Correlation-ID": "integration-blob-exists-test"},
@@ -220,7 +228,8 @@ class TestBlobStorageConnectivity:
 
             video_id = list_data["videos"][0]["video_id"]
 
-            detail_response = await client.get(
+            detail_response = await _get_or_skip(
+                client,
                 f"/api/v1/library/videos/{video_id}",
                 headers={"X-Correlation-ID": "integration-blob-exists-test"},
             )
@@ -264,10 +273,9 @@ class TestLibraryAPIResponseContract:
         - summary: string (non-null)
         - summary_artifact: object with blob_uri
         """
-        import httpx
-
         async with httpx.AsyncClient(base_url=api_base_url) as client:
-            list_response = await client.get(
+            list_response = await _get_or_skip(
+                client,
                 "/api/v1/library/videos",
                 params={"status": "completed", "page_size": 1},
                 headers={"X-Correlation-ID": "contract-test"},
@@ -283,8 +291,10 @@ class TestLibraryAPIResponseContract:
 
             video_id = list_data["videos"][0]["video_id"]
 
-            detail_response = await client.get(
-                f"/api/v1/library/videos/{video_id}", headers={"X-Correlation-ID": "contract-test"}
+            detail_response = await _get_or_skip(
+                client,
+                f"/api/v1/library/videos/{video_id}",
+                headers={"X-Correlation-ID": "contract-test"},
             )
 
             assert detail_response.status_code == 200

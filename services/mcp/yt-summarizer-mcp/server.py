@@ -6,7 +6,9 @@ Provides tools for AI agents (OpenClaw, Claude Code, Copilot, Squad) to:
 - Get video metadata and segment index
 - Fetch transcript text by timestamp range
 - Ask questions via server-side RAG
-- Ingest new YouTube URLs
+- Ingest new YouTube URLs transcript-first by default
+- Ingest selected batches or channel samples transcript-first
+- Extract Obsidian/PARA-ready knowledge notes from transcripts
 - Poll ingestion job status
 """
 
@@ -142,17 +144,120 @@ async def ask(query: str, max_evidence_segments: int = 5) -> str:
 
 
 @mcp.tool()
-async def ingest(url: str) -> str:
+async def ingest(url: str, processing_mode: str = "transcript_only") -> str:
     """Ingest a YouTube video URL for processing.
 
-    Submits the video for async transcription, summarisation, and embedding.
-    Returns a job_id — use get_job_status() to poll for completion.
+    Submits the video for async processing. Defaults to transcript-only so
+    OpenClaw can archive and inspect videos cheaply. Set processing_mode to
+    "full_analysis" only when the user explicitly wants summaries, embeddings,
+    search, and relationships.
 
     Args:
         url: YouTube video URL (e.g. https://www.youtube.com/watch?v=...)
+        processing_mode: "transcript_only" (default) or "full_analysis".
     """
     async with _client() as client:
-        resp = await client.post("/api/v1/agent/videos", json={"url": url})
+        resp = await client.post(
+            "/api/v1/agent/videos",
+            json={"url": url, "processing_mode": processing_mode},
+        )
+        resp.raise_for_status()
+        return json.dumps(resp.json(), indent=2)
+
+
+@mcp.tool()
+async def ingest_batch(
+    urls: list[str] | None = None,
+    video_ids: list[str] | None = None,
+    name: str | None = None,
+    processing_mode: str = "transcript_only",
+) -> str:
+    """Ingest selected YouTube videos as a batch.
+
+    Use this when the user gives several links from Discord. Defaults to
+    transcript-only; full analysis is opt-in.
+
+    Args:
+        urls: YouTube video URLs.
+        video_ids: Raw YouTube video IDs.
+        name: Optional batch display name.
+        processing_mode: "transcript_only" (default) or "full_analysis".
+    """
+    async with _client() as client:
+        resp = await client.post(
+            "/api/v1/agent/batches",
+            json={
+                "urls": urls or [],
+                "video_ids": video_ids or [],
+                "name": name,
+                "processing_mode": processing_mode,
+            },
+        )
+        resp.raise_for_status()
+        return json.dumps(resp.json(), indent=2)
+
+
+@mcp.tool()
+async def ingest_channel_sample(
+    channel_url: str,
+    channel_limit: int = 25,
+    name: str | None = None,
+    processing_mode: str = "transcript_only",
+) -> str:
+    """Ingest a limited sample from a YouTube channel.
+
+    This is intentionally limited so Discord/OpenClaw can run a canary or small
+    research pull before a full channel archive.
+
+    Args:
+        channel_url: YouTube channel URL or handle.
+        channel_limit: Max videos to fetch from the channel, 1-200.
+        name: Optional batch display name.
+        processing_mode: "transcript_only" (default) or "full_analysis".
+    """
+    async with _client(timeout=60.0) as client:
+        resp = await client.post(
+            "/api/v1/agent/batches",
+            json={
+                "channel_url": channel_url,
+                "channel_limit": min(max(channel_limit, 1), 200),
+                "name": name,
+                "processing_mode": processing_mode,
+            },
+        )
+        resp.raise_for_status()
+        return json.dumps(resp.json(), indent=2)
+
+
+@mcp.tool()
+async def extract_knowledge(
+    video_ids: list[str],
+    topic: str | None = None,
+    para_destination: str = "Resources/YouTube",
+    note_title: str | None = None,
+) -> str:
+    """Create an Obsidian/PARA-ready knowledge note from ingested transcripts.
+
+    Returns Markdown plus a suggested PARA path. OpenClaw should write the
+    returned markdown into the user's Obsidian vault; this tool does not write
+    to the vault or dump raw transcripts.
+
+    Args:
+        video_ids: Internal YT Summarizer video UUIDs to extract from.
+        topic: Optional focus for the extraction.
+        para_destination: PARA folder, e.g. "Resources/Training/YouTube".
+        note_title: Optional requested note title.
+    """
+    async with _client(timeout=90.0) as client:
+        resp = await client.post(
+            "/api/v1/agent/knowledge/extract",
+            json={
+                "video_ids": video_ids,
+                "topic": topic,
+                "para_destination": para_destination,
+                "note_title": note_title,
+            },
+        )
         resp.raise_for_status()
         return json.dumps(resp.json(), indent=2)
 

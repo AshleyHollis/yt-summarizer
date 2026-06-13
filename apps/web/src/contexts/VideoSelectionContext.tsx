@@ -11,6 +11,8 @@ export interface SelectedVideo {
   title: string;
   thumbnail_url: string | null;
   youtube_video_id: string;
+  has_transcript?: boolean;
+  has_ai_features?: boolean;
 }
 
 interface VideoSelectionContextType {
@@ -53,6 +55,8 @@ export function toSelectedVideo(video: VideoCardType): SelectedVideo {
     title: video.title,
     thumbnail_url: video.thumbnail_url,
     youtube_video_id: video.youtube_video_id,
+    has_transcript: video.has_transcript,
+    has_ai_features: video.has_ai_features,
   };
 }
 

@@ -11,6 +11,7 @@ import {
   batchApi,
   CreateBatchRequest,
   ApiClientError,
+  ProcessingMode,
 } from '@/services/api';
 
 /**
@@ -26,6 +27,7 @@ export default function AddPage() {
   const [channelUrl, setChannelUrl] = useState('');
   const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([]);
   const [batchName, setBatchName] = useState('');
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>('full_analysis');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +65,7 @@ export default function AddPage() {
         name: batchName || `Channel Import - ${channelData.channel_name}`,
         video_ids: selectedVideoIds,
         ingest_all: false,
+        processing_mode: processingMode,
       };
 
       const batch = await batchApi.create(request);
@@ -94,6 +97,7 @@ export default function AddPage() {
         name: batchName || `Full Channel Import - ${channelData.channel_name}`,
         video_ids: [],
         ingest_all: true,
+        processing_mode: processingMode,
       };
 
       const batch = await batchApi.create(request);
@@ -132,164 +136,236 @@ export default function AddPage() {
         </section>
 
         <AuthGate action="add videos and channels">
-        {/* Smart URL Input */}
-        {!channelData && (
-          <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-6 md:p-8">
-            <SmartUrlInput onChannelLoaded={handleChannelLoaded} className="max-w-2xl mx-auto" />
-          </section>
-        )}
-
-        {/* Channel Video Selection (shown after channel is loaded) */}
-        {channelData && (
-          <>
-            {/* Back button and channel info */}
-            <section className="mb-6">
-              <button
-                onClick={handleReset}
-                className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <svg
-                  className="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M19 12H5M12 19l-7-7 7-7" />
-                </svg>
-                Start over with new URL
-              </button>
-            </section>
-
-            <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-5 md:p-6">
-              <div className="space-y-6">
-                {/* Channel header */}
-                <div className="flex items-center gap-3 pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/50">
-                    <svg
-                      className="w-5 h-5 text-purple-600 dark:text-purple-400"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {channelData.channel_name}
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {channelData.videos.length} videos loaded
-                    </p>
-                  </div>
-                </div>
-
-                {/* Batch name input */}
-                <div>
-                  <label
-                    htmlFor="batch-name"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                  >
-                    Batch Name (optional)
-                  </label>
-                  <input
-                    type="text"
-                    id="batch-name"
-                    value={batchName}
-                    onChange={(e) => setBatchName(e.target.value)}
-                    placeholder="My Batch Import"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 hover:border-red-400 dark:bg-[#1a1a1a] dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-
-                {/* Video list */}
-                <ChannelVideoList
-                  channelData={channelData}
-                  channelUrl={channelUrl}
-                  onSelectionChange={handleSelectionChange}
+          {/* Smart URL Input */}
+          {!channelData && (
+            <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-6 md:p-8">
+              <div className="max-w-2xl mx-auto space-y-6">
+                <ProcessingModeSelector value={processingMode} onChange={setProcessingMode} />
+                <SmartUrlInput
+                  onChannelLoaded={handleChannelLoaded}
+                  processingMode={processingMode}
                 />
-
-                {/* Error message */}
-                {error && (
-                  <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-                    <p className="text-red-700 dark:text-red-400">{error}</p>
-                  </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <button
-                    onClick={handleStartIngestion}
-                    disabled={selectedVideoIds.length === 0 || isSubmitting}
-                    className="flex-1 py-3 px-6 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    {isSubmitting ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg
-                          className="animate-spin h-5 w-5"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                          />
-                        </svg>
-                        Creating Batch...
-                      </span>
-                    ) : (
-                      `Ingest Selected (${selectedVideoIds.length})`
-                    )}
-                  </button>
-
-                  <button
-                    onClick={handleIngestAll}
-                    disabled={isSubmitting}
-                    className="flex-1 py-3 px-6 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    Ingest All Channel Videos
-                  </button>
-                </div>
               </div>
             </section>
-          </>
-        )}
+          )}
 
-        {/* Feature Cards (shown when no channel is loaded) */}
-        {!channelData && (
-          <section className="mt-10 grid md:grid-cols-2 gap-6">
-            <FeatureCard
-              icon={<VideoIcon />}
-              title="Single Video"
-              description="Paste a video URL to instantly process and get AI-powered summaries, transcripts, and key insights."
-              color="blue"
-            />
-            <FeatureCard
-              icon={<ChannelIcon />}
-              title="Channel Import"
-              description="Paste a channel URL to browse all videos and select which ones to batch process."
-              color="purple"
-            />
-          </section>
-        )}
+          {/* Channel Video Selection (shown after channel is loaded) */}
+          {channelData && (
+            <>
+              {/* Back button and channel info */}
+              <section className="mb-6">
+                <button
+                  onClick={handleReset}
+                  className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                  </svg>
+                  Start over with new URL
+                </button>
+              </section>
+
+              <section className="bg-white dark:bg-gray-800/50 rounded-xl shadow-md border border-gray-300 dark:border-gray-700/50 p-5 md:p-6">
+                <div className="space-y-6">
+                  {/* Channel header */}
+                  <div className="flex items-center gap-3 pb-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/50">
+                      <svg
+                        className="w-5 h-5 text-purple-600 dark:text-purple-400"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {channelData.channel_name}
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {channelData.videos.length} videos loaded
+                      </p>
+                    </div>
+                  </div>
+
+                  <ProcessingModeSelector value={processingMode} onChange={setProcessingMode} />
+
+                  {/* Batch name input */}
+                  <div>
+                    <label
+                      htmlFor="batch-name"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                    >
+                      Batch Name (optional)
+                    </label>
+                    <input
+                      type="text"
+                      id="batch-name"
+                      value={batchName}
+                      onChange={(e) => setBatchName(e.target.value)}
+                      placeholder="My Batch Import"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 hover:border-red-400 dark:bg-[#1a1a1a] dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+
+                  {/* Video list */}
+                  <ChannelVideoList
+                    channelData={channelData}
+                    channelUrl={channelUrl}
+                    onSelectionChange={handleSelectionChange}
+                  />
+
+                  {/* Error message */}
+                  {error && (
+                    <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                      <p className="text-red-700 dark:text-red-400">{error}</p>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                      onClick={handleStartIngestion}
+                      disabled={selectedVideoIds.length === 0 || isSubmitting}
+                      className="flex-1 py-3 px-6 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      {isSubmitting ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg
+                            className="animate-spin h-5 w-5"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            />
+                          </svg>
+                          Creating Batch...
+                        </span>
+                      ) : (
+                        `Ingest Selected (${selectedVideoIds.length})`
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleIngestAll}
+                      disabled={isSubmitting}
+                      className="flex-1 py-3 px-6 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      Ingest All Channel Videos
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* Feature Cards (shown when no channel is loaded) */}
+          {!channelData && (
+            <section className="mt-10 grid md:grid-cols-2 gap-6">
+              <FeatureCard
+                icon={<VideoIcon />}
+                title="Single Video"
+                description="Paste a video URL to instantly process and get AI-powered summaries, transcripts, and key insights."
+                color="blue"
+              />
+              <FeatureCard
+                icon={<ChannelIcon />}
+                title="Channel Import"
+                description="Paste a channel URL to browse all videos and select which ones to batch process."
+                color="purple"
+              />
+            </section>
+          )}
         </AuthGate>
       </div>
     </main>
+  );
+}
+
+interface ProcessingModeSelectorProps {
+  value: ProcessingMode;
+  onChange: (value: ProcessingMode) => void;
+}
+
+function ProcessingModeSelector({ value, onChange }: ProcessingModeSelectorProps) {
+  const options: Array<{
+    value: ProcessingMode;
+    label: string;
+    description: string;
+  }> = [
+    {
+      value: 'transcript_only',
+      label: 'Transcript only',
+      description: 'Extract transcripts and stop before paid AI features.',
+    },
+    {
+      value: 'full_analysis',
+      label: 'Full analysis',
+      description: 'Transcript, summary, semantic search, and relationships.',
+    },
+  ];
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        Processing mode
+      </legend>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {options.map((option) => {
+          const selected = value === option.value;
+          return (
+            <label
+              key={option.value}
+              className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
+                selected
+                  ? 'border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-900/20'
+                  : 'border-gray-300 bg-white hover:border-red-300 dark:border-gray-600 dark:bg-[#1a1a1a]'
+              }`}
+            >
+              <input
+                type="radio"
+                name="processing-mode"
+                value={option.value}
+                checked={selected}
+                onChange={() => onChange(option.value)}
+                className="mt-1 h-4 w-4 border-gray-300 text-red-600 focus:ring-red-500"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-gray-900 dark:text-white">
+                  {option.label}
+                </span>
+                <span className="block text-xs text-gray-600 dark:text-gray-400">
+                  {option.description}
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 

@@ -21,6 +21,7 @@ import { ORDERED_TEST_VIDEOS, IMPLICIT_ORDER_VIDEOS } from './global-setup';
  */
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
+const HAS_API_KEY = Boolean(process.env.YT_SUMMARIZER_API_KEY);
 
 test.describe('US6: Synthesis API Integration', () => {
   // Skip unless backend is running
@@ -28,6 +29,7 @@ test.describe('US6: Synthesis API Integration', () => {
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
+  test.skip(() => !HAS_API_KEY, 'Requires YT_SUMMARIZER_API_KEY for synthesis API access');
 
   // All requests to the synthesis/coverage endpoints require the API key
   test.use({

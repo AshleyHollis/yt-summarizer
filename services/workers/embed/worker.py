@@ -48,6 +48,7 @@ class EmbedMessage:
     channel_name: str
     correlation_id: str
     batch_id: str | None = None
+    processing_mode: str = "full_analysis"
     retry_count: int = 0
 
 
@@ -72,6 +73,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             channel_name=raw_message.get("channel_name", "unknown-channel"),
             correlation_id=raw_message.get("correlation_id", "unknown"),
             batch_id=raw_message.get("batch_id"),
+            processing_mode=raw_message.get("processing_mode", "full_analysis"),
             retry_count=raw_message.get("retry_count", 0),
         )
 
@@ -493,6 +495,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 stage="queued",
                 status="pending",
                 correlation_id=correlation_id,
+                processing_mode=message.processing_mode,
             )
             session.add(job)
             await session.flush()
@@ -506,6 +509,7 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                     "youtube_video_id": message.youtube_video_id,
                     "channel_name": message.channel_name,
                     "correlation_id": correlation_id,
+                    "processing_mode": message.processing_mode,
                 }
             )
             if message.batch_id:

@@ -33,6 +33,7 @@ class RelationshipsMessage:
     channel_name: str
     correlation_id: str
     batch_id: str | None = None
+    processing_mode: str = "full_analysis"
     retry_count: int = 0
 
 
@@ -53,6 +54,7 @@ class RelationshipsWorker(BaseWorker[RelationshipsMessage]):
             channel_name=raw_message.get("channel_name", "unknown-channel"),
             correlation_id=raw_message.get("correlation_id", "unknown"),
             batch_id=raw_message.get("batch_id"),
+            processing_mode=raw_message.get("processing_mode", "full_analysis"),
             retry_count=raw_message.get("retry_count", 0),
         )
 

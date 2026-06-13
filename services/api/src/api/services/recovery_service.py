@@ -126,6 +126,7 @@ class RecoveryService:
         stmt = (
             select(Job)
             .where(Job.stage == "dead_lettered")
+            .where(Job.video_id.is_not(None))
             .where(Job.retry_count < Job.max_retries + MAX_AUTO_RECOVERIES)
         )
         jobs_result = await self.session.execute(stmt)
@@ -182,6 +183,7 @@ class RecoveryService:
             select(func.count())
             .select_from(Job)
             .where(Job.stage == "dead_lettered")
+            .where(Job.video_id.is_not(None))
             .where(Job.retry_count >= Job.max_retries + MAX_AUTO_RECOVERIES)
         )
         skip_result = await self.session.execute(skip_stmt)
@@ -269,7 +271,12 @@ class RecoveryService:
         """
         stale_threshold = datetime.utcnow() - timedelta(minutes=STALE_JOB_THRESHOLD_MINUTES)
 
-        stmt = select(Job).where(Job.stage == "running").where(Job.started_at < stale_threshold)
+        stmt = (
+            select(Job)
+            .where(Job.stage == "running")
+            .where(Job.video_id.is_not(None))
+            .where(Job.started_at < stale_threshold)
+        )
         jobs_result = await self.session.execute(stmt)
         stale_jobs = jobs_result.scalars().all()
 
@@ -323,6 +330,7 @@ class RecoveryService:
             select(Job)
             .where(Job.stage == "queued")
             .where(Job.status == "pending")
+            .where(Job.video_id.is_not(None))
             .where(Job.created_at < stale_threshold)
             .where(Job.created_at >= age_limit)
             .order_by(Job.created_at.asc())
@@ -398,6 +406,7 @@ class RecoveryService:
             .select_from(Job)
             .where(Job.stage == "queued")
             .where(Job.status == "pending")
+            .where(Job.video_id.is_not(None))
             .where(Job.created_at < age_limit)
         )
         abandoned_result = await self.session.execute(abandoned_stmt)

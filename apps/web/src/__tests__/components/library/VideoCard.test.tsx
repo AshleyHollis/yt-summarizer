@@ -44,6 +44,10 @@ describe('VideoCard', () => {
     publish_date: '2024-01-15T10:30:00Z',
     thumbnail_url: 'https://example.com/thumbnail.jpg',
     processing_status: 'completed',
+    content_status: 'fully_analyzed',
+    has_transcript: true,
+    has_summary: true,
+    has_ai_features: true,
     segment_count: 25,
     facets: [
       { facet_id: 'facet-1', name: 'Python', type: 'topic' },
@@ -157,6 +161,18 @@ describe('VideoCard', () => {
       renderVideoCard({ video: failedVideo });
 
       expect(screen.getByText('failed')).toBeInTheDocument();
+    });
+
+    it('renders transcript-ready status for transcript-only videos', () => {
+      const transcriptOnlyVideo = {
+        ...mockVideo,
+        content_status: 'transcript_ready' as const,
+        has_summary: false,
+        has_ai_features: false,
+      };
+      renderVideoCard({ video: transcriptOnlyVideo });
+
+      expect(screen.getByText('Transcript ready')).toBeInTheDocument();
     });
   });
 

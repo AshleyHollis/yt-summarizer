@@ -25,8 +25,14 @@
  */
 
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
 
 test.describe('Social Login Authentication @auth', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   /**
    * Tests in this suite require authentication to be configured.
    * They will be skipped if auth setup failed or is not configured.
@@ -96,6 +102,8 @@ test.describe('Social Login Authentication @auth', () => {
   });
 
   test.describe('Authenticated State (After OAuth)', () => {
+    test.use({ storageState: userAuthFile });
+
     /**
      * These tests verify post-authentication state.
      * They use the programmatically authenticated session from auth.setup.ts.
@@ -108,12 +116,7 @@ test.describe('Social Login Authentication @auth', () => {
 
     test.skip(() => {
       // Skip if auth state file doesn't exist
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fs = require('fs');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const path = require('path');
-      const authFile = path.join(__dirname, '../playwright/.auth/user.json');
-      return !fs.existsSync(authFile);
+      return !fs.existsSync(userAuthFile);
     }, 'Auth0 not configured - set AUTH0_* environment variables to run auth tests');
 
     test('authenticated user is redirected from login page to dashboard', async ({ page }) => {

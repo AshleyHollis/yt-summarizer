@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from .base import BaseResponse, PaginatedResponse, TimestampMixin
+from .processing import ProcessingMode
 
 
 class ProcessingStatus(StrEnum):
@@ -25,6 +26,10 @@ class SubmitVideoRequest(BaseModel):
     url: str = Field(
         description="YouTube video URL",
         examples=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
+    )
+    processing_mode: ProcessingMode = Field(
+        default=ProcessingMode.FULL_ANALYSIS,
+        description="How much processing to run for the video",
     )
 
     @field_validator("url")
@@ -109,6 +114,16 @@ class ReprocessVideoRequest(BaseModel):
         default=None,
         description="Specific stages to reprocess (transcribe, summarize, embed, relationships). If null, reprocess all.",
     )
+
+
+class AddAiFeaturesResponse(BaseResponse):
+    """Response after requesting AI features for a transcript-ready video."""
+
+    video_id: UUID = Field(description="Internal video ID")
+    job_id: UUID | None = Field(default=None, description="Queued job ID, if work was needed")
+    status: ProcessingStatus = Field(description="Updated processing status")
+    quota_status: str = Field(description="'released', 'quota_queued', or 'not_needed'")
+    message: str = Field(description="Status message")
 
 
 class VideoListResponse(PaginatedResponse[VideoSummaryResponse]):

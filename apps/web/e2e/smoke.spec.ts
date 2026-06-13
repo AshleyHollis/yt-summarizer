@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
+const hasUserAuthState = () => fs.existsSync(userAuthFile);
 
 /**
  * E2E Smoke Tests for YouTube Summarizer
@@ -33,13 +38,15 @@ test.describe('Core User Flows @smoke', () => {
     test('Browse Library CTA navigates to library @smoke', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
       await page.getByRole('link', { name: /Browse Library/i }).click();
-      await page.waitForURL('**/library');
+      await expect(page).toHaveURL(/\/library\/?(?:[?#].*)?$/, { timeout: 15_000 });
+      await expect(page.getByRole('button', { name: /Select videos/i })).toBeVisible();
     });
 
     test('Add Content CTA navigates to add page @smoke', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
       await page.getByRole('link', { name: /Add Content/i }).click();
-      await page.waitForURL('**/add');
+      await expect(page).toHaveURL(/\/add\/?(?:[?#].*)?$/, { timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: /Add Content/i })).toBeVisible();
     });
 
     test('landing page renders feature cards @smoke', async ({ page }) => {
@@ -76,6 +83,12 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders submit form with URL input', async ({ page }) => {
+      if (!hasUserAuthState()) {
+        await expect(page.getByText(/Sign in to add videos and channels/i)).toBeVisible();
+        await expect(page.getByRole('button', { name: /Sign in with Google/i })).toBeVisible();
+        return;
+      }
+
       // AuthGate requires auth — wait up to 15s for session fetch to complete
       const input = page.getByLabel(/YouTube URL/i);
       await expect(input).toBeVisible({ timeout: 15000 });
@@ -85,6 +98,7 @@ test.describe('Core User Flows @smoke', () => {
     });
 
     test('renders submit button', async ({ page }) => {
+      test.skip(!hasUserAuthState(), 'Auth0 user credentials not configured - add form is gated');
       const submitButton = page.getByRole('button', { name: /Enter URL/i });
       await expect(submitButton).toBeVisible({ timeout: 15000 });
     });
@@ -95,6 +109,11 @@ test.describe('Core User Flows @smoke', () => {
   });
 
   test.describe('Form Validation', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - add form is gated'
+    );
+
     test.beforeEach(async ({ page }) => {
       await page.goto('/add');
       // Wait for AuthGate to resolve (auth context fetches session cross-origin)
@@ -146,6 +165,11 @@ test.describe('Core User Flows @smoke', () => {
   });
 
   test.describe('Valid URL Input', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - add form is gated'
+    );
+
     test.beforeEach(async ({ page }) => {
       await page.goto('/add');
       // Wait for AuthGate to resolve before interacting with form
@@ -191,6 +215,7 @@ test.describe('Video Submission (Requires Backend)', () => {
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
+  test.skip(() => !hasUserAuthState(), 'Auth0 user credentials not configured - add form is gated');
 
   // Use a seeded video with verified auto-captions. dQw4w9WgXcQ (Rick Astley) has NO
   // captions → transcription fails → processing never completes → redirect never happens.
@@ -368,6 +393,7 @@ test.describe('Accessibility', () => {
   });
 
   test('form input has accessible label', async ({ page }) => {
+    test.skip(!hasUserAuthState(), 'Auth0 user credentials not configured - add form is gated');
     await page.goto('/add');
 
     // The input should be associated with a label
@@ -376,6 +402,7 @@ test.describe('Accessibility', () => {
   });
 
   test('form shows disabled button for invalid URLs', async ({ page }) => {
+    test.skip(!hasUserAuthState(), 'Auth0 user credentials not configured - add form is gated');
     await page.goto('/add');
 
     const input = page.getByLabel(/YouTube URL/i);

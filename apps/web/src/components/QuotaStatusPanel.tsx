@@ -22,6 +22,8 @@ export function QuotaStatusPanel() {
   if (!isAuthenticated || isLoading || !quota) return null;
   if (quota.tier === 'admin') return null; // Admins have no limits
 
+  const queuedWork = quota.transcripts.queued + quota.ai_features.queued;
+
   const handleRequestExpedite = async () => {
     try {
       await quotaApi.requestExpedite(expediteReason || undefined);
@@ -35,35 +37,53 @@ export function QuotaStatusPanel() {
 
   return (
     <div className="bg-white dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700/50 p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-        Quota Status
-      </h3>
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Quota Status</h3>
 
-      {/* Video quota */}
+      {/* Transcript quota */}
       <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-600 dark:text-gray-400">Videos today</span>
+        <span className="text-gray-600 dark:text-gray-400">Transcripts today</span>
         <span className="font-medium">
-          {quota.videos.processed_today}/{quota.videos.limit ?? '∞'}
-          {quota.videos.remaining !== null && quota.videos.remaining > 0 && (
+          {quota.transcripts.used_today}/{quota.transcripts.limit ?? '∞'}
+          {quota.transcripts.remaining !== null && quota.transcripts.remaining > 0 && (
             <span className="text-green-600 dark:text-green-400 ml-1">
-              ({quota.videos.remaining} remaining)
+              ({quota.transcripts.remaining} remaining)
             </span>
           )}
         </span>
       </div>
 
-      {/* Queued videos */}
-      {quota.videos.queued > 0 && (
+      {quota.transcripts.queued > 0 && (
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600 dark:text-gray-400">
-            🔵 Queued videos
-          </span>
+          <span className="text-gray-600 dark:text-gray-400">Queued transcripts</span>
           <span className="font-medium text-blue-600 dark:text-blue-400">
-            {quota.videos.queued}
-            {quota.videos.estimated_days && (
-              <span className="text-gray-500 ml-1">
-                (~{quota.videos.estimated_days}d)
-              </span>
+            {quota.transcripts.queued}
+            {quota.transcripts.estimated_days && (
+              <span className="text-gray-500 ml-1">(~{quota.transcripts.estimated_days}d)</span>
+            )}
+          </span>
+        </div>
+      )}
+
+      {/* AI feature quota */}
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-gray-600 dark:text-gray-400">AI features today</span>
+        <span className="font-medium">
+          {quota.ai_features.used_today}/{quota.ai_features.limit ?? '∞'}
+          {quota.ai_features.remaining !== null && quota.ai_features.remaining > 0 && (
+            <span className="text-green-600 dark:text-green-400 ml-1">
+              ({quota.ai_features.remaining} remaining)
+            </span>
+          )}
+        </span>
+      </div>
+
+      {quota.ai_features.queued > 0 && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-600 dark:text-gray-400">Queued AI features</span>
+          <span className="font-medium text-blue-600 dark:text-blue-400">
+            {quota.ai_features.queued}
+            {quota.ai_features.estimated_days && (
+              <span className="text-gray-500 ml-1">(~{quota.ai_features.estimated_days}d)</span>
             )}
           </span>
         </div>
@@ -78,12 +98,12 @@ export function QuotaStatusPanel() {
       </div>
 
       {/* Expedite request */}
-      {quota.videos.queued > 0 && !expediteStatus && (
+      {queuedWork > 0 && !expediteStatus && (
         <button
           onClick={() => setShowExpediteModal(true)}
           className="w-full text-sm py-2 px-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
         >
-          ⚡ Request Expedite Processing
+          Request Expedite Processing
         </button>
       )}
 
@@ -99,8 +119,8 @@ export function QuotaStatusPanel() {
               Request Expedite Processing
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              You have {quota.videos.queued} videos in the queue. An admin can approve
-              immediate processing of all queued videos.
+              You have {queuedWork} queued work items. An admin can approve immediate processing for
+              the queued transcript and AI feature jobs.
             </p>
             <textarea
               value={expediteReason}

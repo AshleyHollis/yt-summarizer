@@ -39,6 +39,7 @@ def create_mock_job(
     job_type="transcribe",
     status="pending",
     stage="queued",
+    processing_mode="full_analysis",
 ):
     """Create a mock Job object."""
     job = MagicMock()
@@ -46,6 +47,7 @@ def create_mock_job(
     job.video_id = video_id
     job.batch_id = batch_id
     job.job_type = job_type
+    job.processing_mode = processing_mode
     job.status = status
     job.stage = stage
     job.started_at = None
@@ -325,6 +327,56 @@ class TestBatchItemStatusTransitions:
             # Verify batch item was NOT updated (still running)
             # The status update should not be called for intermediate jobs
             assert batch_item.status == "running"
+
+    @pytest.mark.asyncio
+    async def test_transcript_only_transcribe_success_completes_batch_item(
+        self, sample_batch_id, sample_video_id, sample_job_id
+    ):
+        """Transcript-only batches complete when transcription succeeds."""
+        job = create_mock_job(
+            sample_job_id,
+            sample_video_id,
+            batch_id=sample_batch_id,
+            job_type="transcribe",
+            status="running",
+            processing_mode="transcript_only",
+        )
+        batch_item = create_mock_batch_item(sample_batch_id, sample_video_id, "running")
+        batch = create_mock_batch(sample_batch_id, pending_count=0, running_count=1)
+        video = create_mock_video(sample_video_id, "processing")
+
+        mock_session = AsyncMock()
+
+        job_result = MagicMock()
+        job_result.scalar_one_or_none.return_value = job
+
+        batch_item_result = MagicMock()
+        batch_item_result.scalar_one_or_none.return_value = batch_item
+
+        video_result = MagicMock()
+        video_result.scalar_one_or_none.return_value = video
+
+        batch_result = MagicMock()
+        batch_result.scalar_one_or_none.return_value = batch
+
+        mock_session.execute = AsyncMock(
+            side_effect=[job_result, video_result, batch_item_result, video_result, batch_result]
+        )
+
+        mock_db = MagicMock()
+        mock_db.session.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_db.session.return_value.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("shared.db.job_service.get_db", return_value=mock_db):
+            from shared.db.job_service import update_job_status
+
+            await update_job_status(str(sample_job_id), status="succeeded")
+
+        assert job.status == "succeeded"
+        assert batch_item.status == "succeeded"
+        assert video.processing_status == "completed"
+        assert batch.running_count == 0
+        assert batch.succeeded_count == 1
 
 
 class TestBatchCountUpdates:

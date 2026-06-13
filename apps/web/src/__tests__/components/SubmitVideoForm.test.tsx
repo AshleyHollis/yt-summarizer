@@ -84,11 +84,9 @@ describe('SubmitVideoForm', () => {
       vi.mocked(videoApi.submit).mockResolvedValue({
         video_id: '123',
         youtube_video_id: 'dQw4w9WgXcQ',
-        title: 'Test Video',
-        channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
-        processing_status: 'pending',
-        submitted_at: new Date().toISOString(),
-        jobs_queued: 1,
+        job_id: 'job-123',
+        status: 'pending',
+        message: 'Video submitted for processing',
       });
 
       render(<SubmitVideoForm />);
@@ -112,7 +110,10 @@ describe('SubmitVideoForm', () => {
       // Create a deferred promise to control resolution
       let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
-        () => new Promise<SubmitVideoResponse>((resolve) => { resolveSubmit = resolve; })
+        () =>
+          new Promise<SubmitVideoResponse>((resolve) => {
+            resolveSubmit = resolve;
+          })
       );
 
       render(<SubmitVideoForm />);
@@ -132,11 +133,9 @@ describe('SubmitVideoForm', () => {
       resolveSubmit!({
         video_id: '123',
         youtube_video_id: 'dQw4w9WgXcQ',
-        title: 'Test',
-        channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
-        processing_status: 'pending',
-        submitted_at: new Date().toISOString(),
-        jobs_queued: 4,
+        job_id: 'job-123',
+        status: 'pending',
+        message: 'Video submitted for processing',
       });
     });
 
@@ -144,11 +143,9 @@ describe('SubmitVideoForm', () => {
       vi.mocked(videoApi.submit).mockResolvedValue({
         video_id: '123',
         youtube_video_id: 'dQw4w9WgXcQ',
-        title: 'Never Gonna Give You Up',
-        channel: { channel_id: '1', name: 'Rick Astley', youtube_channel_id: 'UC123' },
-        processing_status: 'pending',
-        submitted_at: new Date().toISOString(),
-        jobs_queued: 4,
+        job_id: 'job-123',
+        status: 'pending',
+        message: 'Video submitted for processing',
       });
 
       render(<SubmitVideoForm />);
@@ -161,7 +158,7 @@ describe('SubmitVideoForm', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/submitted successfully/i)).toBeInTheDocument();
-        expect(screen.getByText(/never gonna give you up/i)).toBeInTheDocument();
+        expect(screen.getByText(/video submitted for processing/i)).toBeInTheDocument();
       });
     });
 
@@ -188,11 +185,9 @@ describe('SubmitVideoForm', () => {
       const response = {
         video_id: '123',
         youtube_video_id: 'dQw4w9WgXcQ',
-        title: 'Test Video',
-        channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
-        processing_status: 'pending' as const,
-        submitted_at: new Date().toISOString(),
-        jobs_queued: 1,
+        job_id: 'job-123',
+        status: 'pending' as const,
+        message: 'Video submitted for processing',
       };
       vi.mocked(videoApi.submit).mockResolvedValue(response);
 
@@ -237,7 +232,10 @@ describe('SubmitVideoForm', () => {
       // Create a deferred promise to control resolution
       let resolveSubmit: (value: SubmitVideoResponse) => void;
       vi.mocked(videoApi.submit).mockImplementation(
-        () => new Promise<SubmitVideoResponse>((resolve) => { resolveSubmit = resolve; })
+        () =>
+          new Promise<SubmitVideoResponse>((resolve) => {
+            resolveSubmit = resolve;
+          })
       );
 
       render(<SubmitVideoForm />);
@@ -257,11 +255,9 @@ describe('SubmitVideoForm', () => {
       resolveSubmit!({
         video_id: '123',
         youtube_video_id: 'dQw4w9WgXcQ',
-        title: 'Test',
-        channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
-        processing_status: 'pending',
-        submitted_at: new Date().toISOString(),
-        jobs_queued: 4,
+        job_id: 'job-123',
+        status: 'pending',
+        message: 'Video submitted for processing',
       });
     });
   });

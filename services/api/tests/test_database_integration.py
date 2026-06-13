@@ -6,8 +6,8 @@ These tests verify that:
 3. The health check accurately reports database status
 4. Fallback behavior works when database is unavailable
 
-These tests require a running database (via Aspire or direct connection).
-Use environment variable DATABASE_URL or ConnectionStrings__ytsummarizer.
+Live database tests require a running database (via Aspire or direct connection).
+Set RUN_LIVE_DB_TESTS=true or E2E_TESTS_ENABLED=true plus a connection string to execute them.
 """
 
 import os
@@ -205,14 +205,17 @@ class TestReadinessWithDatabase:
 
 
 @pytest.mark.skipif(
-    not os.environ.get("DATABASE_URL") and not os.environ.get("ConnectionStrings__ytsummarizer"),
-    reason="No database connection string available",
+    (
+        os.environ.get("RUN_LIVE_DB_TESTS", "").lower() != "true"
+        and os.environ.get("E2E_TESTS_ENABLED", "").lower() != "true"
+    )
+    or not (os.environ.get("DATABASE_URL") or os.environ.get("ConnectionStrings__ytsummarizer")),
+    reason="Live database tests are not enabled",
 )
 class TestLiveDatabaseIntegration:
     """Live integration tests that require an actual database.
 
-    These tests are skipped if no database connection is configured.
-    Run with Aspire or set DATABASE_URL to execute.
+    These tests are skipped unless live DB tests are explicitly enabled.
     """
 
     @pytest.mark.asyncio

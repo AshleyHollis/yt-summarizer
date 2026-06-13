@@ -41,6 +41,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Install shared package and workers dependencies
 RUN cd /app/shared && uv pip install --system --prerelease=allow -e .
+# The local workers pyproject points at ../shared for developer checkouts. In this
+# Docker layout the workers project is /app, so provide the equivalent path.
+RUN ln -s /app/shared /shared
 RUN uv pip install --system --prerelease=allow -e .
 
 # ================================
@@ -74,6 +77,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY services/shared/pyproject.toml /app/shared/
 COPY services/shared/README.md /app/shared/
 COPY services/shared/shared/ /app/shared/shared/
+COPY services/workers/backup/ ./backup/
 COPY services/workers/transcribe/ ./transcribe/
 COPY services/workers/summarize/ ./summarize/
 COPY services/workers/embed/ ./embed/
@@ -89,7 +93,7 @@ RUN useradd --create-home --shell /bin/bash appuser
 USER appuser
 
 # Worker type is set via environment variable
-# WORKER_TYPE: transcribe | summarize | embed | relationships
+# WORKER_TYPE: transcribe | summarize | embed | relationships | backup.nightly
 ENV WORKER_TYPE=transcribe
 
 # Health check - worker-specific health endpoint would be needed

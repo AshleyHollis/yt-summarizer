@@ -16,6 +16,18 @@ class ProcessingStatusFilter(StrEnum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    RATE_LIMITED = "rate_limited"
+
+
+class ContentStatus(StrEnum):
+    """User-facing content readiness state."""
+
+    PENDING = "pending"
+    PROCESSING = "processing"
+    TRANSCRIPT_READY = "transcript_ready"
+    FULLY_ANALYZED = "fully_analyzed"
+    FAILED = "failed"
+    RATE_LIMITED = "rate_limited"
 
 
 class SortField(StrEnum):
@@ -54,6 +66,16 @@ class VideoCard(BaseResponse):
     publish_date: datetime = Field(description="Video publish date")
     thumbnail_url: str | None = Field(default=None, description="Video thumbnail URL")
     processing_status: str = Field(description="Current processing status")
+    content_status: ContentStatus = Field(
+        default=ContentStatus.PENDING,
+        description="User-facing content readiness state",
+    )
+    has_transcript: bool = Field(default=False, description="Whether transcript content exists")
+    has_summary: bool = Field(default=False, description="Whether summary content exists")
+    has_ai_features: bool = Field(
+        default=False,
+        description="Whether the AI feature package is available",
+    )
     segment_count: int = Field(default=0, description="Number of transcript segments")
     facets: list[FacetTag] = Field(default_factory=list, description="Video facets/tags")
 
@@ -95,6 +117,16 @@ class VideoDetailResponse(BaseResponse, TimestampMixin):
     thumbnail_url: str | None = Field(default=None, description="Video thumbnail URL")
     youtube_url: str = Field(description="YouTube video URL")
     processing_status: str = Field(description="Current processing status")
+    content_status: ContentStatus = Field(
+        default=ContentStatus.PENDING,
+        description="User-facing content readiness state",
+    )
+    has_transcript: bool = Field(default=False, description="Whether transcript content exists")
+    has_summary: bool = Field(default=False, description="Whether summary content exists")
+    has_ai_features: bool = Field(
+        default=False,
+        description="Whether the AI feature package is available",
+    )
     summary: str | None = Field(default=None, description="AI-generated summary")
     summary_artifact: ArtifactInfo | None = Field(default=None, description="Summary artifact info")
     transcript_artifact: ArtifactInfo | None = Field(

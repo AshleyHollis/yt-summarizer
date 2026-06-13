@@ -31,7 +31,10 @@ except ImportError:
 
 from ..dependencies.auth import AuthenticatedUser, require_auth
 from ..dependencies.quota import (
+    AI_FEATURES_OPERATION,
+    COPILOT_QUERY_OPERATION,
     QUOTA_LIMITS,
+    TRANSCRIPT_EXTRACT_OPERATION,
     get_or_create_user,
     get_usage_count,
 )
@@ -43,7 +46,8 @@ router = APIRouter(prefix="/api/v1/quota", tags=["Quota"])
 # --- Response Models ---
 
 
-class VideoQuotaStatus(BaseModel):
+class WorkQuotaStatus(BaseModel):
+    used_today: int
     processed_today: int
     limit: int | None
     remaining: int | None
@@ -66,7 +70,9 @@ class ExpediteRequestStatus(BaseModel):
 
 class QuotaStatusResponse(BaseModel):
     tier: str
-    videos: VideoQuotaStatus
+    transcripts: WorkQuotaStatus
+    ai_features: WorkQuotaStatus
+    videos: WorkQuotaStatus
     copilot: CopilotQuotaStatus
     expedite: ExpediteRequestStatus | None
 
@@ -95,36 +101,29 @@ async def get_quota_status(
     tier = db_user.quota_tier
     tier_limits = QUOTA_LIMITS.get(tier)
 
-    # Video quota
-    video_limit_config = tier_limits.get("video_submit") if tier_limits else None
-    if video_limit_config:
-        video_used = await get_usage_count(
-            session, db_user.user_id, "video_submit", video_limit_config["window_seconds"]
-        )
-        video_limit = video_limit_config["max_count"]
-        video_remaining = max(0, video_limit - video_used)
-    else:
-        video_used = 0
-        video_limit = None
-        video_remaining = None
-
-    # Count queued jobs
-    queued_count_result = await session.execute(
-        select(func.count(Job.job_id)).where(
-            Job.user_id == db_user.user_id,
-            Job.quota_status == "quota_queued",
-        )
+    transcripts = await _get_work_quota_status(
+        session,
+        db_user,
+        tier_limits,
+        TRANSCRIPT_EXTRACT_OPERATION,
+        ["transcribe"],
     )
-    queued_count = queued_count_result.scalar() or 0
-    estimated_days = None
-    if queued_count > 0 and video_limit:
-        estimated_days = max(1, (queued_count + video_limit - 1) // video_limit)
+    ai_features = await _get_work_quota_status(
+        session,
+        db_user,
+        tier_limits,
+        AI_FEATURES_OPERATION,
+        ["summarize", "embed", "build_relationships"],
+    )
 
     # Copilot quota
-    copilot_limit_config = tier_limits.get("copilot_query") if tier_limits else None
+    copilot_limit_config = tier_limits.get(COPILOT_QUERY_OPERATION) if tier_limits else None
     if copilot_limit_config:
         copilot_used = await get_usage_count(
-            session, db_user.user_id, "copilot_query", copilot_limit_config["window_seconds"]
+            session,
+            db_user.user_id,
+            COPILOT_QUERY_OPERATION,
+            copilot_limit_config["window_seconds"],
         )
         copilot_limit = copilot_limit_config["max_count"]
         copilot_remaining = max(0, copilot_limit - copilot_used)
@@ -149,13 +148,9 @@ async def get_quota_status(
 
     return QuotaStatusResponse(
         tier=tier,
-        videos=VideoQuotaStatus(
-            processed_today=video_used,
-            limit=video_limit,
-            remaining=video_remaining,
-            queued=queued_count,
-            estimated_days=estimated_days,
-        ),
+        transcripts=transcripts,
+        ai_features=ai_features,
+        videos=ai_features,
         copilot=CopilotQuotaStatus(
             used_this_hour=copilot_used,
             limit=copilot_limit,
@@ -169,6 +164,51 @@ async def get_quota_status(
         )
         if active_expedite
         else None,
+    )
+
+
+async def _get_work_quota_status(
+    session: AsyncSession,
+    db_user: User,
+    tier_limits: dict[str, Any] | None,
+    operation_type: str,
+    job_types: list[str],
+) -> WorkQuotaStatus:
+    """Build quota status for a user-facing work bucket."""
+    limit_config = tier_limits.get(operation_type) if tier_limits else None
+    if limit_config:
+        used = await get_usage_count(
+            session,
+            db_user.user_id,
+            operation_type,
+            limit_config["window_seconds"],
+        )
+        limit = limit_config["max_count"]
+        remaining = max(0, limit - used)
+    else:
+        used = 0
+        limit = None
+        remaining = None
+
+    queued_result = await session.execute(
+        select(func.count(Job.job_id)).where(
+            Job.user_id == db_user.user_id,
+            Job.quota_status == "quota_queued",
+            Job.job_type.in_(job_types),
+        )
+    )
+    queued = queued_result.scalar() or 0
+    estimated_days = None
+    if queued > 0 and limit:
+        estimated_days = max(1, (queued + limit - 1) // limit)
+
+    return WorkQuotaStatus(
+        used_today=used,
+        processed_today=used,
+        limit=limit,
+        remaining=remaining,
+        queued=queued,
+        estimated_days=estimated_days,
     )
 
 

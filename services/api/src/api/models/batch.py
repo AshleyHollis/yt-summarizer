@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from .base import BaseResponse
+from .processing import ProcessingMode
 
 
 class BatchStatus(StrEnum):
@@ -55,6 +56,10 @@ class CreateBatchRequest(BaseResponse):
         default=False,
         description="If true, ingest all videos from the channel (ignores videoIds)",
     )
+    processing_mode: ProcessingMode = Field(
+        default=ProcessingMode.FULL_ANALYSIS,
+        description="How much processing to run for each video",
+    )
 
 
 # =============================================================================
@@ -81,6 +86,10 @@ class BatchResponse(BaseResponse):
     id: UUID = Field(description="Batch ID")
     name: str = Field(description="Batch display name")
     channel_name: str | None = Field(default=None, description="Associated channel name")
+    processing_mode: ProcessingMode = Field(
+        default=ProcessingMode.FULL_ANALYSIS,
+        description="Processing mode for the batch",
+    )
     status: BatchStatus = Field(description="Overall batch status")
     total_count: int = Field(description="Total videos in batch")
     pending_count: int = Field(description="Videos pending processing")

@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const hasUserAuthState =
+  Boolean(process.env.AUTH0_USER_TEST_EMAIL && process.env.AUTH0_USER_TEST_PASSWORD) ||
+  Boolean(process.env.AUTH0_TEST_EMAIL && process.env.AUTH0_TEST_PASSWORD);
+const hasAdminAuthState = Boolean(
+  process.env.AUTH0_ADMIN_TEST_EMAIL && process.env.AUTH0_ADMIN_TEST_PASSWORD
+);
+
 /**
  * Playwright configuration for E2E tests
  * @see https://playwright.dev/docs/test-configuration
@@ -77,7 +84,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         // Use authenticated storage state for tests that require auth
         // Tests can override this by setting storageState: undefined in test.use()
-        storageState: 'playwright/.auth/user.json',
+        ...(hasUserAuthState ? { storageState: 'playwright/.auth/user.json' } : {}),
       },
       // Run setup before chromium tests (only if setup test exists)
       dependencies: ['setup'],
@@ -88,7 +95,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         // Use admin authenticated storage state for admin-only tests
-        storageState: 'playwright/.auth/admin.json',
+        ...(hasAdminAuthState ? { storageState: 'playwright/.auth/admin.json' } : {}),
       },
       // Run setup before admin tests
       dependencies: ['setup'],

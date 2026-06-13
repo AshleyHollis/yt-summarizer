@@ -213,7 +213,7 @@ export function SubmitVideoForm({ onSuccess, className = '' }: SubmitVideoFormPr
                   Video submitted successfully!
                 </p>
                 <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                  &quot;{success.title}&quot; is now being processed. Redirecting...
+                  {success.message} Redirecting...
                 </p>
               </div>
             </div>

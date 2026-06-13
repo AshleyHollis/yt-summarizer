@@ -39,6 +39,8 @@ function formatRelativeTime(dateString: string): string {
  */
 function getStatusBadgeClass(status: string): string {
   switch (status) {
+    case 'transcript_ready':
+      return 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300';
     case 'completed':
       return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
     case 'processing':
@@ -59,6 +61,8 @@ function getStatusBadgeClass(status: string): string {
  */
 function getStatusLabel(status: string): string {
   switch (status) {
+    case 'transcript_ready':
+      return 'Transcript ready';
     case 'rate_limited':
       return 'Rate Limited';
     default:
@@ -76,6 +80,12 @@ export function VideoCard({ video }: VideoCardProps) {
 
   const thumbnailUrl =
     video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`;
+  const badgeStatus =
+    video.content_status === 'transcript_ready'
+      ? video.content_status
+      : video.processing_status !== 'completed'
+        ? video.processing_status
+        : null;
 
   const handleClick = (e: React.MouseEvent) => {
     if (selectionMode) {
@@ -140,14 +150,14 @@ export function VideoCard({ video }: VideoCardProps) {
 
       {/* Content */}
       <div className="p-3">
-        {/* Status badge - only show for non-completed states */}
-        {video.processing_status !== 'completed' && (
+        {/* Status badge - show non-completed states and transcript-only readiness */}
+        {badgeStatus && (
           <span
             className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold mb-1 ${getStatusBadgeClass(
-              video.processing_status
+              badgeStatus
             )}`}
           >
-            {getStatusLabel(video.processing_status)}
+            {getStatusLabel(badgeStatus)}
           </span>
         )}
 

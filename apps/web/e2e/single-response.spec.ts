@@ -1,4 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 import { waitForCopilotReady, submitQuery, waitForAssistantResponse } from './helpers';
 
 /**
@@ -16,7 +18,14 @@ function countAssistantMessageBlocks(page: Page) {
   return page.locator('text="Limited Information"').count();
 }
 
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
+
 test.describe('Single Response Per Message', () => {
+  test.skip(
+    () => !fs.existsSync(userAuthFile),
+    'Auth0 user credentials not configured - single-response tests require authenticated copilot chat'
+  );
+
   // All tests navigate with ?chat=open for reliable chat panel activation.
   // openChatViaButton (button click) is flaky — the click sometimes doesn't
   // register or the panel fails to open within the timeout.

@@ -249,15 +249,20 @@ jobs:
   terraform:
     name: Terraform
     uses: ./.github/workflows/terraform-deploy.yml
-    needs: [detect-changes]
+    needs: [detect-changes, wait-for-ci, get-production-tag]
     if: |
+      always() &&
       !cancelled() &&
+      needs.detect-changes.result == 'success' &&
+      needs.wait-for-ci.result != 'failure' &&
+      needs.get-production-tag.result != 'failure' &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_terraform == true) ||
        (github.event_name != 'workflow_dispatch' && needs.detect-changes.outputs.needs_deployment == 'true'))
     with:
       environment: preview
       terraform-version: ${{ vars.TERRAFORM_VERSION || '1.9' }}
       working-directory: infra/terraform/environments/prod
+      backup-worker-image-tag: ${{ needs.wait-for-ci.outputs.image_tag || needs.get-production-tag.outputs.image_tag || 'latest' }}
       run-plan: true
       run-apply: >-
         ${{ (github.event_name == 'workflow_dispatch' && inputs.apply_terraform == true) ||

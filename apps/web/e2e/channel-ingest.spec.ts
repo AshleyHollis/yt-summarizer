@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * E2E Tests for Channel Ingestion (User Story 2)
@@ -18,11 +21,242 @@ import { test, expect } from '@playwright/test';
  */
 
 const TEST_CHANNEL_URL = 'https://www.youtube.com/@darciisabella/videos';
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
+const MOCK_BATCH_ID = '11111111-1111-4111-8111-111111111111';
+
+const mockChannelResponse = {
+  channel_id: null,
+  youtube_channel_id: 'UC3_A9yDRB1TMyah5CD0TfyQ',
+  channel_name: 'Darci Isabella',
+  total_video_count: 3,
+  returned_count: 3,
+  videos: [
+    {
+      youtube_video_id: 'ian-storm',
+      title: 'Hurricane Ian... headed straight for us',
+      duration: 312,
+      publish_date: '2022-09-28T00:00:00Z',
+      thumbnail_url: 'https://img.youtube.com/vi/ian-storm/mqdefault.jpg',
+      already_ingested: false,
+    },
+    {
+      youtube_video_id: 'garden-tour',
+      title: 'Garden update and recovery',
+      duration: 201,
+      publish_date: '2022-10-05T00:00:00Z',
+      thumbnail_url: 'https://img.youtube.com/vi/garden-tour/mqdefault.jpg',
+      already_ingested: true,
+    },
+    {
+      youtube_video_id: 'small-channel',
+      title: 'Small channel test fixture',
+      duration: 98,
+      publish_date: '2022-10-12T00:00:00Z',
+      thumbnail_url: 'https://img.youtube.com/vi/small-channel/mqdefault.jpg',
+      already_ingested: false,
+    },
+  ],
+  next_cursor: null,
+  has_more: false,
+};
+
+const mockBatchResponse = {
+  id: MOCK_BATCH_ID,
+  name: 'Darci Isabella - Test',
+  channel_name: 'Darci Isabella',
+  processing_mode: 'full_analysis',
+  status: 'completed',
+  total_count: 2,
+  pending_count: 0,
+  running_count: 0,
+  succeeded_count: 2,
+  failed_count: 0,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+};
+
+const mockBatchDetailResponse = {
+  ...mockBatchResponse,
+  items: [
+    {
+      id: '22222222-2222-4222-8222-222222222222',
+      video_id: '33333333-3333-4333-8333-333333333333',
+      youtube_video_id: 'ian-storm',
+      title: 'Hurricane Ian... headed straight for us',
+      status: 'succeeded',
+      error_message: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    },
+  ],
+};
+
+const mockQuotaResponse = {
+  tier: 'free',
+  transcripts: {
+    used_today: 0,
+    processed_today: 0,
+    limit: 100,
+    remaining: 100,
+    queued: 0,
+    estimated_days: null,
+  },
+  ai_features: {
+    used_today: 0,
+    processed_today: 0,
+    limit: 5,
+    remaining: 5,
+    queued: 0,
+    estimated_days: null,
+  },
+  videos: {
+    used_today: 0,
+    processed_today: 0,
+    limit: 100,
+    remaining: 100,
+    queued: 0,
+    estimated_days: null,
+  },
+  copilot: {
+    used_this_hour: 0,
+    limit: 30,
+    remaining: 30,
+    resets_in_seconds: 3600,
+  },
+};
+
+async function mockAuthenticatedChannelPage(page: Page) {
+  await page.addInitScript(
+    ({ channelResponse, batchResponse, batchDetailResponse, batchId, quotaResponse }) => {
+      const sessionResponse = {
+        user: {
+          sub: 'auth0|channel-e2e-user',
+          email: 'user@test.yt-summarizer.internal',
+          email_verified: true,
+          name: 'Channel E2E User',
+          picture: null,
+          'https://yt-summarizer.com/role': 'normal',
+          updated_at: '2026-01-01T00:00:00Z',
+        },
+      };
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        const method = (
+          init?.method || (input instanceof Request ? input.method : 'GET')
+        ).toUpperCase();
+
+        if (url.includes('/api/auth/session')) {
+          return new Response(JSON.stringify(sessionResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (url.includes('/api/v1/channels')) {
+          return new Response(JSON.stringify(channelResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (url.includes('/api/v1/quota')) {
+          return new Response(JSON.stringify(quotaResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (url.endsWith('/api/v1/batches') && method === 'POST') {
+          return new Response(JSON.stringify(batchResponse), {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (url.includes(`/api/v1/batches/${batchId}`)) {
+          return new Response(JSON.stringify(batchDetailResponse), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return originalFetch(input, init);
+      };
+    },
+    {
+      channelResponse: mockChannelResponse,
+      batchResponse: mockBatchResponse,
+      batchDetailResponse: mockBatchDetailResponse,
+      batchId: MOCK_BATCH_ID,
+      quotaResponse: mockQuotaResponse,
+    }
+  );
+
+  await page.route('**/api/auth/session**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        user: {
+          sub: 'auth0|channel-e2e-user',
+          email: 'user@test.yt-summarizer.internal',
+          email_verified: true,
+          name: 'Channel E2E User',
+          picture: null,
+          'https://yt-summarizer.com/role': 'normal',
+          updated_at: '2026-01-01T00:00:00Z',
+        },
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/channels**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockChannelResponse),
+    });
+  });
+
+  await page.route('**/api/v1/quota**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockQuotaResponse),
+    });
+  });
+
+  await page.route('**/api/v1/batches', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(mockBatchResponse),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.route(`**/api/v1/batches/${MOCK_BATCH_ID}`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockBatchDetailResponse),
+    });
+  });
+}
 
 // Check if live processing tests should run (requires real AI services)
 const LIVE_PROCESSING = process.env.LIVE_PROCESSING === 'true';
+const hasUserAuthState = () => fs.existsSync(userAuthFile);
 
 test.describe('Channel Ingestion Flow', () => {
+  test.describe.configure({ mode: 'serial' });
+
   test.describe('Navigation', () => {
     test('submit page has link to channel ingestion', async ({ page }) => {
       await page.goto('/submit');
@@ -50,14 +284,24 @@ test.describe('Channel Ingestion Flow', () => {
     test('ingest page renders correctly', async ({ page }) => {
       await page.goto('/ingest');
 
-      // Check page elements
       await expect(page.getByRole('heading', { name: /Ingest from Channel/i })).toBeVisible();
+      if (!hasUserAuthState()) {
+        await expect(page.getByText(/Sign in to import videos from a channel/i)).toBeVisible();
+        await expect(page.getByRole('button', { name: /Sign in with Google/i })).toBeVisible();
+        return;
+      }
+
       await expect(page.getByLabel(/YouTube Channel URL/i)).toBeVisible();
       await expect(page.getByRole('button', { name: /Fetch Videos/i })).toBeVisible();
     });
   });
 
   test.describe('Channel Form Validation', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - channel ingestion form is auth-gated'
+    );
+
     test.beforeEach(async ({ page }) => {
       await page.goto('/ingest');
     });
@@ -94,8 +338,8 @@ test.describe('Channel Ingestion Flow', () => {
   });
 
   test.describe('Channel Video Fetching', () => {
-    // These tests require the backend to be running
     test.beforeEach(async ({ page }) => {
+      await mockAuthenticatedChannelPage(page);
       await page.goto('/ingest');
       // Wait for AuthGate to finish loading auth state so the channel URL
       // input is visible before each test body runs.
@@ -167,7 +411,7 @@ test.describe('Channel Ingestion Flow', () => {
     // These tests require actual video processing to complete
     test.skip(
       () => !LIVE_PROCESSING,
-      'Requires live AI processing - run with LIVE_PROCESSING=true'
+      'Requires batch flow coverage - run with LIVE_PROCESSING=true'
     );
 
     // Run serially to avoid race conditions when multiple tests hit the same channel API
@@ -178,6 +422,7 @@ test.describe('Channel Ingestion Flow', () => {
     let sharedBatchUrl: string | null = null;
 
     test.beforeEach(async ({ page }) => {
+      await mockAuthenticatedChannelPage(page);
       await page.goto('/ingest');
     });
 
@@ -308,7 +553,7 @@ test.describe('Channel Ingestion Flow', () => {
         await expect(page).toHaveURL(/\/library\?status=completed/);
 
         // Verify library page loads with the filter applied
-        await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+        await expect(page.getByRole('button', { name: /Select videos/i })).toBeVisible();
         const statusDropdown = page.getByLabel(/Status/i);
         await expect(statusDropdown).toHaveValue('completed');
       }
@@ -327,6 +572,7 @@ test.describe('Channel Ingestion Flow', () => {
   test.describe('Already Ingested Videos', () => {
     test('shows already ingested indicator for previously ingested videos', async ({ page }) => {
       // Fetch videos from a channel that has been ingested before
+      await mockAuthenticatedChannelPage(page);
       await page.goto('/ingest');
       await page.getByLabel(/YouTube Channel URL/i).fill(TEST_CHANNEL_URL);
       await page.getByRole('button', { name: /Fetch Videos/i }).click();

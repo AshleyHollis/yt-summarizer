@@ -135,6 +135,7 @@ jobs:
       environment: production
       terraform-version: ${{ vars.TERRAFORM_VERSION || '1.9' }}
       working-directory: infra/terraform/environments/prod
+      backup-worker-image-tag: ${{ needs.wait-for-ci.outputs.image_tag || 'latest' }}
       run-plan: true
       run-apply: true
       require-changes: true

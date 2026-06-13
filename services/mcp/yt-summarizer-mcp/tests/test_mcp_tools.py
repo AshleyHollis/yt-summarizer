@@ -12,10 +12,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from server import (  # noqa: E402
     ask,
+    extract_knowledge,
     get_job_status,
     get_segments,
     get_video,
     ingest,
+    ingest_batch,
+    ingest_channel_sample,
     search_library,
     search_youtube,
 )
@@ -153,8 +156,98 @@ async def test_ingest_calls_videos_endpoint():
     assert "/api/v1/agent/videos" in call_url
     body = mock_client.post.call_args[1]["json"]
     assert body["url"] == yt_url
+    assert body["processing_mode"] == "transcript_only"
     parsed = json.loads(result)
     assert parsed["job_id"] == job_id
+
+
+@pytest.mark.asyncio
+async def test_ingest_accepts_full_analysis_override():
+    """ingest can explicitly request full analysis."""
+    response_data = {
+        "job_id": "550e8400-e29b-41d4-a716-446655440012",
+        "video_id": "550e8400-e29b-41d4-a716-446655440013",
+        "status": "pending",
+    }
+    mock_cm, mock_client = _make_mock_client(response_data)
+
+    with patch("server._client", return_value=mock_cm):
+        await ingest(
+            url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            processing_mode="full_analysis",
+        )
+
+    body = mock_client.post.call_args[1]["json"]
+    assert body["processing_mode"] == "full_analysis"
+
+
+@pytest.mark.asyncio
+async def test_ingest_batch_calls_batches_endpoint():
+    """ingest_batch POSTs selected URLs to /api/v1/agent/batches."""
+    response_data = {"id": "batch-1", "total_count": 2}
+    mock_cm, mock_client = _make_mock_client(response_data)
+
+    with patch("server._client", return_value=mock_cm):
+        result = await ingest_batch(
+            urls=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
+            video_ids=["abc123"],
+            name="Discord links",
+        )
+
+    call_url = mock_client.post.call_args[0][0]
+    assert "/api/v1/agent/batches" in call_url
+    body = mock_client.post.call_args[1]["json"]
+    assert body["urls"] == ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+    assert body["video_ids"] == ["abc123"]
+    assert body["name"] == "Discord links"
+    assert body["processing_mode"] == "transcript_only"
+    assert json.loads(result)["total_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_ingest_channel_sample_calls_batches_endpoint():
+    """ingest_channel_sample sends a limited channel request."""
+    response_data = {"id": "batch-2", "total_count": 10}
+    mock_cm, mock_client = _make_mock_client(response_data)
+
+    with patch("server._client", return_value=mock_cm):
+        await ingest_channel_sample("https://www.youtube.com/@MarkWildman", channel_limit=10)
+
+    call_url = mock_client.post.call_args[0][0]
+    assert "/api/v1/agent/batches" in call_url
+    body = mock_client.post.call_args[1]["json"]
+    assert body["channel_url"] == "https://www.youtube.com/@MarkWildman"
+    assert body["channel_limit"] == 10
+    assert body["processing_mode"] == "transcript_only"
+
+
+@pytest.mark.asyncio
+async def test_extract_knowledge_calls_knowledge_endpoint():
+    """extract_knowledge returns Obsidian-ready note payloads."""
+    response_data = {
+        "title": "Clubbell Shoulder Mobility",
+        "para_path": "Resources/Training/YouTube/Clubbell Shoulder Mobility.md",
+        "markdown": "# Clubbell Shoulder Mobility",
+        "tags": ["youtube"],
+        "sources": [],
+        "estimated_tokens": 12,
+    }
+    mock_cm, mock_client = _make_mock_client(response_data)
+
+    with patch("server._client", return_value=mock_cm):
+        result = await extract_knowledge(
+            ["550e8400-e29b-41d4-a716-446655440014"],
+            topic="shoulder mobility",
+            para_destination="Resources/Training/YouTube",
+        )
+
+    call_url = mock_client.post.call_args[0][0]
+    assert "/api/v1/agent/knowledge/extract" in call_url
+    body = mock_client.post.call_args[1]["json"]
+    assert body["video_ids"] == ["550e8400-e29b-41d4-a716-446655440014"]
+    assert body["topic"] == "shoulder mobility"
+    assert body["para_destination"] == "Resources/Training/YouTube"
+    assert json.loads(result)["markdown"].startswith("# Clubbell")
 
 
 @pytest.mark.asyncio

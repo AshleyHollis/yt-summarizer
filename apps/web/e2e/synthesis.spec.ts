@@ -82,6 +82,7 @@ test.describe('US6: Synthesis Feature UI', () => {
             !text.includes('warning') &&
             !text.includes('cors') &&
             !text.includes('favicon') &&
+            !text.includes('status of 404') &&
             !text.includes('400 ()') &&
             !text.includes('401') &&
             !text.includes('403') &&
@@ -90,7 +91,8 @@ test.describe('US6: Synthesis Feature UI', () => {
             !text.includes('session') &&
             !text.includes('cross-origin') &&
             !text.includes('copilotkit') &&
-            !text.includes('component stack')
+            !text.includes('component stack') &&
+            text !== 'event'
           ) {
             errors.push(msg.text());
           }

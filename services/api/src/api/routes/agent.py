@@ -34,9 +34,13 @@ from ..models.agent import (
     AskCitation,
     AskRequest,
     AskResponse,
+    BatchIngestRequest,
     IngestRequest,
     IngestResponse,
     JobStatusResponse,
+    KnowledgeExtractRequest,
+    KnowledgeExtractResponse,
+    KnowledgeSource,
     SegmentDetail,
     SegmentRangeResponse,
     SemanticSearchRequest,
@@ -45,13 +49,19 @@ from ..models.agent import (
     YouTubeSearchResponse,
     YouTubeSearchResult,
 )
+from ..models.batch import BatchResponse, CreateBatchRequest
 from ..models.copilot import CopilotQueryRequest, SegmentSearchRequest
+from ..models.video import extract_youtube_video_id
+from ..services.batch_service import BatchService
 from ..services.copilot_service import CopilotService
 from ..services.search_service import SearchService
 from ..services.youtube_service import YouTubeService
 
 router = APIRouter(prefix="/api/v1/agent", tags=["Agent"])
 logger = get_logger(__name__)
+
+AGENT_CORRELATION_ID = "agent"
+AGENT_BATCH_CORRELATION_ID = "agent-batch"
 
 
 def get_search_service(session: AsyncSession = Depends(get_session)) -> SearchService:
@@ -369,12 +379,21 @@ async def ingest_video(
     user: AuthenticatedUser = Depends(require_api_key),
     session: AsyncSession = Depends(get_session),
 ) -> IngestResponse:
-    """Submit a YouTube URL for async ingestion. Returns a job_id to poll."""
+    """Submit a YouTube URL for async ingestion. Returns a job_id to poll.
+
+    Agent ingestion defaults to transcript-only so OpenClaw can archive and inspect
+    videos without spending AI-feature quota unless the caller explicitly asks for it.
+    """
     try:
         from ..services.video_service import VideoAlreadyExistsError, VideoService
 
         video_service = VideoService(session)
-        result = await video_service.submit_video(body.url, correlation_id="agent", user_id=None)
+        result = await video_service.submit_video(
+            body.url,
+            correlation_id=AGENT_CORRELATION_ID,
+            user_id=None,
+            processing_mode=body.processing_mode,
+        )
 
         return IngestResponse(
             job_id=result.job_id,
@@ -382,6 +401,7 @@ async def ingest_video(
             status=str(result.status.value)
             if hasattr(result.status, "value")
             else str(result.status),
+            processing_mode=body.processing_mode,
         )
     except HTTPException:
         raise
@@ -396,6 +416,256 @@ async def ingest_video(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ingest failed: {str(e)}",
         )
+
+
+def _dedupe_video_ids(video_ids: list[str]) -> list[str]:
+    """Return YouTube video IDs in first-seen order without duplicates."""
+    seen: set[str] = set()
+    deduped = []
+    for video_id in video_ids:
+        normalized = video_id.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+@router.post(
+    "/batches",
+    response_model=BatchResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Ingest multiple YouTube videos transcript-first",
+)
+async def ingest_batch(
+    body: BatchIngestRequest,
+    user: AuthenticatedUser = Depends(require_api_key),
+    session: AsyncSession = Depends(get_session),
+) -> BatchResponse:
+    """Create a transcript-first batch from URLs, IDs, or a small channel fetch.
+
+    This gives OpenClaw a safe default for Discord-driven research sessions:
+    it can collect transcripts for selected videos without automatically queuing
+    summaries, embeddings, or relationship analysis.
+    """
+    video_ids = list(body.video_ids)
+    invalid_urls = []
+    for url in body.urls:
+        extracted = extract_youtube_video_id(url)
+        if extracted:
+            video_ids.append(extracted)
+        else:
+            invalid_urls.append(url)
+
+    youtube_channel_id = None
+    channel_name = None
+    if body.channel_url:
+        try:
+            channel_data = await YouTubeService().fetch_channel_videos(
+                body.channel_url,
+                limit=body.channel_limit,
+            )
+        except Exception as e:
+            logger.error("Agent channel ingest failed", channel_url=body.channel_url, error=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to fetch channel videos: {str(e)}",
+            )
+        youtube_channel_id = channel_data.get("youtube_channel_id")
+        channel_name = channel_data.get("channel_name")
+        video_ids.extend(
+            str(video["youtube_video_id"])
+            for video in channel_data.get("videos", [])
+            if video.get("youtube_video_id")
+        )
+
+    if invalid_urls:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": "Invalid YouTube URLs", "urls": invalid_urls},
+        )
+
+    video_ids = _dedupe_video_ids(video_ids)
+    if not video_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide at least one YouTube URL, video ID, or channel URL.",
+        )
+
+    batch_name = body.name
+    if not batch_name:
+        if channel_name:
+            batch_name = f"OpenClaw Transcript Import - {channel_name}"
+        else:
+            batch_name = f"OpenClaw Transcript Import - {len(video_ids)} videos"
+
+    request = CreateBatchRequest(
+        name=batch_name,
+        video_ids=video_ids,
+        youtube_channel_id=youtube_channel_id,
+        ingest_all=False,
+        processing_mode=body.processing_mode,
+    )
+    service = BatchService(session)
+    try:
+        return await service.create_batch(
+            request,
+            correlation_id=AGENT_BATCH_CORRELATION_ID,
+            user_id=None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error("Agent batch ingest failed", error=str(e), count=len(video_ids))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Batch ingest failed: {str(e)}",
+        )
+
+
+def _format_timestamp(seconds: float) -> str:
+    minutes = int(seconds // 60)
+    remaining = int(seconds % 60)
+    return f"{minutes}:{remaining:02d}"
+
+
+def _truncate_text(text: str, max_chars: int = 60000) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rsplit("\n", 1)[0] + "\n[Transcript truncated for prompt size.]"
+
+
+@router.post(
+    "/knowledge/extract",
+    response_model=KnowledgeExtractResponse,
+    summary="Extract Obsidian-ready knowledge from transcript segments",
+)
+async def extract_knowledge(
+    body: KnowledgeExtractRequest,
+    user: AuthenticatedUser = Depends(require_api_key),
+    session: AsyncSession = Depends(get_session),
+) -> KnowledgeExtractResponse:
+    """Distill one or more transcript-ready videos into a PARA-friendly note.
+
+    The API returns Markdown and a suggested path; OpenClaw remains responsible
+    for writing the returned note into the user's Obsidian vault.
+    """
+    video_result = await session.execute(
+        select(Video).options(selectinload(Video.channel)).where(Video.video_id.in_(body.video_ids))
+    )
+    videos = video_result.scalars().all()
+    found_ids = {video.video_id for video in videos}
+    missing_ids = [str(video_id) for video_id in body.video_ids if video_id not in found_ids]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"message": "Some videos were not found", "video_ids": missing_ids},
+        )
+
+    segment_result = await session.execute(
+        select(Segment)
+        .where(Segment.video_id.in_(body.video_ids))
+        .order_by(Segment.video_id, Segment.sequence_number)
+    )
+    all_segments = segment_result.scalars().all()
+    segments_by_video: dict[UUID, list] = {}
+    for segment in all_segments:
+        segments_by_video.setdefault(segment.video_id, []).append(segment)
+
+    sources: list[KnowledgeSource] = []
+    transcript_blocks = []
+    for video in videos:
+        segments = segments_by_video.get(video.video_id, [])[: body.max_segments_per_video]
+        if not segments:
+            continue
+
+        youtube_url = f"https://www.youtube.com/watch?v={video.youtube_video_id}"
+        channel_name = video.channel.name if getattr(video, "channel", None) else None
+        sources.append(
+            KnowledgeSource(
+                video_id=video.video_id,
+                youtube_video_id=video.youtube_video_id,
+                title=video.title,
+                channel_name=channel_name,
+                youtube_url=youtube_url,
+                segment_count=len(segments),
+            )
+        )
+        lines = [
+            f"VIDEO: {video.title}",
+            f"CHANNEL: {channel_name or 'Unknown'}",
+            f"URL: {youtube_url}",
+            "TRANSCRIPT:",
+        ]
+        for segment in segments:
+            lines.append(f"[{_format_timestamp(segment.start_time)}] {segment.text}")
+        transcript_blocks.append("\n".join(lines))
+
+    if not transcript_blocks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No transcript segments are available for the requested videos.",
+        )
+
+    transcript_context = _truncate_text("\n\n---\n\n".join(transcript_blocks))
+    requested_title = body.note_title or "Let the note title describe the extracted concept."
+    topic_focus = body.topic or "Extract the most durable useful knowledge from the transcripts."
+
+    system_prompt = """You create concise Obsidian notes from YouTube transcript excerpts.
+
+Rules:
+- Create curated knowledge, not a raw transcript dump.
+- Use PARA. Respect the requested destination unless the note clearly belongs elsewhere.
+- Include source links with timestamps for claims that came from the transcript.
+- Prefer practical concepts, definitions, methods, decision points, and reusable insights.
+- Keep the Markdown directly usable in Obsidian.
+- Return JSON only."""
+
+    user_prompt = f"""Create one Obsidian-ready Markdown note.
+
+Requested PARA destination: {body.para_destination}
+Requested title: {requested_title}
+Topic/focus: {topic_focus}
+
+Return JSON with this shape:
+{{
+  "title": "Short note title",
+  "para_path": "Resources/YouTube/Topic/Short note title.md",
+  "markdown": "---\\ntags: [youtube, transcript]\\nsource: yt-summarizer\\n---\\n# Short note title\\n...",
+  "tags": ["youtube", "transcript"]
+}}
+
+Transcript excerpts:
+{transcript_context}"""
+
+    try:
+        from ..services.llm_service import get_llm_service
+
+        extracted = await get_llm_service().generate_structured_output(system_prompt, user_prompt)
+    except Exception as e:
+        logger.error("Knowledge extraction failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Knowledge extraction failed: {str(e)}",
+        )
+
+    title = str(extracted.get("title") or body.note_title or "YouTube Knowledge Note").strip()
+    para_path = str(
+        extracted.get("para_path") or f"{body.para_destination.rstrip('/')}/{title}.md"
+    ).strip()
+    markdown = str(extracted.get("markdown") or "").strip()
+    if not markdown:
+        markdown = f"# {title}\n\nNo durable knowledge could be extracted from the transcript."
+    tags = extracted.get("tags") if isinstance(extracted.get("tags"), list) else []
+
+    return KnowledgeExtractResponse(
+        title=title,
+        para_path=para_path,
+        markdown=markdown,
+        tags=[str(tag) for tag in tags],
+        sources=sources,
+        estimated_tokens=(len(transcript_context) + len(markdown)) // 4,
+    )
 
 
 # ---------------------------------------------------------------------------

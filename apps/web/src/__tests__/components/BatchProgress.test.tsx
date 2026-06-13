@@ -24,52 +24,54 @@ vi.mock('@/services/api', () => ({
 
 import { batchApi } from '@/services/api';
 
-const createMockBatch = (overrides: Partial<BatchDetailResponse> = {}): BatchDetailResponse => ({
-  id: 'batch-123',
-  name: 'Test Batch - 12/14/2025',
-  channel_name: 'Test Channel',
-  status: 'running',
-  total_count: 3,
-  pending_count: 1,
-  running_count: 1,
-  succeeded_count: 1,
-  failed_count: 0,
-  created_at: '2025-12-14T10:00:00Z',
-  updated_at: '2025-12-14T10:05:00Z',
-  items: [
-    {
-      id: 'item-1',
-      video_id: 'video-1',
-      youtube_video_id: 'yt-123',
-      title: 'Video 1',
-      status: 'succeeded',
-      error_message: null,
-      created_at: '2025-12-14T10:00:00Z',
-      updated_at: '2025-12-14T10:02:00Z',
-    },
-    {
-      id: 'item-2',
-      video_id: 'video-2',
-      youtube_video_id: 'yt-456',
-      title: 'Video 2',
-      status: 'running',
-      error_message: null,
-      created_at: '2025-12-14T10:00:00Z',
-      updated_at: '2025-12-14T10:03:00Z',
-    },
-    {
-      id: 'item-3',
-      video_id: 'video-3',
-      youtube_video_id: 'yt-789',
-      title: 'Video 3',
-      status: 'pending',
-      error_message: null,
-      created_at: '2025-12-14T10:00:00Z',
-      updated_at: '2025-12-14T10:00:00Z',
-    },
-  ],
-  ...overrides,
-});
+const createMockBatch = (overrides: Partial<BatchDetailResponse> = {}): BatchDetailResponse =>
+  ({
+    id: 'batch-123',
+    name: 'Test Batch - 12/14/2025',
+    channel_name: 'Test Channel',
+    processing_mode: 'full_analysis',
+    status: 'running',
+    total_count: 3,
+    pending_count: 1,
+    running_count: 1,
+    succeeded_count: 1,
+    failed_count: 0,
+    created_at: '2025-12-14T10:00:00Z',
+    updated_at: '2025-12-14T10:05:00Z',
+    items: [
+      {
+        id: 'item-1',
+        video_id: 'video-1',
+        youtube_video_id: 'yt-123',
+        title: 'Video 1',
+        status: 'succeeded',
+        error_message: null,
+        created_at: '2025-12-14T10:00:00Z',
+        updated_at: '2025-12-14T10:02:00Z',
+      },
+      {
+        id: 'item-2',
+        video_id: 'video-2',
+        youtube_video_id: 'yt-456',
+        title: 'Video 2',
+        status: 'running',
+        error_message: null,
+        created_at: '2025-12-14T10:00:00Z',
+        updated_at: '2025-12-14T10:03:00Z',
+      },
+      {
+        id: 'item-3',
+        video_id: 'video-3',
+        youtube_video_id: 'yt-789',
+        title: 'Video 3',
+        status: 'pending',
+        error_message: null,
+        created_at: '2025-12-14T10:00:00Z',
+        updated_at: '2025-12-14T10:00:00Z',
+      },
+    ],
+    ...overrides,
+  }) as BatchDetailResponse;
 
 describe('BatchProgress', () => {
   beforeEach(() => {

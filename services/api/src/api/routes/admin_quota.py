@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
@@ -29,6 +29,7 @@ except ImportError:
 
 from ..dependencies.auth import AuthenticatedUser, require_auth
 from ..dependencies.quota import get_or_create_user
+from ..services.quota_dispatcher import DispatchResult, QuotaDispatcher
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/admin/expedite-requests", tags=["Admin - Quota"])
@@ -122,6 +123,7 @@ async def list_expedite_requests(
 )
 async def approve_expedite(
     request_id: UUID,
+    request: Request,
     admin: AuthenticatedUser = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> ExpediteReviewResponse:
@@ -143,16 +145,16 @@ async def approve_expedite(
             detail=f"Request already {expedite.status}",
         )
 
-    # Release all queued jobs for this user
-    release_result = await session.execute(
-        update(Job)
-        .where(
-            Job.user_id == expedite.user_id,
-            Job.quota_status == "quota_queued",
-        )
-        .values(quota_status="released")
+    # Release and dispatch all queued jobs for this user. Held downstream jobs are
+    # marked released so the current worker chain can dispatch them after prerequisites.
+    dispatcher = QuotaDispatcher(session)
+    dispatch_result = await dispatcher.release_all_for_user(
+        expedite.user_id,
+        getattr(request.state, "correlation_id", f"expedite-{request_id}"),
+        DispatchResult(users_checked=1),
+        defer_if_prerequisites_missing=True,
     )
-    jobs_released = release_result.rowcount
+    jobs_released = dispatch_result.jobs_released
 
     # Update the request
     expedite.status = "approved"
@@ -168,9 +170,6 @@ async def approve_expedite(
         jobs_released=jobs_released,
         admin_id=str(admin_user.user_id),
     )
-
-    # TODO: Dispatch released jobs to Azure Storage Queue
-    # This should be handled by the QuotaDispatcher service
 
     return ExpediteReviewResponse(
         request_id=request_id,

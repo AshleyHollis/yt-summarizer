@@ -29,13 +29,18 @@ from .auth import AuthenticatedUser, require_auth
 
 logger = get_logger(__name__)
 
+TRANSCRIPT_EXTRACT_OPERATION = "transcript_extract"
+AI_FEATURES_OPERATION = "ai_features"
+COPILOT_QUERY_OPERATION = "copilot_query"
+LEGACY_VIDEO_SUBMIT_OPERATION = "video_submit"
 
 # Quota limits defined in code for simplicity.
 # To add tiers (e.g., "pro"), add another entry with different limits.
 QUOTA_LIMITS: dict[str, dict[str, Any] | None] = {
     "free": {
-        "video_submit": {"max_count": 5, "window_seconds": 86400},  # 5 per day
-        "copilot_query": {"max_count": 30, "window_seconds": 3600},  # 30 per hour
+        TRANSCRIPT_EXTRACT_OPERATION: {"max_count": 100, "window_seconds": 86400},
+        AI_FEATURES_OPERATION: {"max_count": 5, "window_seconds": 86400},
+        COPILOT_QUERY_OPERATION: {"max_count": 30, "window_seconds": 3600},
     },
     "admin": None,  # No limits — bypass all checks
 }
@@ -108,6 +113,15 @@ def get_quota_limit(tier: str, operation_type: str) -> dict[str, int] | None:
     return tier_limits.get(operation_type)
 
 
+def get_quota_operation_for_job_type(job_type: str) -> str | None:
+    """Map a job type to the user-facing quota bucket it consumes."""
+    if job_type == "transcribe":
+        return TRANSCRIPT_EXTRACT_OPERATION
+    if job_type in {"summarize", "embed", "build_relationships"}:
+        return AI_FEATURES_OPERATION
+    return None
+
+
 async def check_copilot_quota(
     request: Request,
     user: AuthenticatedUser = Depends(require_auth),
@@ -124,14 +138,14 @@ async def check_copilot_quota(
         return user
 
     db_user = await get_or_create_user(session, user)
-    limit = get_quota_limit(db_user.quota_tier, "copilot_query")
+    limit = get_quota_limit(db_user.quota_tier, COPILOT_QUERY_OPERATION)
 
     if limit is None:
         # Admin — no limits
         return user
 
     current_count = await get_usage_count(
-        session, db_user.user_id, "copilot_query", limit["window_seconds"]
+        session, db_user.user_id, COPILOT_QUERY_OPERATION, limit["window_seconds"]
     )
 
     if current_count >= limit["max_count"]:
@@ -149,7 +163,7 @@ async def check_copilot_quota(
         )
 
     # Record the usage
-    await record_usage(session, db_user.user_id, "copilot_query")
+    await record_usage(session, db_user.user_id, COPILOT_QUERY_OPERATION)
     await session.commit()
 
     return user
@@ -159,7 +173,7 @@ async def check_video_quota(
     session: AsyncSession,
     db_user: User,
 ) -> dict[str, Any]:
-    """Check video submission quota for a user.
+    """Check transcript extraction quota for a user.
 
     Returns quota status dict:
     {
@@ -169,23 +183,34 @@ async def check_video_quota(
         "limit": int | None,
     }
     """
-    limit = get_quota_limit(db_user.quota_tier, "video_submit")
+    return await check_operation_quota(session, db_user, TRANSCRIPT_EXTRACT_OPERATION)
+
+
+async def check_operation_quota(
+    session: AsyncSession,
+    db_user: User,
+    operation_type: str,
+) -> dict[str, Any]:
+    """Check quota for a specific operation bucket."""
+    limit = get_quota_limit(db_user.quota_tier, operation_type)
 
     if limit is None:
         return {
             "tier": db_user.quota_tier,
+            "operation_type": operation_type,
             "remaining": None,
             "used_today": 0,
             "limit": None,
         }
 
     used_today = await get_usage_count(
-        session, db_user.user_id, "video_submit", limit["window_seconds"]
+        session, db_user.user_id, operation_type, limit["window_seconds"]
     )
     remaining = max(0, limit["max_count"] - used_today)
 
     return {
         "tier": db_user.quota_tier,
+        "operation_type": operation_type,
         "remaining": remaining,
         "used_today": used_today,
         "limit": limit["max_count"],

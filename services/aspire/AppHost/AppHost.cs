@@ -1,5 +1,15 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
+static int GetPort(string name, int fallback)
+{
+    return int.TryParse(Environment.GetEnvironmentVariable(name), out var port) ? port : fallback;
+}
+
+var apiPort = GetPort("API_PORT", 8000);
+var webPort = GetPort("WEB_PORT", 3000);
+var apiBaseUrl = Environment.GetEnvironmentVariable("API_BASE_URL") ?? $"http://localhost:{apiPort}";
+var webBaseUrl = Environment.GetEnvironmentVariable("BASE_URL") ?? $"http://localhost:{webPort}";
+
 // OpenAI API Key (required for summarize and embed workers)
 var openAiApiKey = builder.AddParameter("openai-api-key", secret: true);
 
@@ -42,8 +52,8 @@ var sql = builder.AddSqlServer("sql")
 
 // Python API (FastAPI) - using uvicorn module
 var api = builder.AddPythonModule("api", "../../api", "uvicorn")
-    .WithArgs("src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload")
-    .WithHttpEndpoint(port: 8000, targetPort: 8000, name: "http", isProxied: false)
+    .WithArgs("src.api.main:app", "--host", "0.0.0.0", "--port", apiPort.ToString(), "--reload")
+    .WithHttpEndpoint(port: apiPort, targetPort: apiPort, name: "http", isProxied: false)
     .WithExternalHttpEndpoints()
     .WithReference(blobs)
     .WithReference(queues)
@@ -51,12 +61,12 @@ var api = builder.AddPythonModule("api", "../../api", "uvicorn")
     .WithEnvironment("AZURE_OPENAI_ENDPOINT", azureOpenAiEndpoint)
     .WithEnvironment("AZURE_OPENAI_API_KEY", azureOpenAiApiKey)
     .WithEnvironment("AZURE_OPENAI_DEPLOYMENT", azureOpenAiDeployment)
-    .WithEnvironment("API_BASE_URL", "http://localhost:8000")
+    .WithEnvironment("API_BASE_URL", apiBaseUrl)
     .WithEnvironment("AUTH0_DOMAIN", auth0Domain)
     .WithEnvironment("AUTH0_CLIENT_ID", auth0ClientId)
     .WithEnvironment("AUTH0_CLIENT_SECRET", auth0ClientSecret)
     .WithEnvironment("AUTH0_SESSION_SECRET", auth0SessionSecret)
-    .WithEnvironment("AUTH0_DEFAULT_RETURN_TO", "http://localhost:3000")
+    .WithEnvironment("AUTH0_DEFAULT_RETURN_TO", webBaseUrl)
     .WithEnvironment("PROXY_ENABLED", "true")
     .WithEnvironment("PROXY_USERNAME", webshareProxyUsername)
     .WithEnvironment("PROXY_PASSWORD", webshareProxyPassword)
@@ -64,9 +74,10 @@ var api = builder.AddPythonModule("api", "../../api", "uvicorn")
 
 // Next.js Frontend
 var web = builder.AddNpmApp("web", "../../../apps/web", "dev")
-    .WithHttpEndpoint(port: 3000, targetPort: 3000, name: "http", isProxied: false)
+    .WithHttpEndpoint(port: webPort, targetPort: webPort, name: "http", isProxied: false)
     .WithExternalHttpEndpoints()
-    .WithEnvironment("NEXT_PUBLIC_API_URL", "http://localhost:8000");
+    .WithEnvironment("PORT", webPort.ToString())
+    .WithEnvironment("NEXT_PUBLIC_API_URL", apiBaseUrl);
 
 // Python Workers - each worker has its own directory and virtual environment
 // Using AddExecutable to avoid pip install conflicts - venvs are pre-created

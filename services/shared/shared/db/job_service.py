@@ -12,6 +12,13 @@ from shared.logging.config import get_logger
 logger = get_logger(__name__)
 
 
+def _is_final_success_job(job: Job) -> bool:
+    """Return whether a successful job should complete its video/batch item."""
+    if job.job_type == "build_relationships":
+        return True
+    return job.job_type == "transcribe" and getattr(job, "processing_mode", "") == "transcript_only"
+
+
 async def update_job_status(
     job_id: str,
     status: str,
@@ -73,7 +80,7 @@ async def update_job_status(
                 video_status = "processing"
             elif status == "failed":
                 video_status = "failed"
-            elif status == "succeeded" and job_type == "build_relationships":
+            elif status == "succeeded" and _is_final_success_job(job):
                 video_status = "completed"
 
             if video_status:
@@ -100,7 +107,7 @@ async def update_job_status(
             elif status == "failed":
                 # Any job failure - mark as failed
                 batch_item_status = "failed"
-            elif status == "succeeded" and job_type == "build_relationships":
+            elif status == "succeeded" and _is_final_success_job(job):
                 # Final job succeeded - mark as succeeded
                 batch_item_status = "succeeded"
             # For intermediate job successes (transcribe, summarize, embed),
