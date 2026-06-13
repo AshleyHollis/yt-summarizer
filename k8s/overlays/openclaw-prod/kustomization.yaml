@@ -12,6 +12,7 @@ namespace: yt-summarizer
 
 resources:
   - ../prod
+  - transcribe-worker-scaledobject.yaml
 
 images:
   # The nested ../prod overlay rewrites short image names to ACR names first.
@@ -81,6 +82,27 @@ patches:
         value: api-ytsummarizer.ashleyhollis.com
       - op: remove
         path: /metadata/annotations/external-dns.alpha.kubernetes.io~1hostname
+
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: transcribe-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: transcribe-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                env:
+                  - name: QUEUE_BATCH_SIZE
+                    value: "2"
+                  - name: PROXY_MAX_CONCURRENCY
+                    value: "2"
 
 labels:
   - pairs:
