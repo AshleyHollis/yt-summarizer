@@ -33,9 +33,10 @@ test.describe('Processing History', () => {
   let secondVideoIdWithHistory: string | null = null;
 
   test.beforeAll(async ({ request }) => {
-    // Find up to 2 completed videos that actually have processing history records.
+    // Find up to 2 completed full-analysis videos that actually have processing history records.
     // Old videos may have been processed before history tracking was added,
-    // so we verify the /history endpoint returns stages before picking a video.
+    // and transcript-only videos intentionally do not have summary/embed stages,
+    // so we verify the /history endpoint returns AI stages before picking a video.
     const listResponse = await request.get(
       `${API_URL}/api/v1/library/videos?status=completed&page_size=50`
     );
@@ -48,7 +49,12 @@ test.describe('Processing History', () => {
       );
       if (!historyResponse.ok()) continue;
       const historyData = await historyResponse.json();
-      if (historyData.stages && historyData.stages.length > 0) {
+      const historyText = JSON.stringify(historyData).toLowerCase();
+      const hasFullAnalysisHistory =
+        historyData.stages &&
+        historyData.stages.length > 0 &&
+        (historyText.includes('summar') || historyText.includes('embed'));
+      if (hasFullAnalysisHistory) {
         if (!videoIdWithHistory) {
           videoIdWithHistory = video.video_id;
           console.log(`[processing-history] Found video 1 with history: ${videoIdWithHistory}`);
@@ -62,7 +68,7 @@ test.describe('Processing History', () => {
       }
     }
     if (!videoIdWithHistory) {
-      console.log('[processing-history] No completed videos with history records found');
+      console.log('[processing-history] No completed full-analysis videos with history found');
     }
   });
 
