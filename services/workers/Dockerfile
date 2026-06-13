@@ -41,6 +41,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Install shared package and workers dependencies
 RUN cd /app/shared && uv pip install --system --prerelease=allow -e .
+# The local workers pyproject points at ../shared for developer checkouts. In this
+# Docker layout the workers project is /app, so provide the equivalent path.
+RUN ln -s /app/shared /shared
 RUN uv pip install --system --prerelease=allow -e .
 
 # ================================
