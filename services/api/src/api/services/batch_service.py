@@ -1,6 +1,7 @@
 """Batch service for batch ingestion operations."""
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -162,6 +163,7 @@ class BatchService:
         # Process each video (quota-aware dispatching)
         transcript_released_count = 0
         ai_released_count = 0
+        queued_transcribe_messages: list[dict[str, Any]] = []
         for youtube_video_id in video_ids_to_ingest:
             # Determine quota status for this job
             if (
@@ -181,7 +183,11 @@ class BatchService:
                     ai_quota_status = "quota_queued"
 
             try:
-                transcript_released, ai_released = await self._create_batch_item(
+                (
+                    transcript_released,
+                    ai_released,
+                    transcribe_message,
+                ) = await self._create_batch_item(
                     batch=batch,
                     youtube_video_id=youtube_video_id,
                     correlation_id=correlation_id,
@@ -191,6 +197,8 @@ class BatchService:
                     ai_quota_status=ai_quota_status,
                     processing_mode=processing_mode,
                 )
+                if transcribe_message is not None:
+                    queued_transcribe_messages.append(transcribe_message)
                 if transcript_released:
                     transcript_released_count += 1
                     if user_id:
@@ -218,6 +226,8 @@ class BatchService:
                 # Continue with other videos
 
         await self.session.commit()
+
+        self._dispatch_transcribe_messages(queued_transcribe_messages)
 
         logger.info(
             "Created batch",
@@ -250,7 +260,7 @@ class BatchService:
         quota_status: str = "released",
         ai_quota_status: str = "released",
         processing_mode: ProcessingMode = ProcessingMode.FULL_ANALYSIS,
-    ) -> tuple[bool, bool]:
+    ) -> tuple[bool, bool, dict[str, Any] | None]:
         """Create a batch item for a single video.
 
         Args:
@@ -264,7 +274,10 @@ class BatchService:
             processing_mode: Requested processing depth.
 
         Returns:
-            Tuple of (released_transcript_job_created, released_ai_job_created).
+            Tuple of:
+            - whether a released transcribe job was created
+            - whether a released AI job was created
+            - transcribe queue message to publish after commit, when applicable
         """
         # Check if video already exists
         result = await self.session.execute(
@@ -285,7 +298,7 @@ class BatchService:
             if video.processing_status == "completed":
                 batch.pending_count -= 1
                 batch.succeeded_count += 1
-            return (False, False)
+            return (False, False, None)
 
         # Fetch video metadata
         video_metadata = await self._fetch_video_metadata(youtube_video_id)
@@ -350,32 +363,39 @@ class BatchService:
             self.session.add(ai_job)
             ai_job_released = ai_quota_status == "released"
 
-        # Only dispatch to queue if released (not quota_queued)
+        transcribe_message: dict[str, Any] | None = None
+        # Only dispatch to queue if released (not quota_queued), after DB commit.
         if quota_status == "released":
+            transcribe_message = {
+                "job_id": str(job.job_id),
+                "video_id": str(video.video_id),
+                "youtube_video_id": youtube_video_id,
+                "channel_name": channel.name,
+                "batch_id": str(batch.batch_id),
+                "correlation_id": correlation_id,
+                "processing_mode": processing_mode.value,
+            }
+
+        return (quota_status == "released", ai_job_released, transcribe_message)
+
+    def _dispatch_transcribe_messages(self, messages: list[dict[str, Any]]) -> None:
+        """Publish transcribe jobs only after their database rows are committed."""
+        if not messages:
+            return
+
+        queue_client = get_queue_client()
+        for message in messages:
             try:
-                queue_client = get_queue_client()
                 queue_client.send_message(
                     TRANSCRIBE_QUEUE,
-                    inject_trace_context(
-                        {
-                            "job_id": str(job.job_id),
-                            "video_id": str(video.video_id),
-                            "youtube_video_id": youtube_video_id,
-                            "channel_name": channel.name,
-                            "batch_id": str(batch.batch_id),
-                            "correlation_id": correlation_id,
-                            "processing_mode": processing_mode.value,
-                        }
-                    ),
+                    inject_trace_context(message),
                 )
             except Exception as e:
                 logger.warning(
                     "Failed to queue job",
-                    job_id=str(job.job_id),
+                    job_id=message.get("job_id"),
                     error=str(e),
                 )
-
-        return (quota_status == "released", ai_job_released)
 
     async def _fetch_video_metadata(self, youtube_video_id: str) -> dict:
         """Fetch video metadata from YouTube using yt-dlp.

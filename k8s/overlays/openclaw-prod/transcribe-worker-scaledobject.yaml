@@ -11,7 +11,7 @@ spec:
   pollingInterval: 30
   cooldownPeriod: 300
   minReplicaCount: 1
-  maxReplicaCount: 5
+  maxReplicaCount: 8
   triggers:
     - type: azure-queue
       metadata:

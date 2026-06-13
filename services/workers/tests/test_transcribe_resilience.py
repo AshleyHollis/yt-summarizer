@@ -199,6 +199,32 @@ class TestFetchTranscriptRetry:
             with pytest.raises(RateLimitError):
                 await worker._fetch_transcript_with_timestamps_and_text("test_video_id")
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "error_message",
+        [
+            "ERROR: [youtube] abc123: Sign in to confirm you're not a bot.",
+            "ERROR: [youtube] abc123: Sign in to confirm your age.",
+            "ERROR: [youtube] abc123: Use --cookies-from-browser or --cookies.",
+            "Tunnel connection failed: 402 Payment Required",
+        ],
+    )
+    async def test_auth_and_proxy_failures_stay_retryable(self, worker, error_message):
+        """Bot checks, auth prompts, and proxy billing failures are not no-caption results."""
+        import yt_dlp
+
+        from transcribe.worker import RateLimitError
+
+        with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+            mock_ydl.__exit__ = MagicMock(return_value=False)
+            mock_ydl.extract_info.side_effect = yt_dlp.utils.DownloadError(error_message)
+            mock_ydl_class.return_value = mock_ydl
+
+            with pytest.raises(RateLimitError):
+                await worker._fetch_transcript_with_timestamps_and_text("test_video_id")
+
 
 class TestWorkerResultOnInvalidContent:
     """Tests for worker behavior when content is invalid."""
