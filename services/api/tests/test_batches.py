@@ -196,7 +196,7 @@ class TestBatchServiceCreate:
             processing_mode="transcript_only",
         )
         service = BatchService(session)
-        service._create_batch_item = AsyncMock(return_value=(True, False))
+        service._create_batch_item = AsyncMock(return_value=(True, False, None))
 
         with patch("api.services.batch_service.record_usage", new=AsyncMock()):
             response = await service.create_batch(
@@ -212,6 +212,56 @@ class TestBatchServiceCreate:
         assert service._create_batch_item.await_args.kwargs["processing_mode"] == (
             ProcessingMode.TRANSCRIPT_ONLY
         )
+
+    @pytest.mark.asyncio
+    async def test_create_batch_dispatches_transcribe_messages_after_commit(
+        self, sample_youtube_video_ids
+    ):
+        """Regression: workers must not see queued jobs before SQL commit."""
+        from api.models.batch import CreateBatchRequest
+        from api.services.batch_service import BatchService
+
+        events = []
+        session = MagicMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+
+        async def commit():
+            events.append("commit")
+
+        def dispatch(messages):
+            events.append("dispatch")
+            assert messages == [{"job_id": "job-1"}]
+
+        def assign_batch_defaults():
+            batch = session.add.call_args.args[0]
+            batch.batch_id = uuid4()
+            batch.status = "pending"
+            batch.created_at = datetime.now(UTC)
+            batch.updated_at = batch.created_at
+
+        session.flush.side_effect = assign_batch_defaults
+        session.commit = AsyncMock(side_effect=commit)
+
+        request = CreateBatchRequest(
+            name="Transcript Only Batch",
+            video_ids=[sample_youtube_video_ids[0]],
+            processing_mode="transcript_only",
+        )
+        service = BatchService(session)
+        service._create_batch_item = AsyncMock(return_value=(True, False, {"job_id": "job-1"}))
+        service._dispatch_transcribe_messages = MagicMock(side_effect=dispatch)
+
+        with patch("api.services.batch_service.record_usage", new=AsyncMock()):
+            await service.create_batch(
+                request,
+                correlation_id="test-correlation",
+                user_id=None,
+                transcript_quota_slots=1,
+                ai_features_quota_slots=None,
+            )
+
+        assert events == ["commit", "dispatch"]
 
     @pytest.mark.asyncio
     async def test_fetch_video_metadata_uses_proxy_log_contract(self):

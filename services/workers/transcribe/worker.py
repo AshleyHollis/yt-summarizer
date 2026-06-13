@@ -32,6 +32,19 @@ logger = get_logger(__name__)
 
 # Maximum length for content to be considered an error page when combined with other signals
 MAX_ERROR_PAGE_LENGTH = 1000
+RETRYABLE_YOUTUBE_ERROR_PHRASES = (
+    "429",
+    "too many",
+    "rate",
+    "block",
+    "ip",
+    "sign in to confirm",
+    "not a bot",
+    "cookies",
+    "age",
+    "payment required",
+    "unable to connect to proxy",
+)
 
 
 class RateLimitError(Exception):
@@ -630,9 +643,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 raise  # Re-raise rate limit errors
             except yt_dlp.utils.DownloadError as e:
                 error_str = str(e)
-                if any(
-                    phrase in error_str.lower() for phrase in ["429", "too many", "rate", "block"]
-                ):
+                if any(phrase in error_str.lower() for phrase in RETRYABLE_YOUTUBE_ERROR_PHRASES):
                     raise RateLimitError(
                         "YouTube is blocking requests from this IP. This may take hours to resolve."
                     )
@@ -640,10 +651,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 return None, None
             except Exception as e:
                 error_str = str(e)
-                if any(
-                    phrase in error_str.lower()
-                    for phrase in ["429", "too many", "rate", "block", "ip"]
-                ):
+                if any(phrase in error_str.lower() for phrase in RETRYABLE_YOUTUBE_ERROR_PHRASES):
                     raise RateLimitError(
                         "YouTube is blocking requests from this IP. This may take hours to resolve."
                     )
