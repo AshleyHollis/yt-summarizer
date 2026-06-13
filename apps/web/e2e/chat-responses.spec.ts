@@ -1,4 +1,5 @@
 import { test, expect, BrowserContext } from '@playwright/test';
+import * as fs from 'fs';
 import * as path from 'path';
 import {
   submitQuery,
@@ -28,20 +29,28 @@ import {
  * These tests use multiple assertions per test for efficiency.
  */
 
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
+
 test.describe('Chat Response Quality', () => {
+  test.skip(
+    () => !fs.existsSync(userAuthFile),
+    'Auth0 user credentials not configured - chat response tests require authenticated copilot API access'
+  );
+
   // Each test gets a fresh browser context so CopilotKit in-memory thread state
   // never accumulates across tests. This avoids client-generated thread IDs
   // (server should own thread ID generation) and prevents history bloat
   // that causes progressive LLM prompt growth and timeout failures.
-  let context: BrowserContext;
+  let context: BrowserContext | undefined;
   let page: import('@playwright/test').Page;
 
   test.beforeEach(async ({ browser }) => {
     // Fresh context per test (prevents CopilotKit thread state accumulation),
     // but must include auth state so the copilot API calls succeed.
     context = await browser.newContext({
+      baseURL: process.env.BASE_URL || 'http://localhost:3000',
       viewport: { width: 1280, height: 720 },
-      storageState: path.join(__dirname, '../playwright/.auth/user.json'),
+      storageState: userAuthFile,
     });
     page = await context.newPage();
     await page.goto('/library?chat=open', { waitUntil: 'commit' });
@@ -50,7 +59,7 @@ test.describe('Chat Response Quality', () => {
   });
 
   test.afterEach(async () => {
-    await context.close();
+    await context?.close();
   });
 
   test('push-up query returns accurate content with proper citations', async ({}, testInfo) => {
@@ -281,6 +290,11 @@ test.describe('Chat Response Quality', () => {
 });
 
 test.describe('Chat Edge Cases', () => {
+  test.skip(
+    () => !fs.existsSync(userAuthFile),
+    'Auth0 user credentials not configured - chat edge-case tests require authenticated copilot API access'
+  );
+
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // Navigate with chat=open to have the sidebar open by default

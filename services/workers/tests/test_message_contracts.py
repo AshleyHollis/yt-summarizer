@@ -281,6 +281,26 @@ class TestWorkerMessageOptionalFields:
                 f"{type(worker).__name__} has wrong default retry_count"
             )
 
+    def test_processing_mode_defaults_and_parses_for_ai_pipeline_workers(self, minimal_api_message):
+        """Transcribe, summarize, and embed workers preserve processing_mode."""
+        from embed.worker import EmbedWorker
+        from summarize.worker import SummarizeWorker
+        from transcribe.worker import TranscribeWorker
+
+        workers = [TranscribeWorker(), SummarizeWorker(), EmbedWorker()]
+
+        for worker in workers:
+            default_message = worker.parse_message(minimal_api_message)
+            assert default_message.processing_mode == "full_analysis"
+
+            transcript_only_message = worker.parse_message(
+                {
+                    **minimal_api_message,
+                    "processing_mode": "transcript_only",
+                }
+            )
+            assert transcript_only_message.processing_mode == "transcript_only"
+
 
 # ============================================================================
 # Message Schema Tests - Missing Required Fields

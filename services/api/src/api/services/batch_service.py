@@ -43,6 +43,11 @@ except ImportError:
     ProxyService = None  # type: ignore[assignment,misc]
 
 
+from ..dependencies.quota import (
+    AI_FEATURES_OPERATION,
+    TRANSCRIPT_EXTRACT_OPERATION,
+    record_usage,
+)
 from ..models.batch import (
     BatchDetailResponse,
     BatchItemStatus,
@@ -56,6 +61,7 @@ from ..models.batch import (
     BatchItem as BatchItemResponse,
 )
 from ..models.job import JobStage, JobStatus, JobType
+from ..models.processing import ProcessingMode
 from .channel_service import ChannelService
 from .youtube_service import get_youtube_service
 
@@ -86,7 +92,8 @@ class BatchService:
         request: CreateBatchRequest,
         correlation_id: str,
         user_id: str | None = None,
-        quota_slots: int | None = None,
+        transcript_quota_slots: int | None = None,
+        ai_features_quota_slots: int | None = None,
     ) -> BatchResponse:
         """Create a batch for video ingestion.
 
@@ -94,15 +101,19 @@ class BatchService:
             request: Batch creation request.
             correlation_id: Request correlation ID.
             user_id: Optional user ID for quota tracking.
-            quota_slots: Number of videos to dispatch immediately (rest queued).
-                         None means all dispatch immediately (no quota enforcement).
+            transcript_quota_slots: Number of transcript jobs to dispatch immediately.
+                None means unlimited.
+            ai_features_quota_slots: Number of AI feature jobs to reserve immediately.
+                None means unlimited.
         """
+        processing_mode = request.processing_mode
         logger.info(
             "Creating batch",
             name=request.name,
             video_count=len(request.video_ids),
             ingest_all=request.ingest_all,
             channel_id=str(request.channel_id) if request.channel_id else None,
+            processing_mode=processing_mode.value,
         )
 
         # Collect video IDs to ingest
@@ -138,6 +149,7 @@ class BatchService:
         batch = Batch(
             channel_id=channel.channel_id if channel else None,
             name=request.name,
+            processing_mode=processing_mode.value,
             total_count=len(video_ids_to_ingest),
             pending_count=len(video_ids_to_ingest),
             running_count=0,
@@ -148,25 +160,55 @@ class BatchService:
         await self.session.flush()
 
         # Process each video (quota-aware dispatching)
-        dispatched_count = 0
+        transcript_released_count = 0
+        ai_released_count = 0
         for youtube_video_id in video_ids_to_ingest:
             # Determine quota status for this job
-            if quota_slots is not None and dispatched_count >= quota_slots:
-                job_quota_status = "quota_queued"
+            if (
+                transcript_quota_slots is not None
+                and transcript_released_count >= transcript_quota_slots
+            ):
+                transcript_quota_status = "quota_queued"
             else:
-                job_quota_status = "released"
+                transcript_quota_status = "released"
+
+            ai_quota_status = "released"
+            if processing_mode == ProcessingMode.FULL_ANALYSIS:
+                if transcript_quota_status != "released" or (
+                    ai_features_quota_slots is not None
+                    and ai_released_count >= ai_features_quota_slots
+                ):
+                    ai_quota_status = "quota_queued"
 
             try:
-                await self._create_batch_item(
+                transcript_released, ai_released = await self._create_batch_item(
                     batch=batch,
                     youtube_video_id=youtube_video_id,
                     correlation_id=correlation_id,
                     channel=channel,
                     user_id=user_id,
-                    quota_status=job_quota_status,
+                    quota_status=transcript_quota_status,
+                    ai_quota_status=ai_quota_status,
+                    processing_mode=processing_mode,
                 )
-                if job_quota_status == "released":
-                    dispatched_count += 1
+                if transcript_released:
+                    transcript_released_count += 1
+                    if user_id:
+                        await record_usage(
+                            self.session,
+                            user_id,
+                            TRANSCRIPT_EXTRACT_OPERATION,
+                            youtube_video_id,
+                        )
+                if ai_released:
+                    ai_released_count += 1
+                    if user_id:
+                        await record_usage(
+                            self.session,
+                            user_id,
+                            AI_FEATURES_OPERATION,
+                            youtube_video_id,
+                        )
             except Exception as e:
                 logger.warning(
                     "Failed to create batch item",
@@ -187,6 +229,7 @@ class BatchService:
             id=batch.batch_id,
             name=batch.name or "",
             channel_name=channel.name if channel else None,
+            processing_mode=ProcessingMode(batch.processing_mode),
             status=self._compute_batch_status(batch),
             total_count=batch.total_count,
             pending_count=batch.pending_count,
@@ -205,7 +248,9 @@ class BatchService:
         channel: Channel | None,
         user_id: str | None = None,
         quota_status: str = "released",
-    ) -> None:
+        ai_quota_status: str = "released",
+        processing_mode: ProcessingMode = ProcessingMode.FULL_ANALYSIS,
+    ) -> tuple[bool, bool]:
         """Create a batch item for a single video.
 
         Args:
@@ -215,6 +260,11 @@ class BatchService:
             channel: Optional channel for the video.
             user_id: Optional user ID for quota tracking.
             quota_status: "released" to dispatch now, "quota_queued" to hold.
+            ai_quota_status: AI features quota status for the held summarize job.
+            processing_mode: Requested processing depth.
+
+        Returns:
+            Tuple of (released_transcript_job_created, released_ai_job_created).
         """
         # Check if video already exists
         result = await self.session.execute(
@@ -235,7 +285,7 @@ class BatchService:
             if video.processing_status == "completed":
                 batch.pending_count -= 1
                 batch.succeeded_count += 1
-            return
+            return (False, False)
 
         # Fetch video metadata
         video_metadata = await self._fetch_video_metadata(youtube_video_id)
@@ -279,9 +329,26 @@ class BatchService:
             correlation_id=correlation_id,
             user_id=user_id,
             quota_status=quota_status,
+            processing_mode=processing_mode.value,
         )
         self.session.add(job)
         await self.session.flush()
+
+        ai_job_released = False
+        if processing_mode == ProcessingMode.FULL_ANALYSIS:
+            ai_job = Job(
+                video_id=video.video_id,
+                batch_id=batch.batch_id,
+                job_type=JobType.SUMMARIZE.value,
+                stage=JobStage.QUEUED.value,
+                status=JobStatus.PENDING.value,
+                correlation_id=correlation_id,
+                user_id=user_id,
+                quota_status=ai_quota_status,
+                processing_mode=processing_mode.value,
+            )
+            self.session.add(ai_job)
+            ai_job_released = ai_quota_status == "released"
 
         # Only dispatch to queue if released (not quota_queued)
         if quota_status == "released":
@@ -297,6 +364,7 @@ class BatchService:
                             "channel_name": channel.name,
                             "batch_id": str(batch.batch_id),
                             "correlation_id": correlation_id,
+                            "processing_mode": processing_mode.value,
                         }
                     ),
                 )
@@ -306,6 +374,8 @@ class BatchService:
                     job_id=str(job.job_id),
                     error=str(e),
                 )
+
+        return (quota_status == "released", ai_job_released)
 
     async def _fetch_video_metadata(self, youtube_video_id: str) -> dict:
         """Fetch video metadata from YouTube using yt-dlp.
@@ -505,6 +575,7 @@ class BatchService:
             id=batch.batch_id,
             name=batch.name or "",
             channel_name=batch.channel.name if batch.channel else None,
+            processing_mode=ProcessingMode(batch.processing_mode),
             status=self._compute_batch_status(batch),
             total_count=batch.total_count,
             pending_count=batch.pending_count,
@@ -520,12 +591,18 @@ class BatchService:
         self,
         batch_id: UUID,
         correlation_id: str,
+        user_id: str | None = None,
+        transcript_quota_slots: int | None = None,
+        ai_features_quota_slots: int | None = None,
     ) -> BatchRetryResponse:
         """Retry all failed items in a batch.
 
         Args:
             batch_id: Batch ID.
             correlation_id: Request correlation ID.
+            user_id: Optional user ID for quota tracking.
+            transcript_quota_slots: Number of transcript retry jobs to dispatch immediately.
+            ai_features_quota_slots: Number of AI feature retry jobs to reserve immediately.
 
         Returns:
             BatchRetryResponse with retry info.
@@ -559,9 +636,29 @@ class BatchService:
                 message="No failed items to retry",
             )
 
+        processing_mode = ProcessingMode(batch.processing_mode)
+
         # Reset failed items to pending and queue jobs
         retried_count = 0
+        transcript_released_count = 0
+        ai_released_count = 0
         for item in failed_items:
+            if (
+                transcript_quota_slots is not None
+                and transcript_released_count >= transcript_quota_slots
+            ):
+                transcript_quota_status = "quota_queued"
+            else:
+                transcript_quota_status = "released"
+
+            ai_quota_status = "released"
+            if processing_mode == ProcessingMode.FULL_ANALYSIS:
+                if transcript_quota_status != "released" or (
+                    ai_features_quota_slots is not None
+                    and ai_released_count >= ai_features_quota_slots
+                ):
+                    ai_quota_status = "quota_queued"
+
             item.status = "pending"
             batch.failed_count -= 1
             batch.pending_count += 1
@@ -579,39 +676,80 @@ class BatchService:
                     stage=JobStage.QUEUED.value,
                     status=JobStatus.PENDING.value,
                     correlation_id=correlation_id,
+                    user_id=user_id,
+                    quota_status=transcript_quota_status,
+                    processing_mode=processing_mode.value,
                 )
                 self.session.add(job)
                 await self.session.flush()
 
-                # Queue job
-                try:
-                    # Get channel name for blob storage path
-                    channel_name = "unknown-channel"
-                    if item.video.channel:
-                        channel_name = item.video.channel.name
-                    elif batch.channel:
-                        channel_name = batch.channel.name
+                if processing_mode == ProcessingMode.FULL_ANALYSIS:
+                    ai_job = Job(
+                        video_id=item.video_id,
+                        batch_id=batch_id,
+                        job_type=JobType.SUMMARIZE.value,
+                        stage=JobStage.QUEUED.value,
+                        status=JobStatus.PENDING.value,
+                        correlation_id=correlation_id,
+                        user_id=user_id,
+                        quota_status=ai_quota_status,
+                        processing_mode=processing_mode.value,
+                    )
+                    self.session.add(ai_job)
 
-                    queue_client = get_queue_client()
-                    queue_client.send_message(
-                        TRANSCRIBE_QUEUE,
-                        inject_trace_context(
-                            {
-                                "job_id": str(job.job_id),
-                                "video_id": str(item.video_id),
-                                "youtube_video_id": item.video.youtube_video_id,
-                                "channel_name": channel_name,
-                                "batch_id": str(batch_id),
-                                "correlation_id": correlation_id,
-                            }
-                        ),
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "Failed to queue retry job",
-                        job_id=str(job.job_id),
-                        error=str(e),
-                    )
+                if transcript_quota_status == "released":
+                    transcript_released_count += 1
+                    if user_id:
+                        await record_usage(
+                            self.session,
+                            user_id,
+                            TRANSCRIPT_EXTRACT_OPERATION,
+                            str(item.video_id),
+                        )
+                if (
+                    processing_mode == ProcessingMode.FULL_ANALYSIS
+                    and ai_quota_status == "released"
+                ):
+                    ai_released_count += 1
+                    if user_id:
+                        await record_usage(
+                            self.session,
+                            user_id,
+                            AI_FEATURES_OPERATION,
+                            str(item.video_id),
+                        )
+
+                # Queue job
+                if transcript_quota_status == "released":
+                    try:
+                        # Get channel name for blob storage path
+                        channel_name = "unknown-channel"
+                        if item.video.channel:
+                            channel_name = item.video.channel.name
+                        elif batch.channel:
+                            channel_name = batch.channel.name
+
+                        queue_client = get_queue_client()
+                        queue_client.send_message(
+                            TRANSCRIBE_QUEUE,
+                            inject_trace_context(
+                                {
+                                    "job_id": str(job.job_id),
+                                    "video_id": str(item.video_id),
+                                    "youtube_video_id": item.video.youtube_video_id,
+                                    "channel_name": channel_name,
+                                    "batch_id": str(batch_id),
+                                    "correlation_id": correlation_id,
+                                    "processing_mode": processing_mode.value,
+                                }
+                            ),
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to queue retry job",
+                            job_id=str(job.job_id),
+                            error=str(e),
+                        )
 
             retried_count += 1
 
@@ -628,6 +766,9 @@ class BatchService:
         batch_id: UUID,
         video_id: UUID,
         correlation_id: str,
+        user_id: str | None = None,
+        transcript_quota_slots: int | None = None,
+        ai_features_quota_slots: int | None = None,
     ) -> BatchRetryResponse:
         """Retry a single failed item in a batch.
 
@@ -635,6 +776,9 @@ class BatchService:
             batch_id: Batch ID.
             video_id: Video ID to retry.
             correlation_id: Request correlation ID.
+            user_id: Optional user ID for quota tracking.
+            transcript_quota_slots: Number of transcript retry jobs to dispatch immediately.
+            ai_features_quota_slots: Number of AI feature retry jobs to reserve immediately.
 
         Returns:
             BatchRetryResponse with retry info.
@@ -674,6 +818,21 @@ class BatchService:
                 message="Video is not in failed state",
             )
 
+        processing_mode = ProcessingMode(batch.processing_mode)
+        transcript_quota_status = (
+            "quota_queued"
+            if transcript_quota_slots is not None and transcript_quota_slots <= 0
+            else "released"
+        )
+        ai_quota_status = "released"
+        if processing_mode == ProcessingMode.FULL_ANALYSIS:
+            if (
+                transcript_quota_status != "released"
+                or ai_features_quota_slots is not None
+                and ai_features_quota_slots <= 0
+            ):
+                ai_quota_status = "quota_queued"
+
         # Reset item to pending
         item.status = "pending"
         batch.failed_count -= 1
@@ -692,39 +851,77 @@ class BatchService:
                 stage=JobStage.QUEUED.value,
                 status=JobStatus.PENDING.value,
                 correlation_id=correlation_id,
+                user_id=user_id,
+                quota_status=transcript_quota_status,
+                processing_mode=processing_mode.value,
             )
             self.session.add(job)
             await self.session.flush()
 
-            # Queue job
-            try:
-                # Get channel name for blob storage path
-                channel_name = "unknown-channel"
-                if item.video.channel:
-                    channel_name = item.video.channel.name
-                elif batch.channel:
-                    channel_name = batch.channel.name
+            if processing_mode == ProcessingMode.FULL_ANALYSIS:
+                ai_job = Job(
+                    video_id=item.video_id,
+                    batch_id=batch_id,
+                    job_type=JobType.SUMMARIZE.value,
+                    stage=JobStage.QUEUED.value,
+                    status=JobStatus.PENDING.value,
+                    correlation_id=correlation_id,
+                    user_id=user_id,
+                    quota_status=ai_quota_status,
+                    processing_mode=processing_mode.value,
+                )
+                self.session.add(ai_job)
 
-                queue_client = get_queue_client()
-                queue_client.send_message(
-                    TRANSCRIBE_QUEUE,
-                    inject_trace_context(
-                        {
-                            "job_id": str(job.job_id),
-                            "video_id": str(item.video_id),
-                            "youtube_video_id": item.video.youtube_video_id,
-                            "channel_name": channel_name,
-                            "batch_id": str(batch_id),
-                            "correlation_id": correlation_id,
-                        }
-                    ),
+            if transcript_quota_status == "released" and user_id:
+                await record_usage(
+                    self.session,
+                    user_id,
+                    TRANSCRIPT_EXTRACT_OPERATION,
+                    str(item.video_id),
                 )
-            except Exception as e:
-                logger.warning(
-                    "Failed to queue retry job",
-                    job_id=str(job.job_id),
-                    error=str(e),
+            if (
+                processing_mode == ProcessingMode.FULL_ANALYSIS
+                and ai_quota_status == "released"
+                and user_id
+            ):
+                await record_usage(
+                    self.session,
+                    user_id,
+                    AI_FEATURES_OPERATION,
+                    str(item.video_id),
                 )
+
+            # Queue job
+            if transcript_quota_status == "released":
+                try:
+                    # Get channel name for blob storage path
+                    channel_name = "unknown-channel"
+                    if item.video.channel:
+                        channel_name = item.video.channel.name
+                    elif batch.channel:
+                        channel_name = batch.channel.name
+
+                    queue_client = get_queue_client()
+                    queue_client.send_message(
+                        TRANSCRIBE_QUEUE,
+                        inject_trace_context(
+                            {
+                                "job_id": str(job.job_id),
+                                "video_id": str(item.video_id),
+                                "youtube_video_id": item.video.youtube_video_id,
+                                "channel_name": channel_name,
+                                "batch_id": str(batch_id),
+                                "correlation_id": correlation_id,
+                                "processing_mode": processing_mode.value,
+                            }
+                        ),
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to queue retry job",
+                        job_id=str(job.job_id),
+                        error=str(e),
+                    )
 
         await self.session.commit()
 
@@ -740,6 +937,7 @@ class BatchService:
             id=batch.batch_id,
             name=batch.name or "",
             channel_name=batch.channel.name if batch.channel else None,
+            processing_mode=ProcessingMode(batch.processing_mode),
             status=self._compute_batch_status(batch),
             total_count=batch.total_count,
             pending_count=batch.pending_count,

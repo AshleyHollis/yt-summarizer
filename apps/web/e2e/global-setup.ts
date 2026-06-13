@@ -482,6 +482,25 @@ async function waitForVideoProcessing(): Promise<boolean> {
   return false;
 }
 
+async function hasExistingCoverage(): Promise<boolean> {
+  try {
+    const coverageResponse = await fetch(`${API_URL}/api/v1/copilot/coverage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    if (!coverageResponse.ok) {
+      return false;
+    }
+
+    const coverage = await coverageResponse.json();
+    return (coverage.videoCount || 0) > 0 || (coverage.segmentCount || 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Warm up the SWA (Static Web App) preview environment.
  *
@@ -636,8 +655,11 @@ async function globalSetup(_config: FullConfig) {
 
   console.log(`[global-setup] Done: ${submitted} submitted, ${skipped} skipped, ${failed} failed`);
 
+  const allSeedingSkippedDueToAuth =
+    submitted === 0 && skipped === ALL_TEST_VIDEOS.length && failed === 0;
+
   // If all videos were skipped due to auth, log a clear message
-  if (submitted === 0 && skipped === ALL_TEST_VIDEOS.length) {
+  if (allSeedingSkippedDueToAuth) {
     console.log(
       '[global-setup] All seeding skipped (auth gates active). Checking existing video coverage...'
     );
@@ -654,12 +676,19 @@ async function globalSetup(_config: FullConfig) {
     return;
   }
 
-  // Monitor batch progress with detailed queue/ETA tracking
-  if (videoIds.size > 0) {
-    await monitorBatchProgress(videoIds);
+  if (allSeedingSkippedDueToAuth && videoIds.size === 0 && !(await hasExistingCoverage())) {
+    console.log(
+      '[global-setup] No existing coverage found after auth-gated seeding. ' +
+        'Continuing immediately; content-dependent tests will skip.'
+    );
   } else {
-    // Fallback to simple wait if we couldn't get video IDs
-    await waitForVideoProcessing();
+    // Monitor batch progress with detailed queue/ETA tracking
+    if (videoIds.size > 0) {
+      await monitorBatchProgress(videoIds);
+    } else {
+      // Fallback to simple wait if we couldn't get video IDs
+      await waitForVideoProcessing();
+    }
   }
 
   // Warm up the CopilotKit agent endpoint.

@@ -110,6 +110,7 @@ if ($Component -eq 'detect') {
         }
     } catch {
         Write-Host "Could not detect changes (git error) - running full tests" -ForegroundColor Yellow
+        $Component = 'all'
     }
 }
 
@@ -138,13 +139,59 @@ function Add-TestResult {
         Status = $Status
     }
 
-    if ($Failed -gt 0) {
+    if ($Status -eq "FAIL") {
         $script:allPassed = $false
         $script:failures += @{
             Suite = $Suite
             Output = $FailureOutput
         }
     }
+}
+
+function Test-YtApiEndpoint {
+    param(
+        [string]$ApiUrl = "http://localhost:8000"
+    )
+
+    try {
+        $health = Invoke-RestMethod -Uri "$($ApiUrl.TrimEnd('/'))/health" -TimeoutSec 5 -ErrorAction Stop
+        return $health.checks.api -eq $true -and
+            $null -ne $health.checks.database -and
+            $null -ne $health.checks.blob_storage -and
+            $null -ne $health.checks.queue_storage
+    } catch {
+        return $false
+    }
+}
+
+function Test-YtWebEndpoint {
+    param(
+        [string]$BaseUrl = "http://localhost:3000"
+    )
+
+    try {
+        $response = Invoke-WebRequest -Uri "$($BaseUrl.TrimEnd('/'))/sign-in" -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+        return $response.Content -match "YT Summarizer" -or $response.Content -match "YouTube Summarizer"
+    } catch {
+        return $false
+    }
+}
+
+function Get-UrlPort {
+    param(
+        [string]$Url,
+        [int]$Fallback
+    )
+
+    try {
+        $uri = [System.Uri]$Url
+        if ($uri.Port -gt 0) {
+            return $uri.Port
+        }
+    } catch {
+        return $Fallback
+    }
+    return $Fallback
 }
 
 function Write-FailureLog {
@@ -170,6 +217,17 @@ function Write-FailureLog {
 }
 
 function Get-PythonExe {
+    param(
+        [string]$ComponentPath = $null
+    )
+
+    if ($ComponentPath) {
+        $componentPython = Join-Path $ComponentPath ".venv\Scripts\python.exe"
+        if (Test-Path $componentPython) {
+            return $componentPython
+        }
+    }
+
     $venvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
     if (Test-Path $venvPython) {
         return $venvPython
@@ -177,31 +235,65 @@ function Get-PythonExe {
     return "python"
 }
 
+function Get-PytestCount {
+    param(
+        [string]$Output,
+        [string]$Label
+    )
+
+    $matches = [regex]::Matches($Output, "(\d+) $Label")
+    if ($matches.Count -gt 0) {
+        return [int]$matches[$matches.Count - 1].Groups[1].Value
+    }
+    return 0
+}
+
 function Test-Api {
     Write-Host "[API] Running API Tests..." -ForegroundColor Yellow
-    Push-Location "$repoRoot\services\api"
-    $pythonExe = Get-PythonExe
-    $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
-    $passMatch = [regex]::Match($output, "(\d+) passed")
-    $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
-    $failMatch = [regex]::Match($output, "(\d+) failed")
-    $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
+    $componentPath = Join-Path $repoRoot "services\api"
+    Push-Location $componentPath
+    $pythonExe = Get-PythonExe $componentPath
+
+    $passed = 0
+    $failed = 0
+    $skipped = 0
+    $failureOutput = ""
+    $testFiles = Get-ChildItem -Path "tests" -Filter "test_*.py" | Sort-Object Name
+
+    foreach ($testFile in $testFiles) {
+        Write-Host "  [API] $($testFile.Name)" -ForegroundColor Cyan
+        $output = & $pythonExe -m pytest $testFile.FullName -q --tb=short 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
+        $filePassed = Get-PytestCount -Output $output -Label "passed"
+        $fileFailed = Get-PytestCount -Output $output -Label "failed"
+        $fileSkipped = Get-PytestCount -Output $output -Label "skipped"
+
+        $passed += $filePassed
+        $failed += $fileFailed
+        $skipped += $fileSkipped
+
+        if ($exitCode -ne 0 -or $fileFailed -gt 0) {
+            $failureOutput = $output
+            break
+        }
+    }
     Pop-Location
 
     return [PSCustomObject]@{
         Suite = "API"
         Passed = $passed
         Failed = $failed
-        Skipped = 0
+        Skipped = $skipped
         Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
-        FailureOutput = if ($failed -gt 0) { $output } else { "" }
+        FailureOutput = if ($failed -gt 0 -or $passed -eq 0) { $failureOutput } else { "" }
     }
 }
 
 function Test-Workers {
     Write-Host "[WORKERS] Running Worker Tests..." -ForegroundColor Yellow
-    Push-Location "$repoRoot\services\workers"
-    $pythonExe = Get-PythonExe
+    $componentPath = Join-Path $repoRoot "services\workers"
+    Push-Location $componentPath
+    $pythonExe = Get-PythonExe $componentPath
     $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
     $passMatch = [regex]::Match($output, "(\d+) passed")
     $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
@@ -215,15 +307,15 @@ function Test-Workers {
         Failed = $failed
         Skipped = 0
         Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
-        FailureOutput = if ($failed -gt 0) { $output } else { "" }
+        FailureOutput = if ($failed -gt 0 -or $passed -eq 0) { $output } else { "" }
     }
 }
 
 function Test-Shared {
     Write-Host "[SHARED] Running Shared Package Tests..." -ForegroundColor Yellow
-    Push-Location "$repoRoot\services\shared"
-    $pythonExe = Get-PythonExe
-    $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
+    $componentPath = Join-Path $repoRoot "services\shared"
+    Push-Location $componentPath
+    $output = & uv run --extra dev pytest tests/ -v 2>&1 | Out-String
     $passMatch = [regex]::Match($output, "(\d+) passed")
     $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
     $failMatch = [regex]::Match($output, "(\d+) failed")
@@ -236,7 +328,7 @@ function Test-Shared {
         Failed = $failed
         Skipped = 0
         Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
-        FailureOutput = if ($failed -gt 0) { $output } else { "" }
+        FailureOutput = if ($failed -gt 0 -or $passed -eq 0) { $output } else { "" }
     }
 }
 
@@ -261,36 +353,80 @@ function Test-Web {
         Failed = $failed
         Skipped = 0
         Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
-        FailureOutput = if ($failed -gt 0) { $output } else { "" }
+        FailureOutput = if ($failed -gt 0 -or $passed -eq 0) { $output } else { "" }
     }
 }
 
 function Test-E2E {
     $startTime = Get-Date
     Write-Host "[E2E] Running E2E Tests (Playwright)..." -ForegroundColor Yellow
+    $apiUrl = if ($env:API_URL) { $env:API_URL } else { "http://localhost:8000" }
+    $baseUrl = if ($env:BASE_URL) { $env:BASE_URL } else { "http://localhost:3000" }
+    $env:API_URL = $apiUrl
+    $env:BASE_URL = $baseUrl
+    $env:NEXT_PUBLIC_API_URL = $apiUrl
+    $env:API_PORT = "$(Get-UrlPort -Url $apiUrl -Fallback 8000)"
+    $env:WEB_PORT = "$(Get-UrlPort -Url $baseUrl -Fallback 3000)"
+    $env:API_BASE_URL = $apiUrl
 
-    # Check if Aspire is running by testing the API endpoint
-    $aspireRunning = $false
-    try {
-        $null = Invoke-RestMethod -Uri "http://localhost:8000/health" -TimeoutSec 5 -ErrorAction Stop
-        $aspireRunning = $true
-    } catch {
-        $aspireRunning = $false
-    }
+    # Check if Aspire is running by testing a YT Summarizer-specific endpoint.
+    # A generic /health probe can be satisfied by another local app on port 8000.
+    $aspireRunning = Test-YtApiEndpoint -ApiUrl $apiUrl
 
     if ($aspireRunning -eq $false) {
         Write-Host "  [WARN] Aspire not running - starting it..." -ForegroundColor Yellow
         # Use the wrapper script if available
         $aspireCmd = Join-Path $repoRoot "tools\aspire.cmd"
         if (Test-Path $aspireCmd) {
-            & $aspireCmd run
+            Start-Process -FilePath $aspireCmd -ArgumentList "run" -WorkingDirectory $repoRoot -WindowStyle Hidden
         } else {
             Push-Location "$repoRoot\services\aspire\AppHost"
             Start-Process -FilePath "dotnet" -ArgumentList "run" -WindowStyle Hidden
             Pop-Location
         }
-        Write-Host "  Waiting 45 seconds for services to start..." -ForegroundColor Yellow
-        Start-Sleep -Seconds 45
+        $startupTimeoutSeconds = 180
+        $deadline = (Get-Date).AddSeconds($startupTimeoutSeconds)
+        Write-Host "  Waiting up to $startupTimeoutSeconds seconds for services to start..." -ForegroundColor Yellow
+        do {
+            $apiReady = Test-YtApiEndpoint -ApiUrl $apiUrl
+            $webReady = Test-YtWebEndpoint -BaseUrl $baseUrl
+            if ($apiReady -and $webReady) {
+                break
+            }
+            Start-Sleep -Seconds 5
+        } while ((Get-Date) -lt $deadline)
+    }
+
+    if (-not (Test-YtApiEndpoint -ApiUrl $apiUrl)) {
+        $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
+        $message = "YT Summarizer API is not available at $apiUrl. " +
+            "Stop any other service using that port or start Aspire before running E2E."
+        Write-Host "  [FAIL] E2E Tests: $message" -ForegroundColor Red
+        return [PSCustomObject]@{
+            Suite = "E2E"
+            Passed = 0
+            Failed = 1
+            Skipped = 0
+            Status = "FAIL"
+            FailureOutput = $message
+            Duration = $duration
+        }
+    }
+
+    if (-not (Test-YtWebEndpoint -BaseUrl $baseUrl)) {
+        $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
+        $message = "YT Summarizer web app is not available at $baseUrl. " +
+            "Stop any other service using that port or start Aspire before running E2E."
+        Write-Host "  [FAIL] E2E Tests: $message" -ForegroundColor Red
+        return [PSCustomObject]@{
+            Suite = "E2E"
+            Passed = 0
+            Failed = 1
+            Skipped = 0
+            Status = "FAIL"
+            FailureOutput = $message
+            Duration = $duration
+        }
     }
 
     Push-Location "$repoRoot\apps\web"
@@ -333,218 +469,42 @@ $runE2E = ($SkipE2E -eq $false) -and ($Component -eq 'all' -or $Component -eq 'e
 
 switch ($Component) {
     'all' {
-        # Run unit/integration tests in parallel
-        Write-Host "Running unit/integration tests in parallel..." -ForegroundColor Yellow
+        Write-Host "Running unit/integration tests sequentially with fail-fast..." -ForegroundColor Yellow
 
-        # Define script blocks for parallel execution
-        $sharedScript = {
-            param($repoRoot)
-            $startTime = Get-Date
-            Write-Host "[SHARED] Running Shared Package Tests..." -ForegroundColor Yellow
-            Push-Location "$repoRoot\services\shared"
-            $pythonExe = if (Test-Path "$repoRoot\.venv\Scripts\python.exe") { "$repoRoot\.venv\Scripts\python.exe" } else { "python" }
-            $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
-            $passMatch = [regex]::Match($output, "(\d+) passed")
-            $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
-            $failMatch = [regex]::Match($output, "(\d+) failed")
-            $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
-            Pop-Location
+        $testSteps = @(
+            @{ Name = "API"; Run = { Test-Api } },
+            @{ Name = "Shared"; Run = { Test-Shared } },
+            @{ Name = "Workers"; Run = { Test-Workers } },
+            @{ Name = "Frontend"; Run = { Test-Web } }
+        )
 
-            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
-            if ($failed -eq 0 -and $passed -gt 0) {
-                Write-Host "  [PASS] Shared Tests: $passed passed in ${duration}s" -ForegroundColor Green
-            } else {
-                Write-Host "  [FAIL] Shared Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
+        foreach ($step in $testSteps) {
+            if (-not $script:allPassed) {
+                Write-Host "[$($step.Name)] Skipped because an earlier layer failed" -ForegroundColor Yellow
+                $script:results += [PSCustomObject]@{
+                    Suite = $step.Name
+                    Passed = 0
+                    Failed = 0
+                    Skipped = 0
+                    Status = "SKIPPED"
+                }
+                continue
             }
 
-            return [PSCustomObject]@{
-                Suite = "Shared"
-                Passed = $passed
-                Failed = $failed
-                Skipped = 0
-                Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
-                FailureOutput = if ($failed -gt 0) { $output } else { "" }
-                Duration = $duration
-            }
-        }
-
-        $workersScript = {
-            param($repoRoot)
-            $startTime = Get-Date
-            Write-Host "[WORKERS] Running Worker Tests..." -ForegroundColor Yellow
-            Push-Location "$repoRoot\services\workers"
-            $pythonExe = if (Test-Path "$repoRoot\.venv\Scripts\python.exe") { "$repoRoot\.venv\Scripts\python.exe" } else { "python" }
-
-            # Try to use pytest-xdist if available for parallel execution
-            $xdistAvailable = $false
-            try {
-                & $pythonExe -c "import pytest_xdist" 2>$null
-                $xdistAvailable = $true
-            } catch {}
-
-            if ($xdistAvailable) {
-                Write-Host "  Using pytest-xdist for parallel test execution" -ForegroundColor Cyan
-                $output = & $pythonExe -m pytest -n auto tests/ -v --tb=short 2>&1 | Out-String
-            } else {
-                Write-Host "  Installing pytest-xdist for parallel execution..." -ForegroundColor Yellow
-                & $pythonExe -m pip install pytest-xdist --quiet 2>$null
-                try {
-                    & $pythonExe -c "import pytest_xdist" 2>$null
-                    Write-Host "  Using pytest-xdist for parallel test execution" -ForegroundColor Cyan
-                    $output = & $pythonExe -m pytest -n auto tests/ -v --tb=short 2>&1 | Out-String
-                } catch {
-                    Write-Host "  pytest-xdist installation failed, running sequentially" -ForegroundColor Yellow
-                    $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
+            $result = & $step.Run
+            if ($result.Status -eq "FAIL") {
+                $script:allPassed = $false
+                $script:failures += @{
+                    Suite = $result.Suite
+                    Output = $result.FailureOutput
                 }
             }
-
-            $passMatch = [regex]::Match($output, "(\d+) passed")
-            $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
-            $failMatch = [regex]::Match($output, "(\d+) failed")
-            $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
-            Pop-Location
-
-            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
-            if ($failed -eq 0 -and $passed -gt 0) {
-                Write-Host "  [PASS] Worker Tests: $passed passed in ${duration}s" -ForegroundColor Green
-            } else {
-                Write-Host "  [FAIL] Worker Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
-            }
-
-            return [PSCustomObject]@{
-                Suite = "Workers"
-                Passed = $passed
-                Failed = $failed
-                Skipped = 0
-                Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
-                FailureOutput = if ($failed -gt 0) { $output } else { "" }
-                Duration = $duration
-            }
+            $script:results += $result
         }
 
-        $apiScript = {
-            param($repoRoot)
-            $startTime = Get-Date
-            Write-Host "[API] Running API Tests..." -ForegroundColor Yellow
-            Push-Location "$repoRoot\services\api"
-            $pythonExe = if (Test-Path "$repoRoot\.venv\Scripts\python.exe") { "$repoRoot\.venv\Scripts\python.exe" } else { "python" }
-
-            # Try to use pytest-xdist if available for parallel execution
-            $xdistAvailable = $false
-            try {
-                & $pythonExe -c "import pytest_xdist" 2>$null
-                $xdistAvailable = $true
-            } catch {}
-
-            if ($xdistAvailable) {
-                Write-Host "  Using pytest-xdist for parallel test execution" -ForegroundColor Cyan
-                $output = & $pythonExe -m pytest -n auto tests/ -v --tb=short 2>&1 | Out-String
-            } else {
-                Write-Host "  Installing pytest-xdist for parallel execution..." -ForegroundColor Yellow
-                & $pythonExe -m pip install pytest-xdist --quiet 2>$null
-                try {
-                    & $pythonExe -c "import pytest_xdist" 2>$null
-                    Write-Host "  Using pytest-xdist for parallel test execution" -ForegroundColor Cyan
-                    $output = & $pythonExe -m pytest -n auto tests/ -v --tb=short 2>&1 | Out-String
-                } catch {
-                    Write-Host "  pytest-xdist installation failed, running sequentially" -ForegroundColor Yellow
-                    $output = & $pythonExe -m pytest tests/ -v 2>&1 | Out-String
-                }
-            }
-
-            $passMatch = [regex]::Match($output, "(\d+) passed")
-            $passed = if ($passMatch.Success) { [int]$passMatch.Groups[1].Value } else { 0 }
-            $failMatch = [regex]::Match($output, "(\d+) failed")
-            $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
-            Pop-Location
-
-            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
-            if ($failed -eq 0 -and $passed -gt 0) {
-                Write-Host "  [PASS] API Tests: $passed passed in ${duration}s" -ForegroundColor Green
-            } else {
-                Write-Host "  [FAIL] API Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
-            }
-
-            return [PSCustomObject]@{
-                Suite = "API"
-                Passed = $passed
-                Failed = $failed
-                Skipped = 0
-                Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
-                FailureOutput = if ($failed -gt 0) { $output } else { "" }
-                Duration = $duration
-            }
-        }
-
-        $webScript = {
-            param($repoRoot)
-            $startTime = Get-Date
-            Write-Host "[WEB] Running Frontend Tests (Vitest)..." -ForegroundColor Yellow
-            Push-Location "$repoRoot\apps\web"
-            $output = npm run test:run 2>&1 | Out-String
-            $allPassedMatches = [regex]::Matches($output, "(\d+) passed")
-            $passed = if ($allPassedMatches.Count -ge 2) {
-                [int]$allPassedMatches[$allPassedMatches.Count - 1].Groups[1].Value
-            } elseif ($allPassedMatches.Count -eq 1) {
-                [int]$allPassedMatches[0].Groups[1].Value
-            } else { 0 }
-            $failMatch = [regex]::Match($output, "(\d+) failed")
-            $failed = if ($failMatch.Success) { [int]$failMatch.Groups[1].Value } else { 0 }
-            Pop-Location
-
-            $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
-            if ($failed -eq 0 -and $passed -gt 0) {
-                Write-Host "  [PASS] Frontend Tests: $passed passed in ${duration}s" -ForegroundColor Green
-            } else {
-                Write-Host "  [FAIL] Frontend Tests: $failed failed, $passed passed in ${duration}s" -ForegroundColor Red
-            }
-
-            return [PSCustomObject]@{
-                Suite = "Frontend"
-                Passed = $passed
-                Failed = $failed
-                Skipped = 0
-                Status = if ($failed -eq 0 -and $passed -gt 0) { "PASS" } else { "FAIL" }
-                FailureOutput = if ($failed -gt 0) { $output } else { "" }
-                Duration = $duration
-            }
-        }
-
-        $jobs = @()
-        $jobs += Start-Job -ScriptBlock $sharedScript -ArgumentList $repoRoot -Name "Shared"
-        $jobs += Start-Job -ScriptBlock $workersScript -ArgumentList $repoRoot -Name "Workers"
-        $jobs += Start-Job -ScriptBlock $apiScript -ArgumentList $repoRoot -Name "API"
-        $jobs += Start-Job -ScriptBlock $webScript -ArgumentList $repoRoot -Name "Web"
-
-        # Wait for all jobs to complete and show results progressively
-        $completedJobs = @{}
-        while ($jobs.Count -gt 0) {
-            $finishedJobs = $jobs | Where-Object { $_.State -eq 'Completed' }
-            foreach ($job in $finishedJobs) {
-                $result = Receive-Job -Job $job
-                $completedJobs[$job.Name] = $result
-                $jobs = $jobs | Where-Object { $_.Id -ne $job.Id }
-                Remove-Job -Job $job
-
-                # Add to results
-                if ($result.Failed -gt 0) {
-                    $script:allPassed = $false
-                    $script:failures += @{
-                        Suite = $result.Suite
-                        Output = $result.FailureOutput
-                    }
-                }
-                $script:results += $result
-            }
-
-            if ($finishedJobs.Count -eq 0) {
-                Start-Sleep -Milliseconds 500  # Wait a bit before checking again
-            }
-        }
-        # Run E2E tests sequentially after unit tests
-        if ($runE2E) {
+        if ($runE2E -and $script:allPassed) {
             $e2eResult = Test-E2E
-            if ($e2eResult.Failed -gt 0) {
+            if ($e2eResult.Status -eq "FAIL") {
                 $script:allPassed = $false
                 $script:failures += @{
                     Suite = $e2eResult.Suite
@@ -552,6 +512,15 @@ switch ($Component) {
                 }
             }
             $script:results += $e2eResult
+        } elseif ($runE2E) {
+            $script:results += [PSCustomObject]@{
+                Suite = "E2E"
+                Passed = 0
+                Failed = 0
+                Skipped = 0
+                Status = "SKIPPED"
+            }
+            Write-Host "[E2E] Skipped because an earlier layer failed" -ForegroundColor Yellow
         } else {
             $script:results += [PSCustomObject]@{
                 Suite = "E2E"
@@ -562,10 +531,11 @@ switch ($Component) {
             }
             Write-Host "[E2E] Skipped (use without -SkipE2E to include)" -ForegroundColor Yellow
         }
+
     }
     'api' {
         $result = Test-Api
-        if ($result.Failed -gt 0) {
+        if ($result.Status -eq "FAIL") {
             $script:allPassed = $false
             $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
         }
@@ -573,7 +543,7 @@ switch ($Component) {
     }
     'workers' {
         $result = Test-Workers
-        if ($result.Failed -gt 0) {
+        if ($result.Status -eq "FAIL") {
             $script:allPassed = $false
             $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
         }
@@ -581,7 +551,7 @@ switch ($Component) {
     }
     'shared' {
         $result = Test-Shared
-        if ($result.Failed -gt 0) {
+        if ($result.Status -eq "FAIL") {
             $script:allPassed = $false
             $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
         }
@@ -589,7 +559,7 @@ switch ($Component) {
     }
     'web' {
         $result = Test-Web
-        if ($result.Failed -gt 0) {
+        if ($result.Status -eq "FAIL") {
             $script:allPassed = $false
             $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
         }
@@ -597,11 +567,50 @@ switch ($Component) {
     }
     'e2e' {
         $result = Test-E2E
-        if ($result.Failed -gt 0) {
+        if ($result.Status -eq "FAIL") {
             $script:allPassed = $false
             $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
         }
         $script:results += $result
+    }
+    default {
+        $components = $Component -split ',' | Where-Object { $_ -in @('api','workers','shared','web','e2e') }
+        foreach ($detectedComponent in $components) {
+            switch ($detectedComponent) {
+                'api' {
+                    $result = Test-Api
+                }
+                'workers' {
+                    $result = Test-Workers
+                }
+                'shared' {
+                    $result = Test-Shared
+                }
+                'web' {
+                    $result = Test-Web
+                }
+                'e2e' {
+                    if ($script:allPassed) {
+                        $result = Test-E2E
+                    } else {
+                        $result = [PSCustomObject]@{
+                            Suite = "E2E"
+                            Passed = 0
+                            Failed = 0
+                            Skipped = 0
+                            Status = "SKIPPED"
+                        }
+                        Write-Host "[E2E] Skipped because earlier tests failed" -ForegroundColor Yellow
+                    }
+                }
+            }
+
+            if ($result.Status -eq "FAIL") {
+                $script:allPassed = $false
+                $script:failures += @{ Suite = $result.Suite; Output = $result.FailureOutput }
+            }
+            $script:results += $result
+        }
     }
 }
 

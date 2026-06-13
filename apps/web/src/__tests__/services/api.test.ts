@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { api, ApiClientError, videoApi, jobApi, healthApi } from '@/services/api';
+import { api, ApiClientError, adminBackupApi, healthApi, jobApi, videoApi } from '@/services/api';
 
 describe('API Client', () => {
   beforeEach(() => {
@@ -126,11 +126,9 @@ describe('API Client', () => {
         json: async () => ({
           video_id: '123',
           youtube_video_id: 'abc',
-          title: 'Test',
-          channel: { channel_id: '1', name: 'Test', youtube_channel_id: 'UC123' },
-          processing_status: 'pending',
-          submitted_at: new Date().toISOString(),
-          jobs_queued: 1,
+          job_id: 'job-123',
+          status: 'pending',
+          message: 'Video submitted for processing',
         }),
       } as Response);
 
@@ -277,6 +275,40 @@ describe('API Client', () => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining('/health/ready'),
         expect.any(Object)
+      );
+    });
+  });
+
+  describe('adminBackupApi', () => {
+    it('getStatus calls GET /api/v1/admin/backups/status', async () => {
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ latest_run: null }),
+      } as Response);
+
+      await adminBackupApi.getStatus();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/admin/backups/status'),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('listRuns includes the limit query parameter', async () => {
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({ runs: [], total: 0 }),
+      } as Response);
+
+      await adminBackupApi.listRuns(12);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/api\/v1\/admin\/backups\/runs\?.*limit=12/),
+        expect.objectContaining({ method: 'GET' })
       );
     });
   });

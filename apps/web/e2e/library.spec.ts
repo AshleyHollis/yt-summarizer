@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 import { getSeededVideoId } from './helpers';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
+const hasUserAuthState = () => fs.existsSync(userAuthFile);
 
 /**
  * E2E Tests for User Story 3: Browse the Library
@@ -47,7 +51,18 @@ test.describe('User Story 3: Browse the Library', () => {
       await expect(page.locator('label[for="sort-by"]')).toBeVisible();
     });
 
-    test('library page fetches and displays videos', async ({ page }) => {
+    test('library page fetches and displays videos', async ({ page, request }) => {
+      const statsResponse = await request.get(`${API_URL}/api/v1/library/stats`, {
+        headers: { 'X-Correlation-ID': 'e2e-library-display-precheck' },
+      });
+      if (statsResponse.ok()) {
+        const stats = await statsResponse.json();
+        if ((stats.total_videos || 0) === 0) {
+          test.skip(true, 'No videos available in local library');
+          return;
+        }
+      }
+
       await page.goto('/library');
 
       // Wait for loading to finish (loading skeleton or actual content)
@@ -187,8 +202,18 @@ test.describe('User Story 3: Browse the Library', () => {
       await expect(toDate).toBeVisible();
 
       // Set date range
-      await fromDate.fill('2024-01-01');
-      await toDate.fill('2024-12-31');
+      await fromDate.evaluate((input, value) => {
+        const element = input as HTMLInputElement;
+        element.value = value;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      }, '2024-01-01');
+      await toDate.evaluate((input, value) => {
+        const element = input as HTMLInputElement;
+        element.value = value;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      }, '2024-12-31');
 
       // Verify values
       await expect(fromDate).toHaveValue('2024-01-01');
@@ -333,6 +358,11 @@ test.describe('User Story 3: Browse the Library', () => {
   });
 
   test.describe('Video Detail from Library', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - video detail library tests use user auth state'
+    );
+
     // Force user.json for both chromium and chromium-admin — these tests make direct API
     // calls (request fixture) and browser page calls that behave consistently with user
     // auth. Admin sessions can return different API responses or have expired role claims
@@ -586,6 +616,10 @@ test.describe('User Story 3: Browse the Library', () => {
 
     // Force user.json for both chromium and chromium-admin — same reasoning as
     // Video Detail from Library above.
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - summary verification tests use user auth state'
+    );
     test.use({ storageState: 'playwright/.auth/user.json' });
 
     let sharedVideoId: string | null = null;

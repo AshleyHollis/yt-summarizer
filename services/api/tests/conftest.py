@@ -72,7 +72,7 @@ def app(mock_session):
     from shared.db.connection import get_session
 
     from api.middleware import CorrelationIdMiddleware
-    from api.routes import batches, channels, copilot, health, jobs, library, threads, videos
+    from api.routes import admin, batches, channels, copilot, health, jobs, library, threads, videos
 
     @asynccontextmanager
     async def mock_lifespan(app: FastAPI):
@@ -110,6 +110,7 @@ def app(mock_session):
     application.include_router(batches.router)
     application.include_router(copilot.router)
     application.include_router(threads.router)
+    application.include_router(admin.router)
 
     # Override the database session dependency
     async def mock_get_session():

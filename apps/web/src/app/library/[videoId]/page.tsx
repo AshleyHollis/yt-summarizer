@@ -20,7 +20,7 @@ import JobProgress from '@/components/JobProgress';
 import ProcessingHistory from '@/components/ProcessingHistory';
 import TranscriptViewer from '@/components/TranscriptViewer';
 import type { VideoDetailResponse } from '@/services/api';
-import { libraryApi, videoApi } from '@/services/api';
+import { ApiClientError, libraryApi, videoApi } from '@/services/api';
 import { useVideoContext } from '@/app/providers';
 import { formatDuration } from '@/utils/formatDuration';
 
@@ -71,6 +71,11 @@ function TabButton({
  */
 function getStatusBadge(status: string): { className: string; label: string } {
   switch (status) {
+    case 'transcript_ready':
+      return {
+        className: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300',
+        label: 'Transcript ready',
+      };
     case 'completed':
       return {
         className: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
@@ -110,6 +115,7 @@ function getStatusBadge(status: string): { className: string; label: string } {
 function isProcessing(status: string): boolean {
   return [
     'pending',
+    'processing',
     'transcribing',
     'summarizing',
     'embedding',
@@ -132,6 +138,9 @@ export default function VideoDetailPage() {
   const [activeTab, setActiveTab] = useState<TabId>('summary');
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessError, setReprocessError] = useState<string | null>(null);
+  const [addingAiFeatures, setAddingAiFeatures] = useState(false);
+  const [aiFeatureMessage, setAiFeatureMessage] = useState<string | null>(null);
+  const [aiFeatureError, setAiFeatureError] = useState<string | null>(null);
 
   /**
    * Fetch video detail
@@ -142,6 +151,9 @@ export default function VideoDetailPage() {
       setError(null);
       const response = await libraryApi.getVideoDetail(videoId);
       setVideo(response);
+      if (!response.has_summary && response.has_transcript) {
+        setActiveTab('transcript');
+      }
 
       // Set the video context for the copilot to use
       setCurrentVideo({
@@ -177,6 +189,25 @@ export default function VideoDetailPage() {
     fetchVideo();
   };
 
+  const handleAddAiFeatures = async () => {
+    if (!video) return;
+
+    try {
+      setAddingAiFeatures(true);
+      setAiFeatureError(null);
+      const response = await videoApi.addAiFeatures(video.video_id);
+      setAiFeatureMessage(response.message);
+      await fetchVideo();
+    } catch (err) {
+      console.error('Failed to add AI features:', err);
+      setAiFeatureError(
+        err instanceof ApiClientError ? err.message : 'Failed to queue AI features.'
+      );
+    } finally {
+      setAddingAiFeatures(false);
+    }
+  };
+
   /**
    * Handle reprocessing a video - queues it for re-transcription
    */
@@ -199,14 +230,11 @@ export default function VideoDetailPage() {
 
   /**
    * Check if video should show reprocess button
-   * Shows for: failed, completed with no transcript, or completed with no summary
+   * Shows for: failed or completed with no transcript
    */
   const shouldShowReprocessButton = (videoData: VideoDetailResponse): boolean => {
     if (videoData.processing_status === 'failed') return true;
-    if (videoData.processing_status === 'completed') {
-      // Show if transcript or summary is missing
-      if (!videoData.summary || videoData.summary.trim() === '') return true;
-    }
+    if (videoData.processing_status === 'completed' && !videoData.has_transcript) return true;
     return false;
   };
 
@@ -252,9 +280,22 @@ export default function VideoDetailPage() {
     );
   }
 
-  const statusBadge = getStatusBadge(video.processing_status);
+  const displayStatus =
+    video.content_status === 'transcript_ready' ? video.content_status : video.processing_status;
+  const statusBadge = getStatusBadge(displayStatus);
   const thumbnailUrl =
     video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_video_id}/maxresdefault.jpg`;
+  const tabs: Tab[] = [
+    ...(video.has_summary
+      ? [{ id: 'summary' as TabId, label: 'Summary', icon: SparklesIcon }]
+      : []),
+    { id: 'description' as TabId, label: 'Description', icon: DocumentTextIcon },
+    ...(video.has_transcript
+      ? [{ id: 'transcript' as TabId, label: 'Transcript', icon: DocumentTextIcon }]
+      : []),
+    { id: 'history' as TabId, label: 'History', icon: ChartBarIcon },
+  ];
+  const selectedTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : tabs[0].id;
 
   return (
     <main className="min-h-screen bg-gray-100 dark:bg-[#0f0f0f]">
@@ -290,8 +331,9 @@ export default function VideoDetailPage() {
                 <PlayIcon className="h-8 w-8 ml-1" />
               </div>
             </a>
-            {/* Status badge - only show if not completed (per design system) */}
-            {video.processing_status !== 'completed' && (
+            {/* Status badge - show non-completed states and transcript-only readiness */}
+            {(video.processing_status !== 'completed' ||
+              video.content_status === 'transcript_ready') && (
               <span
                 className={`absolute top-4 right-4 rounded-full px-3 py-1 text-sm font-medium ${statusBadge.className}`}
               >
@@ -348,7 +390,7 @@ export default function VideoDetailPage() {
                     <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                       {video.processing_status === 'failed'
                         ? 'The video may have been rate-limited by YouTube or encountered another error. You can try reprocessing it.'
-                        : 'This video is missing a transcript or summary. Reprocessing will attempt to fetch and generate the missing content.'}
+                        : 'This video is missing a transcript. Reprocessing will attempt to fetch the missing content.'}
                     </p>
                     {reprocessError && (
                       <p className="text-sm text-red-600 dark:text-red-400 mt-2">
@@ -367,6 +409,45 @@ export default function VideoDetailPage() {
                 </div>
               </div>
             )}
+
+            {video.has_transcript &&
+              !video.has_ai_features &&
+              !isProcessing(video.processing_status) &&
+              !aiFeatureMessage && (
+                <div className="mt-6 p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                  <div className="flex items-start gap-3">
+                    <SparklesIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">
+                        AI features are not enabled for this video
+                      </p>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        Add the summary, semantic search, and relationships package when you need
+                        deeper analysis.
+                      </p>
+                      {aiFeatureError && (
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                          {aiFeatureError}
+                        </p>
+                      )}
+                      <button
+                        onClick={handleAddAiFeatures}
+                        disabled={addingAiFeatures}
+                        className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <SparklesIcon className="h-4 w-4" />
+                        {addingAiFeatures ? 'Queueing AI features...' : 'Add AI features'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            {aiFeatureMessage && (
+              <div className="mt-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
+                <p className="text-sm text-blue-800 dark:text-blue-200">{aiFeatureMessage}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -377,23 +458,16 @@ export default function VideoDetailPage() {
           </div>
         )}
 
-        {/* Tab Navigation (only show when completed) */}
-        {video.processing_status === 'completed' && (
+        {/* Tab Navigation */}
+        {(video.processing_status === 'completed' || video.has_transcript) && (
           <div className="mt-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 overflow-hidden">
             {/* Tab Headers */}
             <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
-              {(
-                [
-                  { id: 'summary' as TabId, label: 'Summary', icon: SparklesIcon },
-                  { id: 'description' as TabId, label: 'Description', icon: DocumentTextIcon },
-                  { id: 'transcript' as TabId, label: 'Transcript', icon: DocumentTextIcon },
-                  { id: 'history' as TabId, label: 'History', icon: ChartBarIcon },
-                ] as Tab[]
-              ).map((tab) => (
+              {tabs.map((tab) => (
                 <TabButton
                   key={tab.id}
                   tab={tab}
-                  isActive={activeTab === tab.id}
+                  isActive={selectedTab === tab.id}
                   onClick={() => setActiveTab(tab.id)}
                 />
               ))}
@@ -402,7 +476,7 @@ export default function VideoDetailPage() {
             {/* Tab Content */}
             <div className="p-6">
               {/* Summary Tab */}
-              {activeTab === 'summary' && (
+              {selectedTab === 'summary' && (
                 <div>
                   {video.summary ? (
                     <MarkdownRenderer content={video.summary} variant="summary" />
@@ -415,7 +489,7 @@ export default function VideoDetailPage() {
               )}
 
               {/* Description Tab */}
-              {activeTab === 'description' && (
+              {selectedTab === 'description' && (
                 <div className="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                   {video.description ? (
                     <DescriptionRenderer content={video.description} />
@@ -428,7 +502,7 @@ export default function VideoDetailPage() {
               )}
 
               {/* Transcript Tab */}
-              {activeTab === 'transcript' && (
+              {selectedTab === 'transcript' && (
                 <TranscriptViewer
                   transcriptUrl={`/api/v1/videos/${video.video_id}/transcript`}
                   videoTitle={video.title}
@@ -436,7 +510,7 @@ export default function VideoDetailPage() {
               )}
 
               {/* History Tab */}
-              {activeTab === 'history' && <ProcessingHistory videoId={video.video_id} />}
+              {selectedTab === 'history' && <ProcessingHistory videoId={video.video_id} />}
             </div>
           </div>
         )}

@@ -50,6 +50,7 @@ class TranscribeMessage:
     correlation_id: str
     channel_name: str = "unknown-channel"
     batch_id: str | None = None
+    processing_mode: str = "full_analysis"
     retry_count: int = 0
 
 
@@ -147,6 +148,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             correlation_id=raw_message.get("correlation_id", "unknown"),
             channel_name=raw_message.get("channel_name", "unknown-channel"),
             batch_id=raw_message.get("batch_id"),
+            processing_mode=raw_message.get("processing_mode", "full_analysis"),
             retry_count=raw_message.get("retry_count", 0),
         )
 
@@ -300,6 +302,17 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
 
             # Mark job as completed
             await mark_job_completed(message.job_id)
+
+            if message.processing_mode == "transcript_only":
+                logger.info(
+                    "Transcript-only job completed; skipping AI feature queue",
+                    job_id=message.job_id,
+                    video_id=message.video_id,
+                )
+                return WorkerResult.success(
+                    message="Transcript extracted successfully",
+                    data={"transcript_length": len(transcript), "blob_uri": blob_uri},
+                )
 
             # Queue next job (summarize)
             await self._queue_next_job(message, correlation_id)
@@ -918,19 +931,42 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         """Queue the next job (summarize)."""
         from uuid import UUID
 
+        from sqlalchemy import select
+
         db = get_db()
         async with db.session() as session:
-            # Create summarize job
-            job = Job(
-                video_id=UUID(message.video_id),
-                batch_id=UUID(message.batch_id) if message.batch_id else None,
-                job_type="summarize",
-                stage="queued",
-                status="pending",
-                correlation_id=correlation_id,
+            result = await session.execute(
+                select(Job)
+                .where(
+                    Job.video_id == UUID(message.video_id),
+                    Job.job_type == "summarize",
+                    Job.status == "pending",
+                )
+                .order_by(Job.created_at.asc())
             )
-            session.add(job)
-            await session.flush()
+            job = result.scalars().first()
+
+            if job is None:
+                job = Job(
+                    video_id=UUID(message.video_id),
+                    batch_id=UUID(message.batch_id) if message.batch_id else None,
+                    job_type="summarize",
+                    stage="queued",
+                    status="pending",
+                    correlation_id=correlation_id,
+                    processing_mode=message.processing_mode,
+                )
+                session.add(job)
+                await session.flush()
+
+            if job.quota_status != "released":
+                logger.info(
+                    "Summarize job is waiting for AI features quota",
+                    job_id=str(job.job_id),
+                    video_id=message.video_id,
+                    quota_status=job.quota_status,
+                )
+                return
 
             # Queue the job
             queue_client = get_queue_client()
@@ -941,6 +977,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                     "youtube_video_id": message.youtube_video_id,
                     "channel_name": message.channel_name,
                     "correlation_id": correlation_id,
+                    "processing_mode": message.processing_mode,
                 }
             )
             if message.batch_id:

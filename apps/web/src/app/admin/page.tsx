@@ -129,6 +129,7 @@ export default function AdminDashboard() {
             actions={[
               { label: 'Processing Queue', href: '/admin/queue' },
               { label: 'Failed Jobs', href: '/admin/failed-jobs' },
+              { label: 'Backups', href: '/admin/backups' },
               { label: 'Processing Stats', href: '/admin/stats' },
             ]}
           />

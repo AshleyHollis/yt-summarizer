@@ -1,10 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useVideoSelection } from '@/contexts/VideoSelectionContext';
 import { useScope } from '@/app/providers';
-import { XMarkIcon, ChatBubbleLeftRightIcon, XCircleIcon } from '@heroicons/react/20/solid';
+import {
+  XMarkIcon,
+  ChatBubbleLeftRightIcon,
+  SparklesIcon,
+  XCircleIcon,
+} from '@heroicons/react/20/solid';
+import { videoApi } from '@/services/api';
 
 /**
  * Floating selection bar that appears when videos are selected
@@ -16,6 +23,8 @@ export function SelectionBar() {
   const { selectedVideos, removeFromSelection, clearSelection, exitSelectionMode } =
     useVideoSelection();
   const { setScope } = useScope();
+  const [isAddingAiFeatures, setIsAddingAiFeatures] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   if (selectedVideos.length === 0) {
     return null;
@@ -36,6 +45,29 @@ export function SelectionBar() {
 
   const handleClear = () => {
     clearSelection();
+    setActionMessage(null);
+  };
+
+  const eligibleForAiFeatures = selectedVideos.filter(
+    (video) => video.has_transcript && !video.has_ai_features
+  );
+
+  const handleAddAiFeatures = async () => {
+    if (eligibleForAiFeatures.length === 0) return;
+
+    setIsAddingAiFeatures(true);
+    setActionMessage(null);
+    const results = await Promise.allSettled(
+      eligibleForAiFeatures.map((video) => videoApi.addAiFeatures(video.video_id))
+    );
+    const succeeded = results.filter((result) => result.status === 'fulfilled').length;
+    const failed = results.length - succeeded;
+    setActionMessage(
+      failed > 0
+        ? `${succeeded} queued, ${failed} failed`
+        : `${succeeded} AI feature ${succeeded === 1 ? 'job' : 'jobs'} queued`
+    );
+    setIsAddingAiFeatures(false);
   };
 
   // Show max 5 thumbnails, then "+X more"
@@ -104,6 +136,16 @@ export function SelectionBar() {
             <XCircleIcon className="w-4 h-4" />
             Clear
           </button>
+          {eligibleForAiFeatures.length > 0 && (
+            <button
+              onClick={handleAddAiFeatures}
+              disabled={isAddingAiFeatures}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shadow-lg shadow-blue-600/25"
+            >
+              <SparklesIcon className="w-4 h-4" />
+              {isAddingAiFeatures ? 'Queueing...' : 'Add AI features'}
+            </button>
+          )}
           <button
             onClick={handleChatWithSelected}
             className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-lg shadow-red-600/25"
@@ -112,6 +154,9 @@ export function SelectionBar() {
             Chat with selected
           </button>
         </div>
+        {actionMessage && (
+          <span className="pl-1 text-xs font-medium text-blue-200">{actionMessage}</span>
+        )}
       </div>
     </div>
   );

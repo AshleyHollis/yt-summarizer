@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload, selectinload
@@ -11,17 +11,25 @@ from sqlalchemy.orm import noload, selectinload
 # Import shared modules
 try:
     from shared.config import get_settings
-    from shared.db.models import Channel, Job, Video
+    from shared.db.models import Artifact, Channel, Job, Segment, Video
     from shared.logging.config import get_logger
     from shared.proxy import ProxyService
-    from shared.queue.client import TRANSCRIBE_QUEUE, get_queue_client
+    from shared.queue.client import (
+        EMBED_QUEUE,
+        RELATIONSHIPS_QUEUE,
+        SUMMARIZE_QUEUE,
+        TRANSCRIBE_QUEUE,
+        get_queue_client,
+    )
     from shared.telemetry.config import inject_trace_context
 except ImportError:
     # Fallback for development
     from typing import Any
 
     Channel = Any
+    Artifact = Any
     Job = Any
+    Segment = Any
     Video = Any
     ProxyService = None  # type: ignore[assignment,misc]
 
@@ -34,6 +42,9 @@ except ImportError:
         return logging.getLogger(name)
 
     TRANSCRIBE_QUEUE = "transcribe-jobs"
+    SUMMARIZE_QUEUE = "summarize-jobs"
+    EMBED_QUEUE = "embed-jobs"
+    RELATIONSHIPS_QUEUE = "relationships-jobs"
 
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
@@ -43,7 +54,9 @@ except ImportError:
 
 
 from ..models.job import JobStage, JobStatus, JobType
+from ..models.processing import ProcessingMode, normalize_processing_mode
 from ..models.video import (
+    AddAiFeaturesResponse,
     ChannelSummary,
     ProcessingStatus,
     SubmitVideoResponse,
@@ -113,6 +126,8 @@ class VideoService:
         correlation_id: str,
         user_id: str | None = None,
         quota_status: str = "released",
+        ai_quota_status: str = "released",
+        processing_mode: ProcessingMode | str = ProcessingMode.FULL_ANALYSIS,
     ) -> SubmitVideoResponse:
         """Submit a video for processing.
 
@@ -120,8 +135,14 @@ class VideoService:
             url: YouTube video URL.
             correlation_id: Request correlation ID.
             user_id: Optional user ID for quota tracking.
-            quota_status: "released" to dispatch now, "quota_queued" to hold.
+            quota_status: Transcript quota status. "released" dispatches now,
+                "quota_queued" holds the transcribe job.
+            ai_quota_status: AI features quota status for full-analysis requests.
+            processing_mode: Requested processing depth.
         """
+        mode = normalize_processing_mode(processing_mode)
+        mode_value = mode.value
+
         # Extract video ID from URL
         youtube_video_id = extract_youtube_video_id(url)
         if not youtube_video_id:
@@ -179,9 +200,24 @@ class VideoService:
                 estimated_wait_seconds=estimated_wait,
                 user_id=user_id,
                 quota_status=quota_status,
+                processing_mode=mode_value,
             )
             self.session.add(job)
             await self.session.flush()
+
+            if mode == ProcessingMode.FULL_ANALYSIS:
+                self.session.add(
+                    Job(
+                        video_id=existing_video.video_id,
+                        job_type=JobType.SUMMARIZE.value,
+                        stage=JobStage.QUEUED.value,
+                        status=JobStatus.PENDING.value,
+                        correlation_id=correlation_id,
+                        user_id=user_id,
+                        quota_status=ai_quota_status,
+                        processing_mode=mode_value,
+                    )
+                )
 
             if quota_status == "released":
                 try:
@@ -193,6 +229,7 @@ class VideoService:
                             "youtube_video_id": existing_video.youtube_video_id,
                             "channel_name": channel_name,
                             "correlation_id": correlation_id,
+                            "processing_mode": mode_value,
                         }
                     )
                     queue_client.send_message(TRANSCRIBE_QUEUE, message)
@@ -279,9 +316,24 @@ class VideoService:
             estimated_wait_seconds=estimated_wait,
             user_id=user_id,
             quota_status=quota_status,
+            processing_mode=mode_value,
         )
         self.session.add(job)
         await self.session.flush()  # Get job_id
+
+        if mode == ProcessingMode.FULL_ANALYSIS:
+            self.session.add(
+                Job(
+                    video_id=video.video_id,
+                    job_type=JobType.SUMMARIZE.value,
+                    stage=JobStage.QUEUED.value,
+                    status=JobStatus.PENDING.value,
+                    correlation_id=correlation_id,
+                    user_id=user_id,
+                    quota_status=ai_quota_status,
+                    processing_mode=mode_value,
+                )
+            )
 
         # Only dispatch to queue if released (not quota_queued)
         if quota_status == "released":
@@ -295,6 +347,7 @@ class VideoService:
                         "youtube_video_id": youtube_video_id,
                         "channel_name": channel.name,
                         "correlation_id": correlation_id,
+                        "processing_mode": mode_value,
                     }
                 )
                 queue_client.send_message(
@@ -418,6 +471,9 @@ class VideoService:
         video_id: UUID,
         stages: list[str] | None,
         correlation_id: str,
+        user_id: str | None = None,
+        quota_status: str = "released",
+        ai_quota_status: str = "released",
     ) -> SubmitVideoResponse:
         """Reprocess a video.
 
@@ -425,6 +481,9 @@ class VideoService:
             video_id: Video ID.
             stages: Specific stages to reprocess, or None for all.
             correlation_id: Request correlation ID.
+            user_id: Optional user ID for quota tracking.
+            quota_status: Transcript quota status when reprocessing from transcribe.
+            ai_quota_status: AI feature quota status for full-analysis work.
 
         Returns:
             SubmitVideoResponse with new job ID.
@@ -464,8 +523,12 @@ class VideoService:
                     start_stage = stage
                     break
 
+        initial_quota_status = (
+            quota_status if start_stage == JobType.TRANSCRIBE else ai_quota_status
+        )
+
         # Update video status
-        video.processing_status = "processing"
+        video.processing_status = "processing" if initial_quota_status == "released" else "pending"
         video.error_message = None
 
         # Create new job for the starting stage
@@ -475,26 +538,47 @@ class VideoService:
             stage=JobStage.QUEUED.value,
             status=JobStatus.PENDING.value,
             correlation_id=correlation_id,
+            user_id=user_id,
+            quota_status=initial_quota_status,
+            processing_mode=ProcessingMode.FULL_ANALYSIS.value,
         )
         self.session.add(job)
         await self.session.flush()
 
-        # Queue the job
-        queue_name = self._get_queue_for_job_type(start_stage)
-        try:
-            queue_client = get_queue_client()
-            queue_client.send_message(
-                queue_name,
-                {
-                    "job_id": str(job.job_id),
-                    "video_id": str(video.video_id),
-                    "youtube_video_id": video.youtube_video_id,
-                    "channel_name": channel_name,
-                    "correlation_id": correlation_id,
-                },
+        if start_stage == JobType.TRANSCRIBE:
+            held_ai_quota_status = (
+                ai_quota_status if initial_quota_status == "released" else "quota_queued"
             )
-        except Exception as e:
-            logger.warning("Failed to queue job", error=str(e))
+            ai_job = Job(
+                video_id=video.video_id,
+                job_type=JobType.SUMMARIZE.value,
+                stage=JobStage.QUEUED.value,
+                status=JobStatus.PENDING.value,
+                correlation_id=correlation_id,
+                user_id=user_id,
+                quota_status=held_ai_quota_status,
+                processing_mode=ProcessingMode.FULL_ANALYSIS.value,
+            )
+            self.session.add(ai_job)
+
+        # Queue the job
+        if initial_quota_status == "released":
+            queue_name = self._get_queue_for_job_type(start_stage)
+            try:
+                queue_client = get_queue_client()
+                queue_client.send_message(
+                    queue_name,
+                    {
+                        "job_id": str(job.job_id),
+                        "video_id": str(video.video_id),
+                        "youtube_video_id": video.youtube_video_id,
+                        "channel_name": channel_name,
+                        "correlation_id": correlation_id,
+                        "processing_mode": ProcessingMode.FULL_ANALYSIS.value,
+                    },
+                )
+            except Exception as e:
+                logger.warning("Failed to queue job", error=str(e))
 
         await self.session.commit()
 
@@ -502,8 +586,149 @@ class VideoService:
             video_id=video.video_id,
             youtube_video_id=video.youtube_video_id,
             job_id=job.job_id,
-            status=ProcessingStatus.PROCESSING,
-            message=f"Video reprocessing started from {start_stage.value}",
+            status=ProcessingStatus(video.processing_status),
+            message=(
+                f"Video reprocessing started from {start_stage.value}"
+                if initial_quota_status == "released"
+                else f"Video reprocessing quota queued from {start_stage.value}"
+            ),
+        )
+
+    async def add_ai_features(
+        self,
+        video_id: UUID,
+        correlation_id: str,
+        user_id: str | None = None,
+        quota_status: str = "released",
+    ) -> AddAiFeaturesResponse:
+        """Queue the missing AI feature package for a transcript-ready video.
+
+        This intentionally consumes only the AI features quota bucket. The transcript
+        already exists, so the first queued stage is the earliest missing AI stage.
+        """
+        result = await self.session.execute(
+            select(Video)
+            .options(
+                selectinload(Video.channel),
+                selectinload(Video.artifacts),
+                noload(Video.segments),
+                noload(Video.jobs),
+            )
+            .where(Video.video_id == video_id)
+        )
+        video = result.scalar_one_or_none()
+
+        if not video:
+            raise ValueError("Video not found")
+
+        artifact_types = {artifact.artifact_type for artifact in video.artifacts}
+        has_transcript = "transcript" in artifact_types
+        has_summary = "summary" in artifact_types
+
+        if not has_transcript:
+            raise ValueError("Transcript is not ready for this video")
+
+        active_job_result = await self.session.execute(
+            select(Job)
+            .where(
+                Job.video_id == video_id,
+                Job.job_type.in_(
+                    [
+                        JobType.SUMMARIZE.value,
+                        JobType.EMBED.value,
+                        JobType.BUILD_RELATIONSHIPS.value,
+                    ]
+                ),
+                Job.status.in_([JobStatus.PENDING.value, JobStatus.RUNNING.value]),
+            )
+            .order_by(Job.created_at.desc())
+            .limit(1)
+        )
+        active_job = active_job_result.scalar_one_or_none()
+        if active_job:
+            return AddAiFeaturesResponse(
+                video_id=video.video_id,
+                job_id=active_job.job_id,
+                status=ProcessingStatus(video.processing_status),
+                quota_status=active_job.quota_status,
+                message="AI features are already queued or processing",
+            )
+
+        segment_count_result = await self.session.execute(
+            select(func.count()).where(Segment.video_id == video_id)
+        )
+        segment_count = segment_count_result.scalar() or 0
+
+        if has_summary and segment_count > 0 and video.processing_status == "completed":
+            return AddAiFeaturesResponse(
+                video_id=video.video_id,
+                job_id=None,
+                status=ProcessingStatus(video.processing_status),
+                quota_status="not_needed",
+                message="AI features are already available",
+            )
+
+        if not has_summary:
+            start_stage = JobType.SUMMARIZE
+        elif segment_count == 0:
+            start_stage = JobType.EMBED
+        else:
+            start_stage = JobType.BUILD_RELATIONSHIPS
+
+        if quota_status == "released":
+            video.processing_status = "processing"
+        video.error_message = None
+
+        job = Job(
+            video_id=video.video_id,
+            job_type=start_stage.value,
+            stage=JobStage.QUEUED.value,
+            status=JobStatus.PENDING.value,
+            correlation_id=correlation_id,
+            user_id=user_id,
+            quota_status=quota_status,
+            processing_mode=ProcessingMode.FULL_ANALYSIS.value,
+        )
+        self.session.add(job)
+        await self.session.flush()
+
+        if quota_status == "released":
+            queue_name = self._get_queue_for_job_type(start_stage)
+            try:
+                queue_client = get_queue_client()
+                queue_client.send_message(
+                    queue_name,
+                    inject_trace_context(
+                        {
+                            "job_id": str(job.job_id),
+                            "video_id": str(video.video_id),
+                            "youtube_video_id": video.youtube_video_id,
+                            "channel_name": video.channel.name
+                            if video.channel
+                            else "unknown-channel",
+                            "correlation_id": correlation_id,
+                            "processing_mode": ProcessingMode.FULL_ANALYSIS.value,
+                        }
+                    ),
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to queue AI features job",
+                    job_id=str(job.job_id),
+                    job_type=start_stage.value,
+                    error=str(e),
+                )
+
+        await self.session.commit()
+
+        return AddAiFeaturesResponse(
+            video_id=video.video_id,
+            job_id=job.job_id,
+            status=ProcessingStatus(video.processing_status),
+            quota_status=quota_status,
+            message="AI features queued"
+            if quota_status == "released"
+            else "AI features quota queued",
         )
 
     async def delete_video(self, video_id: UUID) -> bool:

@@ -17,6 +17,12 @@ except ImportError:
 
 
 from ..dependencies.auth import AuthenticatedUser, require_auth
+from ..dependencies.quota import (
+    AI_FEATURES_OPERATION,
+    TRANSCRIPT_EXTRACT_OPERATION,
+    check_operation_quota,
+    get_or_create_user,
+)
 from ..middleware.correlation import get_correlation_id
 from ..models.batch import (
     BatchDetailResponse,
@@ -25,6 +31,7 @@ from ..models.batch import (
     BatchRetryResponse,
     CreateBatchRequest,
 )
+from ..models.processing import ProcessingMode
 from ..services.batch_service import BatchService
 
 router = APIRouter(prefix="/api/v1/batches", tags=["Batches"])
@@ -47,6 +54,7 @@ async def create_batch(
     body: CreateBatchRequest,
     user: AuthenticatedUser = Depends(require_auth),
     service: BatchService = Depends(get_batch_service),
+    session: AsyncSession = Depends(get_session),
 ) -> BatchResponse:
     """Create a batch for video ingestion.
 
@@ -55,9 +63,24 @@ async def create_batch(
     batch items, and queues transcription jobs.
     """
     correlation_id = get_correlation_id(request)
+    db_user = await get_or_create_user(session, user)
+
+    transcript_quota = await check_operation_quota(session, db_user, TRANSCRIPT_EXTRACT_OPERATION)
+    transcript_quota_slots = transcript_quota["remaining"]
+
+    ai_features_quota_slots = None
+    if body.processing_mode == ProcessingMode.FULL_ANALYSIS:
+        ai_features_quota = await check_operation_quota(session, db_user, AI_FEATURES_OPERATION)
+        ai_features_quota_slots = ai_features_quota["remaining"]
 
     try:
-        result = await service.create_batch(body, correlation_id)
+        result = await service.create_batch(
+            body,
+            correlation_id,
+            user_id=str(db_user.user_id),
+            transcript_quota_slots=transcript_quota_slots,
+            ai_features_quota_slots=ai_features_quota_slots,
+        )
         return result
     except ValueError as e:
         raise HTTPException(
@@ -191,15 +214,25 @@ async def retry_batch_failures(
     batch_id: UUID,
     user: AuthenticatedUser = Depends(require_auth),
     service: BatchService = Depends(get_batch_service),
+    session: AsyncSession = Depends(get_session),
 ) -> BatchRetryResponse:
     """Retry all failed items in a batch.
 
     Resets failed items to pending and queues new jobs.
     """
     correlation_id = get_correlation_id(request)
+    db_user = await get_or_create_user(session, user)
+    transcript_quota = await check_operation_quota(session, db_user, TRANSCRIPT_EXTRACT_OPERATION)
+    ai_features_quota = await check_operation_quota(session, db_user, AI_FEATURES_OPERATION)
 
     try:
-        result = await service.retry_failed_items(batch_id, correlation_id)
+        result = await service.retry_failed_items(
+            batch_id,
+            correlation_id,
+            user_id=str(db_user.user_id),
+            transcript_quota_slots=transcript_quota["remaining"],
+            ai_features_quota_slots=ai_features_quota["remaining"],
+        )
         return result
     except ValueError as e:
         raise HTTPException(
@@ -229,15 +262,26 @@ async def retry_batch_item(
     video_id: UUID,
     user: AuthenticatedUser = Depends(require_auth),
     service: BatchService = Depends(get_batch_service),
+    session: AsyncSession = Depends(get_session),
 ) -> BatchRetryResponse:
     """Retry a single failed item in a batch.
 
     Resets the item to pending and queues a new job.
     """
     correlation_id = get_correlation_id(request)
+    db_user = await get_or_create_user(session, user)
+    transcript_quota = await check_operation_quota(session, db_user, TRANSCRIPT_EXTRACT_OPERATION)
+    ai_features_quota = await check_operation_quota(session, db_user, AI_FEATURES_OPERATION)
 
     try:
-        result = await service.retry_single_item(batch_id, video_id, correlation_id)
+        result = await service.retry_single_item(
+            batch_id,
+            video_id,
+            correlation_id,
+            user_id=str(db_user.user_id),
+            transcript_quota_slots=transcript_quota["remaining"],
+            ai_features_quota_slots=ai_features_quota["remaining"],
+        )
         return result
     except ValueError as e:
         raise HTTPException(

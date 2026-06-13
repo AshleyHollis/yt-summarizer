@@ -17,6 +17,11 @@ on:
         required: false
         type: string
         default: infra/terraform/environments/prod
+      backup-worker-image-tag:
+        description: Worker image tag used by scheduled backup jobs
+        required: false
+        type: string
+        default: latest
       run-plan:
         description: Run terraform plan
         required: false
@@ -99,6 +104,7 @@ jobs:
       TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
       TF_VAR_azure_openai_deployment: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
       TF_VAR_azure_openai_embedding_deployment: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
+      TF_VAR_backup_worker_image_tag: ${{ inputs.backup-worker-image-tag }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
@@ -218,6 +224,7 @@ jobs:
       TF_VAR_azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
       TF_VAR_azure_openai_deployment: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
       TF_VAR_azure_openai_embedding_deployment: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
+      TF_VAR_backup_worker_image_tag: ${{ inputs.backup-worker-image-tag }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}

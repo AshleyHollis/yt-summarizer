@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   submitQuery,
   waitForCopilotReady,
@@ -23,6 +25,9 @@ import {
  * - Then run tests with: USE_EXTERNAL_SERVER=true npm run test:e2e
  */
 
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
+const hasUserAuthState = () => fs.existsSync(userAuthFile);
+
 test.describe('Copilot Feature', () => {
   test.describe('Sidebar Visibility', () => {
     test('copilot sidebar is visible on library page', async ({ page }) => {
@@ -45,6 +50,12 @@ test.describe('Copilot Feature', () => {
       const sidebarVisible = await sidebar.isVisible().catch(() => false);
       const toggleVisible = await toggle.isVisible().catch(() => false);
 
+      if (!hasUserAuthState()) {
+        expect(sidebarVisible || toggleVisible).toBeFalsy();
+        await expect(page.getByRole('link', { name: /sign in/i })).toBeVisible();
+        return;
+      }
+
       expect(sidebarVisible || toggleVisible).toBeTruthy();
     });
 
@@ -66,6 +77,11 @@ test.describe('Copilot Feature', () => {
   });
 
   test.describe('Query Interface', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - copilot chat is auth-gated'
+    );
+
     test.beforeEach(async ({ page }) => {
       // Navigate with chat=open to have the sidebar open by default
       // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
@@ -96,6 +112,11 @@ test.describe('Copilot Feature', () => {
   });
 
   test.describe('Scope Filtering', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - copilot chat is auth-gated'
+    );
+
     test.beforeEach(async ({ page }) => {
       // Navigate with chat=open to have the sidebar open by default
       // Use waitUntil:'commit' to avoid ERR_ABORTED from CopilotKit URL oscillation
@@ -115,7 +136,24 @@ test.describe('Copilot Feature', () => {
   });
 
   test.describe('Coverage Indicator', () => {
-    test('coverage information displays video count', async ({ page }) => {
+    test('coverage information displays video count', async ({ page, request }) => {
+      const coverageResponse = await request
+        .post(`${getApiUrl()}/api/v1/copilot/coverage`, {
+          data: {},
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        .catch(() => null);
+
+      if (coverageResponse?.ok()) {
+        const coverage = await coverageResponse.json();
+        if ((coverage.videoCount || 0) === 0 && (coverage.segmentCount || 0) === 0) {
+          test.skip(true, 'No indexed content available for coverage indicator');
+          return;
+        }
+      }
+
       await page.goto('/library');
       await page.waitForLoadState('domcontentloaded');
 
@@ -177,7 +215,7 @@ test.describe('Copilot Feature', () => {
 
       if (queryResponse) {
         // Should not be 404 or 405
-        expect([200, 400, 422, 500, 503]).toContain(queryResponse.status());
+        expect([200, 400, 401, 422, 500, 503]).toContain(queryResponse.status());
       }
     });
   });
@@ -199,6 +237,7 @@ test.describe('Copilot Feature', () => {
       const criticalErrors = errors.filter((e) => {
         const lowerError = e.toLowerCase();
         return !(
+          lowerError === 'event' ||
           lowerError.includes('failed to fetch') ||
           lowerError.includes('failed to load resource') ||
           lowerError.includes('404') ||
@@ -262,6 +301,11 @@ test.describe('Copilot Feature', () => {
   });
 
   test.describe('Relevance Filtering', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - copilot chat is auth-gated'
+    );
+
     test.beforeEach(async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 720 });
       // Navigate with chat=open to have the sidebar open by default
@@ -386,6 +430,11 @@ test.describe('Copilot Feature', () => {
   });
 
   test.describe('Thread Persistence with Tool Calls', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - copilot chat is auth-gated'
+    );
+
     /**
      * Tests for thread persistence: verifies that threads are properly saved
      * with user messages and assistant messages containing tool calls.

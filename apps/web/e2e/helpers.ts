@@ -275,7 +275,10 @@ export function getApiUrl(): string {
  */
 export async function getSeededVideoId(): Promise<string | null> {
   const API_URL = getApiUrl();
-  const maxAttempts = 5;
+  const canSeedVideos = Boolean(
+    process.env.AUTH0_USER_TEST_EMAIL && process.env.AUTH0_USER_TEST_PASSWORD
+  );
+  const maxAttempts = canSeedVideos ? 5 : 1;
   const backoffMs = [5000, 10000, 20000, 30000];
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {

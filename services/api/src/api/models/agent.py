@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .processing import ProcessingMode
+
 
 class SemanticSearchRequest(BaseModel):
     query: str = Field(description="Search query")
@@ -106,12 +108,90 @@ class AskResponse(BaseModel):
 
 class IngestRequest(BaseModel):
     url: str = Field(description="YouTube video URL to ingest")
+    processing_mode: ProcessingMode = Field(
+        default=ProcessingMode.TRANSCRIPT_ONLY,
+        description="How much processing to run. Agent ingestion defaults to transcript-only.",
+    )
 
 
 class IngestResponse(BaseModel):
     job_id: UUID
     video_id: UUID
     status: str
+    processing_mode: ProcessingMode = ProcessingMode.TRANSCRIPT_ONLY
+
+
+class BatchIngestRequest(BaseModel):
+    name: str | None = Field(
+        default=None,
+        description="Display name for the batch. Defaults to an OpenClaw-generated name.",
+    )
+    urls: list[str] = Field(
+        default_factory=list,
+        description="YouTube video URLs to ingest.",
+    )
+    video_ids: list[str] = Field(
+        default_factory=list,
+        description="Raw YouTube video IDs to ingest.",
+    )
+    channel_url: str | None = Field(
+        default=None,
+        description="Optional YouTube channel URL to fetch candidate videos from.",
+    )
+    channel_limit: int = Field(
+        default=25,
+        ge=1,
+        le=200,
+        description="Maximum number of videos to fetch from channel_url.",
+    )
+    processing_mode: ProcessingMode = Field(
+        default=ProcessingMode.TRANSCRIPT_ONLY,
+        description="How much processing to run. Agent batch ingestion defaults to transcript-only.",
+    )
+
+
+class KnowledgeSource(BaseModel):
+    video_id: UUID
+    youtube_video_id: str
+    title: str
+    channel_name: str | None = None
+    youtube_url: str
+    segment_count: int
+
+
+class KnowledgeExtractRequest(BaseModel):
+    video_ids: list[UUID] = Field(
+        min_length=1,
+        max_length=5,
+        description="One to five ingested video IDs to distill into an Obsidian-ready note.",
+    )
+    topic: str | None = Field(
+        default=None,
+        description="Optional topic or angle to focus the extracted knowledge on.",
+    )
+    para_destination: str = Field(
+        default="Resources/YouTube",
+        description="PARA destination folder to suggest for the Obsidian note.",
+    )
+    note_title: str | None = Field(
+        default=None,
+        description="Optional note title. If omitted, the LLM proposes one.",
+    )
+    max_segments_per_video: int = Field(
+        default=120,
+        ge=10,
+        le=300,
+        description="Maximum transcript segments per video to include in the extraction prompt.",
+    )
+
+
+class KnowledgeExtractResponse(BaseModel):
+    title: str
+    para_path: str
+    markdown: str
+    tags: list[str] = Field(default_factory=list)
+    sources: list[KnowledgeSource] = Field(default_factory=list)
+    estimated_tokens: int
 
 
 class JobStatusResponse(BaseModel):

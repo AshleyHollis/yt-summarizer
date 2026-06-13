@@ -23,15 +23,21 @@ export function CopilotQuotaIndicator() {
   const isLow = remaining <= 5;
   const isExhausted = remaining <= 0;
 
-  const resetMin = Math.ceil(resets_in_seconds / 60);
+  const resetMin = Math.ceil((resets_in_seconds ?? 0) / 60);
 
   return (
     <div className="px-3 py-1.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-xs">
       <div className="flex items-center justify-between">
-        <span className={isExhausted ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'}>
-          {isExhausted
-            ? `Quota resets in ${resetMin}m`
-            : `${remaining}/${limit} queries remaining`}
+        <span
+          className={
+            isExhausted
+              ? 'text-red-500'
+              : isLow
+                ? 'text-amber-500'
+                : 'text-gray-500 dark:text-gray-400'
+          }
+        >
+          {isExhausted ? `Quota resets in ${resetMin}m` : `${remaining}/${limit} queries remaining`}
         </span>
         {/* Mini progress bar */}
         <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden ml-2">

@@ -42,9 +42,19 @@ except ImportError:
 
 
 from ..dependencies.auth import AuthenticatedUser, require_auth
-from ..dependencies.quota import check_video_quota, get_or_create_user, record_usage
+from ..dependencies.quota import (
+    AI_FEATURES_OPERATION,
+    TRANSCRIPT_EXTRACT_OPERATION,
+    check_operation_quota,
+    check_video_quota,
+    get_or_create_user,
+    record_usage,
+)
 from ..middleware.correlation import get_correlation_id
+from ..models.job import JobType
+from ..models.processing import ProcessingMode
 from ..models.video import (
+    AddAiFeaturesResponse,
     ReprocessVideoRequest,
     SubmitVideoRequest,
     SubmitVideoResponse,
@@ -82,6 +92,23 @@ async def get_artifact_blob_name(
     return extract_blob_name_from_uri(blob_uri, container_name)
 
 
+def _get_reprocess_start_stage(stages: list[str] | None) -> JobType:
+    """Match VideoService's stage selection so quota checks cover the queued work."""
+    if not stages:
+        return JobType.TRANSCRIBE
+
+    for stage in [
+        JobType.TRANSCRIBE,
+        JobType.SUMMARIZE,
+        JobType.EMBED,
+        JobType.BUILD_RELATIONSHIPS,
+    ]:
+        if stage.value in stages:
+            return stage
+
+    return JobType.TRANSCRIBE
+
+
 @router.post(
     "",
     response_model=SubmitVideoResponse,
@@ -110,7 +137,18 @@ async def submit_video(
     quota_info = await check_video_quota(session, db_user)
 
     # Determine quota_status for this single video
-    quota_status = "released" if quota_info["remaining"] > 0 else "quota_queued"
+    quota_remaining = quota_info["remaining"]
+    quota_status = "released" if quota_remaining is None or quota_remaining > 0 else "quota_queued"
+
+    ai_quota_status = "released"
+    if body.processing_mode == ProcessingMode.FULL_ANALYSIS:
+        ai_quota_info = await check_operation_quota(session, db_user, AI_FEATURES_OPERATION)
+        ai_remaining = ai_quota_info["remaining"]
+        ai_quota_status = (
+            "released"
+            if quota_status == "released" and (ai_remaining is None or ai_remaining > 0)
+            else "quota_queued"
+        )
 
     try:
         result = await service.submit_video(
@@ -118,11 +156,26 @@ async def submit_video(
             correlation_id,
             user_id=str(db_user.user_id),
             quota_status=quota_status,
+            ai_quota_status=ai_quota_status,
+            processing_mode=body.processing_mode,
         )
 
         # Record usage if dispatched
         if quota_status == "released":
-            await record_usage(session, db_user.user_id, "video_submit", str(result.video_id))
+            await record_usage(
+                session,
+                db_user.user_id,
+                TRANSCRIPT_EXTRACT_OPERATION,
+                str(result.video_id),
+            )
+        if body.processing_mode == ProcessingMode.FULL_ANALYSIS and ai_quota_status == "released":
+            await record_usage(
+                session,
+                db_user.user_id,
+                AI_FEATURES_OPERATION,
+                str(result.video_id),
+            )
+        if quota_status == "released" or ai_quota_status == "released":
             await session.commit()
 
         return result
@@ -148,6 +201,57 @@ async def submit_video(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_detail,
+        )
+
+
+@router.post(
+    "/{video_id}/ai-features",
+    response_model=AddAiFeaturesResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Add AI Features",
+    description="Queue summary, semantic search, and relationships for a transcript-ready video",
+)
+async def add_ai_features(
+    request: Request,
+    video_id: UUID,
+    user: AuthenticatedUser = Depends(require_auth),
+    service: VideoService = Depends(get_video_service),
+    session: AsyncSession = Depends(get_session),
+) -> AddAiFeaturesResponse:
+    """Queue the AI feature package for a video that already has a transcript."""
+    correlation_id = get_correlation_id(request)
+    db_user = await get_or_create_user(session, user)
+    ai_quota_info = await check_operation_quota(session, db_user, AI_FEATURES_OPERATION)
+    remaining = ai_quota_info["remaining"]
+    quota_status = "released" if remaining is None or remaining > 0 else "quota_queued"
+
+    try:
+        result = await service.add_ai_features(
+            video_id,
+            correlation_id,
+            user_id=str(db_user.user_id),
+            quota_status=quota_status,
+        )
+        if (
+            quota_status == "released"
+            and result.job_id is not None
+            and result.message == "AI features queued"
+        ):
+            await record_usage(
+                session,
+                db_user.user_id,
+                AI_FEATURES_OPERATION,
+                str(video_id),
+            )
+            await session.commit()
+        return result
+    except ValueError as e:
+        message = str(e)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND
+            if message == "Video not found"
+            else status.HTTP_400_BAD_REQUEST,
+            detail=message,
         )
 
 
@@ -213,6 +317,7 @@ async def reprocess_video(
     body: ReprocessVideoRequest | None = None,
     user: AuthenticatedUser = Depends(require_auth),
     service: VideoService = Depends(get_video_service),
+    session: AsyncSession = Depends(get_session),
 ) -> SubmitVideoResponse:
     """Reprocess a video.
 
@@ -221,9 +326,56 @@ async def reprocess_video(
     """
     correlation_id = get_correlation_id(request)
     stages = body.stages if body else None
+    start_stage = _get_reprocess_start_stage(stages)
+
+    db_user = await get_or_create_user(session, user)
+    transcript_quota_status = "released"
+    ai_quota_status = "released"
+
+    if start_stage == JobType.TRANSCRIBE:
+        transcript_quota = await check_operation_quota(
+            session,
+            db_user,
+            TRANSCRIPT_EXTRACT_OPERATION,
+        )
+        remaining = transcript_quota["remaining"]
+        transcript_quota_status = (
+            "released" if remaining is None or remaining > 0 else "quota_queued"
+        )
+
+    ai_quota = await check_operation_quota(session, db_user, AI_FEATURES_OPERATION)
+    ai_remaining = ai_quota["remaining"]
+    ai_quota_status = (
+        "released"
+        if transcript_quota_status == "released" and (ai_remaining is None or ai_remaining > 0)
+        else "quota_queued"
+    )
 
     try:
-        result = await service.reprocess_video(video_id, stages, correlation_id)
+        result = await service.reprocess_video(
+            video_id,
+            stages,
+            correlation_id,
+            user_id=str(db_user.user_id),
+            quota_status=transcript_quota_status,
+            ai_quota_status=ai_quota_status,
+        )
+        if start_stage == JobType.TRANSCRIBE and transcript_quota_status == "released":
+            await record_usage(
+                session,
+                db_user.user_id,
+                TRANSCRIPT_EXTRACT_OPERATION,
+                str(video_id),
+            )
+        if ai_quota_status == "released":
+            await record_usage(
+                session,
+                db_user.user_id,
+                AI_FEATURES_OPERATION,
+                str(video_id),
+            )
+        if transcript_quota_status == "released" or ai_quota_status == "released":
+            await session.commit()
         return result
     except ValueError as e:
         raise HTTPException(

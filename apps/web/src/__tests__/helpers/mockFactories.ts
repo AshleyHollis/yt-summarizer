@@ -91,6 +91,10 @@ export function createMockVideoCard(overrides: Partial<VideoCard> = {}): VideoCa
     publish_date: new Date().toISOString(),
     thumbnail_url: null,
     processing_status: 'completed',
+    content_status: 'fully_analyzed',
+    has_transcript: true,
+    has_summary: true,
+    has_ai_features: true,
     segment_count: 10,
     facets: [],
     ...overrides,
@@ -113,6 +117,10 @@ export function createMockVideoDetail(
     publish_date: new Date().toISOString(),
     thumbnail_url: null,
     processing_status: 'completed',
+    content_status: 'fully_analyzed',
+    has_transcript: true,
+    has_summary: true,
+    has_ai_features: true,
     channel: {
       channel_id: 'ch-123',
       youtube_channel_id: 'yt-ch-123',
@@ -140,15 +148,9 @@ export function createMockSubmitVideoResponse(
   return {
     video_id: 'vid-123',
     youtube_video_id: 'abc123',
-    title: 'Test Video',
-    channel: {
-      channel_id: 'ch-123',
-      name: 'Test Channel',
-      youtube_channel_id: 'yt-ch-123',
-    },
-    processing_status: 'pending',
-    submitted_at: new Date().toISOString(),
-    jobs_queued: 4,
+    job_id: 'job-123',
+    status: 'pending',
+    message: 'Video submitted for processing',
     ...overrides,
   };
 }

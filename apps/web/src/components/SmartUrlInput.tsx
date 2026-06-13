@@ -8,6 +8,7 @@ import {
   SubmitVideoResponse,
   ChannelVideosResponse,
   ApiClientError,
+  ProcessingMode,
 } from '@/services/api';
 
 /**
@@ -43,6 +44,8 @@ function detectUrlType(url: string): UrlType {
 export interface SmartUrlInputProps {
   /** Callback when channel videos are loaded */
   onChannelLoaded?: (response: ChannelVideosResponse, channelUrl: string) => void;
+  /** Requested processing depth for video submissions */
+  processingMode?: ProcessingMode;
   /** Custom class name */
   className?: string;
 }
@@ -50,7 +53,11 @@ export interface SmartUrlInputProps {
 /**
  * Smart URL input that auto-detects video vs channel URLs
  */
-export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInputProps) {
+export function SmartUrlInput({
+  onChannelLoaded,
+  processingMode = 'full_analysis',
+  className = '',
+}: SmartUrlInputProps) {
   const router = useRouter();
   const [url, setUrl] = useState('');
   const [urlType, setUrlType] = useState<UrlType>('unknown');
@@ -76,7 +83,10 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
     setError(null);
 
     try {
-      const response = await videoApi.submit({ url: url.trim() });
+      const response = await videoApi.submit({
+        url: url.trim(),
+        processing_mode: processingMode,
+      });
       setSuccess(response);
 
       // Navigate to video page after short delay
@@ -157,7 +167,7 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
     }
     switch (urlType) {
       case 'video':
-        return 'Process Video';
+        return processingMode === 'transcript_only' ? 'Extract Transcript' : 'Process Video';
       case 'channel':
         return 'View Channel Videos';
       default:
@@ -257,7 +267,9 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
           {urlType !== 'unknown' && (
             <p id="url-type" className="text-sm text-gray-500 dark:text-gray-400">
               {urlType === 'video'
-                ? '📹 Video detected — will process and generate AI summary'
+                ? processingMode === 'transcript_only'
+                  ? 'Video detected — will extract the transcript'
+                  : 'Video detected — will process and generate AI features'
                 : '📺 Channel detected — will show videos for batch selection'}
             </p>
           )}
@@ -299,7 +311,7 @@ export function SmartUrlInput({ onChannelLoaded, className = '' }: SmartUrlInput
                   Video submitted successfully!
                 </p>
                 <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                  &quot;{success.title}&quot; is now being processed. Redirecting...
+                  {success.message} Redirecting...
                 </p>
               </div>
             </div>

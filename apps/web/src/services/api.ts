@@ -376,6 +376,7 @@ export const healthApi = {
  */
 export type ProcessingStatus =
   | 'pending'
+  | 'processing'
   | 'transcribing'
   | 'summarizing'
   | 'embedding'
@@ -385,10 +386,27 @@ export type ProcessingStatus =
   | 'rate_limited';
 
 /**
+ * User-selected processing depth.
+ */
+export type ProcessingMode = 'transcript_only' | 'full_analysis';
+
+/**
+ * User-facing content readiness state.
+ */
+export type ContentStatus =
+  | 'pending'
+  | 'processing'
+  | 'transcript_ready'
+  | 'fully_analyzed'
+  | 'failed'
+  | 'rate_limited';
+
+/**
  * Request to submit a video for processing
  */
 export interface SubmitVideoRequest {
   url: string;
+  processing_mode?: ProcessingMode;
 }
 
 /**
@@ -406,11 +424,20 @@ export interface ChannelSummary {
 export interface SubmitVideoResponse {
   video_id: string;
   youtube_video_id: string;
-  title: string;
-  channel: ChannelSummary;
-  processing_status: ProcessingStatus;
-  submitted_at: string;
-  jobs_queued: number;
+  job_id: string;
+  status: ProcessingStatus;
+  message: string;
+}
+
+/**
+ * Response after adding AI features to a transcript-ready video.
+ */
+export interface AddAiFeaturesResponse {
+  video_id: string;
+  job_id: string | null;
+  status: ProcessingStatus;
+  quota_status: 'released' | 'quota_queued' | 'not_needed';
+  message: string;
 }
 
 /**
@@ -660,6 +687,12 @@ export const videoApi = {
    */
   reprocess: (videoId: string): Promise<SubmitVideoResponse> =>
     api.post(`/api/v1/videos/${videoId}/reprocess`),
+
+  /**
+   * Add AI features to a transcript-ready video
+   */
+  addAiFeatures: (videoId: string): Promise<AddAiFeaturesResponse> =>
+    api.post(`/api/v1/videos/${videoId}/ai-features`),
 };
 
 // ============================================================================
@@ -753,6 +786,10 @@ export interface VideoCard {
   publish_date: string;
   thumbnail_url: string | null;
   processing_status: string;
+  content_status: ContentStatus;
+  has_transcript: boolean;
+  has_summary: boolean;
+  has_ai_features: boolean;
   segment_count: number;
   facets: FacetTag[];
 }
@@ -802,6 +839,10 @@ export interface VideoDetailResponse {
   thumbnail_url: string | null;
   youtube_url: string;
   processing_status: string;
+  content_status: ContentStatus;
+  has_transcript: boolean;
+  has_summary: boolean;
+  has_ai_features: boolean;
   summary: string | null;
   summary_artifact: ArtifactInfo | null;
   transcript_artifact: ArtifactInfo | null;
@@ -1014,6 +1055,7 @@ export interface CreateBatchRequest {
   name: string;
   video_ids: string[];
   ingest_all?: boolean;
+  processing_mode?: ProcessingMode;
 }
 
 /**
@@ -1037,6 +1079,7 @@ export interface BatchResponse {
   id: string;
   name: string;
   channel_name: string | null;
+  processing_mode: ProcessingMode;
   status: BatchStatus;
   total_count: number;
   pending_count: number;
@@ -1191,20 +1234,25 @@ export const batchApi = {
 /**
  * Quota status response from GET /api/v1/quota
  */
+export interface WorkQuotaStatus {
+  used_today: number;
+  processed_today: number;
+  limit: number | null;
+  remaining: number | null;
+  queued: number;
+  estimated_days: number | null;
+}
+
 export interface QuotaStatus {
   tier: string;
-  videos: {
-    processed_today: number;
-    limit: number | null;
-    remaining: number | null;
-    queued: number;
-    estimated_days: number | null;
-  };
+  transcripts: WorkQuotaStatus;
+  ai_features: WorkQuotaStatus;
+  videos: WorkQuotaStatus;
   copilot: {
     used_this_hour: number;
     limit: number | null;
     remaining: number | null;
-    resets_in_seconds: number;
+    resets_in_seconds: number | null;
   };
 }
 
@@ -1221,13 +1269,57 @@ export interface ExpediteRequest {
   reviewed_at: string | null;
 }
 
+export interface BackupChannelProgress {
+  slug: string;
+  name: string | null;
+  status: string;
+  phase: string | null;
+  total_videos: number;
+  processed_videos: number;
+  copied_blobs: number;
+  skipped_blobs: number;
+  missing_blobs: number;
+  bytes_copied: number;
+  warnings: string[];
+}
+
+export interface BackupRunSummary {
+  job_id: string;
+  run_id: string;
+  status: string;
+  stage: string;
+  progress: number;
+  started_at: string | null;
+  completed_at: string | null;
+  current_channel: string | null;
+  total_channels: number;
+  completed_channels: number;
+  copied_blobs: number;
+  skipped_blobs: number;
+  missing_blobs: number;
+  bytes_copied: number;
+  warning_count: number;
+  warnings: string[];
+  report_blob_path: string | null;
+  error_message: string | null;
+  channels: BackupChannelProgress[];
+}
+
+export interface BackupStatusResponse {
+  latest_run: BackupRunSummary | null;
+}
+
+export interface BackupRunListResponse {
+  runs: BackupRunSummary[];
+  total: number;
+}
+
 /**
  * Quota API client
  */
 export const quotaApi = {
   /** Get current quota status */
-  getStatus: (): Promise<QuotaStatus> =>
-    api.get('/api/v1/quota'),
+  getStatus: (): Promise<QuotaStatus> => api.get('/api/v1/quota'),
 
   /** Submit an expedite request */
   requestExpedite: (reason?: string): Promise<ExpediteRequest> =>
@@ -1247,12 +1339,32 @@ export const adminQuotaApi = {
     api.get('/api/v1/admin/expedite-requests', { params: status ? { status } : undefined }),
 
   /** Approve an expedite request */
-  approve: (requestId: string): Promise<{ request_id: string; status: string; jobs_released: number; message: string }> =>
+  approve: (
+    requestId: string
+  ): Promise<{ request_id: string; status: string; jobs_released: number; message: string }> =>
     api.post(`/api/v1/admin/expedite-requests/${requestId}/approve`),
 
   /** Deny an expedite request */
-  deny: (requestId: string): Promise<{ request_id: string; status: string; jobs_released: number; message: string }> =>
+  deny: (
+    requestId: string
+  ): Promise<{ request_id: string; status: string; jobs_released: number; message: string }> =>
     api.post(`/api/v1/admin/expedite-requests/${requestId}/deny`),
+};
+
+/**
+ * Admin backup API
+ */
+export const adminBackupApi = {
+  /** Get latest backup run status */
+  getStatus: (): Promise<BackupStatusResponse> => api.get('/api/v1/admin/backups/status'),
+
+  /** List recent backup runs */
+  listRuns: (limit = 30): Promise<BackupRunListResponse> =>
+    api.get('/api/v1/admin/backups/runs', { params: { limit } }),
+
+  /** Get one backup run */
+  getRun: (jobId: string): Promise<BackupRunSummary> =>
+    api.get(`/api/v1/admin/backups/runs/${jobId}`),
 };
 
 export default api;

@@ -52,6 +52,7 @@ from ..models.facet import FacetCount, FacetListResponse
 from ..models.library import (
     ArtifactInfo,
     ChannelSummaryLibrary,
+    ContentStatus,
     FacetTag,
     LibraryStatsResponse,
     SegmentListResponse,
@@ -198,6 +199,7 @@ class LibraryService:
 
         video_ids = [v.video_id for v in videos]
         segment_counts = {row[0].video_id: row.segment_count or 0 for row in rows}
+        artifact_types = await self._get_artifact_types(video_ids)
 
         # Get facets for all videos
         video_facets = await self._get_video_facets(video_ids)
@@ -205,6 +207,14 @@ class LibraryService:
         # Build video cards
         video_cards = []
         for video in videos:
+            types = artifact_types.get(video.video_id, set())
+            has_transcript = "transcript" in types
+            has_summary = "summary" in types
+            has_ai_features = (
+                has_summary
+                and segment_counts.get(video.video_id, 0) > 0
+                and video.processing_status == "completed"
+            )
             video_cards.append(
                 VideoCard(
                     video_id=video.video_id,
@@ -217,6 +227,14 @@ class LibraryService:
                     publish_date=video.publish_date,
                     thumbnail_url=video.thumbnail_url,
                     processing_status=video.processing_status,
+                    content_status=self._get_content_status(
+                        video.processing_status,
+                        has_transcript,
+                        has_ai_features,
+                    ),
+                    has_transcript=has_transcript,
+                    has_summary=has_summary,
+                    has_ai_features=has_ai_features,
                     segment_count=segment_counts.get(video.video_id, 0),
                     facets=video_facets.get(video.video_id, []),
                 )
@@ -317,6 +335,12 @@ class LibraryService:
             elif artifact.artifact_type == "transcript":
                 transcript_artifact = artifact_info
 
+        has_transcript = transcript_artifact is not None
+        has_summary = summary_artifact is not None
+        has_ai_features = (
+            has_summary and segment_count > 0 and video.processing_status == "completed"
+        )
+
         # Fetch summary content from blob storage if available
         if summary_blob_name and get_blob_client is not None:
             try:
@@ -343,6 +367,14 @@ class LibraryService:
             thumbnail_url=video.thumbnail_url,
             youtube_url=f"https://www.youtube.com/watch?v={video.youtube_video_id}",
             processing_status=video.processing_status,
+            content_status=self._get_content_status(
+                video.processing_status,
+                has_transcript,
+                has_ai_features,
+            ),
+            has_transcript=has_transcript,
+            has_summary=has_summary,
+            has_ai_features=has_ai_features,
             summary=summary_text,
             summary_artifact=summary_artifact,
             transcript_artifact=transcript_artifact,
@@ -641,6 +673,43 @@ class LibraryService:
         )
 
         return {row.video_id: row.count for row in result.all()}
+
+    async def _get_artifact_types(self, video_ids: list[UUID]) -> dict[UUID, set[str]]:
+        """Get artifact type names for multiple videos."""
+        if not video_ids:
+            return {}
+
+        result = await self.session.execute(
+            select(Artifact.video_id, Artifact.artifact_type).where(
+                Artifact.video_id.in_(video_ids)
+            )
+        )
+
+        artifact_types: dict[UUID, set[str]] = {vid: set() for vid in video_ids}
+        for row in result.all():
+            artifact_types.setdefault(row.video_id, set()).add(row.artifact_type)
+        return artifact_types
+
+    def _get_content_status(
+        self,
+        processing_status: str,
+        has_transcript: bool,
+        has_ai_features: bool,
+    ) -> ContentStatus:
+        """Map internal processing state plus artifacts to user-facing readiness."""
+        if processing_status == "failed":
+            return ContentStatus.FAILED
+        if processing_status == "rate_limited":
+            return ContentStatus.RATE_LIMITED
+        if processing_status == "processing":
+            return ContentStatus.PROCESSING
+        if has_ai_features:
+            return ContentStatus.FULLY_ANALYZED
+        if has_transcript:
+            return ContentStatus.TRANSCRIPT_READY
+        if processing_status == "pending":
+            return ContentStatus.PENDING
+        return ContentStatus.PENDING
 
     async def _get_video_facets(self, video_ids: list[UUID]) -> dict[UUID, list[FacetTag]]:
         """Get facets for multiple videos.

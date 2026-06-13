@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   waitForCopilotReady,
   submitQuery,
@@ -33,6 +35,8 @@ import {
 // dQw4w9WgXcQ (Rick Astley) has NO captions → transcription fails → all ingest tests fail.
 // ZDa-Z5JzLYM (Corey Schafer - Python OOP) is in the seed list with verified captions.
 const TEST_VIDEO_URL = 'https://www.youtube.com/watch?v=ZDa-Z5JzLYM';
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
+const hasUserAuthState = () => fs.existsSync(userAuthFile);
 
 // =========================================================================
 // Ingest Journey Tests — These test the submit → process → query flow
@@ -42,6 +46,10 @@ test.describe('Full User Journey: Ingest Video → Query Copilot', () => {
   test.skip(
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
+  );
+  test.skip(
+    () => !hasUserAuthState(),
+    'Auth0 user credentials not configured - full journey requires authenticated add/copilot access'
   );
 
   test('complete journey: ingest video and query copilot', async ({ page }, testInfo) => {
@@ -146,6 +154,10 @@ test.describe('Copilot Behavior: Response Quality', () => {
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
   );
+  test.skip(
+    () => !hasUserAuthState(),
+    'Auth0 user credentials not configured - copilot chat is auth-gated'
+  );
 
   test('copilot handles empty library gracefully', async ({ page }, testInfo) => {
     test.slow(); // LLM call: triple timeout to 540s
@@ -238,6 +250,10 @@ test.describe('Copilot Response Quality: Citations and Evidence', () => {
   test.skip(
     () => !process.env.USE_EXTERNAL_SERVER,
     'Requires full backend - run with USE_EXTERNAL_SERVER=true after starting Aspire'
+  );
+  test.skip(
+    () => !hasUserAuthState(),
+    'Auth0 user credentials not configured - copilot chat is auth-gated'
   );
 
   // Fetch a pre-seeded video ID once for all tests in this block.

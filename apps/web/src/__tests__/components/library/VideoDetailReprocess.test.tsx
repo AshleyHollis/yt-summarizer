@@ -29,39 +29,55 @@ vi.mock('@/services/api', () => ({
   },
   videoApi: {
     reprocess: vi.fn(),
+    addAiFeatures: vi.fn(),
+  },
+  ApiClientError: class ApiClientError extends Error {
+    constructor(
+      message: string,
+      public status: number,
+      public correlationId: string | null
+    ) {
+      super(message);
+    }
   },
 }));
 
 import { libraryApi, videoApi } from '@/services/api';
+import type { VideoDetailResponse } from '@/services/api';
 
 // Create a mock video response factory
-const createMockVideoDetail = (overrides = {}) => ({
-  video_id: 'test-video-id',
-  youtube_video_id: 'abc123',
-  youtube_url: 'https://youtube.com/watch?v=abc123',
-  title: 'Test Video Title',
-  description: 'Test description',
-  duration: 300,
-  publish_date: '2024-01-15T10:00:00Z',
-  thumbnail_url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg',
-  processing_status: 'completed',
-  channel: {
-    channel_id: 'channel-1',
-    name: 'Test Channel',
-    youtube_channel_id: 'UC12345',
-    thumbnail_url: 'https://example.com/channel-thumb.jpg',
-  },
-  facets: [],
-  summary: 'This is a test summary with content.',
-  transcript: 'Test transcript content',
-  summary_artifact: null,
-  transcript_artifact: null,
-  segment_count: 0,
-  relationship_count: 0,
-  created_at: '2024-01-15T10:00:00Z',
-  updated_at: '2024-01-15T10:00:00Z',
-  ...overrides,
-});
+const createMockVideoDetail = (overrides: Partial<VideoDetailResponse> = {}): VideoDetailResponse =>
+  ({
+    video_id: 'test-video-id',
+    youtube_video_id: 'abc123',
+    youtube_url: 'https://youtube.com/watch?v=abc123',
+    title: 'Test Video Title',
+    description: 'Test description',
+    duration: 300,
+    publish_date: '2024-01-15T10:00:00Z',
+    thumbnail_url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg',
+    processing_status: 'completed',
+    content_status: 'fully_analyzed',
+    has_transcript: true,
+    has_summary: true,
+    has_ai_features: true,
+    channel: {
+      channel_id: 'channel-1',
+      name: 'Test Channel',
+      youtube_channel_id: 'UC12345',
+      thumbnail_url: 'https://example.com/channel-thumb.jpg',
+    },
+    facets: [],
+    summary: 'This is a test summary with content.',
+    transcript: 'Test transcript content',
+    summary_artifact: null,
+    transcript_artifact: null,
+    segment_count: 0,
+    relationship_count: 0,
+    created_at: '2024-01-15T10:00:00Z',
+    updated_at: '2024-01-15T10:00:00Z',
+    ...overrides,
+  }) as VideoDetailResponse;
 
 describe('Video Detail Page - Reprocess Button', () => {
   beforeEach(() => {
@@ -89,12 +105,15 @@ describe('Video Detail Page - Reprocess Button', () => {
       );
     });
 
-    it('shows reprocess button for completed videos with missing summary', async () => {
+    it('shows add AI features for completed videos with missing summary', async () => {
       vi.mocked(libraryApi.getVideoDetail).mockResolvedValue(
         createMockVideoDetail({
           video_id: 'test-video-id',
           processing_status: 'completed',
+          content_status: 'transcript_ready',
           summary: null,
+          has_summary: false,
+          has_ai_features: false,
         })
       );
 
@@ -103,18 +122,22 @@ describe('Video Detail Page - Reprocess Button', () => {
 
       await waitFor(
         () => {
-          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+          expect(screen.getByRole('button', { name: /Add AI features/i })).toBeInTheDocument();
         },
         { timeout: 5000 }
       );
+      expect(screen.queryByRole('button', { name: /Reprocess Video/i })).not.toBeInTheDocument();
     });
 
-    it('shows reprocess button for completed videos with empty summary', async () => {
+    it('shows add AI features for completed videos with empty summary', async () => {
       vi.mocked(libraryApi.getVideoDetail).mockResolvedValue(
         createMockVideoDetail({
           video_id: 'test-video-id',
           processing_status: 'completed',
+          content_status: 'transcript_ready',
           summary: '   ',
+          has_summary: false,
+          has_ai_features: false,
         })
       );
 
@@ -123,10 +146,11 @@ describe('Video Detail Page - Reprocess Button', () => {
 
       await waitFor(
         () => {
-          expect(screen.getByRole('button', { name: /Reprocess Video/i })).toBeInTheDocument();
+          expect(screen.getByRole('button', { name: /Add AI features/i })).toBeInTheDocument();
         },
         { timeout: 5000 }
       );
+      expect(screen.queryByRole('button', { name: /Reprocess Video/i })).not.toBeInTheDocument();
     });
 
     it('does NOT show reprocess button for completed videos with valid summary', async () => {
@@ -189,15 +213,9 @@ describe('Video Detail Page - Reprocess Button', () => {
       vi.mocked(videoApi.reprocess).mockResolvedValue({
         video_id: 'test-video-id',
         youtube_video_id: 'abc123',
-        title: 'Test Video Title',
-        channel: {
-          channel_id: 'channel-1',
-          name: 'Test Channel',
-          youtube_channel_id: 'UC12345',
-        },
-        processing_status: 'pending',
-        submitted_at: '2024-01-15T10:00:00Z',
-        jobs_queued: 4,
+        job_id: 'job-123',
+        status: 'pending',
+        message: 'Video re-queued for processing',
       });
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
@@ -229,19 +247,20 @@ describe('Video Detail Page - Reprocess Button', () => {
 
       // Delay the reprocess response to test loading state
       vi.mocked(videoApi.reprocess).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({
-          video_id: 'test-video-id',
-          youtube_video_id: 'abc123',
-          title: 'Test Video Title',
-          channel: {
-            channel_id: 'channel-1',
-            name: 'Test Channel',
-            youtube_channel_id: 'UC12345',
-          },
-          processing_status: 'pending',
-          submitted_at: '2024-01-15T10:00:00Z',
-          jobs_queued: 4,
-        }), 500))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  video_id: 'test-video-id',
+                  youtube_video_id: 'abc123',
+                  job_id: 'job-123',
+                  status: 'pending',
+                  message: 'Video re-queued for processing',
+                }),
+              500
+            )
+          )
       );
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
@@ -273,19 +292,20 @@ describe('Video Detail Page - Reprocess Button', () => {
       );
 
       vi.mocked(videoApi.reprocess).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({
-          video_id: 'test-video-id',
-          youtube_video_id: 'abc123',
-          title: 'Test Video Title',
-          channel: {
-            channel_id: 'channel-1',
-            name: 'Test Channel',
-            youtube_channel_id: 'UC12345',
-          },
-          processing_status: 'pending',
-          submitted_at: '2024-01-15T10:00:00Z',
-          jobs_queued: 4,
-        }), 500))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  video_id: 'test-video-id',
+                  youtube_video_id: 'abc123',
+                  job_id: 'job-123',
+                  status: 'pending',
+                  message: 'Video re-queued for processing',
+                }),
+              500
+            )
+          )
       );
 
       const { default: VideoDetailPage } = await import('@/app/library/[videoId]/page');
@@ -392,12 +412,15 @@ describe('Video Detail Page - Reprocess Button', () => {
       );
     });
 
-    it('shows missing content message for completed videos without summary', async () => {
+    it('shows add AI features message for completed videos without summary', async () => {
       vi.mocked(libraryApi.getVideoDetail).mockResolvedValue(
         createMockVideoDetail({
           video_id: 'test-video-id',
           processing_status: 'completed',
+          content_status: 'transcript_ready',
           summary: null,
+          has_summary: false,
+          has_ai_features: false,
         })
       );
 
@@ -406,7 +429,7 @@ describe('Video Detail Page - Reprocess Button', () => {
 
       await waitFor(
         () => {
-          expect(screen.getByText(/Missing content detected/i)).toBeInTheDocument();
+          expect(screen.getByText(/AI features are not enabled/i)).toBeInTheDocument();
         },
         { timeout: 5000 }
       );

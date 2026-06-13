@@ -28,6 +28,12 @@ class Batch(Base):
         nullable=True,
     )
     name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    processing_mode: Mapped[str] = mapped_column(
+        String(50),
+        default="full_analysis",
+        nullable=False,
+        comment="'transcript_only' or 'full_analysis'",
+    )
     total_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     pending_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     running_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -70,9 +76,9 @@ class BatchItem(Base):
         ForeignKey("Batches.batch_id"),
         nullable=False,
     )
-    video_id: Mapped[UUID] = mapped_column(
+    video_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("Videos.video_id"),
-        nullable=False,
+        nullable=True,
     )
     status: Mapped[str] = mapped_column(
         String(50),
@@ -107,9 +113,9 @@ class Job(Base, TimestampMixin):
         primary_key=True,
         default=generate_uuid,
     )
-    video_id: Mapped[UUID] = mapped_column(
+    video_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("Videos.video_id"),
-        nullable=False,
+        nullable=True,
     )
     batch_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("Batches.batch_id"),
@@ -145,6 +151,17 @@ class Job(Base, TimestampMixin):
         nullable=False,
         comment="'quota_queued' (awaiting quota) or 'released' (dispatched to worker queue)",
     )
+    processing_mode: Mapped[str] = mapped_column(
+        String(50),
+        default="full_analysis",
+        nullable=False,
+        comment="'transcript_only' or 'full_analysis'",
+    )
+    metadata_json: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Compact JSON metadata for system/admin jobs",
+    )
     user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("Users.user_id"),
         nullable=True,
@@ -152,7 +169,7 @@ class Job(Base, TimestampMixin):
     )
 
     # Relationships
-    video: Mapped["Video"] = relationship(
+    video: Mapped["Video | None"] = relationship(
         "Video",
         back_populates="jobs",
     )
@@ -170,6 +187,7 @@ class Job(Base, TimestampMixin):
         Index("ix_jobs_created", "created_at"),
         Index("ix_jobs_quota_status", "quota_status"),
         Index("ix_jobs_user_id", "user_id"),
+        Index("ix_jobs_system_type_created", "job_type", "video_id", "created_at"),
     )
 
 

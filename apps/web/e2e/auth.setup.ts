@@ -26,6 +26,7 @@
  */
 
 import { test as setup } from '@playwright/test';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const adminAuthFile = path.join(__dirname, '../playwright/.auth/admin.json');
@@ -110,6 +111,7 @@ setup('authenticate as admin', async ({ page }) => {
   const password = process.env.AUTH0_ADMIN_TEST_PASSWORD;
 
   if (!email || !password) {
+    await fs.rm(adminAuthFile, { force: true });
     console.warn('[auth-setup] ⚠ Admin test credentials not set. Skipping admin authentication.');
     console.warn(
       '[auth-setup] Set AUTH0_ADMIN_TEST_EMAIL and AUTH0_ADMIN_TEST_PASSWORD to enable admin tests.'
@@ -160,6 +162,7 @@ setup('authenticate as normal user', async ({ page }) => {
   const password = process.env.AUTH0_USER_TEST_PASSWORD;
 
   if (!email || !password) {
+    await fs.rm(userAuthFile, { force: true });
     console.warn('[auth-setup] ⚠ User test credentials not set. Skipping user authentication.');
     console.warn(
       '[auth-setup] Set AUTH0_USER_TEST_EMAIL and AUTH0_USER_TEST_PASSWORD to enable user tests.'

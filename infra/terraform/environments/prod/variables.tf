@@ -72,6 +72,87 @@ variable "cloudflare_api_token" {
   sensitive   = true
 }
 
+variable "acr_name" {
+  description = "Azure Container Registry name that stores production API and worker images."
+  type        = string
+  default     = "acrytsummprdci"
+}
+
+variable "acr_resource_group_name" {
+  description = "Resource group containing the Azure Container Registry. Leave empty to use the shared resource group."
+  type        = string
+  default     = ""
+}
+
+# -----------------------------------------------------------------------------
+# Channel Backups
+# -----------------------------------------------------------------------------
+
+variable "backup_channels" {
+  description = "Sanitized channel slugs or YouTube channel IDs included in nightly backups."
+  type        = list(string)
+  default     = ["mark-wildman"]
+}
+
+variable "backup_blob_version_retention_days" {
+  description = "Number of days to retain previous backup blob versions for corruption rollback."
+  type        = number
+  default     = 35
+}
+
+variable "backup_container_name" {
+  description = "Blob container name used for channel backups."
+  type        = string
+  default     = "backups"
+}
+
+variable "backup_job_log_retention_days" {
+  description = "Log Analytics retention in days for the scheduled backup job."
+  type        = number
+  default     = 30
+}
+
+variable "backup_job_timeout_seconds" {
+  description = "Maximum runtime for a single scheduled channel backup job replica."
+  type        = number
+  default     = 21600
+}
+
+variable "backup_schedule_cron_expression" {
+  description = "Cron expression for the nightly Azure Container Apps backup job. 16:00 UTC is 02:00 Australia/Brisbane."
+  type        = string
+  default     = "0 16 * * *"
+}
+
+variable "backup_snapshot_retention_days" {
+  description = "Number of days to retain snapshot manifests and backup reports."
+  type        = number
+  default     = 180
+}
+
+variable "backup_storage_account_name" {
+  description = "Optional explicit backup storage account name. Leave empty to use the default name."
+  type        = string
+  default     = ""
+}
+
+variable "backup_storage_replication_type" {
+  description = "Replication type for the backup storage account. LRS keeps nightly backups inexpensive."
+  type        = string
+  default     = "LRS"
+
+  validation {
+    condition     = contains(["LRS", "GRS", "RAGRS", "ZRS"], var.backup_storage_replication_type)
+    error_message = "Backup storage replication type must be LRS, GRS, RAGRS, or ZRS."
+  }
+}
+
+variable "backup_worker_image_tag" {
+  description = "Worker image tag used by the Azure Container Apps backup job."
+  type        = string
+  default     = "latest"
+}
+
 variable "openclaw_vps_public_ip" {
   description = "Public IPv4 address of the OpenClaw VPS allowed to reach Azure SQL during migration"
   type        = string

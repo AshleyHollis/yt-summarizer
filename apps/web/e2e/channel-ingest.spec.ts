@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * E2E Tests for Channel Ingestion (User Story 2)
@@ -18,9 +20,11 @@ import { test, expect } from '@playwright/test';
  */
 
 const TEST_CHANNEL_URL = 'https://www.youtube.com/@darciisabella/videos';
+const userAuthFile = path.join(__dirname, '../playwright/.auth/user.json');
 
 // Check if live processing tests should run (requires real AI services)
 const LIVE_PROCESSING = process.env.LIVE_PROCESSING === 'true';
+const hasUserAuthState = () => fs.existsSync(userAuthFile);
 
 test.describe('Channel Ingestion Flow', () => {
   test.describe('Navigation', () => {
@@ -50,14 +54,24 @@ test.describe('Channel Ingestion Flow', () => {
     test('ingest page renders correctly', async ({ page }) => {
       await page.goto('/ingest');
 
-      // Check page elements
       await expect(page.getByRole('heading', { name: /Ingest from Channel/i })).toBeVisible();
+      if (!hasUserAuthState()) {
+        await expect(page.getByText(/Sign in to import videos from a channel/i)).toBeVisible();
+        await expect(page.getByRole('button', { name: /Sign in with Google/i })).toBeVisible();
+        return;
+      }
+
       await expect(page.getByLabel(/YouTube Channel URL/i)).toBeVisible();
       await expect(page.getByRole('button', { name: /Fetch Videos/i })).toBeVisible();
     });
   });
 
   test.describe('Channel Form Validation', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - channel ingestion form is auth-gated'
+    );
+
     test.beforeEach(async ({ page }) => {
       await page.goto('/ingest');
     });
@@ -94,6 +108,11 @@ test.describe('Channel Ingestion Flow', () => {
   });
 
   test.describe('Channel Video Fetching', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - channel ingestion form is auth-gated'
+    );
+
     // These tests require the backend to be running
     test.beforeEach(async ({ page }) => {
       await page.goto('/ingest');
@@ -164,6 +183,11 @@ test.describe('Channel Ingestion Flow', () => {
   });
 
   test.describe('Batch Creation', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - channel ingestion form is auth-gated'
+    );
+
     // These tests require actual video processing to complete
     test.skip(
       () => !LIVE_PROCESSING,
@@ -325,6 +349,11 @@ test.describe('Channel Ingestion Flow', () => {
   });
 
   test.describe('Already Ingested Videos', () => {
+    test.skip(
+      () => !hasUserAuthState(),
+      'Auth0 user credentials not configured - channel ingestion form is auth-gated'
+    );
+
     test('shows already ingested indicator for previously ingested videos', async ({ page }) => {
       // Fetch videos from a channel that has been ingested before
       await page.goto('/ingest');

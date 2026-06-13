@@ -73,7 +73,9 @@ class JobService:
         Returns:
             JobResponse or None if not found.
         """
-        result = await self.session.execute(select(Job).where(Job.job_id == job_id))
+        result = await self.session.execute(
+            select(Job).where(Job.job_id == job_id, Job.video_id.is_not(None))
+        )
         job = result.scalar_one_or_none()
 
         if not job:
@@ -114,7 +116,7 @@ class JobService:
             Paginated list of jobs.
         """
         # Build query
-        query = select(Job)
+        query = select(Job).where(Job.video_id.is_not(None))
 
         if filters.video_id:
             query = query.where(Job.video_id == filters.video_id)
@@ -209,8 +211,8 @@ class JobService:
             } - succeeded_types
             running = sum(1 for j in items if j.status == JobStatus.RUNNING)
 
-            # Expected 4 stages for complete processing
-            expected_stages = 4
+            processing_mode = getattr(jobs[0], "processing_mode", "full_analysis")
+            expected_stages = 1 if processing_mode == "transcript_only" else 4
             overall_progress = min(int((succeeded / expected_stages) * 100), 100)
 
             if failed_types:
@@ -307,7 +309,9 @@ class JobService:
         Returns:
             RetryJobResponse or None if job not found.
         """
-        result = await self.session.execute(select(Job).where(Job.job_id == job_id))
+        result = await self.session.execute(
+            select(Job).where(Job.job_id == job_id, Job.video_id.is_not(None))
+        )
         job = result.scalar_one_or_none()
 
         if not job:

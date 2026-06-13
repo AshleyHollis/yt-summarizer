@@ -1,27 +1,233 @@
 """Admin routes for system management and recovery."""
 
-from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel
+import json
+from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     from shared.db.connection import get_session
+    from shared.db.models import Job
 except ImportError:
 
     async def get_session():
         raise NotImplementedError("Database session not available")
 
+    Job = None  # type: ignore
+
 
 from ..dependencies.auth import AuthenticatedUser, require_auth
+from ..dependencies.quota import get_or_create_user
 from ..services.quota_dispatcher import DispatchResult, QuotaDispatcher
 from ..services.recovery_service import RecoveryResult, RecoveryService
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 
+BACKUP_JOB_TYPE = "backup_nightly"
+
+
+async def require_admin(
+    user: AuthenticatedUser = Depends(require_auth),
+    session: AsyncSession = Depends(get_session),
+) -> AuthenticatedUser:
+    """Require the authenticated user to be an admin."""
+    db_user = await get_or_create_user(session, user)
+    if db_user.quota_tier != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user
+
+
+class BackupChannelProgress(BaseModel):
+    slug: str
+    name: str | None = None
+    status: str
+    phase: str | None = None
+    total_videos: int = 0
+    processed_videos: int = 0
+    copied_blobs: int = 0
+    skipped_blobs: int = 0
+    missing_blobs: int = 0
+    bytes_copied: int = 0
+    warnings: list[str] = Field(default_factory=list)
+
+
+class BackupRunSummary(BaseModel):
+    job_id: UUID
+    run_id: str
+    status: str
+    stage: str
+    progress: int
+    started_at: datetime | None
+    completed_at: datetime | None
+    current_channel: str | None
+    total_channels: int
+    completed_channels: int
+    copied_blobs: int
+    skipped_blobs: int
+    missing_blobs: int
+    bytes_copied: int
+    warning_count: int
+    warnings: list[str] = Field(default_factory=list)
+    report_blob_path: str | None
+    error_message: str | None
+    channels: list[BackupChannelProgress] = Field(default_factory=list)
+
+
+class BackupStatusResponse(BaseModel):
+    latest_run: BackupRunSummary | None
+
+
+class BackupRunListResponse(BaseModel):
+    runs: list[BackupRunSummary] = Field(default_factory=list)
+    total: int
+
 
 def get_recovery_service(session: AsyncSession = Depends(get_session)) -> RecoveryService:
     """Dependency to get recovery service."""
     return RecoveryService(session)
+
+
+def _load_backup_metadata(job: Job) -> dict[str, Any]:
+    if not getattr(job, "metadata_json", None):
+        return {}
+    try:
+        metadata = json.loads(job.metadata_json)
+    except json.JSONDecodeError:
+        return {}
+    return metadata if isinstance(metadata, dict) else {}
+
+
+def _backup_run_from_job(job: Job) -> BackupRunSummary:
+    metadata = _load_backup_metadata(job)
+    warnings = metadata.get("warnings") if isinstance(metadata.get("warnings"), list) else []
+    channels = []
+    for channel in metadata.get("channels", []):
+        if not isinstance(channel, dict):
+            continue
+        channels.append(
+            BackupChannelProgress(
+                slug=str(channel.get("slug") or "unknown-channel"),
+                name=channel.get("name"),
+                status=str(channel.get("status") or "unknown"),
+                phase=channel.get("phase"),
+                total_videos=int(channel.get("total_videos") or 0),
+                processed_videos=int(channel.get("processed_videos") or 0),
+                copied_blobs=int(channel.get("copied_blobs") or 0),
+                skipped_blobs=int(channel.get("skipped_blobs") or 0),
+                missing_blobs=int(channel.get("missing_blobs") or 0),
+                bytes_copied=int(channel.get("bytes_copied") or 0),
+                warnings=channel.get("warnings")
+                if isinstance(channel.get("warnings"), list)
+                else [],
+            )
+        )
+
+    return BackupRunSummary(
+        job_id=job.job_id,
+        run_id=str(metadata.get("run_id") or job.correlation_id),
+        status=job.status,
+        stage=job.stage,
+        progress=job.progress or 0,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+        current_channel=metadata.get("current_channel"),
+        total_channels=int(metadata.get("total_channels") or len(channels)),
+        completed_channels=int(metadata.get("completed_channels") or 0),
+        copied_blobs=int(metadata.get("copied_blobs") or 0),
+        skipped_blobs=int(metadata.get("skipped_blobs") or 0),
+        missing_blobs=int(metadata.get("missing_blobs") or 0),
+        bytes_copied=int(metadata.get("bytes_copied") or 0),
+        warning_count=len(warnings),
+        warnings=[str(warning) for warning in warnings],
+        report_blob_path=metadata.get("report_blob_path"),
+        error_message=job.error_message,
+        channels=channels,
+    )
+
+
+async def _latest_backup_job(session: AsyncSession) -> Job | None:
+    result = await session.execute(
+        select(Job)
+        .where(Job.video_id.is_(None), Job.job_type == BACKUP_JOB_TYPE)
+        .order_by(Job.created_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+@router.get(
+    "/backups/status",
+    response_model=BackupStatusResponse,
+    summary="Backup Status",
+    description="Get the latest nightly backup status from the system job row.",
+)
+async def get_backup_status(
+    _admin: AuthenticatedUser = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> BackupStatusResponse:
+    """Get the latest backup run status."""
+    job = await _latest_backup_job(session)
+    return BackupStatusResponse(latest_run=_backup_run_from_job(job) if job else None)
+
+
+@router.get(
+    "/backups/runs",
+    response_model=BackupRunListResponse,
+    summary="Backup Runs",
+    description="List recent nightly backup runs.",
+)
+async def list_backup_runs(
+    limit: int = Query(default=30, ge=1, le=100),
+    _admin: AuthenticatedUser = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> BackupRunListResponse:
+    """List recent backup runs."""
+    query = (
+        select(Job)
+        .where(Job.video_id.is_(None), Job.job_type == BACKUP_JOB_TYPE)
+        .order_by(Job.created_at.desc())
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    jobs = result.scalars().all()
+    runs = [_backup_run_from_job(job) for job in jobs]
+    return BackupRunListResponse(runs=runs, total=len(runs))
+
+
+@router.get(
+    "/backups/runs/{job_id}",
+    response_model=BackupRunSummary,
+    summary="Backup Run Detail",
+    description="Get one nightly backup run by system job ID.",
+)
+async def get_backup_run(
+    job_id: UUID,
+    _admin: AuthenticatedUser = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> BackupRunSummary:
+    """Get backup run detail."""
+    result = await session.execute(
+        select(Job).where(
+            Job.job_id == job_id,
+            Job.video_id.is_(None),
+            Job.job_type == BACKUP_JOB_TYPE,
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Backup run not found",
+        )
+    return _backup_run_from_job(job)
 
 
 @router.post(
@@ -63,7 +269,10 @@ async def recovery_status(
 
     # Count dead-lettered jobs
     dead_result = await session.execute(
-        select(func.count()).select_from(Job).where(Job.stage == "dead_lettered")
+        select(func.count())
+        .select_from(Job)
+        .where(Job.stage == "dead_lettered")
+        .where(Job.video_id.is_not(None))
     )
     dead_count = dead_result.scalar() or 0
 
@@ -75,6 +284,7 @@ async def recovery_status(
         select(func.count())
         .select_from(Job)
         .where(Job.stage == "running")
+        .where(Job.video_id.is_not(None))
         .where(Job.started_at < stale_threshold)
     )
     stale_count = stale_result.scalar() or 0
@@ -89,6 +299,7 @@ async def recovery_status(
     active_result = await session.execute(
         select(func.count())
         .select_from(Job)
+        .where(Job.video_id.is_not(None))
         .where(Job.stage.in_(["queued", "running", "rate_limited"]))
     )
     active_count = active_result.scalar() or 0
