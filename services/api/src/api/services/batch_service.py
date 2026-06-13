@@ -61,7 +61,7 @@ from ..models.batch import (
     BatchItem as BatchItemResponse,
 )
 from ..models.job import JobStage, JobStatus, JobType
-from ..models.processing import ProcessingMode
+from ..models.processing import ProcessingMode, normalize_processing_mode
 from .channel_service import ChannelService
 from .youtube_service import get_youtube_service
 
@@ -106,7 +106,7 @@ class BatchService:
             ai_features_quota_slots: Number of AI feature jobs to reserve immediately.
                 None means unlimited.
         """
-        processing_mode = request.processing_mode
+        processing_mode = normalize_processing_mode(request.processing_mode)
         logger.info(
             "Creating batch",
             name=request.name,

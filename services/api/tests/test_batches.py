@@ -4,8 +4,8 @@ These tests verify the batch creation, listing, and management endpoints.
 Batch API is critical for User Story 2: Ingest from Channel.
 """
 
-from datetime import datetime
-from unittest.mock import MagicMock
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -164,6 +164,54 @@ class TestCreateBatch:
             status.HTTP_422_UNPROCESSABLE_ENTITY,  # Validation error
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         ]
+
+
+class TestBatchServiceCreate:
+    """Focused service tests for batch creation behavior."""
+
+    @pytest.mark.asyncio
+    async def test_create_batch_normalizes_string_processing_mode(self, sample_youtube_video_ids):
+        """Regression: API requests may provide processing_mode as a raw string."""
+        from api.models.batch import CreateBatchRequest
+        from api.models.processing import ProcessingMode
+        from api.services.batch_service import BatchService
+
+        session = MagicMock()
+        session.add = MagicMock()
+        session.flush = AsyncMock()
+        session.commit = AsyncMock()
+
+        def assign_batch_defaults():
+            batch = session.add.call_args.args[0]
+            batch.batch_id = uuid4()
+            batch.status = "pending"
+            batch.created_at = datetime.now(UTC)
+            batch.updated_at = batch.created_at
+
+        session.flush.side_effect = assign_batch_defaults
+
+        request = CreateBatchRequest(
+            name="Transcript Only Batch",
+            video_ids=[sample_youtube_video_ids[0]],
+            processing_mode="transcript_only",
+        )
+        service = BatchService(session)
+        service._create_batch_item = AsyncMock(return_value=(True, False))
+
+        with patch("api.services.batch_service.record_usage", new=AsyncMock()):
+            response = await service.create_batch(
+                request,
+                correlation_id="test-correlation",
+                user_id=None,
+                transcript_quota_slots=1,
+                ai_features_quota_slots=None,
+            )
+
+        assert response.processing_mode == ProcessingMode.TRANSCRIPT_ONLY
+        service._create_batch_item.assert_awaited_once()
+        assert service._create_batch_item.await_args.kwargs["processing_mode"] == (
+            ProcessingMode.TRANSCRIPT_ONLY
+        )
 
 
 # ============================================================================
