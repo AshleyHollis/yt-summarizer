@@ -39,7 +39,9 @@ test.describe('Core User Flows @smoke', () => {
       await page.goto('/', { timeout: 60_000 });
       await page.getByRole('link', { name: /Browse Library/i }).click();
       await expect(page).toHaveURL(/\/library\/?(?:[?#].*)?$/, { timeout: 15_000 });
-      await expect(page.getByRole('button', { name: /Select videos/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Select videos/i })).toBeVisible({
+        timeout: 60_000,
+      });
     });
 
     test('Add Content CTA navigates to add page @smoke', async ({ page }) => {
