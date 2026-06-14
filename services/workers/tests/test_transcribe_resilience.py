@@ -302,6 +302,36 @@ class TestAgeGatedWorkerCapability:
         }
 
     @pytest.mark.asyncio
+    async def test_age_gated_cookie_download_uses_subtitle_only_options(self, monkeypatch):
+        from shared.config import refresh_settings
+
+        from transcribe.worker import TranscribeWorker
+
+        monkeypatch.setenv("TRANSCRIBE_CAPABILITIES", "age_gated")
+        monkeypatch.setenv("YTDLP_COOKIES_FILE", "C:/secure/youtube-cookies.txt")
+        refresh_settings()
+
+        worker = TranscribeWorker()
+
+        with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+            mock_ydl.__exit__ = MagicMock(return_value=False)
+            mock_ydl.extract_info.return_value = {"subtitles": {}, "automatic_captions": {}}
+            mock_ydl_class.return_value = mock_ydl
+
+            transcript, segments = await worker._fetch_transcript_with_timestamps_and_text(
+                "age_gated_video"
+            )
+
+            assert transcript is None
+            assert segments is None
+            ydl_opts = mock_ydl_class.call_args.args[0]
+            assert ydl_opts["cookiefile"] == "C:/secure/youtube-cookies.txt"
+            assert ydl_opts["ignore_no_formats_error"] is True
+            assert "extractor_args" not in ydl_opts
+
+    @pytest.mark.asyncio
     async def test_missing_required_capability_fails_before_youtube_call(self):
         from shared.worker.base_worker import WorkerStatus
 
@@ -329,6 +359,40 @@ class TestAgeGatedWorkerCapability:
             assert "age_gated" in result.message
             mock_failed.assert_called_once()
             mock_fetch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_age_gated_retry_bypasses_prior_no_captions_short_circuit(self, monkeypatch):
+        from shared.config import refresh_settings
+        from shared.worker.base_worker import WorkerStatus
+
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
+
+        monkeypatch.setenv("TRANSCRIBE_CAPABILITIES", "age_gated")
+        refresh_settings()
+
+        worker = TranscribeWorker()
+        message = TranscribeMessage(
+            job_id="test-job-id",
+            video_id="test-video-id",
+            youtube_video_id="age_gated_video",
+            correlation_id="test-correlation",
+            required_capabilities=["age_gated"],
+        )
+
+        with (
+            patch("transcribe.worker.mark_job_running", new_callable=AsyncMock),
+            patch("transcribe.worker.mark_job_failed", new_callable=AsyncMock),
+            patch.object(worker, "_has_permanent_no_captions", return_value=True),
+            patch.object(
+                worker, "_fetch_transcript_with_timestamps_and_text", new_callable=AsyncMock
+            ) as mock_fetch,
+        ):
+            mock_fetch.return_value = (None, None)
+
+            result = await worker.process_message(message, "test-correlation")
+
+            assert result.status == WorkerStatus.FAILED
+            mock_fetch.assert_called_once_with("age_gated_video")
 
     @pytest.mark.asyncio
     async def test_age_gated_error_marks_job_failed_with_clear_message(self):
