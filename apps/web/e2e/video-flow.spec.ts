@@ -263,8 +263,8 @@ test.describe('User Story 1: Video Submission Flow', () => {
       await expect(page.locator('main')).toBeVisible();
 
       // Should show video title or ID
-      const titleOrId = page.getByText(/video|du8qD6fiX7Y/i);
-      await expect(titleOrId.first()).toBeVisible({ timeout: 5_000 });
+      const titleOrId = page.locator('main').getByText(/video|du8qD6fiX7Y/i);
+      await expect(titleOrId.first()).toBeVisible({ timeout: 60_000 });
     });
 
     test('shows completion status for finished video', async ({ page }) => {

@@ -275,7 +275,11 @@ test.describe('Channel Ingestion Flow', () => {
       await expect(ingestLink).toBeVisible();
 
       // Click the channel ingestion link
-      await ingestLink.click();
+      await ingestLink.scrollIntoViewIfNeeded();
+      await Promise.all([
+        page.waitForURL(/\/ingest(?:\?|$)/, { timeout: 30000 }),
+        ingestLink.click(),
+      ]);
 
       // Should be on ingest page
       await expect(page).toHaveURL(/\/ingest(?:\?|$)/, { timeout: 10000 });

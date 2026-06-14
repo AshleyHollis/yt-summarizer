@@ -314,6 +314,138 @@ class TestBatchServiceCreate:
         )
 
 
+class TestBatchOperationalProgress:
+    """Focused tests for long-running batch operational visibility."""
+
+    @pytest.mark.asyncio
+    async def test_reconcile_batch_counts_repairs_stale_rollup(self):
+        """Batch rollups should be recomputed from BatchItems when requested."""
+        from api.services.batch_service import BatchService
+
+        batch = MagicMock()
+        batch.batch_id = uuid4()
+        batch.total_count = 5
+        batch.pending_count = 5
+        batch.running_count = 0
+        batch.succeeded_count = 0
+        batch.failed_count = 0
+        batch.completed_at = None
+
+        result = MagicMock()
+        result.all.return_value = [("succeeded", 3), ("failed", 2)]
+
+        session = MagicMock()
+        session.flush = AsyncMock()
+        session.execute = AsyncMock(return_value=result)
+
+        service = BatchService(session)
+
+        changed = await service._reconcile_batch_counts(batch)
+
+        assert changed is True
+        assert batch.total_count == 5
+        assert batch.pending_count == 0
+        assert batch.running_count == 0
+        assert batch.succeeded_count == 3
+        assert batch.failed_count == 2
+        assert batch.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_get_batch_progress_returns_reconciled_operational_metrics(self):
+        """Progress response includes throughput, failure categories, queue depths, and AI safety."""
+        from api.models.batch import BatchFailureCategory
+        from api.models.processing import ProcessingMode
+        from api.services.batch_service import BatchService
+
+        batch = MagicMock()
+        batch.batch_id = uuid4()
+        batch.name = "Mark Wildman Import"
+        batch.channel = None
+        batch.processing_mode = ProcessingMode.TRANSCRIPT_ONLY.value
+        batch.total_count = 10
+        batch.pending_count = 0
+        batch.running_count = 0
+        batch.succeeded_count = 8
+        batch.failed_count = 2
+        batch.created_at = datetime(2026, 6, 13, tzinfo=UTC)
+
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = batch
+
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=result)
+
+        service = BatchService(session)
+        service._reconcile_batch_counts = AsyncMock(return_value=True)
+        service._get_batch_job_window = AsyncMock(
+            return_value=(
+                datetime(2026, 6, 13, 0, 0, tzinfo=UTC),
+                datetime(2026, 6, 13, 2, 0, tzinfo=UTC),
+            )
+        )
+        service._get_recent_completed_count = AsyncMock(return_value=4)
+        service._get_queue_depths = MagicMock(return_value={"transcribe-jobs": 0})
+        service._get_failure_categories = AsyncMock(
+            return_value=[BatchFailureCategory(category="no_captions", count=2)]
+        )
+        service._get_non_transcribe_job_count = AsyncMock(return_value=0)
+
+        progress = await service.get_batch_progress(batch.batch_id, recent_window_minutes=30)
+
+        assert progress is not None
+        assert progress.processing_mode == ProcessingMode.TRANSCRIPT_ONLY
+        assert progress.completed_count == 10
+        assert progress.progress_pct == 100
+        assert progress.elapsed_seconds == 7200
+        assert progress.overall_videos_per_hour == 5
+        assert progress.recent_videos_per_hour == 8
+        assert progress.queue_depths == {"transcribe-jobs": 0}
+        assert progress.failure_categories[0].category == "no_captions"
+        assert progress.non_transcribe_job_count == 0
+
+    def test_failure_categorization_keeps_no_caption_and_auth_distinct(self):
+        from api.services.batch_service import BatchService
+
+        service = BatchService(MagicMock())
+
+        assert (
+            service._categorize_transcribe_failure("No transcript available for this video")
+            == "no_captions"
+        )
+        assert (
+            service._categorize_transcribe_failure("Sign in to confirm your age") == "age_or_auth"
+        )
+        assert (
+            service._categorize_transcribe_failure("HTTP Error 429 rate limit") == "rate_or_block"
+        )
+
+    def test_batch_progress_response_model(self):
+        from api.models.batch import BatchProgressResponse, BatchStatus
+        from api.models.processing import ProcessingMode
+
+        response = BatchProgressResponse(
+            id=uuid4(),
+            name="Channel Import",
+            processing_mode=ProcessingMode.TRANSCRIPT_ONLY,
+            status=BatchStatus.COMPLETED,
+            total_count=3,
+            pending_count=0,
+            running_count=0,
+            succeeded_count=2,
+            failed_count=1,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            completed_count=3,
+            progress_pct=100,
+            queue_depths={"transcribe-jobs": 0},
+            non_transcribe_job_count=0,
+        )
+
+        assert response.completed_count == 3
+        assert response.progress_pct == 100
+        assert response.queue_depths["transcribe-jobs"] == 0
+
+
 # ============================================================================
 # List Batches Tests
 # ============================================================================
@@ -416,6 +548,24 @@ class TestGetBatch:
             assert "status" in data
             assert "items" in data
             assert isinstance(data["items"], list)
+
+
+class TestGetBatchProgress:
+    """Integration tests for GET /api/v1/batches/{batch_id}/progress endpoint."""
+
+    def test_get_batch_progress_requires_valid_uuid(self, client, headers):
+        response = client.get(
+            "/api/v1/batches/not-a-uuid/progress",
+            headers=headers,
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_get_batch_progress_validates_recent_window(self, client, headers, sample_batch_id):
+        response = client.get(
+            f"/api/v1/batches/{sample_batch_id}/progress?recent_window_minutes=1",
+            headers=headers,
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
 # ============================================================================

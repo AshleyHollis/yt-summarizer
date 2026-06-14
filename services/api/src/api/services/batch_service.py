@@ -1,6 +1,6 @@
 """Batch service for batch ingestion operations."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -14,7 +14,13 @@ try:
     from shared.logging.config import get_logger
     from shared.proxy import ProxyService
     from shared.proxy.models import ProxyConfigurationError
-    from shared.queue.client import TRANSCRIBE_QUEUE, get_queue_client
+    from shared.queue.client import (
+        EMBED_QUEUE,
+        RELATIONSHIPS_QUEUE,
+        SUMMARIZE_QUEUE,
+        TRANSCRIBE_QUEUE,
+        get_queue_client,
+    )
     from shared.telemetry.config import inject_trace_context
 except ImportError:
     from typing import Any
@@ -31,6 +37,9 @@ except ImportError:
         return logging.getLogger(name)
 
     TRANSCRIBE_QUEUE = "transcribe-jobs"
+    SUMMARIZE_QUEUE = "summarize-jobs"
+    EMBED_QUEUE = "embed-jobs"
+    RELATIONSHIPS_QUEUE = "relationships-jobs"
 
     def get_queue_client():
         raise NotImplementedError("Queue client not available")
@@ -51,8 +60,10 @@ from ..dependencies.quota import (
 )
 from ..models.batch import (
     BatchDetailResponse,
+    BatchFailureCategory,
     BatchItemStatus,
     BatchListResponse,
+    BatchProgressResponse,
     BatchResponse,
     BatchRetryResponse,
     BatchStatus,
@@ -577,6 +588,8 @@ class BatchService:
         if not batch:
             return None
 
+        await self._reconcile_batch_counts(batch)
+
         items = [
             BatchItemResponse(
                 id=item.batch_item_id,
@@ -605,6 +618,73 @@ class BatchService:
             created_at=batch.created_at,
             updated_at=batch.created_at,
             items=items,
+        )
+
+    async def get_batch_progress(
+        self,
+        batch_id: UUID,
+        recent_window_minutes: int = 60,
+    ) -> BatchProgressResponse | None:
+        """Get an operational progress summary for a long-running batch.
+
+        The response uses reconciled BatchItem counts so it remains trustworthy after retries,
+        manual repairs, or interrupted workers.
+        """
+        result = await self.session.execute(
+            select(Batch).options(selectinload(Batch.channel)).where(Batch.batch_id == batch_id)
+        )
+        batch = result.scalar_one_or_none()
+
+        if not batch:
+            return None
+
+        await self._reconcile_batch_counts(batch)
+
+        completed_count = batch.succeeded_count + batch.failed_count
+        progress_pct = (
+            round((completed_count / batch.total_count) * 100, 2) if batch.total_count else 100.0
+        )
+
+        first_job_created, last_job_completed = await self._get_batch_job_window(batch_id)
+        elapsed_seconds = self._elapsed_seconds(first_job_created, last_job_completed)
+        overall_videos_per_hour = (
+            round(completed_count / (elapsed_seconds / 3600), 2)
+            if elapsed_seconds and elapsed_seconds > 0
+            else None
+        )
+        recent_completed_count = await self._get_recent_completed_count(
+            batch_id,
+            recent_window_minutes,
+        )
+        recent_videos_per_hour = round(
+            recent_completed_count / (recent_window_minutes / 60),
+            2,
+        )
+
+        return BatchProgressResponse(
+            id=batch.batch_id,
+            name=batch.name or "",
+            channel_name=batch.channel.name if batch.channel else None,
+            processing_mode=ProcessingMode(batch.processing_mode),
+            status=self._compute_batch_status(batch),
+            total_count=batch.total_count,
+            pending_count=batch.pending_count,
+            running_count=batch.running_count,
+            succeeded_count=batch.succeeded_count,
+            failed_count=batch.failed_count,
+            created_at=batch.created_at,
+            updated_at=batch.created_at,
+            completed_count=completed_count,
+            progress_pct=progress_pct,
+            elapsed_seconds=elapsed_seconds,
+            overall_videos_per_hour=overall_videos_per_hour,
+            recent_videos_per_hour=recent_videos_per_hour,
+            recent_completed_count=recent_completed_count,
+            recent_window_minutes=recent_window_minutes,
+            queue_depths=self._get_queue_depths(),
+            failure_categories=await self._get_failure_categories(batch_id),
+            non_transcribe_job_count=await self._get_non_transcribe_job_count(batch_id),
+            counts_reconciled=True,
         )
 
     async def retry_failed_items(
@@ -662,6 +742,7 @@ class BatchService:
         retried_count = 0
         transcript_released_count = 0
         ai_released_count = 0
+        queued_transcribe_messages: list[dict[str, Any]] = []
         for item in failed_items:
             if (
                 transcript_quota_slots is not None
@@ -739,41 +820,31 @@ class BatchService:
                             str(item.video_id),
                         )
 
-                # Queue job
                 if transcript_quota_status == "released":
-                    try:
-                        # Get channel name for blob storage path
-                        channel_name = "unknown-channel"
-                        if item.video.channel:
-                            channel_name = item.video.channel.name
-                        elif batch.channel:
-                            channel_name = batch.channel.name
+                    # Queue after commit so workers cannot observe uncommitted SQL rows.
+                    channel_name = "unknown-channel"
+                    if item.video.channel:
+                        channel_name = item.video.channel.name
+                    elif batch.channel:
+                        channel_name = batch.channel.name
 
-                        queue_client = get_queue_client()
-                        queue_client.send_message(
-                            TRANSCRIBE_QUEUE,
-                            inject_trace_context(
-                                {
-                                    "job_id": str(job.job_id),
-                                    "video_id": str(item.video_id),
-                                    "youtube_video_id": item.video.youtube_video_id,
-                                    "channel_name": channel_name,
-                                    "batch_id": str(batch_id),
-                                    "correlation_id": correlation_id,
-                                    "processing_mode": processing_mode.value,
-                                }
-                            ),
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to queue retry job",
-                            job_id=str(job.job_id),
-                            error=str(e),
-                        )
+                    queued_transcribe_messages.append(
+                        {
+                            "job_id": str(job.job_id),
+                            "video_id": str(item.video_id),
+                            "youtube_video_id": item.video.youtube_video_id,
+                            "channel_name": channel_name,
+                            "batch_id": str(batch_id),
+                            "correlation_id": correlation_id,
+                            "processing_mode": processing_mode.value,
+                        }
+                    )
 
             retried_count += 1
 
+        await self._reconcile_batch_counts(batch)
         await self.session.commit()
+        self._dispatch_transcribe_messages(queued_transcribe_messages)
 
         return BatchRetryResponse(
             batch_id=batch_id,
@@ -859,6 +930,7 @@ class BatchService:
         batch.pending_count += 1
 
         # Reset video status
+        queued_transcribe_messages: list[dict[str, Any]] = []
         if item.video:
             item.video.processing_status = "pending"
             item.video.error_message = None
@@ -911,39 +983,28 @@ class BatchService:
                     str(item.video_id),
                 )
 
-            # Queue job
             if transcript_quota_status == "released":
-                try:
-                    # Get channel name for blob storage path
-                    channel_name = "unknown-channel"
-                    if item.video.channel:
-                        channel_name = item.video.channel.name
-                    elif batch.channel:
-                        channel_name = batch.channel.name
+                channel_name = "unknown-channel"
+                if item.video.channel:
+                    channel_name = item.video.channel.name
+                elif batch.channel:
+                    channel_name = batch.channel.name
 
-                    queue_client = get_queue_client()
-                    queue_client.send_message(
-                        TRANSCRIBE_QUEUE,
-                        inject_trace_context(
-                            {
-                                "job_id": str(job.job_id),
-                                "video_id": str(item.video_id),
-                                "youtube_video_id": item.video.youtube_video_id,
-                                "channel_name": channel_name,
-                                "batch_id": str(batch_id),
-                                "correlation_id": correlation_id,
-                                "processing_mode": processing_mode.value,
-                            }
-                        ),
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "Failed to queue retry job",
-                        job_id=str(job.job_id),
-                        error=str(e),
-                    )
+                queued_transcribe_messages.append(
+                    {
+                        "job_id": str(job.job_id),
+                        "video_id": str(item.video_id),
+                        "youtube_video_id": item.video.youtube_video_id,
+                        "channel_name": channel_name,
+                        "batch_id": str(batch_id),
+                        "correlation_id": correlation_id,
+                        "processing_mode": processing_mode.value,
+                    }
+                )
 
+        await self._reconcile_batch_counts(batch)
         await self.session.commit()
+        self._dispatch_transcribe_messages(queued_transcribe_messages)
 
         return BatchRetryResponse(
             batch_id=batch_id,
@@ -967,6 +1028,167 @@ class BatchService:
             created_at=batch.created_at,
             updated_at=batch.created_at,
         )
+
+    async def _reconcile_batch_counts(self, batch: Batch) -> bool:
+        """Recompute batch rollup counts from BatchItems.
+
+        This is intentionally small and SQL-backed so operational reads and retry repairs can
+        trust the item table as the source of truth.
+        """
+        if not getattr(batch, "batch_id", None):
+            return False
+
+        await self.session.flush()
+        result = await self.session.execute(
+            select(BatchItem.status, func.count(BatchItem.batch_item_id))
+            .where(BatchItem.batch_id == batch.batch_id)
+            .group_by(BatchItem.status)
+        )
+        status_counts = {status: int(count) for status, count in result.all()}
+        total_count = sum(status_counts.values())
+        pending_count = status_counts.get("pending", 0)
+        running_count = status_counts.get("running", 0)
+        succeeded_count = status_counts.get("succeeded", 0)
+        failed_count = status_counts.get("failed", 0)
+
+        changed = (
+            batch.total_count != total_count
+            or batch.pending_count != pending_count
+            or batch.running_count != running_count
+            or batch.succeeded_count != succeeded_count
+            or batch.failed_count != failed_count
+        )
+
+        batch.total_count = total_count
+        batch.pending_count = pending_count
+        batch.running_count = running_count
+        batch.succeeded_count = succeeded_count
+        batch.failed_count = failed_count
+
+        if pending_count == 0 and running_count == 0:
+            if batch.completed_at is None:
+                batch.completed_at = datetime.utcnow()
+                changed = True
+        elif batch.completed_at is not None:
+            batch.completed_at = None
+            changed = True
+
+        if changed:
+            logger.info(
+                "Reconciled batch counts",
+                batch_id=str(batch.batch_id),
+                counts={
+                    "total": total_count,
+                    "pending": pending_count,
+                    "running": running_count,
+                    "succeeded": succeeded_count,
+                    "failed": failed_count,
+                },
+            )
+
+        return changed
+
+    async def _get_batch_job_window(
+        self,
+        batch_id: UUID,
+    ) -> tuple[datetime | None, datetime | None]:
+        result = await self.session.execute(
+            select(func.min(Job.created_at), func.max(Job.completed_at)).where(
+                Job.batch_id == batch_id,
+                Job.job_type == JobType.TRANSCRIBE.value,
+            )
+        )
+        first_job_created, last_job_completed = result.one()
+        return first_job_created, last_job_completed
+
+    def _elapsed_seconds(
+        self,
+        first_job_created: datetime | None,
+        last_job_completed: datetime | None,
+    ) -> float | None:
+        if first_job_created is None:
+            return None
+
+        end_time = last_job_completed or datetime.utcnow()
+        elapsed = (end_time - first_job_created).total_seconds()
+        return max(elapsed, 0.0)
+
+    async def _get_recent_completed_count(
+        self,
+        batch_id: UUID,
+        recent_window_minutes: int,
+    ) -> int:
+        since = datetime.utcnow() - timedelta(minutes=recent_window_minutes)
+        result = await self.session.execute(
+            select(func.count(Job.job_id)).where(
+                Job.batch_id == batch_id,
+                Job.job_type == JobType.TRANSCRIBE.value,
+                Job.completed_at.is_not(None),
+                Job.completed_at >= since,
+            )
+        )
+        return int(result.scalar_one() or 0)
+
+    async def _get_failure_categories(self, batch_id: UUID) -> list[BatchFailureCategory]:
+        result = await self.session.execute(
+            select(Job.error_message).where(
+                Job.batch_id == batch_id,
+                Job.job_type == JobType.TRANSCRIBE.value,
+                Job.status == JobStatus.FAILED.value,
+            )
+        )
+
+        counts: dict[str, int] = {}
+        for error_message in result.scalars().all():
+            category = self._categorize_transcribe_failure(error_message or "")
+            counts[category] = counts.get(category, 0) + 1
+
+        return [
+            BatchFailureCategory(category=category, count=count)
+            for category, count in sorted(counts.items(), key=lambda item: item[1], reverse=True)
+        ]
+
+    def _categorize_transcribe_failure(self, error_message: str) -> str:
+        message = error_message.lower()
+        if "no transcript available" in message or "does not have captions" in message:
+            return "no_captions"
+        if "age" in message or "cookies" in message:
+            return "age_or_auth"
+        if "rate" in message or "blocking" in message or "too many requests" in message:
+            return "rate_or_block"
+        if "proxy" in message or "tunnel" in message:
+            return "proxy"
+        return "other"
+
+    async def _get_non_transcribe_job_count(self, batch_id: UUID) -> int:
+        result = await self.session.execute(
+            select(func.count(Job.job_id)).where(
+                Job.batch_id == batch_id,
+                Job.job_type != JobType.TRANSCRIBE.value,
+            )
+        )
+        return int(result.scalar_one() or 0)
+
+    def _get_queue_depths(self) -> dict[str, int | None]:
+        queue_names = [TRANSCRIBE_QUEUE, SUMMARIZE_QUEUE, EMBED_QUEUE, RELATIONSHIPS_QUEUE]
+        try:
+            queue_client = get_queue_client()
+        except Exception as e:
+            logger.warning("Unable to create queue client for batch progress", error=str(e))
+            return {queue_name: None for queue_name in queue_names}
+
+        depths: dict[str, int | None] = {}
+        for queue_name in queue_names:
+            try:
+                depths[queue_name] = queue_client.get_queue_length(queue_name)
+            except Exception as e:
+                logger.warning(
+                    "Unable to read queue depth for batch progress",
+                    queue_name=queue_name,
+                    error=str(e),
+                )
+                depths[queue_name] = None
+        return depths
 
     def _compute_batch_status(self, batch: Batch) -> BatchStatus:
         """Compute overall batch status from counts."""
