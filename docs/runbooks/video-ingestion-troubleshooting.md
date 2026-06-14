@@ -68,7 +68,49 @@ Get-Content aspire.log | Select-String -Pattern "job\.(started|completed|failed)
 
 ---
 
-### 3. OpenAI API Errors
+### 3. Age-Gated Videos
+
+**Symptoms**:
+- Error contains: "Age-gated video requires an age-gated transcript worker"
+- YouTube asks to sign in to confirm age
+- The video may have captions, but anonymous yt-dlp access cannot read metadata/subtitles
+
+**Behavior**:
+- Regular transcribe workers do not use browser cookies, even if cookie settings are present.
+- Age-gated failures are marked failed and terminal in the queue so regular workers do not keep
+  retrying the same message.
+- A transcribe worker must declare `TRANSCRIBE_CAPABILITIES=age_gated` before yt-dlp cookie
+  settings are honored.
+
+**Local recovery with an existing signed-in browser profile**:
+1. Make sure the target video is in a failed state with an age-gated error.
+2. Start only one local transcribe worker with an explicit capability and cookie source:
+   ```powershell
+   cd services/workers
+   $env:TRANSCRIBE_CAPABILITIES = "age_gated,local"
+   $env:YTDLP_COOKIES_FROM_BROWSER = "edge:Default"
+   uv run python -m transcribe
+   ```
+3. Retry the specific failed transcribe job or batch item.
+4. Stop the local worker after the recovery job succeeds.
+5. Clear the cookie-related environment variables from the shell.
+
+If the browser cookie database is locked, close the browser or export a temporary Netscape cookie
+file and use `YTDLP_COOKIES_FILE` instead. Treat exported cookie files as secrets and delete them
+after recovery.
+
+**Production account path**:
+- Do not store a personal YouTube browser profile or personal cookies in production.
+- For persistent PROD age-gated processing, create a dedicated YouTube account, document its owner
+  and recovery path, export or refresh an authenticated cookie/session artifact, store that artifact
+  in Azure Key Vault via Terraform, and deploy a dedicated age-gated transcribe worker that has
+  `TRANSCRIBE_CAPABILITIES=age_gated`.
+- Keep the regular transcribe worker pool unauthenticated so only the dedicated worker has the
+  expanded blast radius.
+
+---
+
+### 4. OpenAI API Errors
 
 **Symptoms**:
 - Summarize or embed jobs failing
@@ -91,7 +133,7 @@ Get-Content aspire.log | Select-String -Pattern "job\.(started|completed|failed)
 
 ---
 
-### 4. Database Write Failures
+### 5. Database Write Failures
 
 **Symptoms**:
 - Jobs fail at persist step
@@ -112,7 +154,7 @@ Get-Content aspire.log | Select-String -Pattern "job\.(started|completed|failed)
 
 ---
 
-### 5. Queue Message Failures
+### 6. Queue Message Failures
 
 **Symptoms**:
 - Job stuck between stages

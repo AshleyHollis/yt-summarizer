@@ -11,6 +11,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def refresh_settings_cache():
+    """Keep environment-driven worker settings isolated between tests."""
+    from shared.config import refresh_settings
+
+    refresh_settings()
+    yield
+    refresh_settings()
+
+
 class TestContentValidation:
     """Tests for _is_valid_transcript_content method."""
 
@@ -204,7 +214,6 @@ class TestFetchTranscriptRetry:
         "error_message",
         [
             "ERROR: [youtube] abc123: Sign in to confirm you're not a bot.",
-            "ERROR: [youtube] abc123: Sign in to confirm your age.",
             "ERROR: [youtube] abc123: Use --cookies-from-browser or --cookies.",
             "Tunnel connection failed: 402 Payment Required",
         ],
@@ -224,6 +233,140 @@ class TestFetchTranscriptRetry:
 
             with pytest.raises(RateLimitError):
                 await worker._fetch_transcript_with_timestamps_and_text("test_video_id")
+
+    @pytest.mark.asyncio
+    async def test_age_confirmation_is_classified_as_age_gated(self, worker):
+        """Age confirmation is a capability/auth problem, not a no-caption result."""
+        import yt_dlp
+
+        from transcribe.worker import AgeGatedTranscriptError
+
+        with patch("yt_dlp.YoutubeDL") as mock_ydl_class:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+            mock_ydl.__exit__ = MagicMock(return_value=False)
+            mock_ydl.extract_info.side_effect = yt_dlp.utils.DownloadError(
+                "ERROR: [youtube] abc123: Sign in to confirm your age."
+            )
+            mock_ydl_class.return_value = mock_ydl
+
+            with pytest.raises(AgeGatedTranscriptError):
+                await worker._fetch_transcript_with_timestamps_and_text("test_video_id")
+
+
+class TestAgeGatedWorkerCapability:
+    """Tests for explicit age-gated worker capability and yt-dlp auth options."""
+
+    def test_cookie_file_ignored_without_age_gated_capability(self, monkeypatch):
+        from shared.config import refresh_settings
+
+        from transcribe.worker import TranscribeWorker
+
+        monkeypatch.setenv("YTDLP_COOKIES_FILE", "C:/secure/youtube-cookies.txt")
+        refresh_settings()
+
+        worker = TranscribeWorker()
+
+        assert worker.can_process_age_gated is False
+        assert worker._get_yt_dlp_auth_opts() == {}
+
+    def test_cookie_file_used_with_age_gated_capability(self, monkeypatch):
+        from shared.config import refresh_settings
+
+        from transcribe.worker import TranscribeWorker
+
+        monkeypatch.setenv("TRANSCRIBE_CAPABILITIES", "age_gated")
+        monkeypatch.setenv("YTDLP_COOKIES_FILE", "C:/secure/youtube-cookies.txt")
+        refresh_settings()
+
+        worker = TranscribeWorker()
+
+        assert worker.can_process_age_gated is True
+        assert worker._get_yt_dlp_auth_opts() == {"cookiefile": "C:/secure/youtube-cookies.txt"}
+
+    def test_browser_profile_used_with_age_gated_capability(self, monkeypatch):
+        from shared.config import refresh_settings
+
+        from transcribe.worker import TranscribeWorker
+
+        monkeypatch.setenv("TRANSCRIBE_CAPABILITIES", "age_gated,local")
+        monkeypatch.setenv("YTDLP_COOKIES_FROM_BROWSER", "edge:Default")
+        refresh_settings()
+
+        worker = TranscribeWorker()
+
+        assert worker.can_process_age_gated is True
+        assert worker.capabilities == {"age_gated", "local"}
+        assert worker._get_yt_dlp_auth_opts() == {
+            "cookiesfrombrowser": ("edge", "Default", None, None)
+        }
+
+    @pytest.mark.asyncio
+    async def test_missing_required_capability_fails_before_youtube_call(self):
+        from shared.worker.base_worker import WorkerStatus
+
+        from transcribe.worker import TranscribeMessage, TranscribeWorker
+
+        worker = TranscribeWorker()
+        message = TranscribeMessage(
+            job_id="test-job-id",
+            video_id="test-video-id",
+            youtube_video_id="age_gated_video",
+            correlation_id="test-correlation",
+            required_capabilities=["age_gated"],
+        )
+
+        with (
+            patch("transcribe.worker.mark_job_running", new_callable=AsyncMock),
+            patch("transcribe.worker.mark_job_failed", new_callable=AsyncMock) as mock_failed,
+            patch.object(
+                worker, "_fetch_transcript_with_timestamps_and_text", new_callable=AsyncMock
+            ) as mock_fetch,
+        ):
+            result = await worker.process_message(message, "test-correlation")
+
+            assert result.status == WorkerStatus.DEAD_LETTER
+            assert "age_gated" in result.message
+            mock_failed.assert_called_once()
+            mock_fetch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_age_gated_error_marks_job_failed_with_clear_message(self):
+        from shared.worker.base_worker import WorkerStatus
+
+        from transcribe.worker import (
+            AGE_GATED_TRANSCRIPT_ERROR,
+            AgeGatedTranscriptError,
+            TranscribeMessage,
+            TranscribeWorker,
+        )
+
+        worker = TranscribeWorker()
+        message = TranscribeMessage(
+            job_id="test-job-id",
+            video_id="test-video-id",
+            youtube_video_id="age_gated_video",
+            correlation_id="test-correlation",
+        )
+
+        with (
+            patch("transcribe.worker.mark_job_running", new_callable=AsyncMock),
+            patch("transcribe.worker.mark_job_failed", new_callable=AsyncMock) as mock_failed,
+            patch.object(
+                worker, "_check_existing_transcript", new_callable=AsyncMock, return_value=None
+            ),
+            patch.object(worker, "_has_permanent_no_captions", return_value=False),
+            patch.object(
+                worker, "_fetch_transcript_with_timestamps_and_text", new_callable=AsyncMock
+            ) as mock_fetch,
+        ):
+            mock_fetch.side_effect = AgeGatedTranscriptError(AGE_GATED_TRANSCRIPT_ERROR)
+
+            result = await worker.process_message(message, "test-correlation")
+
+            assert result.status == WorkerStatus.DEAD_LETTER
+            assert result.message == AGE_GATED_TRANSCRIPT_ERROR
+            mock_failed.assert_called_once_with(message.job_id, AGE_GATED_TRANSCRIPT_ERROR)
 
 
 class TestWorkerResultOnInvalidContent:

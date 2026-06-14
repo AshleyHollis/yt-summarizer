@@ -318,6 +318,55 @@ class QueueSettings(BaseSettings):
     )
 
 
+class TranscribeSettings(BaseSettings):
+    """Transcript worker capability and authenticated fetch settings.
+
+    Authenticated YouTube access is intentionally opt-in. Cookie settings are ignored unless the
+    worker declares the matching capability via TRANSCRIBE_CAPABILITIES=age_gated.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="TRANSCRIBE_")
+
+    capabilities: str = Field(
+        default="",
+        description="Comma-separated worker capabilities, for example: age_gated",
+    )
+
+    @property
+    def normalized_capabilities(self) -> set[str]:
+        """Return lower-case worker capabilities."""
+        return {
+            capability.strip().lower()
+            for capability in self.capabilities.split(",")
+            if capability.strip()
+        }
+
+    @property
+    def can_process_age_gated(self) -> bool:
+        """Whether this worker is allowed to use authenticated YouTube access."""
+        return "age_gated" in self.normalized_capabilities
+
+
+class YtDlpSettings(BaseSettings):
+    """yt-dlp authentication settings for local or dedicated age-gated workers."""
+
+    model_config = SettingsConfigDict(env_prefix="YTDLP_")
+
+    cookies_file: str = Field(
+        default="",
+        description="Path to a Netscape-format cookie file for yt-dlp.",
+    )
+    cookies_from_browser: str = Field(
+        default="",
+        description="Browser spec passed to yt-dlp cookiesfrombrowser, e.g. chrome or edge:Default.",
+    )
+
+    @property
+    def has_authentication(self) -> bool:
+        """Whether any yt-dlp authentication source is configured."""
+        return bool(self.cookies_file or self.cookies_from_browser)
+
+
 class LoggingSettings(BaseSettings):
     """Logging configuration settings."""
 
@@ -474,6 +523,8 @@ class Settings(BaseSettings):
     storage: AzureStorageSettings = Field(default_factory=AzureStorageSettings)
     openai: OpenAISettings = Field(default_factory=OpenAISettings)
     queue: QueueSettings = Field(default_factory=QueueSettings)
+    transcribe: TranscribeSettings = Field(default_factory=TranscribeSettings)
+    yt_dlp: YtDlpSettings = Field(default_factory=YtDlpSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     api: APISettings = Field(default_factory=APISettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
