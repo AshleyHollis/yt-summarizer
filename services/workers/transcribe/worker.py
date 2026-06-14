@@ -323,7 +323,9 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
 
             # Short-circuit: if a prior job already determined this video has no captions,
             # fail immediately instead of hitting YouTube (which may rate-limit us again).
-            if await self._has_permanent_no_captions(message.video_id):
+            if "age_gated" not in (message.required_capabilities or []) and (
+                await self._has_permanent_no_captions(message.video_id)
+            ):
                 error_msg = (
                     "No transcript available for this video. "
                     "This video does not have captions or auto-generated subtitles on YouTube. "
@@ -635,6 +637,9 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
 
             ydl_opts = {
                 "skip_download": True,  # Don't download video/audio
+                # Some age-gated videos expose captions but no playable video formats
+                # to yt-dlp when using authenticated cookies. We only need subtitles.
+                "ignore_no_formats_error": True,
                 "writesubtitles": True,
                 "writeautomaticsub": True,
                 "subtitleslangs": ["en"],
@@ -659,6 +664,9 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 # Authenticated YouTube access is only enabled on explicit age-gated workers.
                 **self._get_yt_dlp_auth_opts(),
             }
+
+            if self._settings.yt_dlp.has_authentication and self.can_process_age_gated:
+                ydl_opts.pop("extractor_args", None)
 
             logger.info(
                 "Starting subtitle download with rate limit delay",
