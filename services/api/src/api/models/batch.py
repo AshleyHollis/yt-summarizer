@@ -106,6 +106,56 @@ class BatchDetailResponse(BatchResponse):
     items: list[BatchItem] = Field(default_factory=list, description="All items in the batch")
 
 
+class BatchFailureCategory(BaseResponse):
+    """Grouped failure summary for a batch."""
+
+    category: str = Field(description="Normalized failure category")
+    count: int = Field(description="Number of failures in this category")
+
+
+class BatchProgressResponse(BatchResponse):
+    """Operational progress view for long-running batch ingestion."""
+
+    completed_count: int = Field(description="Succeeded plus failed item count")
+    progress_pct: float = Field(description="Completed percentage from reconciled item counts")
+    elapsed_seconds: float | None = Field(
+        default=None,
+        description="Seconds between the first batch job creation and last known completion/now",
+    )
+    overall_videos_per_hour: float | None = Field(
+        default=None,
+        description="Completed videos per hour across the whole observed batch window",
+    )
+    recent_videos_per_hour: float | None = Field(
+        default=None,
+        description="Completed videos per hour over the recent observation window",
+    )
+    recent_completed_count: int = Field(
+        default=0,
+        description="Videos completed during the recent observation window",
+    )
+    recent_window_minutes: int = Field(
+        default=60,
+        description="Recent throughput window size in minutes",
+    )
+    queue_depths: dict[str, int | None] = Field(
+        default_factory=dict,
+        description="Approximate Azure Storage Queue depths by queue name",
+    )
+    failure_categories: list[BatchFailureCategory] = Field(
+        default_factory=list,
+        description="Normalized failure category counts",
+    )
+    non_transcribe_job_count: int = Field(
+        default=0,
+        description="Non-transcribe jobs associated with this batch; should be zero for transcript-only",
+    )
+    counts_reconciled: bool = Field(
+        default=True,
+        description="Whether response counts were recomputed from BatchItems before returning",
+    )
+
+
 class BatchListResponse(BaseResponse):
     """Paginated list of batches."""
 

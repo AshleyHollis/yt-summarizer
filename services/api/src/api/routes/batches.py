@@ -27,6 +27,7 @@ from ..middleware.correlation import get_correlation_id
 from ..models.batch import (
     BatchDetailResponse,
     BatchListResponse,
+    BatchProgressResponse,
     BatchResponse,
     BatchRetryResponse,
     CreateBatchRequest,
@@ -130,6 +131,37 @@ async def get_batch(
     Returns full batch information with status of each video.
     """
     result = await service.get_batch(batch_id)
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch not found",
+        )
+
+    return result
+
+
+@router.get(
+    "/{batch_id}/progress",
+    response_model=BatchProgressResponse,
+    summary="Get Batch Progress",
+    description="Get reconciled operational progress and throughput for a batch",
+)
+async def get_batch_progress(
+    batch_id: UUID,
+    recent_window_minutes: int = Query(
+        default=60,
+        ge=5,
+        le=24 * 60,
+        description="Window for recent throughput calculation",
+    ),
+    service: BatchService = Depends(get_batch_service),
+) -> BatchProgressResponse:
+    """Get reconciled progress, throughput, queue depths, and failure categories."""
+    result = await service.get_batch_progress(
+        batch_id,
+        recent_window_minutes=recent_window_minutes,
+    )
 
     if not result:
         raise HTTPException(
