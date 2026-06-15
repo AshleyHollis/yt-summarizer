@@ -123,9 +123,7 @@ class LibraryLayoutMigrator:
                 for video in videos:
                     try:
                         result = await self._migrate_video(session, video)
-                        if self.dry_run:
-                            await session.rollback()
-                        else:
+                        if not self.dry_run:
                             await session.commit()
                     except Exception:
                         await session.rollback()
