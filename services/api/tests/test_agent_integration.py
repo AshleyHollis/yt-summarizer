@@ -6,6 +6,20 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+def _route_paths(app) -> list[str]:
+    """Collect paths from concrete routes and FastAPI included-router wrappers."""
+    paths: list[str] = []
+    for route in app.routes:
+        if hasattr(route, "path"):
+            paths.append(route.path)
+        original_router = getattr(route, "original_router", None)
+        if original_router:
+            paths.extend(
+                nested.path for nested in original_router.routes if hasattr(nested, "path")
+            )
+    return paths
+
+
 @pytest.mark.unit  # run in CI without live DB
 def test_agent_routes_registered():
     """All 7 agent routes are registered in the app."""
@@ -13,7 +27,7 @@ def test_agent_routes_registered():
     from api.main import create_app
 
     app = create_app()
-    paths = [r.path for r in app.routes]
+    paths = _route_paths(app)
     agent_paths = [p for p in paths if "/agent/" in p or p.startswith("/api/v1/agent")]
     assert len(agent_paths) >= 7, f"Expected 7+ agent routes, got {len(agent_paths)}: {agent_paths}"
 

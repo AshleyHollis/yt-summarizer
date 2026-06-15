@@ -40,6 +40,20 @@ requires_agent_framework_ag_ui = pytest.mark.skipif(
 )
 
 
+def _route_paths(app: FastAPI) -> list[str]:
+    """Collect paths from concrete routes and FastAPI included-router wrappers."""
+    paths: list[str] = []
+    for route in app.routes:
+        if hasattr(route, "path"):
+            paths.append(route.path)
+        original_router = getattr(route, "original_router", None)
+        if original_router:
+            paths.extend(
+                nested.path for nested in original_router.routes if hasattr(nested, "path")
+            )
+    return paths
+
+
 # =============================================================================
 # Test: Agent Framework Availability (REQUIRED for CopilotKit)
 # =============================================================================
@@ -561,7 +575,7 @@ class TestFullApplicationIntegration:
         app = create_app()
 
         # Get all registered route paths
-        route_paths = [route.path for route in app.routes]
+        route_paths = _route_paths(app)
 
         assert "/api/copilotkit" in route_paths, "Main app should register /api/copilotkit route"
         assert "/api/copilotkit/info" in route_paths, (
