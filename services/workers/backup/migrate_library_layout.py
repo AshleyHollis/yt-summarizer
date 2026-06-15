@@ -98,11 +98,13 @@ class LibraryLayoutMigrator:
         dry_run: bool,
         delete_verified: bool,
         channels: list[str],
+        limit: int | None = None,
         blob_client: BlobClient | None = None,
     ) -> None:
         self.dry_run = dry_run
         self.delete_verified = delete_verified
         self.channels = [sanitize_channel_name(channel) for channel in channels]
+        self.limit = limit
         self.blob_client = blob_client or get_blob_client()
 
     async def run(self) -> MigrationReport:
@@ -113,22 +115,37 @@ class LibraryLayoutMigrator:
             channels=self.channels,
         )
         db = get_db()
-        async with db.session() as session:
-            videos = await self._load_videos(session)
-
-        report.videos_seen = len(videos)
-        for video in videos:
-            async with db.session() as session:
-                result = await self._migrate_video(session, video)
-            self._delete_verified_legacy_blobs(result)
-            self._apply_video_result(report, result)
-            logger.info(
-                "Library layout migration video processed",
-                channel_slug=result.channel_slug,
-                youtube_video_id=result.youtube_video_id,
-                status=result.status,
-            )
+        try:
+            async with db.session_factory() as session:
+                videos = await self._load_videos(session)
+                videos = self._apply_limit(videos)
+                report.videos_seen = len(videos)
+                for video in videos:
+                    try:
+                        result = await self._migrate_video(session, video)
+                        if self.dry_run:
+                            await session.rollback()
+                        else:
+                            await session.commit()
+                    except Exception:
+                        await session.rollback()
+                        raise
+                    self._delete_verified_legacy_blobs(result)
+                    self._apply_video_result(report, result)
+                    logger.info(
+                        "Library layout migration video processed",
+                        channel_slug=result.channel_slug,
+                        youtube_video_id=result.youtube_video_id,
+                        status=result.status,
+                    )
+        finally:
+            await db.close()
         return report
+
+    def _apply_limit(self, videos: list[Video]) -> list[Video]:
+        if self.limit is None:
+            return videos
+        return videos[: self.limit]
 
     async def _load_videos(self, session: AsyncSession) -> list[Video]:
         stmt = (
@@ -340,6 +357,12 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Limit migration to a channel name, slug, or YouTube channel ID",
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit the number of selected videos processed, useful for canary dry-runs",
+    )
     return parser.parse_args()
 
 
@@ -351,6 +374,7 @@ async def async_main() -> None:
         dry_run=dry_run,
         delete_verified=bool(args.execute and args.delete_verified),
         channels=args.channel,
+        limit=args.limit,
     )
     report = await migrator.run()
     logger.info("Library layout migration completed", report=asdict(report))
