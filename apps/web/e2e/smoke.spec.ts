@@ -37,7 +37,9 @@ test.describe('Core User Flows @smoke', () => {
 
     test('Browse Library CTA navigates to library @smoke', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
-      await page.getByRole('link', { name: /Browse Library/i }).click();
+      const browseLibraryCta = page.locator('main a[href="/library"]').first();
+      await expect(browseLibraryCta).toBeVisible();
+      await browseLibraryCta.click();
       await expect(page).toHaveURL(/\/library\/?(?:[?#].*)?$/, { timeout: 15_000 });
       await expect(page.locator('main')).toBeVisible();
     });

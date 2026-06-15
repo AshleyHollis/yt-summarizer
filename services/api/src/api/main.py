@@ -69,6 +69,9 @@ except ImportError:
         raise NotImplementedError("Database not available in fallback mode")
 
 
+logger = get_logger(__name__)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup/shutdown events."""
@@ -76,7 +79,6 @@ async def lifespan(app: FastAPI):
     import os
     from datetime import datetime
 
-    logger = get_logger(__name__)
     settings = get_settings()
 
     # Store startup timestamp for uptime calculation (T181b)
@@ -272,14 +274,36 @@ def create_app() -> FastAPI:
     setup_agui_endpoint(app)
 
     # Instrument FastAPI with OpenTelemetry (T185a)
+    _instrument_fastapi_safely(app)
+
+    return app
+
+
+def _instrument_fastapi_safely(app: FastAPI) -> None:
+    """Instrument FastAPI unless registered route wrappers are incompatible.
+
+    The AG-UI integration registers FastAPI ``_IncludedRouter`` wrapper objects on
+    newer FastAPI versions. Current OpenTelemetry FastAPI instrumentation assumes
+    every route object has ``.path`` and raises ``AttributeError`` for browser
+    preflight requests when those wrappers are present.
+    """
+    incompatible_routes = [
+        type(route).__name__ for route in app.routes if not hasattr(route, "path")
+    ]
+    if incompatible_routes:
+        logger.warning(
+            "Skipping FastAPI OpenTelemetry instrumentation because route wrappers "
+            "are incompatible: %s",
+            incompatible_routes,
+        )
+        return
+
     try:
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
         FastAPIInstrumentor.instrument_app(app)
     except ImportError:
         pass  # OpenTelemetry instrumentation not available
-
-    return app
 
 
 async def http_exception_handler(

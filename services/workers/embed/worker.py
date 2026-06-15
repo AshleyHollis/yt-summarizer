@@ -15,6 +15,7 @@ except ImportError:
 import sqlalchemy as sa
 
 from shared.blob.client import (
+    LIBRARY_CONTAINER,
     SUMMARIES_CONTAINER,
     TRANSCRIPTS_CONTAINER,
     get_blob_client,
@@ -106,8 +107,9 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 message.channel_name, message.youtube_video_id
             )
             segments_json = await self._fetch_content(
-                TRANSCRIPTS_CONTAINER,
+                LIBRARY_CONTAINER,
                 segments_blob_path,
+                fallback_container=TRANSCRIPTS_CONTAINER,
             )
 
             timestamped_segments = None
@@ -139,12 +141,14 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
                 )
 
                 transcript = await self._fetch_content(
-                    TRANSCRIPTS_CONTAINER,
+                    LIBRARY_CONTAINER,
                     transcript_blob_path,
+                    fallback_container=TRANSCRIPTS_CONTAINER,
                 )
                 summary = await self._fetch_content(
-                    SUMMARIES_CONTAINER,
+                    LIBRARY_CONTAINER,
                     summary_blob_path,
+                    fallback_container=SUMMARIES_CONTAINER,
                 )
 
                 if not transcript and not summary:
@@ -203,10 +207,18 @@ class EmbedWorker(BaseWorker[EmbedMessage]):
             await mark_job_failed(message.job_id, str(e))
             return WorkerResult.failed(e)
 
-    async def _fetch_content(self, container: str, blob_name: str) -> str | None:
+    async def _fetch_content(
+        self,
+        container: str,
+        blob_name: str,
+        *,
+        fallback_container: str | None = None,
+    ) -> str | None:
         """Fetch content from blob storage."""
         try:
             blob_client = get_blob_client()
+            if not blob_client.blob_exists(container, blob_name) and fallback_container:
+                container = fallback_container
             content = blob_client.download_blob(container, blob_name)
             return content.decode("utf-8")
         except Exception as e:

@@ -13,6 +13,7 @@ module "storage" {
   account_replication_type = "GRS"
 
   containers = [
+    { name = "library" },
     { name = "transcripts" },
     { name = "summaries" },
     { name = "embeddings" }

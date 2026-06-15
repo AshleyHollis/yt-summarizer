@@ -9,7 +9,12 @@ from sqlalchemy.orm import contains_eager, noload, selectinload
 
 # Import shared modules
 try:
-    from shared.blob.client import SUMMARIES_CONTAINER, extract_blob_name_from_uri, get_blob_client
+    from shared.blob.client import (
+        LIBRARY_CONTAINER,
+        SUMMARIES_CONTAINER,
+        extract_blob_name_from_uri,
+        get_blob_client,
+    )
     from shared.db.models import (
         Artifact,
         Channel,
@@ -36,6 +41,7 @@ except ImportError as e:
     VideoFacet = Any
     get_blob_client = None
     SUMMARIES_CONTAINER = "summaries"
+    LIBRARY_CONTAINER = "library"
 
     def extract_blob_name_from_uri(blob_uri: str, container_name: str) -> str:
         parts = blob_uri.split(f"/{container_name}/")
@@ -310,7 +316,7 @@ class LibraryService:
         summary_artifact = None
         transcript_artifact = None
         summary_text = None
-        summary_blob_name = None
+        summary_blob_ref = None
 
         for artifact in video.artifacts:
             artifact_info = ArtifactInfo(
@@ -326,12 +332,17 @@ class LibraryService:
                 # blob_uri format: http://host/account/container/{video_id}/{youtube_video_id}_summary.md
                 # We need to extract: {video_id}/{youtube_video_id}_summary.md (everything after container name)
                 if artifact.blob_uri:
-                    summary_blob_name = extract_blob_name_from_uri(
-                        artifact.blob_uri,
-                        SUMMARIES_CONTAINER,
+                    container = (
+                        LIBRARY_CONTAINER
+                        if f"/{LIBRARY_CONTAINER}/" in artifact.blob_uri
+                        else SUMMARIES_CONTAINER
+                    )
+                    summary_blob_ref = (
+                        container,
+                        extract_blob_name_from_uri(artifact.blob_uri, container),
                     )
                 else:
-                    summary_blob_name = None
+                    summary_blob_ref = None
             elif artifact.artifact_type == "transcript":
                 transcript_artifact = artifact_info
 
@@ -342,10 +353,11 @@ class LibraryService:
         )
 
         # Fetch summary content from blob storage if available
-        if summary_blob_name and get_blob_client is not None:
+        if summary_blob_ref and get_blob_client is not None:
             try:
                 blob_client = get_blob_client()
-                summary_bytes = blob_client.download_blob(SUMMARIES_CONTAINER, summary_blob_name)
+                container, blob_name = summary_blob_ref
+                summary_bytes = blob_client.download_blob(container, blob_name)
                 summary_text = summary_bytes.decode("utf-8")
             except Exception as e:
                 logger.warning(f"Failed to fetch summary from blob: {e}")
