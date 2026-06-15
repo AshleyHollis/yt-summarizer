@@ -88,6 +88,20 @@ def test_copy_and_verify_missing_source_is_not_failure():
     assert result.status == "missing"
 
 
+def test_apply_limit_keeps_selected_order():
+    migrator = LibraryLayoutMigrator(
+        dry_run=True,
+        delete_verified=False,
+        channels=[],
+        limit=2,
+        blob_client=_MemoryBlobClient(),
+    )
+
+    videos = [object(), object(), object()]
+
+    assert migrator._apply_limit(videos) == videos[:2]
+
+
 def test_delete_verified_legacy_blobs_only_after_success():
     blob_path = "mark-wildman/video/transcript.txt"
     blob_client = _MemoryBlobClient({(TRANSCRIPTS_CONTAINER, blob_path): b"hello"})
