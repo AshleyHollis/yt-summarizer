@@ -42,3 +42,23 @@ def test_agent_requires_auth():
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.post("/api/v1/agent/search/semantic", json={"query": "test"})
     assert resp.status_code == 401
+
+
+@pytest.mark.unit
+def test_options_preflight_does_not_crash_with_agui_routes():
+    """Browser preflight requests must not crash when AG-UI routes are registered."""
+    os.environ["API_KEY"] = "test-key"
+    from api.main import create_app
+
+    app = create_app()
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.options(
+        "/api/v1/library/videos",
+        headers={
+            "Origin": "https://preview.example.test",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        },
+    )
+
+    assert resp.status_code != 500
