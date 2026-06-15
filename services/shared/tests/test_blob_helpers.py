@@ -6,11 +6,15 @@ import pytest
 from azure.core.exceptions import ResourceNotFoundError
 
 from shared.blob.client import (
+    LIBRARY_CONTAINER,
     SUMMARIES_CONTAINER,
     BlobClient,
     extract_blob_name_from_uri,
+    get_metadata_blob_path,
     get_segments_blob_path,
+    get_summary_blob_path,
     get_transcript_blob_path,
+    get_video_folder_path,
     sanitize_channel_name,
 )
 
@@ -84,6 +88,15 @@ class TestGetTranscriptBlobPath:
         assert result == "my-channel/video123/transcript.txt"
 
 
+class TestGetVideoFolderPath:
+    """Tests for canonical self-contained video folder paths."""
+
+    def test_basic_folder_path(self):
+        """Test canonical folder path generation."""
+        result = get_video_folder_path("Mark Wildman", "abc123")
+        assert result == "mark-wildman/abc123"
+
+
 class TestGetSegmentsBlobPath:
     """Tests for get_segments_blob_path function."""
 
@@ -96,6 +109,24 @@ class TestGetSegmentsBlobPath:
         """Test that YouTube video ID is preserved exactly."""
         result = get_segments_blob_path("Channel", "ABC123xyz")
         assert result == "channel/ABC123xyz/segments.json"
+
+
+class TestGetSummaryBlobPath:
+    """Tests for get_summary_blob_path function."""
+
+    def test_basic_path(self):
+        """Test basic summary path generation."""
+        result = get_summary_blob_path("Test Channel", "dQw4w9WgXcQ")
+        assert result == "test-channel/dQw4w9WgXcQ/summary.md"
+
+
+class TestGetMetadataBlobPath:
+    """Tests for get_metadata_blob_path function."""
+
+    def test_basic_path(self):
+        """Test basic metadata path generation."""
+        result = get_metadata_blob_path("Test Channel", "dQw4w9WgXcQ")
+        assert result == "test-channel/dQw4w9WgXcQ/metadata.json"
 
 
 class TestExtractBlobNameFromUri:
@@ -117,6 +148,16 @@ class TestExtractBlobNameFromUri:
         assert extract_blob_name_from_uri("video_summary.md", SUMMARIES_CONTAINER) == (
             "video_summary.md"
         )
+
+    def test_extracts_library_blob_path(self):
+        """Test extracting canonical library blob paths."""
+        blob_uri = (
+            "https://account.blob.core.windows.net/library/mark-wildman/dQw4w9WgXcQ/transcript.txt"
+        )
+
+        result = extract_blob_name_from_uri(blob_uri, LIBRARY_CONTAINER)
+
+        assert result == "mark-wildman/dQw4w9WgXcQ/transcript.txt"
 
 
 class TestBlobClientDownload:

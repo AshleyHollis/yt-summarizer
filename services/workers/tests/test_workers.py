@@ -220,6 +220,7 @@ class TestTranscribeWorkerProcessing:
                 worker, "_store_timestamped_segments", new_callable=AsyncMock
             ) as mock_store_ts,
             patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact,
+            patch.object(worker, "_write_metadata", new_callable=AsyncMock) as mock_metadata,
             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue,
             patch.object(worker, "_has_permanent_no_captions", return_value=False),
         ):
@@ -231,8 +232,11 @@ class TestTranscribeWorkerProcessing:
                     {"start": 5.0, "duration": 5.0, "text": "This is a test"},
                 ],
             )
-            mock_store.return_value = f"transcripts/{sample_video_id}.txt"
-            mock_store_ts.return_value = f"transcripts/{sample_video_id}_segments.json"
+            mock_store.return_value = f"library/test-channel/{sample_video_id}/transcript.txt"
+            mock_store_ts.return_value = (
+                f"library/test-channel/{sample_video_id}/segments.json",
+                b"[]",
+            )
 
             # Process the message
             result = await worker.process_message(message, sample_correlation_id)
@@ -250,6 +254,7 @@ class TestTranscribeWorkerProcessing:
 
             # Verify timestamped segments were stored
             mock_store_ts.assert_called_once()
+            mock_metadata.assert_called_once()
 
             # Verify next job was queued
             mock_queue.assert_called_once()
@@ -332,6 +337,7 @@ class TestSummarizeWorkerProcessing:
             patch.object(worker, "_generate_summary", new_callable=AsyncMock) as mock_gen,
             patch.object(worker, "_store_summary", new_callable=AsyncMock) as mock_store,
             patch.object(worker, "_create_artifact", new_callable=AsyncMock) as mock_artifact,
+            patch.object(worker, "_write_metadata", new_callable=AsyncMock) as mock_metadata,
             patch.object(worker, "_queue_next_job", new_callable=AsyncMock) as mock_queue,
         ):
             mock_fetch.return_value = sample_transcript
@@ -339,13 +345,14 @@ class TestSummarizeWorkerProcessing:
                 sample_summary,
                 sample_summary,
             )  # Returns tuple (summary, summary_text)
-            mock_store.return_value = f"summaries/{sample_video_id}.md"
+            mock_store.return_value = f"library/test-channel/{sample_video_id}/summary.md"
 
             result = await worker.process_message(message, sample_correlation_id)
 
             assert result.status == WorkerStatus.SUCCESS
             mock_running.assert_called_once_with(sample_job_id, "summarizing")
             mock_completed.assert_called_once_with(sample_job_id)
+            mock_metadata.assert_called_once()
             mock_queue.assert_called_once()
 
 

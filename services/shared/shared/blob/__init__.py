@@ -1,6 +1,7 @@
 """Blob storage client module."""
 
 from .client import (
+    LIBRARY_CONTAINER,
     SUMMARIES_CONTAINER,
     TRANSCRIPTS_CONTAINER,
     BlobClient,
@@ -10,14 +11,27 @@ from .client import (
     extract_blob_name_from_uri,
     get_blob_client,
     get_connection_string,
+    get_metadata_blob_path,
     get_segments_blob_path,
     get_summary_blob_path,
     get_transcript_blob_path,
+    get_video_folder_path,
     sanitize_channel_name,
+)
+from .metadata import (
+    ARTIFACT_CONTENT_TYPES,
+    METADATA_SCHEMA_VERSION,
+    artifact_path,
+    build_video_metadata,
+    metadata_artifact_ref,
+    write_video_metadata,
 )
 
 __all__ = [
+    "ARTIFACT_CONTENT_TYPES",
     "BlobClient",
+    "LIBRARY_CONTAINER",
+    "METADATA_SCHEMA_VERSION",
     "SUMMARIES_CONTAINER",
     "TRANSCRIPTS_CONTAINER",
     "compute_content_hash",
@@ -26,8 +40,14 @@ __all__ = [
     "extract_blob_name_from_uri",
     "get_blob_client",
     "get_connection_string",
+    "get_metadata_blob_path",
     "get_segments_blob_path",
     "get_summary_blob_path",
     "get_transcript_blob_path",
+    "get_video_folder_path",
     "sanitize_channel_name",
+    "artifact_path",
+    "build_video_metadata",
+    "metadata_artifact_ref",
+    "write_video_metadata",
 ]

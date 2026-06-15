@@ -13,6 +13,7 @@ except ImportError:
     pass  # certifi not installed, use system defaults
 
 from shared.blob.client import (
+    LIBRARY_CONTAINER,
     SUMMARIES_CONTAINER,
     TRANSCRIPTS_CONTAINER,
     compute_content_hash,
@@ -20,6 +21,7 @@ from shared.blob.client import (
     get_summary_blob_path,
     get_transcript_blob_path,
 )
+from shared.blob.metadata import metadata_artifact_ref, write_video_metadata
 from shared.config import get_settings
 from shared.db.connection import get_db
 from shared.db.job_service import mark_job_completed, mark_job_failed, mark_job_running
@@ -189,6 +191,10 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
                 blob_uri,
                 summary,
             )
+            await self._write_metadata(
+                message.video_id,
+                {"summary": metadata_artifact_ref(summary.encode("utf-8"), blob_uri)},
+            )
 
             # Generate segment labels (best-effort, does not fail the job)
             openai_client = await self._get_openai_client()
@@ -229,7 +235,10 @@ class SummarizeWorker(BaseWorker[SummarizeMessage]):
         try:
             blob_client = get_blob_client()
             blob_name = get_transcript_blob_path(channel_name, youtube_video_id)
-            content = blob_client.download_blob(TRANSCRIPTS_CONTAINER, blob_name)
+            container_name = LIBRARY_CONTAINER
+            if not blob_client.blob_exists(LIBRARY_CONTAINER, blob_name):
+                container_name = TRANSCRIPTS_CONTAINER
+            content = blob_client.download_blob(container_name, blob_name)
             return content.decode("utf-8")
         except Exception as e:
             logger.error(
@@ -422,10 +431,10 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
         blob_name = get_summary_blob_path(channel_name, youtube_video_id)
 
         uri = blob_client.upload_blob(
-            SUMMARIES_CONTAINER,
+            LIBRARY_CONTAINER,
             blob_name,
             summary.encode("utf-8"),
-            content_type="text/markdown",
+            content_type="text/markdown; charset=utf-8",
         )
 
         return uri
@@ -467,6 +476,16 @@ This is a placeholder summary for testing purposes. Configure an OpenAI API key 
                     content_hash=compute_content_hash(summary.encode("utf-8")),
                 )
                 session.add(artifact)
+
+    async def _write_metadata(
+        self,
+        video_id: str,
+        extra_artifacts: dict[str, dict[str, Any]],
+    ) -> None:
+        """Write metadata.json for the self-contained video folder."""
+        db = get_db()
+        async with db.session() as session:
+            await write_video_metadata(session, video_id, extra_artifacts=extra_artifacts)
 
     async def _queue_next_job(
         self,

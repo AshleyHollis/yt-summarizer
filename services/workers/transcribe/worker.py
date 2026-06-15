@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from shared.blob.client import (
+    LIBRARY_CONTAINER,
     TRANSCRIPTS_CONTAINER,
     compute_content_hash,
     get_blob_client,
     get_segments_blob_path,
     get_transcript_blob_path,
 )
+from shared.blob.metadata import metadata_artifact_ref, write_video_metadata
 from shared.config import get_settings
 from shared.db.connection import get_db
 from shared.db.job_service import (
@@ -404,18 +406,25 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
 
         try:
             # Store transcript in blob storage (using channel-based path)
+            transcript_content = transcript.encode("utf-8")
             blob_uri = await self._store_transcript(
                 message.channel_name,
                 message.youtube_video_id,
                 transcript,
             )
+            extra_artifacts: dict[str, dict[str, Any]] = {
+                "transcript": metadata_artifact_ref(transcript_content, blob_uri)
+            }
 
             # Store timestamped segments (already fetched above, no extra API call)
             if timestamped_segments:
-                await self._store_timestamped_segments(
+                segments_uri, segments_content = await self._store_timestamped_segments(
                     message.channel_name,
                     message.youtube_video_id,
                     timestamped_segments,
+                )
+                extra_artifacts["segments"] = metadata_artifact_ref(
+                    segments_content, segments_uri
                 )
 
             # Create artifact record
@@ -424,6 +433,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                 blob_uri,
                 transcript,
             )
+            await self._write_metadata(message.video_id, extra_artifacts)
 
             # Mark job as completed
             await mark_job_completed(message.job_id)
@@ -544,22 +554,29 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
 
         blob_client = get_blob_client()
 
-        # Check for transcript using the YouTube video ID path
         transcript_path = get_transcript_blob_path(channel_name, youtube_video_id)
         segments_path = get_segments_blob_path(channel_name, youtube_video_id)
 
         try:
-            if not blob_client.blob_exists(TRANSCRIPTS_CONTAINER, transcript_path):
+            transcript_container = LIBRARY_CONTAINER
+            segments_container = LIBRARY_CONTAINER
+            if not blob_client.blob_exists(LIBRARY_CONTAINER, transcript_path):
+                if not blob_client.blob_exists(TRANSCRIPTS_CONTAINER, transcript_path):
+                    return None
+                transcript_container = TRANSCRIPTS_CONTAINER
+                segments_container = TRANSCRIPTS_CONTAINER
+
+            if not blob_client.blob_exists(transcript_container, transcript_path):
                 return None
 
             # Download existing transcript
-            transcript_bytes = blob_client.download_blob(TRANSCRIPTS_CONTAINER, transcript_path)
+            transcript_bytes = blob_client.download_blob(transcript_container, transcript_path)
             transcript = transcript_bytes.decode("utf-8")
 
             # Try to get segments too
             segments = []
-            if blob_client.blob_exists(TRANSCRIPTS_CONTAINER, segments_path):
-                segments_bytes = blob_client.download_blob(TRANSCRIPTS_CONTAINER, segments_path)
+            if blob_client.blob_exists(segments_container, segments_path):
+                segments_bytes = blob_client.download_blob(segments_container, segments_path)
                 segments = json.loads(segments_bytes.decode("utf-8"))
 
             logger.info(
@@ -923,10 +940,10 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         blob_name = get_transcript_blob_path(channel_name, youtube_video_id)
 
         uri = blob_client.upload_blob(
-            TRANSCRIPTS_CONTAINER,
+            LIBRARY_CONTAINER,
             blob_name,
             transcript.encode("utf-8"),
-            content_type="text/plain",
+            content_type="text/plain; charset=utf-8",
         )
 
         logger.info(
@@ -943,7 +960,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         channel_name: str,
         youtube_video_id: str,
         segments: list[dict],
-    ) -> str:
+    ) -> tuple[str, bytes]:
         """Store timestamped transcript segments as JSON for semantic search.
 
         Groups small segments into ~30 second chunks for better semantic coherence
@@ -1002,11 +1019,12 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
         blob_client = get_blob_client()
         blob_name = get_segments_blob_path(channel_name, youtube_video_id)
 
+        content = json.dumps(chunked_segments).encode("utf-8")
         uri = blob_client.upload_blob(
-            TRANSCRIPTS_CONTAINER,
+            LIBRARY_CONTAINER,
             blob_name,
-            json.dumps(chunked_segments).encode("utf-8"),
-            content_type="application/json",
+            content,
+            content_type="application/json; charset=utf-8",
         )
 
         logger.info(
@@ -1017,7 +1035,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
             segment_count=len(chunked_segments),
         )
 
-        return uri
+        return uri, content
 
     async def _create_artifact(
         self,
@@ -1056,6 +1074,16 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                     content_hash=compute_content_hash(transcript.encode("utf-8")),
                 )
                 session.add(artifact)
+
+    async def _write_metadata(
+        self,
+        video_id: str,
+        extra_artifacts: dict[str, dict[str, Any]],
+    ) -> None:
+        """Write metadata.json for the self-contained video folder."""
+        db = get_db()
+        async with db.session() as session:
+            await write_video_metadata(session, video_id, extra_artifacts=extra_artifacts)
 
     async def _queue_next_job(
         self,

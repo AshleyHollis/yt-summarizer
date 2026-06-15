@@ -13,6 +13,7 @@ from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 # Default container names
+LIBRARY_CONTAINER = "library"
 TRANSCRIPTS_CONTAINER = "transcripts"
 SUMMARIES_CONTAINER = "summaries"
 
@@ -62,6 +63,12 @@ def sanitize_channel_name(channel_name: str) -> str:
     return name
 
 
+def get_video_folder_path(channel_name: str, youtube_video_id: str) -> str:
+    """Get the canonical self-contained folder path for a video."""
+    sanitized = sanitize_channel_name(channel_name)
+    return f"{sanitized}/{youtube_video_id}"
+
+
 def get_transcript_blob_path(channel_name: str, youtube_video_id: str) -> str:
     """Get the blob path for a transcript file.
 
@@ -75,8 +82,7 @@ def get_transcript_blob_path(channel_name: str, youtube_video_id: str) -> str:
     Returns:
         The blob path for the transcript file.
     """
-    sanitized = sanitize_channel_name(channel_name)
-    return f"{sanitized}/{youtube_video_id}/transcript.txt"
+    return f"{get_video_folder_path(channel_name, youtube_video_id)}/transcript.txt"
 
 
 def get_segments_blob_path(channel_name: str, youtube_video_id: str) -> str:
@@ -92,8 +98,7 @@ def get_segments_blob_path(channel_name: str, youtube_video_id: str) -> str:
     Returns:
         The blob path for the segments file.
     """
-    sanitized = sanitize_channel_name(channel_name)
-    return f"{sanitized}/{youtube_video_id}/segments.json"
+    return f"{get_video_folder_path(channel_name, youtube_video_id)}/segments.json"
 
 
 def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
@@ -109,8 +114,12 @@ def get_summary_blob_path(channel_name: str, youtube_video_id: str) -> str:
     Returns:
         The blob path for the summary file.
     """
-    sanitized = sanitize_channel_name(channel_name)
-    return f"{sanitized}/{youtube_video_id}/summary.md"
+    return f"{get_video_folder_path(channel_name, youtube_video_id)}/summary.md"
+
+
+def get_metadata_blob_path(channel_name: str, youtube_video_id: str) -> str:
+    """Get the blob path for a video metadata file."""
+    return f"{get_video_folder_path(channel_name, youtube_video_id)}/metadata.json"
 
 
 def extract_blob_name_from_uri(blob_uri: str, container_name: str) -> str:

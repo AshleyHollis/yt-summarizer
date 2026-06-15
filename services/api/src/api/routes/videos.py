@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Import shared modules
 try:
     from shared.blob.client import (
+        LIBRARY_CONTAINER,
         SUMMARIES_CONTAINER,
         TRANSCRIPTS_CONTAINER,
         extract_blob_name_from_uri,
@@ -37,6 +38,7 @@ except ImportError:
         raise NotImplementedError("Blob URI helper not available")
 
     Artifact = None
+    LIBRARY_CONTAINER = "library"
     TRANSCRIPTS_CONTAINER = "transcripts"
     SUMMARIES_CONTAINER = "summaries"
 
@@ -70,12 +72,20 @@ def get_video_service(session: AsyncSession = Depends(get_session)) -> VideoServ
     return VideoService(session)
 
 
-async def get_artifact_blob_name(
+def _extract_artifact_ref(blob_uri: str, default_container: str) -> tuple[str, str]:
+    for container_name in [LIBRARY_CONTAINER, TRANSCRIPTS_CONTAINER, SUMMARIES_CONTAINER]:
+        marker = f"/{container_name}/"
+        if marker in blob_uri:
+            return container_name, extract_blob_name_from_uri(blob_uri, container_name)
+    return default_container, extract_blob_name_from_uri(blob_uri, default_container)
+
+
+async def get_artifact_blob_ref(
     session: AsyncSession,
     video_id: UUID,
     artifact_type: str,
-    container_name: str,
-) -> str | None:
+    default_container: str,
+) -> tuple[str, str] | None:
     """Get the blob name recorded for a video artifact."""
     if Artifact is None:
         return None
@@ -89,7 +99,7 @@ async def get_artifact_blob_name(
     if not blob_uri:
         return None
 
-    return extract_blob_name_from_uri(blob_uri, container_name)
+    return _extract_artifact_ref(blob_uri, default_container)
 
 
 def _get_reprocess_start_stage(stages: list[str] | None) -> JobType:
@@ -409,22 +419,27 @@ async def get_video_transcript(
     # Prefer the persisted artifact URI. It matches how completed videos are stored
     # and avoids probing stale path formats that can be slow when missing.
     channel_name = video.channel.name if video.channel else "unknown-channel"
-    artifact_blob_name = await get_artifact_blob_name(
+    artifact_blob_ref = await get_artifact_blob_ref(
         service.session,
         video_id,
         "transcript",
         TRANSCRIPTS_CONTAINER,
     )
     fallback_blob_name = get_transcript_blob_path(channel_name, video.youtube_video_id)
-    blob_names = [name for name in [artifact_blob_name, fallback_blob_name] if name]
+    blob_refs = [
+        (LIBRARY_CONTAINER, fallback_blob_name),
+        artifact_blob_ref,
+        (TRANSCRIPTS_CONTAINER, fallback_blob_name),
+    ]
 
     blob_client = get_blob_client()
     last_error: Exception | None = None
-    for index, blob_name in enumerate(dict.fromkeys(blob_names)):
+    for index, blob_ref in enumerate(dict.fromkeys(ref for ref in blob_refs if ref)):
+        container_name, blob_name = blob_ref
         try:
-            if index > 0 and not blob_client.blob_exists(TRANSCRIPTS_CONTAINER, blob_name):
+            if index > 0 and not blob_client.blob_exists(container_name, blob_name):
                 continue
-            content = blob_client.download_blob(TRANSCRIPTS_CONTAINER, blob_name)
+            content = blob_client.download_blob(container_name, blob_name)
             return PlainTextResponse(content.decode("utf-8"), media_type="text/plain")
         except Exception as e:
             last_error = e
@@ -466,22 +481,27 @@ async def get_video_summary(
     # Prefer the persisted artifact URI. It matches how completed videos are stored
     # and avoids probing stale path formats that can be slow when missing.
     channel_name = video.channel.name if video.channel else "unknown-channel"
-    artifact_blob_name = await get_artifact_blob_name(
+    artifact_blob_ref = await get_artifact_blob_ref(
         service.session,
         video_id,
         "summary",
         SUMMARIES_CONTAINER,
     )
     fallback_blob_name = get_summary_blob_path(channel_name, video.youtube_video_id)
-    blob_names = [name for name in [artifact_blob_name, fallback_blob_name] if name]
+    blob_refs = [
+        (LIBRARY_CONTAINER, fallback_blob_name),
+        artifact_blob_ref,
+        (SUMMARIES_CONTAINER, fallback_blob_name),
+    ]
 
     blob_client = get_blob_client()
     last_error: Exception | None = None
-    for index, blob_name in enumerate(dict.fromkeys(blob_names)):
+    for index, blob_ref in enumerate(dict.fromkeys(ref for ref in blob_refs if ref)):
+        container_name, blob_name = blob_ref
         try:
-            if index > 0 and not blob_client.blob_exists(SUMMARIES_CONTAINER, blob_name):
+            if index > 0 and not blob_client.blob_exists(container_name, blob_name):
                 continue
-            content = blob_client.download_blob(SUMMARIES_CONTAINER, blob_name)
+            content = blob_client.download_blob(container_name, blob_name)
             return PlainTextResponse(content.decode("utf-8"), media_type="text/markdown")
         except Exception as e:
             last_error = e

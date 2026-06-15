@@ -14,6 +14,7 @@ from uuid import uuid4
 from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import ContentSettings
 from shared.blob.client import (
+    LIBRARY_CONTAINER,
     SUMMARIES_CONTAINER,
     TRANSCRIPTS_CONTAINER,
     BlobClient,
@@ -386,9 +387,10 @@ class NightlyBackupRunner:
             if transcript_artifact:
                 transcript_ref, copied = await self._ensure_backed_up(
                     index_artifacts,
-                    live_container=TRANSCRIPTS_CONTAINER,
+                    live_container=LIBRARY_CONTAINER,
+                    fallback_container=TRANSCRIPTS_CONTAINER,
                     live_path=get_transcript_blob_path(channel.name, video.youtube_video_id),
-                    backup_path=f"mirror/transcripts/{channel_slug}/{video.youtube_video_id}/transcript.txt",
+                    backup_path=f"mirror/library/{channel_slug}/{video.youtube_video_id}/transcript.txt",
                     artifact=transcript_artifact,
                     artifact_type="transcript",
                     content_type="text/plain; charset=utf-8",
@@ -414,9 +416,10 @@ class NightlyBackupRunner:
             if self.config.include_summaries and summary_artifact:
                 summary_ref, copied = await self._ensure_backed_up(
                     index_artifacts,
-                    live_container=SUMMARIES_CONTAINER,
+                    live_container=LIBRARY_CONTAINER,
+                    fallback_container=SUMMARIES_CONTAINER,
                     live_path=get_summary_blob_path(channel.name, video.youtube_video_id),
-                    backup_path=f"mirror/summaries/{channel_slug}/{video.youtube_video_id}/summary.md",
+                    backup_path=f"mirror/library/{channel_slug}/{video.youtube_video_id}/summary.md",
                     artifact=summary_artifact,
                     artifact_type="summary",
                     content_type="text/markdown; charset=utf-8",
@@ -470,6 +473,7 @@ class NightlyBackupRunner:
         index_artifacts: dict[str, Any],
         *,
         live_container: str,
+        fallback_container: str | None = None,
         live_path: str,
         backup_path: str,
         artifact: Artifact,
@@ -489,6 +493,7 @@ class NightlyBackupRunner:
 
         ref = await self._copy_live_blob(
             live_container=live_container,
+            fallback_container=fallback_container,
             live_path=live_path,
             backup_path=backup_path,
             artifact_type=artifact_type,
@@ -510,23 +515,22 @@ class NightlyBackupRunner:
         force_copy: bool,
     ) -> tuple[dict[str, Any] | None, bool]:
         live_path = get_segments_blob_path(channel_name, youtube_video_id)
-        index_key = f"{TRANSCRIPTS_CONTAINER}/{live_path}"
+        index_key = f"{LIBRARY_CONTAINER}/{live_path}"
         existing = index_artifacts.get(index_key)
         if existing and not force_copy:
             return existing, False
 
         try:
             ref = await self._copy_live_blob(
-                live_container=TRANSCRIPTS_CONTAINER,
+                live_container=LIBRARY_CONTAINER,
+                fallback_container=TRANSCRIPTS_CONTAINER,
                 live_path=live_path,
-                backup_path=f"mirror/transcripts/{channel_slug}/{youtube_video_id}/segments.json",
+                backup_path=f"mirror/library/{channel_slug}/{youtube_video_id}/segments.json",
                 artifact_type="segments",
-                content_type="application/json",
+                content_type="application/json; charset=utf-8",
                 source_content_hash=None,
                 source_content_length=None,
-                source_blob_uri=self.live_blob_client.get_blob_url(
-                    TRANSCRIPTS_CONTAINER, live_path
-                ),
+                source_blob_uri=self.live_blob_client.get_blob_url(LIBRARY_CONTAINER, live_path),
             )
         except ResourceNotFoundError:
             return None, False
@@ -538,6 +542,7 @@ class NightlyBackupRunner:
         self,
         *,
         live_container: str,
+        fallback_container: str | None = None,
         live_path: str,
         backup_path: str,
         artifact_type: str,
@@ -546,7 +551,16 @@ class NightlyBackupRunner:
         source_content_length: int | None,
         source_blob_uri: str | None,
     ) -> dict[str, Any]:
-        content = self.live_blob_client.download_blob(live_container, live_path)
+        source_container = live_container
+        try:
+            content = self.live_blob_client.download_blob(live_container, live_path)
+        except ResourceNotFoundError:
+            if not fallback_container:
+                raise
+            source_container = fallback_container
+            content = self.live_blob_client.download_blob(fallback_container, live_path)
+            source_blob_uri = self.live_blob_client.get_blob_url(fallback_container, live_path)
+
         content_hash = compute_content_hash(content)
         content_length = len(content)
         if source_content_hash and content_hash != source_content_hash:
@@ -570,7 +584,7 @@ class NightlyBackupRunner:
         props = blob_client.get_blob_properties()
         return {
             "artifact_type": artifact_type,
-            "live_container": live_container,
+            "live_container": source_container,
             "live_path": live_path,
             "backup_container": self.config.backup_container,
             "backup_path": backup_path,
