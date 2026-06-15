@@ -423,9 +423,7 @@ class TranscribeWorker(BaseWorker[TranscribeMessage]):
                     message.youtube_video_id,
                     timestamped_segments,
                 )
-                extra_artifacts["segments"] = metadata_artifact_ref(
-                    segments_content, segments_uri
-                )
+                extra_artifacts["segments"] = metadata_artifact_ref(segments_content, segments_uri)
 
             # Create artifact record
             await self._create_artifact(
