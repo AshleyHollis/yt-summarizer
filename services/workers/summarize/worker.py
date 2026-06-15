@@ -14,7 +14,6 @@ except ImportError:
 
 from shared.blob.client import (
     LIBRARY_CONTAINER,
-    SUMMARIES_CONTAINER,
     TRANSCRIPTS_CONTAINER,
     compute_content_hash,
     get_blob_client,
