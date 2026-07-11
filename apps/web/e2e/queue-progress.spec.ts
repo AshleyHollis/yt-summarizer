@@ -73,6 +73,10 @@ test.describe('Queue Progress UI Updates', () => {
   test('progress UI shows queue position and ETA updates during batch processing', async ({
     page,
   }) => {
+    // The live queue observation window is five minutes, so leave explicit
+    // headroom for navigation, assertions, and the final History check.
+    test.setTimeout(QUEUE_PROCESSING_TIMEOUT + 60_000);
+
     // This test uses videos seeded by global-setup.ts
     // When run with WATCH_QUEUE_PROGRESS=true, global-setup submits but doesn't wait
     // So we can watch the UI update as videos process
