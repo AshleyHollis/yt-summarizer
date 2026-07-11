@@ -150,16 +150,10 @@ resource "auth0_connection" "database" {
 
   options {
     password_policy = "good"
-    password_history {
-      enable = true
-      size   = 5
-    }
-    password_no_personal_info {
-      enable = true
-    }
-    password_dictionary {
-      enable = true
-    }
+    # Password history, personal-info checks, and dictionary checks require the
+    # Auth0 Enterprise "password-advanced-options" entitlement. Keep the
+    # connection compatible with the current tenant plan rather than planning
+    # settings that Auth0 rejects during apply.
     brute_force_protection         = true
     enabled_database_customization = false
   }
