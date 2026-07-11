@@ -59,6 +59,26 @@ spec:
                 secretKeyRef:
                   name: openai-credentials
                   key: api-key
+            - name: AZURE_OPENAI_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: azure-endpoint
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: azure-api-key
+            - name: AZURE_OPENAI_DEPLOYMENT
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: azure-deployment
+            - name: AZURE_OPENAI_EMBEDDING_DEPLOYMENT
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: azure-embedding-deployment
             - name: AUTH0_DOMAIN
               valueFrom:
                 secretKeyRef:
