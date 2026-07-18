@@ -330,6 +330,43 @@ class TestAzureEndpointURLBuilding:
         )
 
     @requires_agent_framework
+    def test_standard_azure_openai_uses_azure_client(self, monkeypatch):
+        """Verify standard Azure endpoints use SDK-managed api-version query parameters."""
+        monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com/")
+        monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-api-key")
+        monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-5-mini")
+        monkeypatch.setenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
+
+        from src.api.agents import yt_summarizer_agent as agent_module
+
+        captured: dict[str, object] = {}
+        azure_client = object()
+
+        def fake_azure_client(**kwargs):
+            captured["azure_kwargs"] = kwargs
+            return azure_client
+
+        def fake_chat_client(**kwargs):
+            captured["chat_kwargs"] = kwargs
+            return kwargs
+
+        monkeypatch.setattr(agent_module, "AsyncAzureOpenAI", fake_azure_client)
+        monkeypatch.setattr(agent_module, "OpenAIChatClient", fake_chat_client)
+
+        client = agent_module.create_openai_chat_client()
+
+        assert captured["azure_kwargs"] == {
+            "api_key": "test-api-key",
+            "azure_endpoint": "https://test.openai.azure.com",
+            "api_version": "2024-10-21",
+        }
+        assert captured["chat_kwargs"] == {
+            "model_id": "gpt-5-mini",
+            "async_client": azure_client,
+        }
+        assert client == captured["chat_kwargs"]
+
+    @requires_agent_framework
     def test_agent_does_not_set_max_tokens(self, monkeypatch):
         """Verify agent doesn't set max_tokens (causes errors with newer models).
 
