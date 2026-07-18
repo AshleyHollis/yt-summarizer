@@ -28,37 +28,28 @@ export default function Home() {
           channel.
         </p>
 
-        {isAuthenticated ? (
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/add"
-              className="inline-flex items-center gap-2 px-8 py-3 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Add Content →
-            </Link>
-            <Link
-              href="/library"
-              className="inline-flex items-center gap-2 px-8 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-lg font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              Browse Library
-            </Link>
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/library"
-              className="inline-flex items-center gap-2 px-8 py-3 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Browse Library →
-            </Link>
-            <Link
-              href="/add"
-              className="inline-flex items-center gap-2 px-8 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-lg font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              Add Content
-            </Link>
-          </div>
-        )}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link
+            href="/add"
+            className={`inline-flex items-center gap-2 px-8 py-3 text-lg font-semibold rounded-lg transition-colors ${
+              isAuthenticated
+                ? 'order-1 bg-red-600 text-white hover:bg-red-700'
+                : 'order-2 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            Add Content{isAuthenticated ? ' →' : ''}
+          </Link>
+          <Link
+            href="/library"
+            className={`inline-flex items-center gap-2 px-8 py-3 text-lg font-semibold rounded-lg transition-colors ${
+              isAuthenticated
+                ? 'order-2 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                : 'order-1 bg-red-600 text-white hover:bg-red-700'
+            }`}
+          >
+            Browse Library{isAuthenticated ? '' : ' →'}
+          </Link>
+        </div>
       </section>
 
       {/* Features */}

@@ -243,7 +243,10 @@ test.describe('User Story 1: Video Submission Flow', () => {
     test('can navigate back to submit page', async ({ page }) => {
       test.skip(!existingVideoId, 'No video ID from setup');
 
-      await page.goto(`/videos/${existingVideoId}`);
+      // Use the canonical detail route directly. The legacy /videos/:id route
+      // performs a server redirect, which can consume the assertion timeout on
+      // a cold Static Web Apps preview before the library page finishes loading.
+      await page.goto(`/library/${existingVideoId}`);
 
       // Find and click back link
       const backLink = page.getByRole('link', { name: /back|submit|new/i });
