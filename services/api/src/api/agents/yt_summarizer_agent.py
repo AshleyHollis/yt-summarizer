@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 import httpx
+from openai import AsyncAzureOpenAI
 
 # Import Agent Framework components
 try:
@@ -488,10 +489,25 @@ def create_openai_chat_client() -> BaseChatClient | None:
     azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
     if azure_endpoint and azure_api_key:
-        # Detect endpoint type and construct appropriate base_url
+        # Azure AI Foundry exposes an OpenAI-compatible /models endpoint.
         base_url = _build_azure_openai_base_url(azure_endpoint, azure_deployment)
 
         logger.info(f"Using Azure OpenAI - deployment: {azure_deployment}, base_url: {base_url}")
+
+        if "services.ai.azure.com" not in azure_endpoint:
+            # Standard Azure OpenAI requires api-version as a query parameter.  Passing it
+            # through default_headers produces a valid-looking request that Azure answers
+            # with 404 Resource not found.  AsyncAzureOpenAI owns the Azure URL and query
+            # construction, while Agent Framework continues to provide the chat abstraction.
+            azure_client = AsyncAzureOpenAI(
+                api_key=azure_api_key,
+                azure_endpoint=azure_endpoint.rstrip("/"),
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview"),
+            )
+            return OpenAIChatClient(
+                model_id=azure_deployment,
+                async_client=azure_client,
+            )
 
         return OpenAIChatClient(
             model_id=azure_deployment,
