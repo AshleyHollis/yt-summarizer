@@ -73,6 +73,14 @@ test.describe('Queue Progress UI Updates', () => {
   test('progress UI shows queue position and ETA updates during batch processing', async ({
     page,
   }) => {
+    if (process.env.WATCH_QUEUE_PROGRESS !== 'true') {
+      test.skip(
+        true,
+        'Live queue observation requires WATCH_QUEUE_PROGRESS=true so global setup leaves seeded videos processing'
+      );
+      return;
+    }
+
     // The live queue observation window is five minutes, so leave explicit
     // headroom for navigation, assertions, and the final History check.
     test.setTimeout(QUEUE_PROCESSING_TIMEOUT + 60_000);
